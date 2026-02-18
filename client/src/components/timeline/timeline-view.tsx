@@ -1784,7 +1784,7 @@ export default function TimelineView({
           </div>
 
           {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
-          <div className="flex-1 overflow-auto px-4 pb-4">
+          <div className="flex-1 overflow-auto px-4 pb-4 pt-1">
             {allCleanersToShow.length === 0 && !isReadOnly ? (
               <div className="flex items-center justify-center h-64 bg-yellow-100 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
                 <div className="text-center p-6">
@@ -2713,17 +2713,19 @@ export default function TimelineView({
 
       {/* Cleaner Details Dialog */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className={`sm:max-w-2xl max-h-[80vh] overflow-y-auto ${
-          selectedCleaner?.can_do_straordinaria
-            ? "bg-red-100/50 dark:bg-red-950/50 border-2 border-red-300 dark:border-red-700"
-            : selectedCleaner?.role === "Formatore"
-            ? "bg-orange-100/50 dark:bg-orange-950/50 border-2 border-orange-300 dark:border-orange-700"
-            : selectedCleaner?.role === "Premium"
-            ? "bg-yellow-100/50 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700"
-            : selectedCleaner?.role === "Standard"
-            ? "bg-green-100/50 dark:bg-green-950/50 border-2 border-green-300 dark:border-green-700"
-            : ""
-        }`}>
+        <DialogContent
+          className={`sm:max-w-2xl max-h-[80vh] overflow-y-auto ${
+            selectedCleaner?.can_do_straordinaria
+              ? "bg-red-300/70 dark:bg-red-900/60 border-2 border-red-400 dark:border-red-700"
+              : selectedCleaner?.role === "Formatore"
+              ? "bg-orange-300/70 dark:bg-orange-900/60 border-2 border-orange-400 dark:border-orange-700"
+              : selectedCleaner?.role === "Premium"
+              ? "bg-yellow-200/70 dark:bg-yellow-900/60 border-2 border-yellow-300 dark:border-yellow-700"
+              : selectedCleaner?.role === "Standard"
+              ? "bg-green-300/70 dark:bg-green-900/60 border-2 border-green-400 dark:border-green-700"
+              : ""
+          }`}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -2732,22 +2734,22 @@ export default function TimelineView({
                   <>
                     {/* Se straordinario, mostra SOLO badge straordinario (priorità assoluta) */}
                     {selectedCleaner.can_do_straordinaria ? (
-                      <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
+                      <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-600/30 text-gray-900 dark:bg-red-500/40 dark:text-red-200 border-red-700 dark:border-red-400">
                         Straordinario
                       </span>
                     ) : (
                       /* Altrimenti mostra badge role normale */
                       <>
                         {selectedCleaner.role === "Formatore" ? (
-                          <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
+                          <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-600/30 text-gray-900 dark:bg-orange-500/40 dark:text-orange-200 border-orange-700 dark:border-orange-400">
                             Formatore
                           </span>
                         ) : selectedCleaner.role === "Premium" ? (
-                          <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
+                          <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-600/30 text-gray-900 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-700 dark:border-yellow-400">
                             Premium
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
+                          <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-600/30 text-gray-900 dark:bg-green-500/40 dark:text-green-200 border-green-700 dark:border-green-400">
                             Standard
                           </span>
                         )}
@@ -2756,6 +2758,7 @@ export default function TimelineView({
                   </>
                 )}
               </div>
+
               {selectedCleaner && (
                 <Button
                   variant="ghost"
@@ -2815,21 +2818,22 @@ export default function TimelineView({
                   }}
                 >
                   {lockedCleaners.has(selectedCleaner?.id) ? (
-                    <Lock className="h-4 w-4" />
+                    <Lock className="h-4 w-4 stroke-[2.5]" />
                   ) : (
-                    <Unlock className="h-4 w-4" />
+                    <Unlock className="h-4 w-4 stroke-[2.5]" />
                   )}
                 </Button>
               )}
             </DialogTitle>
           </DialogHeader>
+
           {selectedCleaner && (
-            <div className="space-y-4">
+            <div className="space-y-4 text-gray-900 dark:text-foreground">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1 flex items-center gap-1">
                     Alias
-                    {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                    {!isReadOnly && <Pencil className="w-3 h-3 text-gray-700 dark:text-muted-foreground/60" />}
                   </p>
                   <p
                     className={`text-sm p-2 rounded border ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50 border-border hover:border-custom-blue' : 'border-border'}`}
@@ -2841,28 +2845,32 @@ export default function TimelineView({
                     {cleanersAliases[selectedCleaner.id]?.alias || `${selectedCleaner.name} ${selectedCleaner.lastname}`}
                   </p>
                 </div>
+
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <p className="text-sm font-semibold text-muted-foreground mb-1">Nome</p>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">Nome</p>
                     <p className="text-sm">{selectedCleaner.name.toUpperCase()}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-muted-foreground mb-1">Cognome</p>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">Cognome</p>
                     <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
                   </div>
                 </div>
+
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground">Giorni lavorati</p>
+                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground">Giorni lavorati</p>
                   <p className="text-sm">{selectedCleaner.counter_days}</p>
                 </div>
+
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground">Ore lavorate questa settimana</p>
+                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground">Ore lavorate questa settimana</p>
                   <p className="text-sm">{selectedCleaner.counter_hours}</p>
                 </div>
+
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1 flex items-center gap-1">
                     Start Time
-                    {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                    {!isReadOnly && <Pencil className="w-3 h-3 text-gray-700 dark:text-muted-foreground/60" />}
                   </p>
                   <p
                     className={`text-sm p-2 rounded border ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50 border-border hover:border-custom-blue' : 'border-border'}`}
@@ -2874,18 +2882,19 @@ export default function TimelineView({
                     {selectedCleaner.start_time || "10:00"}
                   </p>
                 </div>
+
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground">Tipo contratto</p>
+                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground">Tipo contratto</p>
                   <p className="text-sm">{selectedCleaner.contract_type}</p>
                 </div>
               </div>
 
               {/* Sezione Scambia Cleaner */}
               <div className="border-t pt-4 mt-4">
-                <p className="text-sm font-semibold text-muted-foreground mb-3">
+                <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-3">
                   Scambia Cleaner
                 </p>
-                <p className="text-xs text-muted-foreground mb-3">
+                <p className="text-xs text-gray-700 dark:text-muted-foreground mb-3">
                   Seleziona un altro cleaner per scambiare le task assegnate.
                 </p>
                 <div className="flex gap-3 items-end">
@@ -2937,10 +2946,10 @@ export default function TimelineView({
 
               {/* Sezione Rimuovi Cleaner */}
               <div className="border-t pt-4 mt-4">
-                <p className="text-sm font-semibold text-muted-foreground mb-3">
+                <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-3">
                   Rimuovi Cleaner
                 </p>
-                <p className="text-xs text-muted-foreground mb-3">
+                <p className="text-xs text-gray-700 dark:text-muted-foreground mb-3">
                   Il cleaner sarà rimosso dalla selezione, ma le sue task rimarranno in timeline. Sarà necessario assegnarle a un altro cleaner.
                 </p>
                 <Button

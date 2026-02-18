@@ -4490,32 +4490,58 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
     try {
       for (const cleanerEntry of timelineData.cleaners_assignments) {
-        const cleanerId = cleanerEntry.cleaner?.id;
+        const cleanerId = Number(cleanerEntry.cleaner?.id);
         const tasks = cleanerEntry.tasks || [];
 
         for (const task of tasks) {
-          const taskId = task.task_id;
+          const taskId = Number(task.task_id); // ✅ IMPORTANTISSIMO
           if (!taskId || processedTaskIds.has(taskId)) continue;
           processedTaskIds.add(taskId);
 
           const taskLabel = `${taskId}`;
+
+          // ✅ Calcolo collab UNA SOLA VOLTA (fuori dal try interno)
+          const collabData = collaborationsMap?.get(taskId);
+          const isCollab = (collabData?.cleanerIds?.length ?? 0) > 1;
+
+          const primaryCleanerId =
+            (isCollab ? (collabData as any)?.primaryCleanerId : null) ?? cleanerId;
+
+          const collaboratorIds = collabData?.cleanerIds ?? [];
+          const secondaryCleanerIds = isCollab
+            ? collaboratorIds
+                .map((x: any) => Number(x))
+                .filter((id: number) => !!id && id !== Number(primaryCleanerId))
+            : [];
+
+          // ADAM vuole 1 solo id nel campo collaboration_by
+          const secondaryCleanerIdForAdam = secondaryCleanerIds[0] ?? 0;
+
+          console.log("COLLAB CHECK", {
+            taskId,
+            rawTaskId: task.task_id,
+            typeRaw: typeof task.task_id,
+            found: !!collabData,
+            cleanerIds: collabData?.cleanerIds,
+            primary: (collabData as any)?.primaryCleanerId,
+            secondaryForAdam: secondaryCleanerIdForAdam,
+          });
 
           try {
             // =====================================================
             // 1️⃣ UPDATE PRINCIPALE app_housekeeping (COMPLETO)
             // =====================================================
             const nowRome = format(new Date(), "yyyy-MM-dd HH:mm:ss");
-            const assignedAtUs = Math.floor(Date.now() / 1000);
+            const assignedAtUs = nowRome;
             const assignedAtMilliseconds = Date.now();
 
             const sequence = task.sequence ?? 0;
 
-            const isCollab =
-              !!collaborationsMap?.get(taskId)?.collaborator_ids?.length;
-
-            // cleaned_by_us: per collab, resta il primary (cleanerId), altrimenti cleanerId
-            const primaryCleanerId = cleanerId;
             const cleanedBy = primaryCleanerId ?? null;
+
+            const collaborationFlag = isCollab ? 1 : null;
+            const collaborationBy = isCollab ? (secondaryCleanerIdForAdam || null) : null;
+            const collaborationAt = isCollab ? nowRome : null;           
 
             const updateQuery = `
               UPDATE app_housekeeping
@@ -4535,9 +4561,9 @@ app.post("/api/transfer-to-adam", async (req, res) => {
                 assigned_at_us = ?,
                 assigned_at_milliseconds = ?,
 
-                collaboration = ?,
-                collaboration_by = ?,
-                collaboration_at = ?,
+                collaboration = 0,
+                collaboration_by = NULL,
+                collaboration_at = NULL,
                 collaboration_bypass = 0,
 
                 helpwork = 0,
@@ -4569,11 +4595,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
               assignedAtUs,
               assignedAtMilliseconds,
 
-              0,
-              0,
-              null,
-
-              taskId,
+              taskId
             ];
 
             await connection.execute(updateQuery, updateValues);
@@ -4584,22 +4606,14 @@ app.post("/api/transfer-to-adam", async (req, res) => {
             );
 
             // =====================================================
-            // ✅ LOCK: report o report_collabo
+            // ✅ LOCK: report
             // =====================================================
-            // Se esiste report NON cancellato o report_collaboration non soft-deleted,
-            // non toccare extratimes/collaborations legacy.
             const [reportLockRows] = await connection.execute(
               `
                 SELECT 1
                 FROM app_housekeeping_report r
-                LEFT JOIN app_housekeeping_report_collaboration rc
-                  ON rc.housekeeping_report_id = r.id
                 WHERE r.housekeeping_id = ?
                   AND (r.deleted = 0 OR r.deleted IS NULL)
-                  AND (
-                    rc.id IS NULL
-                    OR rc.deleted_at IS NULL
-                  )
                 LIMIT 1
               `,
               [taskId]
@@ -4669,22 +4683,13 @@ app.post("/api/transfer-to-adam", async (req, res) => {
             // 2️⃣+3️⃣ SYNC COLLAB (diff) + extratimes soft-delete (solo collab)
             // =====================================================
             if (isCollab) {
-              const collabData = collaborationsMap?.get(taskId);
-              const collaboratorIds = collabData?.collaborator_ids || [];
-
               // (ri-check lock; resta uguale)
               const [reportLockRows2] = await connection.execute(
                 `
                   SELECT 1
                   FROM app_housekeeping_report r
-                  LEFT JOIN app_housekeeping_report_collaboration rc
-                    ON rc.housekeeping_report_id = r.id
                   WHERE r.housekeeping_id = ?
                     AND (r.deleted = 0 OR r.deleted IS NULL)
-                    AND (
-                      rc.id IS NULL
-                      OR rc.deleted_at IS NULL
-                    )
                   LIMIT 1
                 `,
                 [taskId]
@@ -4745,13 +4750,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
                 // -----------------------------------------------------
                 // 2B) SYNC collaboratori con diff
                 // -----------------------------------------------------
-                const desiredSecondaries = new Set<number>(
-                  (collaboratorIds || [])
-                    .map((x: any) => Number(x))
-                    .filter(
-                      (id: number) => !!id && id !== Number(primaryCleanerId)
-                    )
-                );
+                const desiredSecondaries = new Set<number>(secondaryCleanerIds);
 
                 const [rows] = await connection.execute(
                   `
@@ -4769,12 +4768,12 @@ app.post("/api/transfer-to-adam", async (req, res) => {
                 }
 
                 const toSoftDelete: number[] = [];
-                for (const userId of existingActive) {
+                for (const userId of Array.from(existingActive)) {
                   if (!desiredSecondaries.has(userId)) toSoftDelete.push(userId);
                 }
 
                 const toInsert: number[] = [];
-                for (const userId of desiredSecondaries) {
+                for (const userId of Array.from(desiredSecondaries)) {
                   if (!existingActive.has(userId)) toInsert.push(userId);
                 }
 
@@ -5593,7 +5592,19 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         console.error("Stderr da extract_active_clients:", stderr);
       }
 
-      const parsed = JSON.parse(stdout);
+      const raw = stdout.trim();
+
+      // prendi solo la parte che sembra JSON (dal primo { all'ultimo })
+      const start = raw.indexOf("{");
+      const end = raw.lastIndexOf("}");
+
+      if (start === -1 || end === -1) {
+        throw new Error(`Python output is not JSON:\n${raw}`);
+      }
+
+      const jsonText = raw.slice(start, end + 1);
+      const parsed = JSON.parse(jsonText);
+
 
       if (!parsed.success) {
         console.error("Errore da extract_active_clients.py:", parsed.error);

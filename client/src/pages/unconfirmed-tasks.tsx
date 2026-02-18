@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw } from "lucide-react";
+import { Home, RefreshCw } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -74,7 +74,7 @@ interface OperationsData {
 }
 
 export default function UnconfirmedTasks() {
-  const [, setLocation] = useLocation();
+  const [, navigate] = useLocation();
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -114,8 +114,39 @@ export default function UnconfirmedTasks() {
     {} as Record<number, string>
   ) || { 1: "FERMATA", 2: "PARTENZA", 3: "PULIZIA STRAORDINARIA", 4: "RIPASSO" };
 
-  const { data: containersData, isLoading } = useQuery<ContainersData>({
+  
+  // 🔄 Prima rigeneriamo i containers per la data selezionata:
+  // questa operazione (refresh da ADAM) è quella che determina/aggiorna confirmed_operation.
+  const {
+    data: refreshResult,
+    isLoading: isRefreshing,
+    isError: isRefreshError,
+    error: refreshError,
+  } = useQuery({
+    queryKey: ["/api/containers/refresh", selectedDate],
+    queryFn: async () => {
+      const response = await fetch("/api/containers/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: selectedDate }),
+      });
+      if (!response.ok) {
+        const msg = await response.text().catch(() => "");
+        throw new Error(msg || "Failed to refresh containers");
+      }
+      return response.json();
+    },
+    // Ad ogni apertura pagina e ad ogni cambio data deve rieseguire il refresh
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
+  });
+
+
+  const { data: containersData, isLoading: isContainersLoading } = useQuery<ContainersData>({
     queryKey: ["/api/containers-enriched", selectedDate],
+    enabled: !!refreshResult?.success,
     queryFn: async () => {
       const response = await fetch(
         `/api/containers-enriched?date=${selectedDate}`,
@@ -123,7 +154,23 @@ export default function UnconfirmedTasks() {
       if (!response.ok) throw new Error("Failed to fetch containers");
       return response.json();
     },
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
   });
+
+
+  const isLoading = isRefreshing || isContainersLoading;
+
+  // Testi loader (allineati allo stile di generate-assignments)
+  const loadingTitle = isRefreshing
+    ? "Estrazione Task Non Confermati"
+    : "Caricamento Task Non Confermati";
+
+  const loadingStepLabel = isRefreshing
+    ? "Step 1/2: Estrazione dal database dei task non confermati..."
+    : "Step 2/2: Caricamento dei task non confermati...";
+
 
   const unconfirmedTasks = (() => {
     if (!containersData?.containers) return [];
@@ -133,9 +180,8 @@ export default function UnconfirmedTasks() {
     Object.values(containersData.containers).forEach((container) => {
       const tasks = (container as { tasks?: Task[] })?.tasks || [];
       tasks.forEach((task) => {
-        // Task non confermata se confirmed_operation è false, 0, null o undefined
-        if (task.confirmed_operation === false || 
-            task.confirmed_operation === 0 || 
+        // Task non confermata se confirmed_operation è false, null o undefined
+        if (task.confirmed_operation === false ||
             task.confirmed_operation === null || 
             task.confirmed_operation === undefined) {
           allTasks.push(task);
@@ -145,6 +191,8 @@ export default function UnconfirmedTasks() {
 
     return allTasks;
   })();
+
+  const hasTasksToSet = unconfirmedTasks.length > 0;
 
   const filteredTasks = unconfirmedTasks.filter((task) => {
     if (!searchTerm) return true;
@@ -294,12 +342,31 @@ export default function UnconfirmedTasks() {
             </div>
           </div>
 
+          {isRefreshError ? (
+            <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+              Errore durante l&apos;aggiornamento dei containers per la data selezionata:{" "}
+              {(refreshError as Error)?.message || "errore sconosciuto"}
+            </div>
+          ) : null}
+
           {isLoading ? (
             <div className="flex items-center justify-center p-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <div className="text-center space-y-4">
+                <div className="flex justify-center">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+                </div>
+                <h2 className="text-xl font-bold text-foreground">
+                  {loadingTitle}
+                </h2>
+                <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+                  <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+                  <span>{loadingStepLabel}</span>
+                </div>
+              </div>
             </div>
           ) : unconfirmedTasks.length === 0 ? (
-            <Card className="border-2 border-custom-blue bg-green-50 dark:bg-green-950/30">
+            <>
+              <Card className="border-2 border-custom-blue bg-green-50 dark:bg-green-950/30">
               <CardContent className="flex flex-col items-center justify-center p-12 text-center">
                 <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
                 <h3 className="text-lg font-semibold mb-2 text-green-800 dark:text-green-200">
@@ -307,6 +374,21 @@ export default function UnconfirmedTasks() {
                 </h3>
               </CardContent>
             </Card>
+
+              <div className="flex justify-center pt-0.5">
+              <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate("/generate-assignments")}
+                  disabled={false}
+                  data-testid="button-go-home"
+                  className="border-2 border-custom-blue"
+                >
+                  <Home className="h-4 w-4 mr-2" />
+                  Torna alla Home
+                </Button>
+              </div>
+            </>
           ) : (
             <>
               <div className="flex items-center gap-4 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
@@ -592,20 +674,42 @@ export default function UnconfirmedTasks() {
                 </div>
               </div>
 
-              <div className="flex justify-center pt-0.5">
+              <div
+                className={
+                  hasTasksToSet
+                    ? "flex justify-center gap-3 pt-0.5 -mt-4"
+                    : "flex justify-center pt-0.5 -mt-4"
+                }
+              >
+                {hasTasksToSet && (
+                  <Button
+                    onClick={handleShowRecap}
+                    disabled={selectedOperations.size === 0 || isSaving}
+                    variant="outline"
+                    className="border-2 border-custom-blue"
+                    data-testid="button-save-adam"
+                  >
+                    {isSaving ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    {isSaving
+                      ? "Salvataggio..."
+                      : `Salva su ADAM (${selectedOperations.size})`}
+                  </Button>
+                )}
+
                 <Button
-                  onClick={handleShowRecap}
-                  disabled={selectedOperations.size === 0 || isSaving}
+                  type="button"
                   variant="outline"
+                  onClick={() => navigate("/generate-assignments")}
+                  disabled={false}
+                  data-testid="button-go-home"
                   className="border-2 border-custom-blue"
-                  data-testid="button-save-adam"
                 >
-                  {isSaving ? (
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
-                  )}
-                  {isSaving ? "Salvataggio..." : `Salva su ADAM (${selectedOperations.size})`}
+                  <Home className="h-4 w-4 mr-2" />
+                  Torna alla Home
                 </Button>
               </div>
 

@@ -1012,6 +1012,27 @@ export default function TaskCard({
     return checkin > selectedDate;
   })();
 
+  
+  const checkoutTime = (taskWithPendingEdits as any).checkout_time as string | undefined;
+  const checkinTime = (taskWithPendingEdits as any).checkin_time as string | undefined;
+
+  const hasCheckout = Boolean(checkoutTime);
+  const hasCheckinRow = Boolean(checkinTime) || isFutureCheckin; // riga check-in o calendario
+  const rowsCount = (hasCheckout ? 1 : 0) + (hasCheckinRow ? 1 : 0);
+
+  const hasSingleRow = rowsCount === 1;
+  const hasCustomerRef = Boolean((task as any).customer_reference);
+
+  // regola tua: se c’è customer_reference e c’è UN SOLO ORARIO -> in basso a destra
+  const forceBottomRightSingleRow = hasSingleRow && hasCustomerRef;
+
+  // classi posizione
+  const timesPositionClass = forceBottomRightSingleRow
+    ? "bottom-0.5 top-auto"
+    : hasSingleRow
+      ? "top-1/2 -translate-y-1/2"
+      : "top-[5px]";
+
   // Determina se il drag è disabilitato in base alla data, se la task è già salvata, o se è bloccata
   const shouldDisableDrag = isDragDisabled || (displayTask as any).checkin_date || isLocked;
 
@@ -1136,17 +1157,41 @@ export default function TaskCard({
                         isFutureCheckin) && (() => {
                         const hasCheckout = Boolean((taskWithPendingEdits as any).checkout_time);
                         const hasCheckin = Boolean((taskWithPendingEdits as any).checkin_time) || isFutureCheckin;
+
                         const linesCount = (hasCheckout ? 1 : 0) + (hasCheckin ? 1 : 0);
-                        const shouldCenterSingleLine = linesCount === 1;
+                        const isSingleLine = linesCount === 1;
+
+                        const hasCustomerRef = Boolean((task as any).customer_reference);
+
+                        // task.duration è tipo "1.30" => 1h 30m
+                        const durationStr = String(task.duration ?? "0.0");
+                        const [hStr, mStr] = durationStr.split(".");
+                        const hours = Number(hStr || 0);
+                        const mins = Number(mStr || 0);
+                        const durationMinutes = hours * 60 + mins;
+
+                        const isShortTask = durationMinutes < 90; // < 1:30
+
+                        // Regola:
+                        // - 2 orari -> top leggermente sotto il ?
+                        // - 1 orario:
+                        //    - se customer ref e task < 1:30 => bottom-right
+                        //    - altrimenti => centrato
+                        // - calendario solo: è comunque "1 linea" (hasCheckin true) quindi segue la stessa regola
+                        const shouldBottomRightSingleLine = isSingleLine && hasCustomerRef && isShortTask;
+                        const shouldCenterSingleLine = isSingleLine && !shouldBottomRightSingleLine;
 
                         return (
                           <div
                             className={[
-                              "absolute right-1 top-[5px] z-40 whitespace-nowrap",
-                              "flex flex-col items-end gap-0.5",
-                              // altezza “slot” da 2 righe: così 1 riga può essere centrata
-                              "min-h-[28px]",
-                              shouldCenterSingleLine ? "justify-center" : "justify-start",
+                              "absolute right-1 z-30 whitespace-nowrap", // z più basso del ? (che è z-50)
+                              "flex flex-col items-end gap-0.5 min-h-[28px]",
+                              // posizione verticale
+                              linesCount === 2
+                                ? "top-[5px] justify-start"
+                                : shouldBottomRightSingleLine
+                                  ? "bottom-[5px] justify-end"
+                                  : "top-[5px] justify-center",
                             ].join(" ")}
                           >
                             {hasCheckout && (
