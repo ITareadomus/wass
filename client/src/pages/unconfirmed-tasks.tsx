@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
 import { useLocation } from "wouter";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Home, RefreshCw } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
@@ -17,7 +18,7 @@ import {
 } from "@/components/ui/popover";
 import {
   AlertTriangle,
-  Calendar,
+  Calendar as CalendarIcon,
   Search,
   ChevronLeft,
   ChevronRight,
@@ -74,6 +75,7 @@ interface OperationsData {
 }
 
 export default function UnconfirmedTasks() {
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -320,14 +322,34 @@ export default function UnconfirmedTasks() {
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <div className="flex items-center gap-2 px-4 py-2 bg-muted rounded-lg">
-                <Calendar className="h-4 w-4" />
-                <span className="font-medium">
-                  {format(new Date(selectedDate), "EEEE d MMMM yyyy", {
-                    locale: it,
-                  })}
-                </span>
-              </div>
+              <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 px-4 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
+                    data-testid="workdate-picker-trigger"
+                  >
+                    <CalendarIcon className="h-4 w-4" />
+                    <span className="font-medium">
+                      {format(parseISO(selectedDate), "EEEE d MMMM yyyy", { locale: it })}
+                    </span>
+                  </button>
+                </PopoverTrigger>
+
+                <PopoverContent className="w-auto p-2" align="start">
+                <Calendar
+                  mode="single"
+                  selected={parseISO(selectedDate)}
+                  onSelect={(d) => {
+                    if (!d) return;
+                    setSelectedDate(format(d, "yyyy-MM-dd"));
+                    setDatePickerOpen(false);
+                  }}
+                  initialFocus
+                  locale={it}
+                />
+                </PopoverContent>
+              </Popover>
               <Button
                 variant="outline"
                 size="icon"

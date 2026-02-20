@@ -195,6 +195,58 @@ export default function TimelineView({
     });
   }, []);
 
+  // EO, HP, LP brackets for priority windows
+  type PriorityWindows = {
+    EO: { start: string; end: string };
+    HP: { start: string; end: string };
+    LP: { start: string; end?: string | null };
+  };
+  
+  const [priorityWindows, setPriorityWindows] = useState<PriorityWindows | null>(null);
+  
+  useEffect(() => {
+    const loadPriorityWindows = async () => {
+      try {
+        const res = await fetch("/api/settings", {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
+        if (!res.ok) return;
+  
+        const s = await res.json();
+  
+        // Struttura presa da app_settings.json nel DB:
+        // s["early-out"].eo_start_time / eo_end_time
+        // s["high-priority"].hp_start_time / hp_end_time
+        // low-priority potrebbe esserci o no (nel tuo repo lato server esiste come chiave)
+        const eoStart = s?.["early-out"]?.eo_start_time;
+        const eoEnd = s?.["early-out"]?.eo_end_time;
+  
+        const hpStart = s?.["high-priority"]?.hp_start_time;
+        const hpEnd = s?.["high-priority"]?.hp_end_time;
+  
+        const lpStart =
+          s?.["low-priority"]?.lp_start_time
+          // fallback sensato se non c’è low-priority nel JSON:
+          ?? hpEnd
+          ?? hpStart;
+  
+        if (eoStart && eoEnd && hpStart && hpEnd && lpStart) {
+          setPriorityWindows({
+            EO: { start: eoStart, end: eoEnd },
+            HP: { start: hpStart, end: hpEnd },
+            // LP tipicamente “da lpStart in poi”
+            LP: { start: lpStart, end: null },
+          });
+        }
+      } catch (e) {
+        console.warn("Failed to load /api/settings for priority windows", e);
+      }
+    };
+  
+    loadPriorityWindows();
+  }, []);
+
   // Carica timestamp ultimo trasferimento ADAM quando cambia la data
   useEffect(() => {
     const fetchLastTransfer = async () => {
@@ -542,6 +594,49 @@ export default function TimelineView({
   const globalTimeSlots = generateGlobalTimeSlots();
   const globalTimelineMinutes = getGlobalTimelineMinutes();
   const globalStartTime = getGlobalStartTime();
+
+
+// Helpers to render EO/HP/LP brackets above the time header
+const timeToMinutes = (t: string) => {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+};
+
+const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+
+const getTimelineStartMinutes = () => {
+  // The grid starts from the first global slot, always HH:00
+  const first = globalTimeSlots?.[0] ?? "10:00";
+  return timeToMinutes(first);
+};
+
+const getTimelineEndMinutes = () => 19 * 60; // 19:00 fixed end
+
+const minutesToPct = (absoluteMinutes: number) => {
+  if (!globalTimeSlots?.length) return 0;
+
+  const timelineStart = timeToMinutes(globalTimeSlots[0]);
+  const timelineEnd = timelineStart + globalTimeSlots.length * 60;
+
+  const total = timelineEnd - timelineStart;
+  if (total <= 0) return 0;
+
+  return ((absoluteMinutes - timelineStart) / total) * 100;
+};
+
+const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
+  const w = Math.max(0.0001, x2 - x1);
+  const curl = Math.min(4, w / 10);
+  const xm = (x1 + x2) / 2;
+
+  return [
+    `M ${x1} ${yTop}`,
+    `C ${x1} ${yTop}, ${x1} ${yTop + 6}, ${x1 + curl} ${yTop + 7}`,
+    `C ${x1 + curl * 2} ${yTop + 8}, ${x1 + curl * 2} ${yBottom - 6}, ${xm} ${yBottom}`,
+    `C ${x2 - curl * 2} ${yBottom - 6}, ${x2 - curl * 2} ${yTop + 8}, ${x2 - curl} ${yTop + 7}`,
+    `C ${x2} ${yTop + 6}, ${x2} ${yTop}, ${x2} ${yTop}`,
+  ].join(" ");
+};
 
   // Esponi globalTimelineMinutes e globalTimeSlotsCount come variabili globali per permettere a TaskCard di usarle
   // IMPORTANTE: La griglia usa N slot, ma rappresenta N-1 intervalli. Per far corrispondere
@@ -1698,8 +1793,8 @@ export default function TimelineView({
           </div>
         )}
       
-        <div className="p-4 border-b border-border">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div className="px-4 py-4 border-b border-border">
+            <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
             <div>
               <h2 className="text-xl font-bold text-foreground flex items-center">
                 <CalendarIcon className="w-5 h-5 mr-2 text-custom-blue" />
@@ -1732,11 +1827,99 @@ export default function TimelineView({
             </div>
           </div>
         </div>
-        <div className="p-4 overflow-x-auto">
+        <div className="px-4 pt-4 pb-4 overflow-x-auto">
+
+{/* Graffe fasce orarie (EO / HP / LP) sopra gli orari */}
+<div className="flex items-stretch mb-1 px-4 h-[26px]">
+  {/* colonna pulsante / nome cleaner (vuota per allineamento) */}
+  <div
+    className="flex-shrink-0 h-full print:hidden"
+    style={{ width: `${cleanerColumnWidth}px` }}
+  />
+  {/* area timeline (stessa larghezza della griglia orari) */}
+  <div className="flex-1 h-full relative">
+    {priorityWindows && (
+    <div className="absolute inset-0">
+      {(() => {
+        const eo1 = clamp(minutesToPct(timeToMinutes(priorityWindows.EO.start)), 0, 100);
+        const eo2 = clamp(minutesToPct(timeToMinutes(priorityWindows.EO.end)), 0, 100);
+
+        const hp1 = clamp(minutesToPct(timeToMinutes(priorityWindows.HP.start)), 0, 100);
+        const hp2 = clamp(minutesToPct(timeToMinutes(priorityWindows.HP.end)), 0, 100);
+
+        const lp1 = clamp(minutesToPct(timeToMinutes(priorityWindows.LP.start)), 0, 100);
+        const lp2 = 100;
+
+        // Due piani:
+        // - LP più su (top più piccolo)
+        // - EO + HP più giù (top più grande)
+        const TOP_LP = -6;   // più su (LP)
+        const TOP_MAIN = 12; // EO/HP un filo più giù
+
+        const windows = [
+          { key: "LP", left: lp1, right: lp2, top: TOP_LP, opacity: 0.65 },
+          { key: "EO", left: eo1, right: eo2, top: TOP_MAIN, opacity: 0.85 },
+          { key: "HP", left: hp1, right: hp2, top: TOP_MAIN, opacity: 0.75 },
+        ];
+
+        return windows.map((w) => {
+          const width = Math.max(0, w.right - w.left);
+          if (width < 2) return null;
+
+          const hideLabel = width < 6;
+
+          return (
+            <div
+              key={w.key}
+              className="absolute"
+              style={{
+                left: `${w.left}%`,
+                width: `${width}%`,
+                top: `${w.top}px`,
+                opacity: w.opacity,
+              }}
+            >
+              <div className="relative h-[20px]">
+                {/* linea orizzontale */}
+                <div className="absolute left-0 right-0 top-[10px] border-t border-white/60" />
+
+                {/* tacche verticali ai bordi */}
+                <div className="absolute left-0 top-[6px] h-[8px] border-l border-white/60" />
+                <div className="absolute right-0 top-[6px] h-[8px] border-r border-white/60" />
+
+                {/* label centrata (stesso stile di map-section.tsx) */}
+                {!hideLabel && (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "absolute left-1/2 -translate-x-1/2 top-[-1px] text-xs shrink-0",
+                      w.key === "EO"
+                        ? "bg-blue-500 text-white border-blue-700"
+                        : w.key === "HP"
+                          ? "bg-orange-500 text-white border-orange-700"
+                          : "bg-gray-500 text-white border-gray-700"
+                    )}
+                  >
+                    {w.key}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          );
+        });
+      })()}
+    </div>
+  )}
+  </div>
+
+  {/* colonna ore lavorate (vuota per allineamento) */}
+  <div className="flex-shrink-0 w-20 h-full" />
+</div>
+
           {/* Header con orari - unico per tutti i cleaner */}
           <div className="flex items-stretch mb-2 px-4 h-[44px]">
             <div
-              className="flex-shrink-0 p-1 flex items-center justify-center border border-border h-full print:hidden"
+              className="flex-shrink-0 p-1 flex items-center justify-center h-full print:hidden"
               style={{ width: `${cleanerColumnWidth}px` }}
             >
               {!isReadOnly && (
@@ -2187,65 +2370,66 @@ export default function TimelineView({
             )}
 
             {/* Riga finale con pulsanti */}
-            <div className="flex items-stretch mb-2 h-[44px]">
-              {/* Pulsante + sotto il nome dell'ultimo cleaner */}
-              <div
-                className="flex-shrink-0 p-1 flex items-center justify-center border border-border h-full"
-                style={{ width: `${cleanerColumnWidth}px` }}
-              >
-                <Button
-                  onClick={() => {
-                    setCleanerToReplace(null);
-                    handleOpenAddCleanerDialog();
-                  }}
-                  variant="ghost"
-                  size="sm"
-                  className="w-full h-full border-2 border-custom-blue"
-                  disabled={isReadOnly}
+            <div className="pt-2"></div>
+              <div className="flex items-stretch mb-2 h-[44px]">
+                {/* Pulsante + sotto il nome dell'ultimo cleaner */}
+                <div
+                  className="flex-shrink-0 p-1 flex items-center justify-center h-full"
+                  style={{ width: `${cleanerColumnWidth}px` }}
                 >
-                  <UserPlus className="w-5 h-5" />
-                </Button>
-              </div>
-              {/* Pulsanti nella riga finale */}
-              <div className="flex-1 p-1 border-t border-border flex gap-2 h-full">
-                {!isReadOnly && (
-                  <div
-                    className="flex-1 h-full flex items-center justify-center gap-2 px-4 py-2 rounded-md border-2 border-custom-blue bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
-                    data-testid="indicator-autosave"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    <span className="text-sm font-medium">Salvataggio automatico attivo</span>
-                  </div>
-                )}
-                {isReadOnly && (
                   <Button
-                    disabled
-                    variant="outline"
-                    className="flex-1 h-full border-2 border-custom-blue bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 cursor-default"
+                    onClick={() => {
+                      setCleanerToReplace(null);
+                      handleOpenAddCleanerDialog();
+                    }}
+                    variant="ghost"
+                    size="sm"
+                    className="w-full h-full border-2 border-custom-blue"
+                    disabled={isReadOnly}
                   >
-                    📜 Sei in modalità storico
+                    <UserPlus className="w-5 h-5" />
                   </Button>
-                )}
-                <Button
-                  onClick={() => setShowAdamTransferDialog(true)}
-                  size="sm"
-                  variant="outline"
-                  className="h-full px-3 border-2 border-custom-blue"
-                  disabled={isReadOnly || !hasTasksInTimeline || isTransferringToAdam}
-                  title={isReadOnly ? "Non puoi trasferire in modalità storico" : !hasTasksInTimeline ? "Nessuna task assegnata nella timeline" : "Trasferisci le assegnazioni sul database ADAM"}
-                  data-testid="button-transfer-adam"
-                >
-                  {isTransferringToAdam ? (
-                    <RefreshCw className="mr-1 h-4 w-4 animate-spin" />
-                  ) : (
-                    <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
+                </div>
+                {/* Pulsanti nella riga finale */}
+                <div className="flex-1 p-1 flex gap-2 h-full">
+                  {!isReadOnly && (
+                    <div
+                      className="flex-1 h-full flex items-center justify-center gap-2 px-4 py-2 rounded-md border-2 border-custom-blue bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
+                      data-testid="indicator-autosave"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      <span className="text-sm font-medium">Salvataggio automatico attivo</span>
+                    </div>
                   )}
-                  {isTransferringToAdam ? "Trasferimento..." : "Trasferisci su ADAM"}
-                </Button>
+                  {isReadOnly && (
+                    <Button
+                      disabled
+                      variant="outline"
+                      className="flex-1 h-full border-2 border-custom-blue bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 cursor-default"
+                    >
+                      📜 Sei in modalità storico
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => setShowAdamTransferDialog(true)}
+                    size="sm"
+                    variant="outline"
+                    className="h-full px-3 border-2 border-custom-blue"
+                    disabled={isReadOnly || !hasTasksInTimeline || isTransferringToAdam}
+                    title={isReadOnly ? "Non puoi trasferire in modalità storico" : !hasTasksInTimeline ? "Nessuna task assegnata nella timeline" : "Trasferisci le assegnazioni sul database ADAM"}
+                    data-testid="button-transfer-adam"
+                  >
+                    {isTransferringToAdam ? (
+                      <RefreshCw className="mr-1 h-4 w-4 animate-spin" />
+                    ) : (
+                      <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                    )}
+                    {isTransferringToAdam ? "Trasferimento..." : "Trasferisci su ADAM"}
+                  </Button>
+                </div>
               </div>
-            </div>
             {lastAdamTransfer && (
               <div className="flex justify-center px-1 pb-1">
                 <span className="text-xs text-muted-foreground">
