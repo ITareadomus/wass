@@ -199,6 +199,12 @@ export default function TaskCard({
   
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
 
+  const displayInputClass =
+  "h-9 border-transparent bg-transparent shadow-none focus-visible:ring-0 px-0 pointer-events-none select-none";
+
+const displayClickableInputClass =
+  "h-9 border-transparent bg-transparent shadow-none focus-visible:ring-0 px-0";
+
   // Carica le operazioni da operations.json
   const { data: operationsData } = useQuery<{ active_operations: { id: number; name: string }[] }>({
     queryKey: ["/data/input/operations.json"],
@@ -1356,38 +1362,37 @@ export default function TaskCard({
               </Button>
             </div>
           </DialogHeader>
+          
           <div className="space-y-4">
             {/* Prima riga: Codice ADAM - Cliente */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">
-                  Codice ADAM
-                </p>
-                <p className="text-sm">{displayTask.name}</p>
+                <p className="text-sm font-semibold text-muted-foreground">Codice ADAM</p>
+                <Input value={String(displayTask.name ?? "")} readOnly className={displayInputClass} />
               </div>
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">
-                  Cliente
-                </p>
-                <p className="text-sm">{displayTask.customer_name || "non migrato"}</p>
+                <p className="text-sm font-semibold text-muted-foreground">Cliente</p>
+                <Input value={String(displayTask.customer_name ?? "non migrato")} readOnly className={displayInputClass} />
               </div>
             </div>
 
-            {/* Seconda riga: Indirizzo - Durata pulizie */}
+            {/* Seconda riga: Indirizzo - Durata pulizia */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">
-                  Indirizzo
-                </p>
-                <p className="text-sm">{displayTask.address?.toUpperCase() || "NON MIGRATO"}</p>
+                <p className="text-sm font-semibold text-muted-foreground">Indirizzo</p>
+                <Input
+                  value={String(displayTask.address?.toUpperCase() ?? "NON MIGRATO")}
+                  readOnly
+                  className={displayInputClass}
+                />
               </div>
               <div>
-                <p className="text-sm font-semibold text-muted-foreground mb-1">
-                  Durata pulizia
-                </p>
-                <p className="text-sm p-1">
-                  {(displayTask.duration || "0.0").replace(".", ":")} ore
-                </p>
+                <p className="text-sm font-semibold text-muted-foreground mb-1">Durata pulizia</p>
+                <Input
+                  value={`${(displayTask.duration || "0.0").replace(".", ":")} ore`}
+                  readOnly
+                  className={displayInputClass}
+                />
               </div>
             </div>
 
@@ -1398,7 +1403,8 @@ export default function TaskCard({
                   Check-out
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
-                {editingFields.has('checkout') && !isReadOnly ? (
+
+                {editingFields.has("checkout") && !isReadOnly ? (
                   <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                     <div className="relative">
                       <Input
@@ -1408,8 +1414,7 @@ export default function TaskCard({
                         onChange={(e) => setEditedCheckoutDate(e.target.value)}
                         onFocus={(e) => {
                           e.stopPropagation();
-                          // Normalizza prima di aprire il picker per evitare errori
-                          setEditedCheckoutDate(prev => normalizeDate(prev));
+                          setEditedCheckoutDate((prev) => normalizeDate(prev));
                           setTimeout(() => (e.target as HTMLInputElement).showPicker?.(), 0);
                         }}
                         onBlur={(e) => e.stopPropagation()}
@@ -1425,8 +1430,7 @@ export default function TaskCard({
                         onChange={(e) => setEditedCheckoutTime(e.target.value)}
                         onFocus={(e) => {
                           e.stopPropagation();
-                          // Normalizza prima di aprire il picker per evitare errori
-                          setEditedCheckoutTime(prev => normalizeTime(prev));
+                          setEditedCheckoutTime((prev) => normalizeTime(prev));
                           setTimeout(() => (e.target as HTMLInputElement).showPicker?.(), 0);
                         }}
                         onBlur={(e) => e.stopPropagation()}
@@ -1436,33 +1440,37 @@ export default function TaskCard({
                     </div>
                   </div>
                 ) : (
-                  <p
-                    className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
+                  <Input
+                    readOnly
+                    value={
+                      (displayTask as any).checkout_date
+                        ? `${new Date((displayTask as any).checkout_date).toLocaleDateString("it-IT", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                          })}${
+                            (displayTask as any).checkout_time
+                              ? ` - ${(displayTask as any).checkout_time}`
+                              : " - orario non migrato"
+                          }`
+                        : "non migrato"
+                    }
+                    className={cn(displayClickableInputClass, !isReadOnly && "cursor-pointer hover:bg-muted/50")}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!isReadOnly) toggleEditingField('checkout');
+                      if (!isReadOnly) toggleEditingField("checkout");
                     }}
-                  >
-                    {(displayTask as any).checkout_date
-                      ? new Date((displayTask as any).checkout_date).toLocaleDateString(
-                          "it-IT",
-                          { day: "2-digit", month: "2-digit", year: "numeric" },
-                        )
-                      : "non migrato"}
-                    {(displayTask as any).checkout_date
-                      ? ((displayTask as any).checkout_time
-                          ? ` - ${(displayTask as any).checkout_time}`
-                          : " - orario non migrato")
-                      : ""}
-                  </p>
+                  />
                 )}
               </div>
+
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Check-in
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
-                {editingFields.has('checkin') && !isReadOnly ? (
+
+                {editingFields.has("checkin") && !isReadOnly ? (
                   <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                     <div className="relative">
                       <Input
@@ -1472,8 +1480,7 @@ export default function TaskCard({
                         onChange={(e) => setEditedCheckinDate(e.target.value)}
                         onFocus={(e) => {
                           e.stopPropagation();
-                          // Normalizza prima di aprire il picker per evitare errori
-                          setEditedCheckinDate(prev => normalizeDate(prev));
+                          setEditedCheckinDate((prev) => normalizeDate(prev));
                           setTimeout(() => (e.target as HTMLInputElement).showPicker?.(), 0);
                         }}
                         onBlur={(e) => e.stopPropagation()}
@@ -1489,8 +1496,7 @@ export default function TaskCard({
                         onChange={(e) => setEditedCheckinTime(e.target.value)}
                         onFocus={(e) => {
                           e.stopPropagation();
-                          // Normalizza prima di aprire il picker per evitare errori
-                          setEditedCheckinTime(prev => normalizeTime(prev));
+                          setEditedCheckinTime((prev) => normalizeTime(prev));
                           setTimeout(() => (e.target as HTMLInputElement).showPicker?.(), 0);
                         }}
                         onBlur={(e) => e.stopPropagation()}
@@ -1500,25 +1506,27 @@ export default function TaskCard({
                     </div>
                   </div>
                 ) : (
-                  <p
-                    className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
+                  <Input
+                    readOnly
+                    value={
+                      (displayTask as any).checkin_date
+                        ? `${new Date((displayTask as any).checkin_date).toLocaleDateString("it-IT", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                          })}${
+                            (displayTask as any).checkin_time
+                              ? ` - ${(displayTask as any).checkin_time}`
+                              : " - orario non migrato"
+                          }`
+                        : "non migrato"
+                    }
+                    className={cn(displayClickableInputClass, !isReadOnly && "cursor-pointer hover:bg-muted/50")}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!isReadOnly) toggleEditingField('checkin');
+                      if (!isReadOnly) toggleEditingField("checkin");
                     }}
-                  >
-                    {(displayTask as any).checkin_date
-                      ? new Date((displayTask as any).checkin_date).toLocaleDateString(
-                          "it-IT",
-                          { day: "2-digit", month: "2-digit", year: "numeric" },
-                        )
-                      : "non migrato"}
-                    {(displayTask as any).checkin_date
-                      ? ((displayTask as any).checkin_time
-                          ? ` - ${(displayTask as any).checkin_time}`
-                          : " - orario non migrato")
-                      : ""}
-                  </p>
+                  />
                 )}
               </div>
             </div>
@@ -1526,60 +1534,53 @@ export default function TaskCard({
             {/* Quarta riga: Tipologia appartamento - Tipologia intervento */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">
-                  Tipologia appartamento
-                </p>
-                <p className="text-sm">{(displayTask as any).type_apt ?? "non migrato"}</p>
+                <p className="text-sm font-semibold text-muted-foreground">Tipologia appartamento</p>
+                <Input value={String((displayTask as any).type_apt ?? "non migrato")} readOnly className={displayInputClass} />
               </div>
+
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Tipologia intervento
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
-                {editingFields.has('operation') && !isReadOnly ? (
+
+                {editingFields.has("operation") && !isReadOnly ? (
                   <div onClick={(e) => e.stopPropagation()}>
-                    <Select
-                      value={editedOperationId}
-                      onValueChange={(value) => setEditedOperationId(value)}
-                    >
+                    <Select value={editedOperationId} onValueChange={(value) => setEditedOperationId(value)}>
                       <SelectTrigger className="text-sm">
                         <SelectValue placeholder="Seleziona operazione" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">— Nessuna operazione —</SelectItem>
                         {(operationsData?.active_operations || []).map((op) => (
-                          <SelectItem key={op.id} value={String(op.id)}>{op.name}</SelectItem>
+                          <SelectItem key={op.id} value={String(op.id)}>
+                            {op.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                 ) : (
-                  <p
-                    className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isReadOnly) toggleEditingField('operation');
-                    }}
-                  >
-                    {(() => {
-                      // Controlla se l'utente ha scelto esplicitamente "Nessuna operazione"
+                  <Input
+                    readOnly
+                    value={(() => {
                       const taskKeyDisplay = getTaskKey(displayTask);
                       const pendingEditsDisplay = getPendingEdits()[taskKeyDisplay];
-                      const userChoseNone = pendingEditsDisplay?.operationIdModified === true && pendingEditsDisplay?.operationId === null;
-                      
-                      if (userChoseNone) {
-                        return "— Nessuna operazione —";
-                      }
-                      if (!isConfirmedOperation) {
-                        return "non migrato";
-                      }
+                      const userChoseNone =
+                        pendingEditsDisplay?.operationIdModified === true && pendingEditsDisplay?.operationId === null;
+
+                      if (userChoseNone) return "— Nessuna operazione —";
+                      if (!isConfirmedOperation) return "non migrato";
                       const opId = (displayTask as any).operation_id;
-                      if (opId) {
-                        return operationNames[opId] || `Operazione ${opId}`;
-                      }
+                      if (opId) return operationNames[opId] || `Operazione ${opId}`;
                       return "-";
                     })()}
-                  </p>
+                    className={cn(displayClickableInputClass, !isReadOnly && "cursor-pointer hover:bg-muted/50")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isReadOnly) toggleEditingField("operation");
+                    }}
+                  />
                 )}
               </div>
             </div>
@@ -1591,7 +1592,8 @@ export default function TaskCard({
                   Pax-In
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
-                {editingFields.has('paxin') && !isReadOnly ? (
+
+                {editingFields.has("paxin") && !isReadOnly ? (
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <Input
                       type="text"
@@ -1599,7 +1601,7 @@ export default function TaskCard({
                       pattern="[0-9]*"
                       value={editedPaxIn}
                       onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, '');
+                        const value = e.target.value.replace(/\D/g, "");
                         setEditedPaxIn(value);
                       }}
                       onFocus={(e) => e.stopPropagation()}
@@ -1611,52 +1613,48 @@ export default function TaskCard({
                     <span className="text-sm text-muted-foreground">persone</span>
                   </div>
                 ) : (
-                  <p
-                    className={`text-sm p-1 rounded ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
+                  <Input
+                    readOnly
+                    value={String((displayTask as any).pax_in ?? "non migrato")}
+                    className={cn(displayClickableInputClass, !isReadOnly && "cursor-pointer hover:bg-muted/50")}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!isReadOnly) toggleEditingField('paxin');
+                      if (!isReadOnly) toggleEditingField("paxin");
                     }}
-                  >
-                    {(displayTask as any).pax_in ?? "non migrato"}
-                  </p>
+                  />
                 )}
               </div>
+
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">
-                  Pax-Out
-                </p>
-                <p className="text-sm">{(displayTask as any).pax_out ?? "non migrato"}</p>
+                <p className="text-sm font-semibold text-muted-foreground">Pax-Out</p>
+                <Input value={String((displayTask as any).pax_out ?? "non migrato")} readOnly className={displayInputClass} />
               </div>
             </div>
 
-            {/* Sesta riga: Travel Time - Start Time/End Time */}
+            {/* Sesta riga: Travel Time - Start Time - End Time (Start/End nella colonna destra) */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-semibold text-muted-foreground">
-                  Travel Time
-                </p>
-                <p className="text-sm">
-                  {assignmentTimes.travel_time !== undefined
-                    ? `${assignmentTimes.travel_time} minuti`
-                    : "non assegnato"}
-                </p>
+                <p className="text-sm font-semibold text-muted-foreground">Travel Time</p>
+                <Input
+                  value={assignmentTimes.travel_time !== undefined ? `${assignmentTimes.travel_time} minuti` : "non assegnato"}
+                  readOnly
+                  className={displayInputClass}
+                />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground">
-                    Start Time
-                  </p>
-                  <p className="text-sm">{assignmentTimes.start_time ?? "non assegnato"}</p>
+                  <p className="text-sm font-semibold text-muted-foreground">Start Time</p>
+                  <Input value={String(assignmentTimes.start_time ?? "non assegnato")} readOnly className={displayInputClass} />
                 </div>
+
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground">
-                    End Time
-                  </p>
-                  <p className="text-sm">{assignmentTimes.end_time ?? "non assegnato"}</p>
+                  <p className="text-sm font-semibold text-muted-foreground">End Time</p>
+                  <Input value={String(assignmentTimes.end_time ?? "non assegnato")} readOnly className={displayInputClass} />
                 </div>
               </div>
             </div>
+          </div>
 
             {/* Settima riga: Gestione Collaboratori - solo per task in timeline */}
             {isInTimeline && (
@@ -1814,7 +1812,6 @@ export default function TaskCard({
               </div>
             )}
 
-          </div>
         </DialogContent>
       </Dialog>
 

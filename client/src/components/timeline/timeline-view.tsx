@@ -125,6 +125,12 @@ export default function TimelineView({
   const [lastAdamTransfer, setLastAdamTransfer] = useState<string | null>(null); // Timestamp ultimo trasferimento ADAM
   const [lockedCleaners, setLockedCleaners] = useState<Set<number>>(new Set()); // Set degli ID dei cleaner bloccati
 
+  const displayInputClass =
+   "h-9 border-transparent bg-transparent shadow-none focus-visible:ring-0 px-0 pointer-events-none select-none";
+
+  const displayClickableInputClass =
+   "h-9 border-transparent bg-transparent shadow-none focus-visible:ring-0 px-0";
+
   // Calcola gli highlightedTaskIds per la ricerca
   const highlightedTaskIds = (() => {
     if (!searchTask.trim()) return new Set<string>();
@@ -1880,24 +1886,24 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               }}
             >
               <div className="relative h-[20px]">
-                {/* linea orizzontale */}
-                <div className="absolute left-0 right-0 top-[10px] border-t border-white/60" />
+                {/* linea orizzontale */} 
+                <div className="absolute left-0 right-0 top-[10px] border-t border-slate-500/60 dark:border-white/60" />
 
                 {/* tacche verticali ai bordi */}
-                <div className="absolute left-0 top-[6px] h-[8px] border-l border-white/60" />
-                <div className="absolute right-0 top-[6px] h-[8px] border-r border-white/60" />
+                <div className="absolute left-0 top-[6px] h-[8px] border-l border-slate-500/60 dark:border-white/60" />
+                <div className="absolute right-0 top-[6px] h-[8px] border-r border-slate-500/60 dark:border-white/60" />
 
-                {/* label centrata (stesso stile di map-section.tsx) */}
+                {/* label centrata */}
                 {!hideLabel && (
                   <Badge
                     variant="outline"
                     className={cn(
                       "absolute left-1/2 -translate-x-1/2 top-[-1px] text-xs shrink-0",
                       w.key === "EO"
-                        ? "bg-blue-500 text-white border-blue-700"
+                        ? "bg-blue-500 text-white border-blue-700 dark:bg-blue-600 dark:border-blue-300"
                         : w.key === "HP"
-                          ? "bg-orange-500 text-white border-orange-700"
-                          : "bg-gray-500 text-white border-gray-700"
+                          ? "bg-orange-500 text-white border-orange-700 dark:bg-orange-600 dark:border-orange-300"
+                          : "bg-gray-500 text-white border-gray-700 dark:bg-gray-600 dark:border-gray-300"
                     )}
                   >
                     {w.key}
@@ -2898,17 +2904,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       {/* Cleaner Details Dialog */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent
-          className={`sm:max-w-2xl max-h-[80vh] overflow-y-auto ${
-            selectedCleaner?.can_do_straordinaria
-              ? "bg-red-300/70 dark:bg-red-900/60 border-2 border-red-400 dark:border-red-700"
-              : selectedCleaner?.role === "Formatore"
-              ? "bg-orange-300/70 dark:bg-orange-900/60 border-2 border-orange-400 dark:border-orange-700"
-              : selectedCleaner?.role === "Premium"
-              ? "bg-yellow-200/70 dark:bg-yellow-900/60 border-2 border-yellow-300 dark:border-yellow-700"
-              : selectedCleaner?.role === "Standard"
-              ? "bg-green-300/70 dark:bg-green-900/60 border-2 border-green-400 dark:border-green-700"
-              : ""
-          }`}
+          className={cn(
+            "sm:max-w-2xl max-h-[80vh] overflow-y-auto",
+            // LIGHT: bianco
+            "bg-white",
+            // DARK: stesso background del dialog Dettagli Task (quello di default di shadcn: bg-background)
+            "dark:bg-background",
+          )}
         >
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
@@ -3013,14 +3015,17 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
           {selectedCleaner && (
             <div className="space-y-4 text-gray-900 dark:text-foreground">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
+              <div className="grid grid-cols-4 gap-x-6 gap-y-4">
+                {/* Alias (LARGO 2/4) */}
+                <div className="col-span-2">
                   <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1 flex items-center gap-1">
                     Alias
                     {!isReadOnly && <Pencil className="w-3 h-3 text-gray-700 dark:text-muted-foreground/60" />}
                   </p>
                   <p
-                    className={`text-sm p-2 rounded border ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50 border-border hover:border-custom-blue' : 'border-border'}`}
+                    className={`text-sm p-2 rounded border ${
+                      !isReadOnly ? "cursor-pointer hover:bg-muted/50 border-border hover:border-custom-blue" : "border-border"
+                    }`}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!isReadOnly) handleOpenAliasDialog(selectedCleaner);
@@ -3030,34 +3035,58 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">Nome</p>
-                    <p className="text-sm">{selectedCleaner.name.toUpperCase()}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">Cognome</p>
-                    <p className="text-sm">{selectedCleaner.lastname.toUpperCase()}</p>
-                  </div>
+                {/* Nome (1/4) */}
+                <div className="col-span-1">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">Nome</p>
+                  <Input
+                    value={selectedCleaner.name.toUpperCase()}
+                    readOnly
+                    className={displayInputClass}
+                  />
                 </div>
 
-                <div>
-                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground">Giorni lavorati</p>
-                  <p className="text-sm">{selectedCleaner.counter_days}</p>
+                {/* Cognome (1/4) */}
+                <div className="col-span-1">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">Cognome</p>
+                  <Input
+                    value={selectedCleaner.lastname.toUpperCase()}
+                    readOnly
+                    className={displayInputClass}
+                  />
                 </div>
 
-                <div>
-                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground">Ore lavorate questa settimana</p>
-                  <p className="text-sm">{selectedCleaner.counter_hours}</p>
+                {/* Giorni lavorati (2/4) */}
+                <div className="col-span-2">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">Giorni lavorati</p>
+                  <Input
+                    value={String(selectedCleaner.counter_days ?? "")}
+                    readOnly
+                    className={displayInputClass}
+                  />
                 </div>
 
-                <div>
+                {/* Ore lavorate (2/4) */}
+                <div className="col-span-2">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">
+                    Ore lavorate questa settimana
+                  </p>
+                  <Input
+                    value={String(selectedCleaner.counter_hours ?? "")}
+                    readOnly
+                    className={displayInputClass}
+                  />
+                </div>
+
+                {/* Start Time (2/4) */}
+                <div className="col-span-2">
                   <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1 flex items-center gap-1">
                     Start Time
                     {!isReadOnly && <Pencil className="w-3 h-3 text-gray-700 dark:text-muted-foreground/60" />}
                   </p>
                   <p
-                    className={`text-sm p-2 rounded border ${!isReadOnly ? 'cursor-pointer hover:bg-muted/50 border-border hover:border-custom-blue' : 'border-border'}`}
+                    className={`text-sm p-2 rounded border ${
+                      !isReadOnly ? "cursor-pointer hover:bg-muted/50 border-border hover:border-custom-blue" : "border-border"
+                    }`}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!isReadOnly) handleOpenStartTimeDialog(selectedCleaner);
@@ -3067,17 +3096,20 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   </p>
                 </div>
 
-                <div>
-                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground">Tipo contratto</p>
-                  <p className="text-sm">{selectedCleaner.contract_type}</p>
+                {/* Tipo contratto (2/4) */}
+                <div className="col-span-2">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">Tipo contratto</p>
+                  <Input
+                    value={String(selectedCleaner.contract_type ?? "")}
+                    readOnly
+                    className={displayInputClass}
+                  />
                 </div>
               </div>
 
               {/* Sezione Scambia Cleaner */}
               <div className="border-t pt-4 mt-4">
-                <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-3">
-                  Scambia Cleaner
-                </p>
+                <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-3">Scambia Cleaner</p>
                 <p className="text-xs text-gray-700 dark:text-muted-foreground mb-3">
                   Seleziona un altro cleaner per scambiare le task assegnate.
                 </p>
@@ -3093,8 +3125,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                       </SelectTrigger>
                       <SelectContent>
                         {cleaners
-                          .filter(c => c.id !== selectedCleaner.id) // Escludi cleaner corrente
-                          .map(cleaner => (
+                          .filter((c) => c.id !== selectedCleaner.id)
+                          .map((cleaner) => (
                             <SelectItem
                               key={cleaner.id}
                               value={String(cleaner.id)}
@@ -3130,11 +3162,10 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
               {/* Sezione Rimuovi Cleaner */}
               <div className="border-t pt-4 mt-4">
-                <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-3">
-                  Rimuovi Cleaner
-                </p>
+                <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-3">Rimuovi Cleaner</p>
                 <p className="text-xs text-gray-700 dark:text-muted-foreground mb-3">
-                  Il cleaner sarà rimosso dalla selezione, ma le sue task rimarranno in timeline. Sarà necessario assegnarle a un altro cleaner.
+                  Il cleaner sarà rimosso dalla selezione, ma le sue task rimarranno in timeline. Sarà necessario assegnarle a un
+                  altro cleaner.
                 </p>
                 <Button
                   onClick={() => {

@@ -172,7 +172,7 @@ export default function Convocazioni() {
         console.log(`   - Disponibili da mostrare: ${availableCleaners.length}`);
 
         // Ordina per counter_hours (decrescente - più ore prima)
-        availableCleaners.sort((a, b) => b.counter_hours - a.counter_hours);
+        availableCleaners.sort((a: any, b: any) => b.counter_hours - a.counter_hours);
 
         setCleaners(availableCleaners);
         setFilteredCleaners(availableCleaners);
@@ -422,7 +422,7 @@ export default function Convocazioni() {
 
       if (newCleaners.length === 0) {
         toast({
-          variant: "warning",
+          variant: "success",
           title: "Nessun nuovo cleaner aggiunto",
           description: `Tutti i cleaners selezionati sono già presenti per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
           duration: 4000
@@ -521,51 +521,44 @@ export default function Convocazioni() {
         {/* Grid con lista cleaners e statistiche affiancate */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
           {/* Lista Cleaners - 2/3 dello spazio */}
-          <Card className="p-6 lg:col-span-2 flex flex-col overflow-hidden border-2 border-custom-blue bg-custom-blue-light">
-          <div className="mb-4 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-custom-blue" />
-            <Input
-              placeholder="Cerca cleaner per nome..."
-              value={searchCleaner}
-              onChange={(e) => setSearchCleaner(e.target.value)}
-              className="pl-10 border-2 border-custom-blue"
-              data-testid="input-search-cleaner"
-            />
-          </div>
-          <div className="space-y-3 flex-1 overflow-y-auto pr-2">
-            {filteredCleaners
-              .filter((cleaner) => 
-                `${cleaner.name} ${cleaner.lastname}`.toUpperCase().includes(searchCleaner.toUpperCase())
-              )
-              .map((cleaner) => { // Itera su filteredCleaners
-              const isPremium = cleaner.role === "Premium";
-              const isAvailable = cleaner.available !== false;
-              const isFormatore = cleaner.role === "Formatore";
-              const canDoStraordinaria = (cleaner as any).can_do_straordinaria === true;
+          <Card className="p-6 lg:col-span-2 flex flex-col overflow-hidden border-2 border-custom-blue bg-custom-blue-light dark:bg-custom-blue">
+            <div className="mb-4 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-custom-blue" />
+              <Input
+                placeholder="Cerca cleaner per nome..."
+                value={searchCleaner}
+                onChange={(e) => setSearchCleaner(e.target.value)}
+                className="pl-10 border-2 border-custom-blue"
+                data-testid="input-search-cleaner"
+              />
+            </div>
 
-              const borderColor = !isAvailable
-                ? "border-gray-300 dark:border-gray-700"
-                : isFormatore ? "border-orange-300 dark:border-orange-700"
-                : canDoStraordinaria ? "border-red-300 dark:border-red-700"
-                : isPremium ? "border-yellow-300 dark:border-yellow-700" 
-                : "border-green-300 dark:border-green-700";
-              const bgColor = !isAvailable
-                ? "bg-gray-100 dark:bg-gray-950/50"
-                : isFormatore ? "bg-orange-100 dark:bg-orange-950/50"
-                : canDoStraordinaria ? "bg-red-100 dark:bg-red-950/50"
-                : isPremium ? "bg-yellow-100 dark:bg-yellow-950/50" 
-                : "bg-green-100 dark:bg-green-950/50";
+            <div className="space-y-3 flex-1 overflow-y-auto pr-2">
+              {filteredCleaners
+                .filter((cleaner) =>
+                  `${cleaner.name} ${cleaner.lastname}`
+                    .toUpperCase()
+                    .includes(searchCleaner.toUpperCase())
+                )
+                .map((cleaner) => {
+                  const isAvailable = cleaner.available !== false;
+                  const isPremium = cleaner.role === "Premium";
+                  const isFormatore = cleaner.role === "Formatore";
+                  const canDoStraordinaria = (cleaner as any).can_do_straordinaria === true;
+                
+                  const borderColor = "border-2 border-custom-blue";
+                  const bgColor = "bg-white dark:bg-background";
 
-              return (
-                <div
-                  key={cleaner.id}
-                  onClick={() => toggleCleanerSelection(cleaner.id, isAvailable)}
-                  className={`flex items-center justify-between p-4 border-2 rounded-lg transition-all ${borderColor} ${bgColor} ${
-                    !isAvailable
-                      ? 'opacity-60 cursor-pointer hover:opacity-70'
-                      : 'hover:opacity-80 cursor-pointer'
-                  }`}
-                >
+                  return (
+                    <div
+                      key={cleaner.id}
+                      onClick={() => toggleCleanerSelection(cleaner.id, isAvailable)}
+                      className={`flex items-center justify-between p-4 rounded-lg transition-all ${borderColor} ${bgColor} ${
+                        !isAvailable
+                          ? "opacity-60 cursor-pointer hover:opacity-70"
+                          : "hover:opacity-80 cursor-pointer"
+                      }`}
+                    >
                   <div className="flex items-start gap-4 flex-1">
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-2">
@@ -604,7 +597,7 @@ export default function Convocazioni() {
                         <span className="font-semibold">Ore questa settimana:</span> {(() => {
                           const hours = cleaner.counter_hours;
                           // Handle if counter_hours is accidentally a time string like "10:00"
-                          if (typeof hours === 'string' && hours.includes(':')) {
+                          if (typeof hours === 'string' && (hours as string).includes(':')) {
                             return '0.00';
                           }
                           return Number(hours || 0).toFixed(2);
