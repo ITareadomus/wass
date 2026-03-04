@@ -1185,158 +1185,62 @@ export default function GenerateAssignments() {
 
 
 
-  // Funzione per assegnare le task Early Out alla timeline
-  const assignEarlyOutToTimeline = async () => {
+  const runWaveAssignment = async (priority: 'early_out' | 'high_priority' | 'low_priority', label: string) => {
     try {
       const year = selectedDate.getFullYear();
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
 
-      // Get current user from localStorage
-      const userStr = localStorage.getItem('user');
-      const currentUser = userStr ? JSON.parse(userStr) : null;
-      const username = currentUser?.username || 'unknown';
-
-      const response = await fetch("/api/assign-early-out-to-timeline", {
+      const response = await fetch("/api/optimizer/run-wave", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: dateStr,
-          created_by: username
-        }),
+        body: JSON.stringify({ date: dateStr, priority }),
       });
 
       const result = await response.json();
 
       if (result.success) {
         toast({
-          title: "Early Out Assegnati!",
-          description: result.message,
+          title: `${label} Assegnati!`,
+          description: result.message || `${result.applied?.insertedCount || 0} task assegnati`,
           duration: 3000,
         });
 
-        scheduleManualRefresh(0); // PATCH D: non blocca UI
+        if (result.warnings?.length) {
+          toast({
+            title: `Attenzione: ${result.warnings.length} violazione/i checkin`,
+            description: result.warnings.join(' | '),
+            variant: "destructive",
+            duration: 10000,
+          });
+        }
+
+        scheduleManualRefresh(0);
       } else {
         toast({
           title: "Errore",
-          description: result.message || "Errore durante l'assegnazione",
+          description: result.error || result.message || `Errore durante l'assegnazione ${label}`,
           variant: "destructive",
           duration: 3000,
         });
       }
     } catch (error: any) {
-      console.error("Errore nell'assegnazione Early Out:", error);
+      console.error(`Errore nell'assegnazione ${label}:`, error);
       toast({
         title: "Errore",
-        description: error.message || "Errore durante l'assegnazione Early Out",
+        description: error.message || `Errore durante l'assegnazione ${label}`,
         variant: "destructive",
         duration: 3000,
       });
     }
   };
 
-  // Funzione per assegnare le task High Priority alla timeline
-  const assignHighPriorityToTimeline = async () => {
-    try {
-      const year = selectedDate.getFullYear();
-      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
+  const assignEarlyOutToTimeline = async () => runWaveAssignment('early_out', 'Early Out');
 
-      // Get current user from localStorage
-      const userStr = localStorage.getItem('user');
-      const currentUser = userStr ? JSON.parse(userStr) : null;
-      const username = currentUser?.username || 'unknown';
+  const assignHighPriorityToTimeline = async () => runWaveAssignment('high_priority', 'High Priority');
 
-      const response = await fetch("/api/assign-high-priority-to-timeline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: dateStr,
-          created_by: username
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast({
-          title: "High Priority Assegnati!",
-          description: result.message,
-          duration: 3000,
-        });
-
-        scheduleManualRefresh(0); // PATCH D: non blocca UI
-      } else {
-        toast({
-          title: "Errore",
-          description: result.message || "Errore durante l'assegnazione",
-          variant: "destructive",
-          duration: 3000,
-        });
-      }
-    } catch (error: any) {
-      console.error("Errore nell'assegnazione High Priority:", error);
-      toast({
-        title: "Errore",
-        description: error.message || "Errore durante l'assegnazione High Priority",
-        variant: "destructive",
-        duration: 3000,
-      });
-    }
-  };
-
-  // Funzione per assegnare le task Low Priority alla timeline
-  const assignLowPriorityToTimeline = async () => {
-    try {
-      const year = selectedDate.getFullYear();
-      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-
-      // Get current user from localStorage
-      const userStr = localStorage.getItem('user');
-      const currentUser = userStr ? JSON.parse(userStr) : null;
-      const username = currentUser?.username || 'unknown';
-
-      const response = await fetch("/api/assign-low-priority-to-timeline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: dateStr,
-          created_by: username
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast({
-          title: "Low Priority Assegnati!",
-          description: result.message,
-          duration: 3000,
-        });
-
-        scheduleManualRefresh(0); // PATCH D: non blocca UI
-      } else {
-        toast({
-          title: "Errore",
-          description: result.message || "Errore durante l'assegnazione",
-          variant: "destructive",
-          duration: 3000,
-        });
-      }
-    } catch (error: any) {
-      console.error("Errore nell'assegnazione Low Priority:", error);
-      toast({
-        title: "Errore",
-        description: error.message || "Errore durante l'assegnazione Low Priority",
-        variant: "destructive",
-        duration: 3000,
-      });
-    }
-  };
+  const assignLowPriorityToTimeline = async () => runWaveAssignment('low_priority', 'Low Priority');
 
   // Esponi le funzioni per poterle chiamare da altri componenti
   (window as any).reloadAllTasks = reloadAllTasks;

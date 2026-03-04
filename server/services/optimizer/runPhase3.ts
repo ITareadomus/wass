@@ -296,12 +296,32 @@ export async function runPhase3(
     phase2Assignments.forEach((groups, cleanerId) => {
       if (!selectedCleanerIds.includes(cleanerId)) return;
       
-      cleanerGroups.push({
+      const cg: CleanerGroups = {
         cleanerId,
         cleanerName: cleanerNames.get(cleanerId) || `Cleaner ${cleanerId}`,
         startTime: startTimes.get(cleanerId) || '09:00',
         groups
-      });
+      };
+
+      if (timelineContext?.lastFixedByCleaner) {
+        const lastFixed = timelineContext.lastFixedByCleaner.get(cleanerId);
+        if (lastFixed && lastFixed.lat !== null && lastFixed.lng !== null) {
+          cg.anchorTask = {
+            taskId: lastFixed.taskId,
+            logisticCode: lastFixed.logisticCode,
+            lat: lastFixed.lat,
+            lng: lastFixed.lng,
+            cleaningTimeMinutes: lastFixed.cleaningTimeMinutes ?? 60,
+            checkoutTime: null,
+            checkinTime: null,
+            checkinDate: null,
+            priorityType: null,
+          };
+          cg.anchorEndTimeStr = lastFixed.endTime || undefined;
+        }
+      }
+
+      cleanerGroups.push(cg);
     });
 
     result.cleanersProcessed = cleanerGroups.length;

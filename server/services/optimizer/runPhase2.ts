@@ -149,7 +149,8 @@ async function loadPhase1Groups(runId: string): Promise<GroupCandidate[]> {
     score: row.payload.score,
     avgTravelMin: row.payload.avg_travel_min,
     maxTravelMin: row.payload.max_travel_min,
-    isSingle: row.payload.is_single || false
+    isSingle: row.payload.is_single || false,
+    anchoredCleanerId: row.payload.anchored_cleaner_id ?? undefined
   }));
 }
 
@@ -235,15 +236,28 @@ export async function runPhase2(
 
   try {
     const apartmentTypes = await loadApartmentTypes();
+    let initialLastPositionByCleaner: Map<number, { lat: number; lng: number }> | undefined;
+    if (timelineContext?.anchorPointsByCleaner) {
+      initialLastPositionByCleaner = new Map();
+      timelineContext.anchorPointsByCleaner.forEach((anchors, cleanerId) => {
+        if (anchors.lastFixed) {
+          initialLastPositionByCleaner!.set(cleanerId, { lat: anchors.lastFixed.lat, lng: anchors.lastFixed.lng });
+        }
+      });
+    }
+
     const fullParams: Phase2Params = { 
       ...DEFAULT_PHASE2_PARAMS, 
       ...params,
       apartmentTypes,
-      initialLoadByCleanerMin: timelineContext?.initialLoadByCleanerMin
+      initialLoadByCleanerMin: timelineContext?.initialLoadByCleanerMin,
+      initialLastPositionByCleaner,
+      initialFixedStatsByCleaner: timelineContext?.fixedStatsByCleaner
     };
     
     if (timelineContext && timelineContext.initialLoadByCleanerMin.size > 0) {
-      console.log(`[Phase2] Using timeline context: ${timelineContext.initialLoadByCleanerMin.size} cleaners with pre-existing load`);
+      const fixedCount = Array.from(timelineContext.fixedStatsByCleaner.values()).reduce((s, v) => s + v.fixedTaskCount, 0);
+      console.log(`[Phase2] Using timeline context: ${timelineContext.initialLoadByCleanerMin.size} cleaners with pre-existing load, ${initialLastPositionByCleaner?.size ?? 0} with anchor positions, ${fixedCount} fixed tasks counted`);
     }
 
     const [selectedCleanerIds, allAvailableCleaners, lockedCleanerIds, tasksMap, allGroups] = await Promise.all([
@@ -271,14 +285,16 @@ export async function runPhase2(
     
     result.cleanersLoaded = cleaners.length;
 
-    // Re-sort groups by size DESC (favor larger groups), then avgTravel ASC
+    // Re-sort: anchored groups first (wave continuity), then size DESC, then avgTravel ASC
     const sortedGroups = [...allGroups].sort((a, b) => {
-      // Primary: size DESC (larger groups first)
+      const aAnchored = a.anchoredCleanerId !== undefined ? 1 : 0;
+      const bAnchored = b.anchoredCleanerId !== undefined ? 1 : 0;
+      if (aAnchored !== bAnchored) return bAnchored - aAnchored;
+
       const sizeA = a.taskIds.length;
       const sizeB = b.taskIds.length;
       if (sizeA !== sizeB) return sizeB - sizeA;
       
-      // Secondary: avgTravel ASC (lower travel first among same-size groups)
       return (a.avgTravelMin ?? 0) - (b.avgTravelMin ?? 0);
     });
     

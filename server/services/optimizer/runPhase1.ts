@@ -21,6 +21,8 @@ export interface Phase1Options {
   params?: Partial<Phase1Params>;
   existingRunId?: string;
   preFilteredTasks?: TaskInput[];
+  timelineSeeds?: Map<number, number>;
+  timelineSeedTasks?: TaskInput[];
 }
 
 export async function runPhase1(
@@ -28,7 +30,7 @@ export async function runPhase1(
   options: Phase1Options = {}
 ): Promise<Phase1RunResult> {
   const startTime = Date.now();
-  const { params = {}, existingRunId, preFilteredTasks } = options;
+  const { params = {}, existingRunId, preFilteredTasks, timelineSeeds, timelineSeedTasks } = options;
   const runId = existingRunId || uuidv4();
   
   const fullParams: Phase1Params = {
@@ -80,6 +82,20 @@ export async function runPhase1(
     }
     result.tasksLoaded = tasks.length;
 
+    if (timelineSeedTasks && timelineSeedTasks.length > 0) {
+      const existingIds = new Set(tasks.map(t => t.taskId));
+      let added = 0;
+      for (const seed of timelineSeedTasks) {
+        if (!existingIds.has(seed.taskId)) {
+          tasks.push(seed);
+          added++;
+        }
+      }
+      if (added > 0) {
+        console.log(`[Phase1] Wave mode: added ${added} timeline seed tasks (${timelineSeeds?.size ?? 0} anchored cleaners)`);
+      }
+    }
+
     if (tasks.length === 0) {
       result.status = 'failed';
       result.error = 'No tasks found for date';
@@ -88,7 +104,7 @@ export async function runPhase1(
       return result;
     }
 
-    const phase1Result: Phase1GeneratorResult = generateCandidateGroups(tasks, fullParams);
+    const phase1Result: Phase1GeneratorResult = generateCandidateGroups(tasks, fullParams, timelineSeeds);
     result.groupsGenerated = phase1Result.stats.groupCount;
     result.singleGroupCount = phase1Result.stats.singleGroupCount;
     result.fallbackSeedCount = phase1Result.stats.fallbackSeedCount;

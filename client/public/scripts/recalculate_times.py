@@ -15,6 +15,35 @@ WORK_START_TIME = "10:00"
 WORK_END_TIME = "19:00"
 MAX_DISTANCE_KM = 50.0
 
+DEFAULT_PRIORITY_WINDOWS = {
+    "EO": {"start_min": 600},   # 10:00
+    "HP": {"start_min": 660},   # 11:00
+    "LP": {"start_min": 660},   # 11:00
+}
+
+PRIORITY_ALIASES = {
+    "early_out": "EO",
+    "high_priority": "HP",
+    "low_priority": "LP",
+    "EO": "EO",
+    "HP": "HP",
+    "LP": "LP",
+}
+
+
+def get_priority_min_start(priority_str: Optional[str],
+                           priority_windows: Dict[str, Any]) -> Optional[int]:
+    """Returns the minimum start time (in minutes) for a given priority, or None."""
+    if not priority_str:
+        return None
+    normalized = PRIORITY_ALIASES.get(priority_str)
+    if not normalized:
+        return None
+    window = priority_windows.get(normalized)
+    if not window:
+        return None
+    return window.get("start_min")
+
 
 def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     """Calcola la distanza haversine in km tra due coordinate."""
@@ -88,13 +117,15 @@ def travel_minutes(lat1: float, lng1: float, lat2: float, lng2: float,
     if same_street(addr1, addr2) and dist_km < 0.10:
         total_time = max(total_time - 2.0, 3.0)
 
-    # Limiti: min 3 min, max 50 min
-    return max(3.0, min(50.0, total_time))
+    # Limiti allineati con optimizer (phase1.ts: MIN_TRAVEL=2, MAX_TRAVEL=45)
+    return max(2.0, min(45.0, total_time))
 
 
 def time_to_minutes(time_str: str) -> int:
-    """Converte una stringa HH:MM in minuti dall'inizio della giornata."""
-    h, m = map(int, time_str.split(':'))
+    """Converte una stringa HH:MM o HH:MM:SS in minuti dall'inizio della giornata."""
+    parts = time_str.split(':')
+    h = int(parts[0])
+    m = int(parts[1]) if len(parts) > 1 else 0
     return h * 60 + m
 
 
@@ -123,7 +154,8 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
         cleaner_data: Dati del cleaner con formato:
             {
                 "cleaner": {...},
-                "tasks": [...]
+                "tasks": [...],
+                "priority_windows": {...}  // opzionale, override dei default
             }
 
     Returns:
@@ -132,6 +164,8 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
     tasks = cleaner_data.get("tasks", [])
     if not tasks:
         return cleaner_data
+
+    priority_windows = cleaner_data.get("priority_windows", DEFAULT_PRIORITY_WINDOWS)
 
     # Usa lo start_time del cleaner se disponibile, altrimenti default a 10:00
     cleaner = cleaner_data.get("cleaner", {})
@@ -168,17 +202,10 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
         except (ValueError, TypeError):
             cleaning_time = 60
 
-        # Calcola travel_time
-        # PRESERVA travel_time esistente se > 0 (già calcolato accuratamente)
-        # Ricalcola solo se mancante (0 o null) - es. nuova task inserita
-        existing_travel = task.get("travel_time")
+        # Calcola travel_time (sempre ricalcolato per la rotta corrente del cleaner)
         if i == 0:
             travel_time = 0
-        elif existing_travel is not None and existing_travel > 0:
-            # Preserva il travel_time esistente
-            travel_time = int(existing_travel)
         else:
-            # Calcola nuovo travel_time (task nuova o senza travel_time)
             travel_time = int(round(travel_minutes(
                 prev_lat, prev_lng, lat, lng, prev_addr, addr
             )))
@@ -228,27 +255,30 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
                     # Se checkout_time non è valido, ignora il vincolo
                     pass
 
-        # Rispetta start_time esistente come vincolo minimo
-        # Se la task aveva già un orario sensato, non riportarla indietro
-        existing_start = task.get("start_time")
-        if existing_start:
-            try:
-                existing_min = time_to_minutes(existing_start)
-                if start_time_min < existing_min:
-                    start_time_min = existing_min
-                    current_time_min = max(current_time_min, existing_min)
-            except (ValueError, AttributeError):
-                pass
+        # Enforce priority time window (HP/LP non possono iniziare prima delle 11:00)
+        priority_min = get_priority_min_start(task.get("priority"), priority_windows)
+        if priority_min is not None and start_time_min < priority_min:
+            start_time_min = priority_min
+            current_time_min = start_time_min
 
         # End time: start + cleaning_time
         end_time_min = start_time_min + cleaning_time
 
-        # Verifica vincolo checkin (se presente, end_time non può superarlo)
+        # Verifica vincolo checkin (allineato con optimizer Phase 3)
+        # Se checkin_date è diverso dal work_date, il vincolo non si applica oggi
+        checkin_date_str = task.get("checkin_date")
         if checkin_time_str:
             checkin_min = time_to_minutes(checkin_time_str)
-            if end_time_min > checkin_min:
-                # Non feasible, ma salviamo comunque i tempi calcolati
-                pass
+            apply_checkin = True
+            if checkin_date_str:
+                try:
+                    work_date_str = cleaner_data.get("work_date")
+                    if work_date_str and checkin_date_str != work_date_str:
+                        apply_checkin = False
+                except (ValueError, TypeError):
+                    pass
+            if apply_checkin and end_time_min > checkin_min:
+                task["_checkin_violated"] = True
 
         # Verifica che non superi la fine del turno
         if end_time_min > work_end_min:

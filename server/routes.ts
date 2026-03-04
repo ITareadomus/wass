@@ -3333,11 +3333,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const overlaps: any[] = [];
 
         for (const cId of allCollaboratorIds) {
-          // Carica tutti i task del cleaner nel formato per recalculateCleanerTimes
           const tasksResult = await client.query(
             `SELECT task_id, logistic_code, cleaner_id,
                     sequence, cleaning_time, address, lat, lng,
-                    start_time, end_time, travel_time
+                    start_time, end_time, travel_time, priority,
+                    checkout_time, checkin_time
              FROM daily_assignments_current
              WHERE work_date = $1 AND cleaner_id = $2
              ORDER BY sequence`,
@@ -3346,10 +3346,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           if (tasksResult.rows.length === 0) continue;
 
-          // Ottieni start_time del cleaner
           const cleanerStartTime = await getCleanerStartTime(cId, workDate) || '10:00';
 
-          // Costruisci cleanerData nel formato atteso da recalculateCleanerTimes (Python script)
           const cleanerData = {
             cleaner: {
               id: cId,
@@ -3365,7 +3363,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               lng: r.lng,
               start_time: r.start_time,
               end_time: r.end_time,
-              travel_time: r.travel_time
+              travel_time: r.travel_time,
+              priority: r.priority ?? null,
+              checkout_time: r.checkout_time ?? null,
+              checkin_time: r.checkin_time ?? null,
             }))
           };
 
@@ -3577,7 +3578,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const tasksResult = await client.query(
             `SELECT task_id, logistic_code, cleaner_id,
                     sequence, cleaning_time, address, lat, lng,
-                    start_time, end_time, travel_time
+                    start_time, end_time, travel_time, priority,
+                    checkout_time, checkin_time
              FROM daily_assignments_current
              WHERE work_date = $1 AND cleaner_id = $2
              ORDER BY sequence`,
@@ -3588,7 +3590,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const cleanerStartTime = await getCleanerStartTime(Number(cId), workDate) || '10:00';
           
-          // Costruisci cleanerData nel formato atteso da recalculateCleanerTimes
           const cleanerData = {
             cleaner: {
               id: Number(cId),
@@ -3604,7 +3605,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               lng: r.lng,
               start_time: r.start_time,
               end_time: r.end_time,
-              travel_time: r.travel_time
+              travel_time: r.travel_time,
+              priority: r.priority ?? null,
+              checkout_time: r.checkout_time ?? null,
+              checkin_time: r.checkin_time ?? null,
             }))
           };
 
@@ -3770,7 +3774,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const tasksResult = await client.query(
             `SELECT task_id, logistic_code, cleaner_id,
                     sequence, cleaning_time, address, lat, lng,
-                    start_time, end_time, travel_time
+                    start_time, end_time, travel_time, priority,
+                    checkout_time, checkin_time
              FROM daily_assignments_current
              WHERE work_date = $1 AND cleaner_id = $2
              ORDER BY sequence`,
@@ -3781,7 +3786,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const cleanerStartTime = await getCleanerStartTime(cId, workDate) || '10:00';
           
-          // Usa Python script per calcoli accurati
           const cleanerData = {
             cleaner: { id: cId, start_time: cleanerStartTime },
             tasks: tasksResult.rows.map((r: any) => ({
@@ -3794,7 +3798,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               lng: r.lng,
               start_time: r.start_time,
               end_time: r.end_time,
-              travel_time: r.travel_time
+              travel_time: r.travel_time,
+              priority: r.priority ?? null,
+              checkout_time: r.checkout_time ?? null,
+              checkin_time: r.checkin_time ?? null,
             }))
           };
 
@@ -3934,7 +3941,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const tasksResult = await client.query(
             `SELECT task_id, logistic_code, cleaner_id,
                     sequence, cleaning_time, address, lat, lng,
-                    start_time, end_time, travel_time
+                    start_time, end_time, travel_time, priority,
+                    checkout_time, checkin_time
              FROM daily_assignments_current
              WHERE work_date = $1 AND cleaner_id = $2
              ORDER BY sequence`,
@@ -3957,7 +3965,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const cleanerStartTime = await getCleanerStartTime(cleanerId, workDate) || '10:00';
           
-          // Usa Python script per calcoli accurati
           const cleanerData = {
             cleaner: { id: cleanerId, start_time: cleanerStartTime },
             tasks: tasksResult.rows.map((r: any) => ({
@@ -3970,7 +3977,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               lng: r.lng,
               start_time: r.start_time,
               end_time: r.end_time,
-              travel_time: r.travel_time
+              travel_time: r.travel_time,
+              priority: r.priority ?? null,
+              checkout_time: r.checkout_time ?? null,
+              checkin_time: r.checkin_time ?? null,
             }))
           };
 
@@ -4541,8 +4551,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
             const collaborationFlag = isCollab ? 1 : null;
             const collaborationBy = isCollab ? (secondaryCleanerIdForAdam || null) : null;
-            const collaborationAt = isCollab ? nowRome : null;           
-
+            const collaborationAt = isCollab ? nowRome : null;  
+            
             const updateQuery = `
               UPDATE app_housekeeping
               SET
@@ -4869,36 +4879,36 @@ app.post("/api/transfer-to-adam", async (req, res) => {
                     } else {
                       await connection.execute(
                         `
-                          INSERT INTO app_housekeeping_collaborations (
-                            id,
-                            housekeeping_id,
-                            housekeeping_report_id,
-                            housekeeping_report_collaboration_id,
-                            deleted_note_id,
-                            user_id,
-                            user_rq,
-                            created_by,
-                            updated_by,
-                            deleted_by,
-                            created_at,
-                            updated_at,
-                            deleted_at
-                          )
-                          VALUES (
-                            NULL,
-                            ?,
-                            NULL,
-                            NULL,
-                            NULL,
-                            ?,
-                            0,
-                            ?,
-                            ?,
-                            '',
-                            NOW(),
-                            NOW(),
-                            NULL
-                          )
+                        INSERT INTO app_housekeeping_collaborations (
+                          id,
+                          housekeeping_id,
+                          housekeeping_report_id,
+                          housekeeping_report_collaboration_id,
+                          deleted_note_id,
+                          user_id,
+                          user_rq,
+                          created_by,
+                          updated_by,
+                          deleted_by,
+                          created_at,
+                          updated_at,
+                          deleted_at
+                        )
+                        VALUES (
+                          NULL,
+                          ?, 
+                          NULL,
+                          NULL,
+                          NULL,
+                          ?, 
+                          0,    
+                          ?, 
+                          ?, 
+                          '',
+                          NOW(),
+                          NOW(),
+                          NULL
+                        )
                         `,
                         [taskId, collaboratorId, adamUpdatedBy, adamUpdatedBy]
                       );
@@ -6651,6 +6661,50 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         success: false,
         error: error.message
       });
+    }
+  });
+
+  // ========== OPTIMIZER WAVE ENDPOINT ==========
+
+  app.post("/api/optimizer/run-wave", async (req, res) => {
+    try {
+      const { date, priority } = req.body;
+
+      const validPriorities = ['early_out', 'high_priority', 'low_priority'];
+      if (!priority || !validPriorities.includes(priority)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid priority. Must be one of: ${validPriorities.join(', ')}`,
+        });
+      }
+
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      console.log(`POST /api/optimizer/run-wave - Wave ${priority} for ${workDate}`);
+
+      const { runSingleWave } = await import('./services/optimizer/runAllPhases');
+
+      const waveResult = await runSingleWave(workDate, priority);
+
+      if (waveResult.skipped) {
+        console.log(`Wave ${priority} skipped: no tasks`);
+        return res.json({ success: true, ...waveResult, message: `No ${priority} tasks to assign` });
+      }
+
+      if (waveResult.status !== 'success') {
+        console.error(`Wave ${priority} failed: ${waveResult.error}`);
+        return res.status(500).json({ success: false, ...waveResult });
+      }
+
+      console.log(`Wave ${priority} complete: ${waveResult.assignedTasks} assigned`);
+
+      res.json({
+        success: true,
+        ...waveResult,
+        message: `${waveResult.assignedTasks} ${priority} tasks assigned`,
+      });
+    } catch (error: any) {
+      console.error("Error in optimizer run-wave:", error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 

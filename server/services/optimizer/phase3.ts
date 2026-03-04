@@ -190,6 +190,13 @@ export function simulateSequence(
 
     const checkoutMinutes = parseTimeToMinutes(task.checkoutTime);
     let earliestStart = checkoutMinutes !== null ? Math.max(arrivalMinutes, checkoutMinutes) : arrivalMinutes;
+
+    if (priorityWindows && task.priorityType) {
+      const window = priorityWindows[task.priorityType];
+      if (window) {
+        earliestStart = Math.max(earliestStart, window.startMin);
+      }
+    }
     
     const cleaningTime = task.cleaningTimeMinutes || 60;
     
@@ -469,6 +476,8 @@ export interface CleanerGroups {
   cleanerName: string;
   startTime: string;
   groups: { taskIds: number[]; score: number }[];
+  anchorTask?: TaskForScheduling;
+  anchorEndTimeStr?: string;
 }
 
 function formatTimeFromMinutes(minutes: number): string {
@@ -497,8 +506,16 @@ export function runPhase3Algorithm(
   for (const cg of cleanerGroups) {
     let currentTimeStr = cg.startTime;
     let globalSequence = 0;
-    let lastTask: TaskForScheduling | null = null;
+    let lastTask: TaskForScheduling | null = cg.anchorTask ?? null;
     const cleanerConstraints = constraintsByCleaner?.get(cg.cleanerId) ?? null;
+
+    if (cg.anchorEndTimeStr) {
+      const anchorEndMin = parseTimeToMinutes(cg.anchorEndTimeStr);
+      const cleanerStartMin = parseTimeToMinutes(cg.startTime);
+      if (anchorEndMin !== null && cleanerStartMin !== null && anchorEndMin > cleanerStartMin) {
+        currentTimeStr = cg.anchorEndTimeStr;
+      }
+    }
 
     for (const group of cg.groups) {
       const result = scheduleSingleGroup(workDate, group.taskIds, tasksMap, currentTimeStr, lastTask, priorityWindows, cleanerConstraints);

@@ -164,6 +164,13 @@ export function groupToDecision(
     payload.is_single = true;
     payload.reason = group.reason;
   }
+
+  if (group.anchoredCleanerId !== undefined) {
+    payload.anchored_cleaner_id = group.anchoredCleanerId;
+  }
+  if (group.timelineTaskIds && group.timelineTaskIds.length > 0) {
+    payload.timeline_task_ids = group.timelineTaskIds;
+  }
   
   return {
     runId,

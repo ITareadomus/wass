@@ -8,6 +8,7 @@ import {
 } from './phase3';
 import { PriorityWindows, priorityPenalty, Priority } from './priorityWindows';
 import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, FairnessParams, DEFAULT_FAIRNESS_PARAMS, MinutesBasedTargets } from './phase2';
+import { TravelPolicy, getWaveLevelConstraints } from './travelPolicy';
 
 export interface Phase4Params {
   maxInsertionAttempts: number;
@@ -30,6 +31,9 @@ export interface Phase4Params {
   dynamicMaxTasks?: number;
   // Minutes-based fairness parameters
   fairness: FairnessParams;
+  // Wave-only: per-leg travel policy (mirrors Phase 1 thresholds).
+  // When set, replaces the legacy deltaTravel check with per-leg maxNewLeg validation.
+  travelPolicy?: TravelPolicy;
 }
 
 // LIMITE HARD DINAMICO - basato su dynamicMaxTasks + bonus travel per-cleaner
@@ -512,9 +516,16 @@ function tryInsertTask(
     };
   }
   
-  // Check travel constraint (soft at L3)
-  if (deltaTravel > constraints.maxTravelMinutes) {
-    if (!constraints.allowHighTravel) {
+  if (params.travelPolicy) {
+    // Wave path: check per-leg travel of the newly inserted task
+    const waveConstraints = getWaveLevelConstraints(relaxLevel, params.travelPolicy);
+    const newTaskIdx = simResult.scheduleRows.findIndex(r => r.taskId === task.taskId);
+    const legToNew = newTaskIdx >= 0 ? simResult.scheduleRows[newTaskIdx].travelMinutesFromPrev : 0;
+    const legFromNew = (newTaskIdx >= 0 && newTaskIdx + 1 < simResult.scheduleRows.length)
+      ? simResult.scheduleRows[newTaskIdx + 1].travelMinutesFromPrev : 0;
+    const maxNewLeg = Math.max(legToNew, legFromNew);
+
+    if (maxNewLeg > waveConstraints.maxNewLegLimit) {
       return {
         cleanerId: schedule.cleanerId,
         position,
@@ -525,25 +536,57 @@ function tryInsertTask(
         underfilledBonus: 0,
         totalScore: Infinity,
         feasible: false,
-        reason: 'HIGH_TRAVEL_REJECTED'
+        reason: `WAVE_LEG_${Math.round(maxNewLeg)}_EXCEEDS_${waveConstraints.maxNewLegLimit}`
       };
     }
-  }
-  
-  // Check lateness/priority violation (soft at L1+)
-  if (deltaPriorityPenalty > 50 && !constraints.allowLateness) {
-    return {
-      cleanerId: schedule.cleanerId,
-      position,
-      deltaTravel,
-      deltaWait,
-      deltaLateness: deltaPriorityPenalty,
-      priorityPenalty: simResult.totalPriorityPenalty,
-      underfilledBonus: 0,
-      totalScore: Infinity,
-      feasible: false,
-      reason: 'PRIORITY_VIOLATION_REJECTED'
-    };
+
+    if (deltaPriorityPenalty > 50 && !waveConstraints.allowLateness) {
+      return {
+        cleanerId: schedule.cleanerId,
+        position,
+        deltaTravel,
+        deltaWait,
+        deltaLateness: deltaPriorityPenalty,
+        priorityPenalty: simResult.totalPriorityPenalty,
+        underfilledBonus: 0,
+        totalScore: Infinity,
+        feasible: false,
+        reason: 'PRIORITY_VIOLATION_REJECTED'
+      };
+    }
+  } else {
+    // Normal optimizer: legacy deltaTravel check
+    if (deltaTravel > constraints.maxTravelMinutes) {
+      if (!constraints.allowHighTravel) {
+        return {
+          cleanerId: schedule.cleanerId,
+          position,
+          deltaTravel,
+          deltaWait,
+          deltaLateness: deltaPriorityPenalty,
+          priorityPenalty: simResult.totalPriorityPenalty,
+          underfilledBonus: 0,
+          totalScore: Infinity,
+          feasible: false,
+          reason: 'HIGH_TRAVEL_REJECTED'
+        };
+      }
+    }
+
+    if (deltaPriorityPenalty > 50 && !constraints.allowLateness) {
+      return {
+        cleanerId: schedule.cleanerId,
+        position,
+        deltaTravel,
+        deltaWait,
+        deltaLateness: deltaPriorityPenalty,
+        priorityPenalty: simResult.totalPriorityPenalty,
+        underfilledBonus: 0,
+        totalScore: Infinity,
+        feasible: false,
+        reason: 'PRIORITY_VIOLATION_REJECTED'
+      };
+    }
   }
   
   let underfilledBonus = 0;
@@ -572,13 +615,17 @@ function tryInsertTask(
   const overGap = Math.max(0, newLoadMin - targets.maxTarget);
   const overloadPenalty = Math.pow(overGap, 2) * fairness.k_over;
   
+  // Continuous balance penalty (consistent with Phase 2)
+  const aboveAvg = Math.max(0, newLoadMin - targets.targetLoadMin);
+  const balancePenalty = aboveAvg * fairness.k_balance;
+  
   // Bonus for empty cleaners
   const zeroBonus = currentLoadMin === 0 ? fairness.zeroBonus : 0;
   
   // Include relaxPenalty nel totalScore - così soluzioni a livello più basso vincono sempre
   const relaxPenaltyValue = relaxPenalty(relaxLevel, params);
   const totalScore = deltaTravel + (deltaWait * 0.5) + (deltaPriorityPenalty * 2) 
-    - underfilledBonus - minutesUnderBonus - zeroBonus + overloadPenalty + relaxPenaltyValue;
+    - underfilledBonus - minutesUnderBonus - zeroBonus + overloadPenalty + balancePenalty + relaxPenaltyValue;
   
   return {
     cleanerId: schedule.cleanerId,
@@ -753,16 +800,22 @@ function trySwapForTask(
         continue;
       }
       
-      // Calcola travel delta approssimativo
-      const travelDelta = simResult.totalTravel - schedule.totalTravel;
-      if (travelDelta > constraints.maxTravelMinutes && !constraints.allowHighTravel) {
-        continue;
-      }
-      
-      // Verifica priority penalty
-      const priorityDelta = simResult.totalPriorityPenalty - schedule.totalPriorityPenalty;
-      if (priorityDelta > 50 && !constraints.allowLateness) {
-        continue;
+      if (params.travelPolicy) {
+        // Wave path: check the new task's leg travel
+        const waveConstraints = getWaveLevelConstraints(relaxLevel, params.travelPolicy);
+        const newTaskRow = simResult.scheduleRows.find(r => r.taskId === task.taskId);
+        const maxNewLeg = newTaskRow?.travelMinutesFromPrev ?? 0;
+        if (maxNewLeg > waveConstraints.maxNewLegLimit) continue;
+
+        const priorityDelta = simResult.totalPriorityPenalty - schedule.totalPriorityPenalty;
+        if (priorityDelta > 50 && !waveConstraints.allowLateness) continue;
+      } else {
+        // Normal optimizer: legacy deltaTravel check
+        const travelDelta = simResult.totalTravel - schedule.totalTravel;
+        if (travelDelta > constraints.maxTravelMinutes && !constraints.allowHighTravel) continue;
+
+        const priorityDelta = simResult.totalPriorityPenalty - schedule.totalPriorityPenalty;
+        if (priorityDelta > 50 && !constraints.allowLateness) continue;
       }
       
       // Calcola guadagno netto (include relaxPenalty nel costo)

@@ -23,11 +23,15 @@ export type Phase1Params = {
   useAdjacentZones: boolean;
   minGroupSize?: number;           // Dynamic: min task per gruppo
   maxGroupSize?: number;           // Dynamic: max task per gruppo
+  // Merge/wave: remaining task slots per cleaner (cleanerId → slots left)
+  // Limits neighborLimit and maxGroupSize for each anchored cleaner so
+  // cleaners with many pre-existing tasks don't get overloaded.
+  remainingSlotsPerCleaner?: Map<number, number>;
 };
 
 export const DEFAULT_PHASE1_PARAMS: Phase1Params = {
   nearbySeedMaxMin: 15,
-  fallbackSeedMaxMin: 20,
+  fallbackSeedMaxMin: 25,
   minNearbyBeforeFallback: 8,
   createSingleGroups: true,
   neighborLimit: 15,
@@ -50,6 +54,8 @@ export type CandidateGroup = {
   reason?: string;
   hasStraordinaria?: boolean;
   isLongStraordinaria?: boolean;
+  anchoredCleanerId?: number;
+  timelineTaskIds?: number[];
 };
 
 export type Phase1Event = {
@@ -106,7 +112,11 @@ export function estimateTravelMinutesWithProvider(
   return estimateTravelMinutes(a, b);
 }
 
-export function generateCandidateGroups(tasks: TaskInput[], params: Phase1Params): Phase1Result {
+export function generateCandidateGroups(
+  tasks: TaskInput[],
+  params: Phase1Params,
+  timelineSeeds?: Map<number, number>
+): Phase1Result {
   const events: Phase1Event[] = [];
   let fallbackSeedCount = 0;
   let singleGroupCount = 0;
@@ -125,104 +135,198 @@ export function generateCandidateGroups(tasks: TaskInput[], params: Phase1Params
 
   const groupMap = new Map<string, CandidateGroup>();
 
-  for (const seed of tasksWithZone) {
-    const seedZone = seed.zone as number;
+  if (timelineSeeds && timelineSeeds.size > 0) {
+    // =========================================================================
+    // MERGE / WAVE MODE: groups centered on cleaner positions
+    // Seeds are ONLY the cleaner's last timeline task. Neighbors are ONLY new
+    // tasks. Every group is born anchored to its cleaner.
+    // =========================================================================
+    const seedTaskIds = new Set(timelineSeeds.keys());
+    const cleanerSeeds = tasksWithZone.filter(t => seedTaskIds.has(t.taskId));
+    const newTasks = tasksWithZone.filter(t => !seedTaskIds.has(t.taskId));
 
-    let pool: TaskInput[] = [...(byZone.get(seedZone) ?? [])].filter(t => t.taskId !== seed.taskId);
+    const newByZone = new Map<number, TaskInput[]>();
+    for (const t of newTasks) {
+      const z = t.zone as number;
+      if (!newByZone.has(z)) newByZone.set(z, []);
+      newByZone.get(z)!.push(t);
+    }
 
-    if (params.useAdjacentZones) {
-      const adj = getAdjacentZones(seedZone as ZoneId, false);
-      for (const z of adj) {
-        pool.push(...(byZone.get(z) ?? []));
+    const coveredTaskIds = new Set<number>();
+
+    for (const seed of cleanerSeeds) {
+      const cleanerId = timelineSeeds.get(seed.taskId)!;
+      const seedZone = seed.zone as number;
+
+      let pool: TaskInput[] = [...(newByZone.get(seedZone) ?? [])];
+      if (params.useAdjacentZones) {
+        const adj = getAdjacentZones(seedZone as ZoneId, false);
+        for (const z of adj) {
+          pool.push(...(newByZone.get(z) ?? []));
+        }
       }
-    }
 
-    const seen = new Set<number>();
-    pool = pool.filter(t => {
-      if (seen.has(t.taskId)) return false;
-      seen.add(t.taskId);
-      return true;
-    });
+      const seen = new Set<number>();
+      pool = pool.filter(t => {
+        if (seen.has(t.taskId)) return false;
+        seen.add(t.taskId);
+        return true;
+      });
 
-    const rankedAll = pool
-      .map(t => ({ t, d: estimateTravelMinutes(seed, t) }))
-      .sort((a, b) => a.d - b.d);
+      const rankedAll = pool
+        .map(t => ({ t, d: estimateTravelMinutes(seed, t) }))
+        .sort((a, b) => a.d - b.d);
 
-    const nearby15 = rankedAll.filter(x => x.d <= params.nearbySeedMaxMin);
+      const nearby15 = rankedAll.filter(x => x.d <= params.nearbySeedMaxMin);
+      let ranked = nearby15;
+      let usedFallback = false;
 
-    let ranked = nearby15;
-    let usedFallback = false;
+      if (nearby15.length < params.minNearbyBeforeFallback) {
+        ranked = rankedAll.filter(x => x.d <= params.fallbackSeedMaxMin);
+        usedFallback = ranked.length > nearby15.length;
+      }
 
-    if (nearby15.length < params.minNearbyBeforeFallback) {
-      ranked = rankedAll.filter(x => x.d <= params.fallbackSeedMaxMin);
-      usedFallback = ranked.length > nearby15.length;
-    }
+      if (usedFallback) {
+        fallbackSeedCount++;
+        events.push({
+          eventType: "PHASE1_USED_FALLBACK_20",
+          payload: {
+            seed_task: seed.taskId,
+            seed_logistic_code: seed.logisticCode,
+            seed_zone: seedZone,
+            cleaner_id: cleanerId,
+            nearby_count_15: nearby15.length,
+            neighbors_count_selected: ranked.length,
+            nearby_threshold: params.nearbySeedMaxMin,
+            fallback_threshold: params.fallbackSeedMaxMin
+          }
+        });
+      }
 
-    if (usedFallback) {
-      fallbackSeedCount++;
+      // Cap neighborLimit and maxGroupSize based on how many task slots remain for
+      // this cleaner. A cleaner with 3 pre-existing tasks and a baseMax of 4 has
+      // only 1 remaining slot → no point generating groups larger than 1 new task.
+      // When remainingSlots = 0, the cleaner is at/above target — skip group generation
+      // so their nearby tasks become non-anchored singles assignable to any cleaner.
+      const remainingSlots = params.remainingSlotsPerCleaner?.get(cleanerId) ?? params.neighborLimit;
+
+      if (remainingSlots <= 0) {
+        events.push({
+          eventType: "PHASE1_CLEANER_SEED_SKIPPED",
+          payload: {
+            cleaner_id: cleanerId,
+            seed_task: seed.taskId,
+            seed_logistic_code: seed.logisticCode,
+            seed_zone: seedZone,
+            remaining_slots: 0,
+            reason: 'CLEANER_AT_OR_ABOVE_TARGET'
+          }
+        });
+        continue;
+      }
+
+      const effectiveNeighborLimit = Math.min(params.neighborLimit, remainingSlots);
+      const neighbors = ranked.slice(0, effectiveNeighborLimit).map(x => x.t);
+      // Seed is a positional anchor (already assigned), not a real task to schedule.
+      // Override minGroupSize to 2 (seed + 1 new task) so pairs aren't rejected
+      // by dynamic limits meant for the normal optimizer.
+      const anchoredMinGS = 2;
+      // Also cap maxGroupSize: a cleaner with 1 remaining slot should only form pairs
+      // (seed + 1 new task), not larger groups.
+      const maxGS = Math.min(params.maxGroupSize ?? 4, 1 + remainingSlots);
+
+      for (const a of neighbors) {
+        addGroup([seed, a], seed, seedZone, groupMap, anchoredMinGS, maxGS);
+      }
+
+      const candidates2 = comb2(neighbors);
+      for (const [a, b] of candidates2) {
+        addGroup([seed, a, b], seed, seedZone, groupMap, anchoredMinGS, maxGS);
+      }
+
+      const candidates3 = comb3(neighbors);
+      for (const [a, b, c] of candidates3) {
+        const g4 = [seed, a, b, c];
+        if (allowFourth(g4) && maxGS >= 4) {
+          addGroup(g4, seed, seedZone, groupMap, anchoredMinGS, maxGS);
+        }
+        addGroup([seed, a, b], seed, seedZone, groupMap, anchoredMinGS, maxGS);
+        addGroup([seed, a, c], seed, seedZone, groupMap, anchoredMinGS, maxGS);
+        addGroup([seed, b, c], seed, seedZone, groupMap, anchoredMinGS, maxGS);
+      }
+
+      for (const n of neighbors) {
+        coveredTaskIds.add(n.taskId);
+      }
+
       events.push({
-        eventType: "PHASE1_USED_FALLBACK_20",
+        eventType: "PHASE1_CLEANER_SEED_PROCESSED",
         payload: {
+          cleaner_id: cleanerId,
           seed_task: seed.taskId,
           seed_logistic_code: seed.logisticCode,
           seed_zone: seedZone,
-          nearby_count_15: nearby15.length,
-          neighbors_count_selected: ranked.length,
-          nearby_threshold: params.nearbySeedMaxMin,
-          fallback_threshold: params.fallbackSeedMaxMin
+          nearby_new_tasks: neighbors.length,
+          remaining_slots: remainingSlots,
+          groups_created: groupMap.size
         }
       });
     }
 
-    const neighbors = ranked.slice(0, params.neighborLimit).map(x => x.t);
+    // Tag all groups containing a timeline seed with anchoredCleanerId
+    const toRemove: string[] = [];
+    groupMap.forEach((group, key) => {
+      let anchorCleanerId: number | undefined;
+      let hasNewTask = false;
+      let mixedCleaners = false;
+      const tlTaskIds: number[] = [];
 
-    let groupsAddedForSeed = 0;
-    const countBefore = groupMap.size;
-    
-    const minGS = params.minGroupSize ?? 1;
-    const maxGS = params.maxGroupSize ?? 4;
-
-    for (const a of neighbors) {
-      addGroup([seed, a], seed, seedZone, groupMap, minGS, maxGS);
-    }
-
-    const candidates2 = comb2(neighbors);
-    for (const [a, b] of candidates2) {
-      addGroup([seed, a, b], seed, seedZone, groupMap, minGS, maxGS);
-    }
-
-    const candidates3 = comb3(neighbors);
-    for (const [a, b, c] of candidates3) {
-      const g4 = [seed, a, b, c];
-      if (allowFourth(g4) && maxGS >= 4) {
-        addGroup(g4, seed, seedZone, groupMap, minGS, maxGS);
+      for (let i = 0; i < group.taskIds.length; i++) {
+        const cid = timelineSeeds.get(group.taskIds[i]);
+        if (cid !== undefined) {
+          tlTaskIds.push(group.taskIds[i]);
+          if (anchorCleanerId === undefined) {
+            anchorCleanerId = cid;
+          } else if (anchorCleanerId !== cid) {
+            mixedCleaners = true;
+          }
+        } else {
+          hasNewTask = true;
+        }
       }
-      addGroup([seed, a, b], seed, seedZone, groupMap, minGS, maxGS);
-      addGroup([seed, a, c], seed, seedZone, groupMap, minGS, maxGS);
-      addGroup([seed, b, c], seed, seedZone, groupMap, minGS, maxGS);
+
+      if (tlTaskIds.length > 0) {
+        if (mixedCleaners || !hasNewTask) {
+          toRemove.push(key);
+        } else {
+          group.anchoredCleanerId = anchorCleanerId;
+          group.timelineTaskIds = tlTaskIds;
+        }
+      }
+    });
+
+    for (let i = 0; i < toRemove.length; i++) {
+      groupMap.delete(toRemove[i]);
     }
 
-    groupsAddedForSeed = groupMap.size - countBefore;
+    // Create single groups for new tasks not near any cleaner (deferred to Phase 4)
+    for (const task of newTasks) {
+      if (coveredTaskIds.has(task.taskId)) continue;
+      const taskZone = task.zone as number;
+      const isOT = task.straordinaria === true;
+      const cleaningTime = task.cleaningTimeMinutes ?? 60;
+      const isLongOT = isOT && cleaningTime >= 360;
+      const singleKey = String(task.taskId);
 
-    // Solo straordinarie possono essere gruppi singoli in Phase 1
-    // I task normali isolati vanno a Phase 4 per recovery
-    const isStraordinariaSeed = seed.straordinaria === true;
-    const cleaningTime = seed.cleaningTimeMinutes ?? 60;
-    const isLongOT = isStraordinariaSeed && cleaningTime >= 360;
-    
-    if (groupsAddedForSeed === 0 && params.createSingleGroups) {
-      const singleKey = String(seed.taskId);
       if (!groupMap.has(singleKey)) {
-        // Straordinarie possono essere gruppi singoli (validi)
-        // Task normali isolati → Phase 4 li gestirà
-        if (isStraordinariaSeed) {
-          const singleScore = isLongOT ? 50 : 35; // Score più alto per OT singole
+        if (isOT) {
+          const singleScore = isLongOT ? 50 : 35;
           groupMap.set(singleKey, {
-            taskIds: [seed.taskId],
-            logisticCodes: [seed.logisticCode],
-            zone: seedZone,
-            seedTaskId: seed.taskId,
-            seedLogisticCode: seed.logisticCode,
+            taskIds: [task.taskId],
+            logisticCodes: [task.logisticCode],
+            zone: taskZone,
+            seedTaskId: task.taskId,
+            seedLogisticCode: task.logisticCode,
             avgTravelMin: 0,
             maxTravelMin: 0,
             score: singleScore,
@@ -232,29 +336,149 @@ export function generateCandidateGroups(tasks: TaskInput[], params: Phase1Params
             isLongStraordinaria: isLongOT
           });
           singleGroupCount++;
-          events.push({
-            eventType: "PHASE1_GROUP_SINGLE_OT_CREATED",
-            payload: {
-              tasks: [seed.taskId],
-              logistic_codes: [seed.logisticCode],
-              zone: seedZone,
-              score: singleScore,
-              reason: "STRAORDINARIA_SINGLE_VALID",
-              is_long_ot: isLongOT
-            }
-          });
         } else {
-          // Task normale isolato: loggalo ma NON creare il gruppo singolo
-          // Phase 4 gestirà questo task
           events.push({
-            eventType: "PHASE1_TASK_ISOLATED_DEFER_TO_PHASE4",
+            eventType: "PHASE1_TASK_NOT_NEAR_ANY_CLEANER",
             payload: {
-              task_id: seed.taskId,
-              logistic_code: seed.logisticCode,
-              zone: seedZone,
-              reason: "ISOLATED_NO_NEIGHBORS_UNDER_20_NORMAL_TASK"
+              task_id: task.taskId,
+              logistic_code: task.logisticCode,
+              zone: taskZone,
+              reason: "NO_NEARBY_CLEANER_POSITION"
             }
           });
+        }
+      }
+    }
+
+  } else {
+    // =========================================================================
+    // NORMAL OPTIMIZER: groups by mutual task proximity (unchanged)
+    // =========================================================================
+    for (const seed of tasksWithZone) {
+      const seedZone = seed.zone as number;
+
+      let pool: TaskInput[] = [...(byZone.get(seedZone) ?? [])].filter(t => t.taskId !== seed.taskId);
+
+      if (params.useAdjacentZones) {
+        const adj = getAdjacentZones(seedZone as ZoneId, false);
+        for (const z of adj) {
+          pool.push(...(byZone.get(z) ?? []));
+        }
+      }
+
+      const seen = new Set<number>();
+      pool = pool.filter(t => {
+        if (seen.has(t.taskId)) return false;
+        seen.add(t.taskId);
+        return true;
+      });
+
+      const rankedAll = pool
+        .map(t => ({ t, d: estimateTravelMinutes(seed, t) }))
+        .sort((a, b) => a.d - b.d);
+
+      const nearby15 = rankedAll.filter(x => x.d <= params.nearbySeedMaxMin);
+
+      let ranked = nearby15;
+      let usedFallback = false;
+
+      if (nearby15.length < params.minNearbyBeforeFallback) {
+        ranked = rankedAll.filter(x => x.d <= params.fallbackSeedMaxMin);
+        usedFallback = ranked.length > nearby15.length;
+      }
+
+      if (usedFallback) {
+        fallbackSeedCount++;
+        events.push({
+          eventType: "PHASE1_USED_FALLBACK_20",
+          payload: {
+            seed_task: seed.taskId,
+            seed_logistic_code: seed.logisticCode,
+            seed_zone: seedZone,
+            nearby_count_15: nearby15.length,
+            neighbors_count_selected: ranked.length,
+            nearby_threshold: params.nearbySeedMaxMin,
+            fallback_threshold: params.fallbackSeedMaxMin
+          }
+        });
+      }
+
+      const neighbors = ranked.slice(0, params.neighborLimit).map(x => x.t);
+
+      let groupsAddedForSeed = 0;
+      const countBefore = groupMap.size;
+
+      const minGS = params.minGroupSize ?? 1;
+      const maxGS = params.maxGroupSize ?? 4;
+
+      for (const a of neighbors) {
+        addGroup([seed, a], seed, seedZone, groupMap, minGS, maxGS);
+      }
+
+      const candidates2 = comb2(neighbors);
+      for (const [a, b] of candidates2) {
+        addGroup([seed, a, b], seed, seedZone, groupMap, minGS, maxGS);
+      }
+
+      const candidates3 = comb3(neighbors);
+      for (const [a, b, c] of candidates3) {
+        const g4 = [seed, a, b, c];
+        if (allowFourth(g4) && maxGS >= 4) {
+          addGroup(g4, seed, seedZone, groupMap, minGS, maxGS);
+        }
+        addGroup([seed, a, b], seed, seedZone, groupMap, minGS, maxGS);
+        addGroup([seed, a, c], seed, seedZone, groupMap, minGS, maxGS);
+        addGroup([seed, b, c], seed, seedZone, groupMap, minGS, maxGS);
+      }
+
+      groupsAddedForSeed = groupMap.size - countBefore;
+
+      const isStraordinariaSeed = seed.straordinaria === true;
+      const cleaningTime = seed.cleaningTimeMinutes ?? 60;
+      const isLongOT = isStraordinariaSeed && cleaningTime >= 360;
+
+      if (groupsAddedForSeed === 0 && params.createSingleGroups) {
+        const singleKey = String(seed.taskId);
+        if (!groupMap.has(singleKey)) {
+          if (isStraordinariaSeed) {
+            const singleScore = isLongOT ? 50 : 35;
+            groupMap.set(singleKey, {
+              taskIds: [seed.taskId],
+              logisticCodes: [seed.logisticCode],
+              zone: seedZone,
+              seedTaskId: seed.taskId,
+              seedLogisticCode: seed.logisticCode,
+              avgTravelMin: 0,
+              maxTravelMin: 0,
+              score: singleScore,
+              isSingle: true,
+              reason: "STRAORDINARIA_SINGLE_VALID",
+              hasStraordinaria: true,
+              isLongStraordinaria: isLongOT
+            });
+            singleGroupCount++;
+            events.push({
+              eventType: "PHASE1_GROUP_SINGLE_OT_CREATED",
+              payload: {
+                tasks: [seed.taskId],
+                logistic_codes: [seed.logisticCode],
+                zone: seedZone,
+                score: singleScore,
+                reason: "STRAORDINARIA_SINGLE_VALID",
+                is_long_ot: isLongOT
+              }
+            });
+          } else {
+            events.push({
+              eventType: "PHASE1_TASK_ISOLATED_DEFER_TO_PHASE4",
+              payload: {
+                task_id: seed.taskId,
+                logistic_code: seed.logisticCode,
+                zone: seedZone,
+                reason: "ISOLATED_NO_NEIGHBORS_UNDER_20_NORMAL_TASK"
+              }
+            });
+          }
         }
       }
     }

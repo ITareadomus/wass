@@ -36,6 +36,7 @@ export interface GroupCandidate {
   hasStraordinaria?: boolean;
   isLongStraordinaria?: boolean;
   minCompatibleCleaners?: number; // Scarcity: min cleaners compatibili tra i task del gruppo
+  anchoredCleanerId?: number;     // Wave: group is anchored to this cleaner (contains their timeline task)
 }
 
 export interface ApartmentTypes {
@@ -56,6 +57,7 @@ export interface FairnessParams {
   wT: number;              // weight for travel in load calculation (loadMin = workMin + wT * travelMin)
   k_under: number;         // bonus multiplier for underfilled cleaners
   k_over: number;          // penalty multiplier for overloaded cleaners (quadratic)
+  k_balance: number;       // continuous penalty per minute above average (eliminates dead zone between minTarget and maxTarget)
   zeroBonus: number;       // bonus in "equivalent minutes" for cleaners with zero load
   minTargetRatio: number;  // ratio for minimum target (e.g., 0.6 = 60% of average)
   maxTargetRatio: number;  // ratio for maximum target (e.g., 1.25 = 125% of average)
@@ -63,12 +65,21 @@ export interface FairnessParams {
 
 export const DEFAULT_FAIRNESS_PARAMS: FairnessParams = {
   wT: 1.0,                 // travel counts as much as work
-  k_under: 3,              // 30 min gap = ~10 points bonus
+  k_under: 6,              // 30 min gap = ~20 points bonus (stronger pull toward underfilled cleaners)
   k_over: 0.05,            // quadratic penalty: (over^2) * k_over
+  k_balance: 2,            // continuous: 2 pts per minute above average (soft nudge, main rebalancing happens in Phase 5)
   zeroBonus: 30,           // 30 min equivalent bonus for empty cleaners
   minTargetRatio: 0.6,     // cleaners under 60% of target get bonus
   maxTargetRatio: 1.25     // cleaners over 125% of target get penalty
 };
+
+export interface CleanerFixedStats {
+  fixedTaskCount: number;
+  fixedHasAnyOT: boolean;
+  fixedHasLongOT: boolean;
+  fixedWorkMinutes: number;
+  fixedTravelMinutes: number;
+}
 
 export interface Phase2Params {
   travelWeight: number;
@@ -78,6 +89,8 @@ export interface Phase2Params {
   dynamicMaxTasks?: number;  // base max from totalTasks/numCleaners, bonus +1 per-cleaner if avgTravel ≤ 10min
   fairness: FairnessParams;  // minutes-based fairness parameters
   initialLoadByCleanerMin?: Map<number, number>; // Pre-existing load from timeline (minutes)
+  initialLastPositionByCleaner?: Map<number, { lat: number; lng: number }>; // Last known geographic position from timeline
+  initialFixedStatsByCleaner?: Map<number, CleanerFixedStats>; // Pre-existing task/OT counts from timeline
 }
 
 export const DEFAULT_PHASE2_PARAMS: Phase2Params = {
@@ -123,13 +136,15 @@ export interface MinutesBasedTargets {
 export function calculateMinutesBasedTargets(
   tasks: TaskForPhase2[],
   numCleaners: number,
-  fairness: FairnessParams
+  fairness: FairnessParams,
+  preExistingTotalLoadMin: number = 0
 ): MinutesBasedTargets {
   if (numCleaners <= 0) {
     return { targetLoadMin: 60, minTarget: 36, maxTarget: 75, totalWorkMin: 60, numCleaners: 1 };
   }
   
-  const totalWorkMin = tasks.reduce((sum, t) => sum + (t.cleaningTime || 60), 0);
+  const remainingWorkMin = tasks.reduce((sum, t) => sum + (t.cleaningTime || 60), 0);
+  const totalWorkMin = remainingWorkMin + preExistingTotalLoadMin;
   const targetLoadMin = totalWorkMin / numCleaners;
   
   return {
@@ -155,6 +170,7 @@ export interface CleanerScore {
     preferenceBonus: number;
     underBonus: number;      // bonus for underfilled cleaners
     overPenalty: number;     // penalty for overloaded cleaners
+    balancePenalty: number;  // continuous penalty for load above average
     zeroBonus: number;       // bonus for empty cleaners
   };
 }
@@ -314,17 +330,21 @@ export function scoreCleanerForGroup(
   const overGap = Math.max(0, newLoadMin - targets.maxTarget);
   const overPenalty = Math.pow(overGap, 2) * fairness.k_over;
   
+  // Continuous balance penalty: penalizes any load above average (eliminates dead zone)
+  const aboveAvg = Math.max(0, newLoadMin - targets.targetLoadMin);
+  const balancePenalty = aboveAvg * fairness.k_balance;
+  
   // Bonus for empty cleaners
   const zeroBonus = currentLoadMin === 0 ? fairness.zeroBonus : 0;
   
   // Final score: base + bonuses - penalties
-  // NOTE: loadPenalty removed - minutes-based underBonus/overPenalty now handle fairness
   const finalScore = baseScore 
     - travelPenalty 
     + prefBonus 
     + underBonus 
     + zeroBonus 
-    - overPenalty;
+    - overPenalty
+    - balancePenalty;
   
   return {
     cleanerId: cleaner.cleanerId,
@@ -340,6 +360,7 @@ export function scoreCleanerForGroup(
       preferenceBonus: prefBonus,
       underBonus: Math.round(underBonus * 10) / 10,
       overPenalty: Math.round(overPenalty * 10) / 10,
+      balancePenalty: Math.round(balancePenalty * 10) / 10,
       zeroBonus
     }
   };
@@ -414,22 +435,36 @@ export function runPhase2Algorithm(
   const cleanerTravelMin = new Map<number, number>();   // Total travel minutes assigned
   
   const initialLoad = params.initialLoadByCleanerMin ?? new Map<number, number>();
+  const initialPositions = params.initialLastPositionByCleaner ?? new Map<number, { lat: number; lng: number }>();
+  const initialFixedStats = params.initialFixedStatsByCleaner ?? new Map<number, CleanerFixedStats>();
   
   cleaners.forEach(c => {
     const preLoad = initialLoad.get(c.cleanerId) ?? 0;
-    cleanerTaskCount.set(c.cleanerId, 0);  // Task count (for straordinaria rules)
+    const fixedStats = initialFixedStats.get(c.cleanerId);
+
+    // Seed task/OT counts from existing timeline so constraints reflect remaining capacity.
+    // For straordinariaDuration: use 0 for short OT (< 6h) or 999 for long OT (≥ 6h) so
+    // the threshold comparison STRAORDINARIA_LONG_THRESHOLD_MIN=360 works correctly even
+    // though fixedWorkMinutes includes all task durations, not just the OT.
+    const fixedOtDurationProxy = fixedStats?.fixedHasLongOT ? 999 : 0;
+    cleanerTaskCount.set(c.cleanerId, fixedStats?.fixedTaskCount ?? 0);
     cleanerLoadMin.set(c.cleanerId, preLoad);    // Minutes-based load = workMin + wT * travelMin (includes pre-existing)
     cleanerTotalTravel.set(c.cleanerId, 0);
-    cleanerHasStraordinaria.set(c.cleanerId, false);
-    cleanerStraordinariaDuration.set(c.cleanerId, 0);
-    cleanerTotalCleaningTime.set(c.cleanerId, 0);
+    cleanerHasStraordinaria.set(c.cleanerId, fixedStats?.fixedHasAnyOT ?? false);
+    cleanerStraordinariaDuration.set(c.cleanerId, fixedOtDurationProxy);
+    cleanerTotalCleaningTime.set(c.cleanerId, fixedStats?.fixedWorkMinutes ?? 0);
     cleanerWorkMin.set(c.cleanerId, preLoad);  // Pre-existing work minutes
     cleanerTravelMin.set(c.cleanerId, 0);
+    const pos = initialPositions.get(c.cleanerId);
+    if (pos) {
+      cleanerLastPosition.set(c.cleanerId, pos);
+    }
   });
   
-  // Calculate minutes-based fairness targets
+  // Calculate minutes-based fairness targets (include pre-existing load so maxTarget reflects total day's work)
   const allTasks = Array.from(tasksMap.values());
-  const targets = calculateMinutesBasedTargets(allTasks, cleaners.length, params.fairness);
+  const preExistingTotalLoadMin = Array.from(initialLoad.values()).reduce((sum, v) => sum + v, 0);
+  const targets = calculateMinutesBasedTargets(allTasks, cleaners.length, params.fairness, preExistingTotalLoadMin);
   
   events.push({
     eventType: 'PHASE2_FAIRNESS_TARGETS',
@@ -486,8 +521,6 @@ export function runPhase2Algorithm(
   let groupsUnassigned = 0;
   let tasksDropped = 0;
   
-  // Traccia OT TASK REALI non ancora assegnate (non gruppi candidati!)
-  // Questo evita di bloccare cleaners basandosi su gruppi duplicati contenenti la stessa OT
   const otTaskIds = new Set<number>();
   tasksMap.forEach((task, taskId) => {
     if (task.straordinaria) otTaskIds.add(taskId);
@@ -649,7 +682,22 @@ export function runPhase2Algorithm(
       // Usa otTaskIds (task reali) invece di gruppi candidati per evitare blocchi eccessivi
       const remainingOtTasks = otTaskIds.size - assignedOtTaskIds.size;
       
-      for (const cleaner of cleaners) {
+      // For anchored groups, try the anchor cleaner first.
+      // If the anchor is already at/above maxTarget, fall back to all cleaners
+      // so the task isn't forced onto an overloaded cleaner.
+      let cleanerPool: CleanerInput[];
+      if (group.anchoredCleanerId !== undefined) {
+        const anchorLoad = cleanerLoadMin.get(group.anchoredCleanerId) || 0;
+        if (anchorLoad >= targets.maxTarget) {
+          cleanerPool = cleaners;
+        } else {
+          cleanerPool = cleaners.filter(c => c.cleanerId === group.anchoredCleanerId);
+        }
+      } else {
+        cleanerPool = cleaners;
+      }
+
+      for (const cleaner of cleanerPool) {
         const taskCount = cleanerTaskCount.get(cleaner.cleanerId) || 0;
         const currentLoadMinValue = cleanerLoadMin.get(cleaner.cleanerId) || 0;
         const totalTravel = cleanerTotalTravel.get(cleaner.cleanerId) || 0;
@@ -673,10 +721,9 @@ export function runPhase2Algorithm(
         const straordinariaDuration = cleanerStraordinariaDuration.get(cleaner.cleanerId) || 0;
         
         // Rule 0: Riserva cleaner straordinari per OT TASK REALI non ancora assegnate
-        // Se ci sono ancora OT da assegnare e questo gruppo NON è OT,
-        // blocca i cleaner canDoStraordinaria (indipendentemente dal loro carico attuale)
-        // Questo garantisce che i cleaner straordinari restino disponibili per le OT
-        if (!groupHasStraordinaria && remainingOtTasks > 0 && cleaner.canDoStraordinaria) {
+        // Skip OT reservation for anchored groups (the cleaner is fixed by the timeline)
+        if (!groupHasStraordinaria && remainingOtTasks > 0 && cleaner.canDoStraordinaria
+            && group.anchoredCleanerId === undefined) {
           incompatibleReasons.push({ cleanerId: cleaner.cleanerId, reasons: ['RESERVED_FOR_PENDING_OT'] });
           continue;
         }
