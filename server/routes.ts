@@ -1111,7 +1111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📖 GET /api/cleaners - Caricamento cleaners per ${workDate}`);
 
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
-      const cleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate);
+      let cleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate);
 
       if (!cleaners || cleaners.length === 0) {
         // PostgreSQL is the only source of truth - no filesystem fallback
@@ -1122,6 +1122,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
           metadata: { date: workDate, source: 'postgresql' }
         });
       }
+
+      // Arricchisci con last_worked_date da app_housekeeping (ADAM MySQL)
+      const lastWorkedByCleanerId = new Map<number, string>();
+      try {
+        const adamConnection = await mysql.createConnection({
+          host: databaseConfig.mysql.host,
+          port: databaseConfig.mysql.port,
+          user: databaseConfig.mysql.user,
+          password: databaseConfig.mysql.password,
+          database: databaseConfig.mysql.database,
+        });
+        try {
+          const [rows]: any = await adamConnection.execute(
+            `SELECT cleaned_by_us, MAX(checkout) AS latest_cleaning
+             FROM app_housekeeping
+             WHERE cleaned = 1
+             GROUP BY cleaned_by_us`
+          );
+          const list = Array.isArray(rows) ? rows : [];
+          for (const r of list) {
+            const id = Number(r?.cleaned_by_us);
+            const checkout = r?.latest_cleaning;
+            if (!Number.isFinite(id) || checkout == null) continue;
+            let dateStr: string;
+            if (checkout instanceof Date) {
+              dateStr = format(checkout, "yyyy-MM-dd");
+            } else {
+              const s = String(checkout).trim();
+              const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+              if (isoMatch) {
+                dateStr = `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+              } else {
+                const d = new Date(s);
+                dateStr = !isNaN(d.getTime()) ? format(d, "yyyy-MM-dd") : "";
+              }
+            }
+            if (dateStr) lastWorkedByCleanerId.set(id, dateStr);
+          }
+        } finally {
+          await adamConnection.end();
+        }
+      } catch (adamErr: any) {
+        console.warn("⚠️ ADAM non disponibile per last_worked_date:", adamErr?.message);
+      }
+
+      cleaners = cleaners.map((c: any) => ({
+        ...c,
+        last_worked_date: lastWorkedByCleanerId.get(Number(c.id)) ?? null,
+      }));
 
       console.log(`✅ Cleaners caricati da PostgreSQL per ${workDate}: ${cleaners.length}`);
       res.json({

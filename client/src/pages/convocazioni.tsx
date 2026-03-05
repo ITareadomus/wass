@@ -25,6 +25,7 @@ interface Cleaner {
   counter_days: number;
   available: boolean;
   contract_type: string;
+  last_worked_date?: string | null;
   preferred_customers: number[];
   telegram_id: number | null;
   start_time: string | null;
@@ -604,6 +605,13 @@ export default function Convocazioni() {
                         })()}h
                         <span className="mx-2">|</span>
                         <span className="font-semibold">Giorni consecutivi:</span> {cleaner.counter_days}
+                        <span className="mx-2">|</span>
+                        <span className="font-semibold">Ultimo giorno lavorato:</span> {cleaner.last_worked_date ? (() => {
+                          const s = String(cleaner.last_worked_date).trim();
+                          const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                          const d = match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : new Date(s);
+                          return isNaN(d.getTime()) ? "—" : format(d, "dd/MM/yyyy", { locale: it });
+                        })() : "—"}
                         <span className="mx-2">|</span>
                         <span className="font-semibold">Contratto:</span> {cleaner.contract_type}
                       </div>

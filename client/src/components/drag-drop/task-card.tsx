@@ -2,13 +2,22 @@ import React, { useState, useEffect } from "react";
 import { Draggable } from "react-beautiful-dnd";
 import { useQuery } from "@tanstack/react-query";
 import { TaskType as Task } from "@shared/schema";
+import { format, parseISO } from "date-fns";
+import { it } from "date-fns/locale";
 import { fetchWithOperation } from '@/lib/operationManager';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,7 +38,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Calendar, Lock, LockOpen, Users, UserPlus, Trash2 } from "lucide-react";
+import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Calendar as CalendarIcon, Lock, LockOpen, Users, UserPlus, Trash2, RefreshCw } from "lucide-react";
 import { CleanerSelectorDialog } from "@/components/dialogs/cleaner-selector-dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -480,6 +489,30 @@ const displayClickableInputClass =
   const [editedPaxIn, setEditedPaxIn] = useState("");
   const [editedOperationId, setEditedOperationId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  // Stato per il dialog Modifica Pax-In (stesso stile di Alias/Start Time in Dettagli Cleaner)
+  const [paxInDialogOpen, setPaxInDialogOpen] = useState(false);
+  const [editingPaxInInDialog, setEditingPaxInInDialog] = useState("");
+  const [isSavingPaxIn, setIsSavingPaxIn] = useState(false);
+
+  // Dialog Check-out (data + orario)
+  const [checkoutDialogOpen, setCheckoutDialogOpen] = useState(false);
+  const [checkoutDatePickerOpen, setCheckoutDatePickerOpen] = useState(false);
+  const [editingCheckoutDateInDialog, setEditingCheckoutDateInDialog] = useState("");
+  const [editingCheckoutTimeInDialog, setEditingCheckoutTimeInDialog] = useState("");
+  const [isSavingCheckout, setIsSavingCheckout] = useState(false);
+
+  // Dialog Check-in (data + orario)
+  const [checkinDialogOpen, setCheckinDialogOpen] = useState(false);
+  const [checkinDatePickerOpen, setCheckinDatePickerOpen] = useState(false);
+  const [editingCheckinDateInDialog, setEditingCheckinDateInDialog] = useState("");
+  const [editingCheckinTimeInDialog, setEditingCheckinTimeInDialog] = useState("");
+  const [isSavingCheckin, setIsSavingCheckin] = useState(false);
+
+  // Dialog Tipologia intervento
+  const [operationDialogOpen, setOperationDialogOpen] = useState(false);
+  const [editingOperationIdInDialog, setEditingOperationIdInDialog] = useState("");
+  const [isSavingOperation, setIsSavingOperation] = useState(false);
   
   // Stato per il dialog di selezione collaboratori
   const [isCleanerSelectorOpen, setIsCleanerSelectorOpen] = useState(false);
@@ -911,6 +944,360 @@ const displayClickableInputClass =
     }
   };
 
+  const handleOpenPaxInDialog = () => {
+    setEditingPaxInInDialog(String((displayTask as any).pax_in ?? 0));
+    setPaxInDialogOpen(true);
+  };
+
+  const handleSavePaxIn = async () => {
+    const value = parseInt(editingPaxInInDialog, 10);
+    if (isNaN(value) || value < 0) {
+      toast({
+        title: "Errore di validazione",
+        description: "Il numero di ospiti (Pax-In) deve essere un numero ≥ 0",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSavingPaxIn(true);
+    try {
+      const taskKey = getTaskKey(displayTask);
+      const duration = displayTask.duration || "0.0";
+      const [hours, mins] = duration.split(".").map(Number);
+      const cleaningTime = (hours || 0) * 60 + (mins || 0);
+      const operationIdValue = (displayTask as any).operation_id != null
+        ? (displayTask as any).operation_id
+        : (editedOperationId === "none" ? null : (parseInt(editedOperationId, 10) || null));
+
+      const pendingEdits = {
+        taskId: taskKey,
+        logisticCode: displayTask.name,
+        checkoutDate: (displayTask as any).checkout_date ?? null,
+        checkoutTime: (displayTask as any).checkout_time ?? null,
+        checkinDate: (displayTask as any).checkin_date ?? null,
+        checkinTime: (displayTask as any).checkin_time ?? null,
+        cleaningTime,
+        paxIn: value,
+        paxOut: (displayTask as any).pax_out,
+        operationId: operationIdValue,
+        operationIdModified: editingFields.has("operation"),
+      };
+      const existingEdits = JSON.parse(sessionStorage.getItem("pending_task_edits") || "{}");
+      existingEdits[taskKey] = pendingEdits;
+      sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
+
+      const workDate = localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const response = await fetch("/api/update-task-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: (displayTask as any).task_id || displayTask.id,
+          logisticCode: displayTask.name,
+          checkoutDate: (displayTask as any).checkout_date ?? null,
+          checkoutTime: (displayTask as any).checkout_time ?? null,
+          checkinDate: (displayTask as any).checkin_date ?? null,
+          checkinTime: (displayTask as any).checkin_time ?? null,
+          cleaningTime,
+          paxIn: value,
+          operationId: operationIdValue,
+          date: workDate,
+          modified_by: currentUser.username || "unknown",
+          skipAdam: true,
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Errore nel salvataggio");
+      }
+      toast({
+        title: "Pax-In aggiornato",
+        description: "Il valore è stato salvato. Premi 'Trasferisci su ADAM' per sincronizzare.",
+      });
+      setPaxInDialogOpen(false);
+      setPendingEditsVersion((v) => v + 1);
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile salvare Pax-In",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingPaxIn(false);
+    }
+  };
+
+  const buildPayloadFromDisplayTask = (overrides: {
+    checkoutDate?: string | null;
+    checkoutTime?: string | null;
+    checkinDate?: string | null;
+    checkinTime?: string | null;
+  }) => {
+    const duration = displayTask.duration || "0.0";
+    const [hours, mins] = duration.split(".").map(Number);
+    const cleaningTime = (hours || 0) * 60 + (mins || 0);
+    const operationIdValue = (displayTask as any).operation_id != null
+      ? (displayTask as any).operation_id
+      : (editedOperationId === "none" ? null : (parseInt(editedOperationId, 10) || null));
+    return {
+      taskKey: getTaskKey(displayTask),
+      duration,
+      cleaningTime,
+      operationIdValue,
+      checkoutDate: overrides.checkoutDate !== undefined ? overrides.checkoutDate : ((displayTask as any).checkout_date ?? null),
+      checkoutTime: overrides.checkoutTime !== undefined ? overrides.checkoutTime : ((displayTask as any).checkout_time ?? null),
+      checkinDate: overrides.checkinDate !== undefined ? overrides.checkinDate : ((displayTask as any).checkin_date ?? null),
+      checkinTime: overrides.checkinTime !== undefined ? overrides.checkinTime : ((displayTask as any).checkin_time ?? null),
+    };
+  };
+
+  const handleOpenCheckoutDialog = () => {
+    setEditingCheckoutDateInDialog(normalizeDate((displayTask as any).checkout_date));
+    setEditingCheckoutTimeInDialog(normalizeTime((displayTask as any).checkout_time));
+    setCheckoutDialogOpen(true);
+  };
+
+  const handleSaveCheckout = async () => {
+    const date = editingCheckoutDateInDialog.trim() || null;
+    const time = editingCheckoutTimeInDialog.trim() || null;
+    if (time && !date) {
+      toast({
+        title: "Errore di validazione",
+        description: "Se inserisci l'orario, devi inserire anche la data.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSavingCheckout(true);
+    try {
+      const payload = buildPayloadFromDisplayTask({
+        checkoutDate: date,
+        checkoutTime: time,
+      });
+      const pendingEdits = {
+        taskId: payload.taskKey,
+        logisticCode: displayTask.name,
+        checkoutDate: payload.checkoutDate,
+        checkoutTime: payload.checkoutTime,
+        checkinDate: payload.checkinDate,
+        checkinTime: payload.checkinTime,
+        cleaningTime: payload.cleaningTime,
+        paxIn: (displayTask as any).pax_in,
+        paxOut: (displayTask as any).pax_out,
+        operationId: payload.operationIdValue,
+        operationIdModified: editingFields.has("operation"),
+      };
+      const existingEdits = JSON.parse(sessionStorage.getItem("pending_task_edits") || "{}");
+      existingEdits[payload.taskKey] = pendingEdits;
+      sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
+
+      const workDate = localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const response = await fetch("/api/update-task-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: (displayTask as any).task_id || displayTask.id,
+          logisticCode: displayTask.name,
+          checkoutDate: payload.checkoutDate,
+          checkoutTime: payload.checkoutTime,
+          checkinDate: payload.checkinDate,
+          checkinTime: payload.checkinTime,
+          cleaningTime: payload.cleaningTime,
+          paxIn: (displayTask as any).pax_in,
+          operationId: payload.operationIdValue,
+          date: workDate,
+          modified_by: currentUser.username || "unknown",
+          skipAdam: true,
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Errore nel salvataggio");
+      }
+      toast({
+        title: "Check-out aggiornato",
+        description: "Data e orario salvati. Premi 'Trasferisci su ADAM' per sincronizzare.",
+      });
+      setCheckoutDialogOpen(false);
+      setPendingEditsVersion((v) => v + 1);
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile salvare Check-out",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingCheckout(false);
+    }
+  };
+
+  const handleOpenCheckinDialog = () => {
+    setEditingCheckinDateInDialog(normalizeDate((displayTask as any).checkin_date));
+    setEditingCheckinTimeInDialog(normalizeTime((displayTask as any).checkin_time));
+    setCheckinDialogOpen(true);
+  };
+
+  const handleSaveCheckin = async () => {
+    const date = editingCheckinDateInDialog.trim() || null;
+    const time = editingCheckinTimeInDialog.trim() || null;
+    if (time && !date) {
+      toast({
+        title: "Errore di validazione",
+        description: "Se inserisci l'orario, devi inserire anche la data.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const checkoutDate = (displayTask as any).checkout_date ?? null;
+    const checkoutTime = (displayTask as any).checkout_time ?? null;
+    if (date && time && checkoutDate && checkoutTime) {
+      const checkinDt = new Date(`${date}T${time}:00`);
+      const checkoutDt = new Date(`${checkoutDate}T${checkoutTime}:00`);
+      if (checkinDt < checkoutDt) {
+        toast({
+          title: "Errore di validazione",
+          description: "Il check-in non può essere precedente al check-out.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    setIsSavingCheckin(true);
+    try {
+      const payload = buildPayloadFromDisplayTask({
+        checkinDate: date,
+        checkinTime: time,
+      });
+      const pendingEdits = {
+        taskId: payload.taskKey,
+        logisticCode: displayTask.name,
+        checkoutDate: payload.checkoutDate,
+        checkoutTime: payload.checkoutTime,
+        checkinDate: payload.checkinDate,
+        checkinTime: payload.checkinTime,
+        cleaningTime: payload.cleaningTime,
+        paxIn: (displayTask as any).pax_in,
+        paxOut: (displayTask as any).pax_out,
+        operationId: payload.operationIdValue,
+        operationIdModified: editingFields.has("operation"),
+      };
+      const existingEdits = JSON.parse(sessionStorage.getItem("pending_task_edits") || "{}");
+      existingEdits[payload.taskKey] = pendingEdits;
+      sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
+
+      const workDate = localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const response = await fetch("/api/update-task-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: (displayTask as any).task_id || displayTask.id,
+          logisticCode: displayTask.name,
+          checkoutDate: payload.checkoutDate,
+          checkoutTime: payload.checkoutTime,
+          checkinDate: payload.checkinDate,
+          checkinTime: payload.checkinTime,
+          cleaningTime: payload.cleaningTime,
+          paxIn: (displayTask as any).pax_in,
+          operationId: payload.operationIdValue,
+          date: workDate,
+          modified_by: currentUser.username || "unknown",
+          skipAdam: true,
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Errore nel salvataggio");
+      }
+      toast({
+        title: "Check-in aggiornato",
+        description: "Data e orario salvati. Premi 'Trasferisci su ADAM' per sincronizzare.",
+      });
+      setCheckinDialogOpen(false);
+      setPendingEditsVersion((v) => v + 1);
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile salvare Check-in",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingCheckin(false);
+    }
+  };
+
+  const handleOpenOperationDialog = () => {
+    const opId = (displayTask as any).operation_id;
+    setEditingOperationIdInDialog(opId != null ? String(opId) : "none");
+    setOperationDialogOpen(true);
+  };
+
+  const handleSaveOperation = async () => {
+    const operationIdValue = editingOperationIdInDialog === "none"
+      ? null
+      : (parseInt(editingOperationIdInDialog, 10) || null);
+    setIsSavingOperation(true);
+    try {
+      const payload = buildPayloadFromDisplayTask({});
+      const pendingEdits = {
+        taskId: payload.taskKey,
+        logisticCode: displayTask.name,
+        checkoutDate: payload.checkoutDate,
+        checkoutTime: payload.checkoutTime,
+        checkinDate: payload.checkinDate,
+        checkinTime: payload.checkinTime,
+        cleaningTime: payload.cleaningTime,
+        paxIn: (displayTask as any).pax_in,
+        paxOut: (displayTask as any).pax_out,
+        operationId: operationIdValue,
+        operationIdModified: true,
+      };
+      const existingEdits = JSON.parse(sessionStorage.getItem("pending_task_edits") || "{}");
+      existingEdits[payload.taskKey] = pendingEdits;
+      sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
+
+      const workDate = localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const response = await fetch("/api/update-task-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: (displayTask as any).task_id || displayTask.id,
+          logisticCode: displayTask.name,
+          checkoutDate: payload.checkoutDate,
+          checkoutTime: payload.checkoutTime,
+          checkinDate: payload.checkinDate,
+          checkinTime: payload.checkinTime,
+          cleaningTime: payload.cleaningTime,
+          paxIn: (displayTask as any).pax_in,
+          operationId: operationIdValue,
+          date: workDate,
+          modified_by: currentUser.username || "unknown",
+          skipAdam: true,
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Errore nel salvataggio");
+      }
+      toast({
+        title: "Tipologia intervento aggiornata",
+        description: "Modifica salvata. Premi 'Trasferisci su ADAM' per sincronizzare.",
+      });
+      setOperationDialogOpen(false);
+      setPendingEditsVersion((v) => v + 1);
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile salvare la tipologia intervento",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingOperation(false);
+    }
+  };
+
   // Calcola la larghezza in base alla durata
   const calculateWidth = (duration: string | undefined, forTimeline: boolean) => {
     const safeDuration = duration || "0.0";
@@ -1213,7 +1600,7 @@ const displayClickableInputClass =
                               <div className="flex items-center gap-0.5 leading-none">
                                 {isFutureCheckin ? (
                                   <>
-                                    <Calendar className="w-3.5 h-3.5 text-red-600" strokeWidth={2.5} />
+                                    <CalendarIcon className="w-3.5 h-3.5 text-red-600" strokeWidth={2.5} />
                                     {(taskWithPendingEdits as any).checkin_time && (
                                       <span className="text-red-600 text-[11px] leading-none font-bold">
                                         {(taskWithPendingEdits as any).checkin_time}
@@ -1396,72 +1783,34 @@ const displayClickableInputClass =
               </div>
             </div>
 
-            {/* Terza riga: Check-out - Check-in */}
+            {/* Terza riga: Check-out - Check-in (click apre dialog come Pax-In) */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Check-out
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
-
-                {editingFields.has("checkout") && !isReadOnly ? (
-                  <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-                    <div className="relative">
-                      <Input
-                        id="checkout-date-input"
-                        type="date"
-                        value={editedCheckoutDate}
-                        onChange={(e) => setEditedCheckoutDate(e.target.value)}
-                        onFocus={(e) => {
-                          e.stopPropagation();
-                          setEditedCheckoutDate((prev) => normalizeDate(prev));
-                          setTimeout(() => (e.target as HTMLInputElement).showPicker?.(), 0);
-                        }}
-                        onBlur={(e) => e.stopPropagation()}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-sm cursor-text"
-                      />
-                    </div>
-                    <div className="relative">
-                      <Input
-                        id="checkout-time-input"
-                        type="time"
-                        value={editedCheckoutTime}
-                        onChange={(e) => setEditedCheckoutTime(e.target.value)}
-                        onFocus={(e) => {
-                          e.stopPropagation();
-                          setEditedCheckoutTime((prev) => normalizeTime(prev));
-                          setTimeout(() => (e.target as HTMLInputElement).showPicker?.(), 0);
-                        }}
-                        onBlur={(e) => e.stopPropagation()}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-sm cursor-text"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <Input
-                    readOnly
-                    value={
-                      (displayTask as any).checkout_date
-                        ? `${new Date((displayTask as any).checkout_date).toLocaleDateString("it-IT", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                          })}${
-                            (displayTask as any).checkout_time
-                              ? ` - ${(displayTask as any).checkout_time}`
-                              : " - orario non migrato"
-                          }`
-                        : "non migrato"
-                    }
-                    className={cn(displayClickableInputClass, !isReadOnly && "cursor-pointer hover:bg-muted/50")}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isReadOnly) toggleEditingField("checkout");
-                    }}
-                  />
-                )}
+                <Input
+                  readOnly
+                  value={
+                    (displayTask as any).checkout_date
+                      ? `${new Date((displayTask as any).checkout_date).toLocaleDateString("it-IT", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}${
+                          (displayTask as any).checkout_time
+                            ? ` - ${(displayTask as any).checkout_time}`
+                            : " - orario non migrato"
+                        }`
+                      : "non migrato"
+                  }
+                  className={cn(displayClickableInputClass, !isReadOnly && "cursor-pointer hover:bg-muted/50")}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isReadOnly) handleOpenCheckoutDialog();
+                  }}
+                />
               </div>
 
               <div>
@@ -1469,65 +1818,27 @@ const displayClickableInputClass =
                   Check-in
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
-
-                {editingFields.has("checkin") && !isReadOnly ? (
-                  <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-                    <div className="relative">
-                      <Input
-                        id="checkin-date-input"
-                        type="date"
-                        value={editedCheckinDate}
-                        onChange={(e) => setEditedCheckinDate(e.target.value)}
-                        onFocus={(e) => {
-                          e.stopPropagation();
-                          setEditedCheckinDate((prev) => normalizeDate(prev));
-                          setTimeout(() => (e.target as HTMLInputElement).showPicker?.(), 0);
-                        }}
-                        onBlur={(e) => e.stopPropagation()}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-sm cursor-text"
-                      />
-                    </div>
-                    <div className="relative">
-                      <Input
-                        id="checkin-time-input"
-                        type="time"
-                        value={editedCheckinTime}
-                        onChange={(e) => setEditedCheckinTime(e.target.value)}
-                        onFocus={(e) => {
-                          e.stopPropagation();
-                          setEditedCheckinTime((prev) => normalizeTime(prev));
-                          setTimeout(() => (e.target as HTMLInputElement).showPicker?.(), 0);
-                        }}
-                        onBlur={(e) => e.stopPropagation()}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-sm cursor-text"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <Input
-                    readOnly
-                    value={
-                      (displayTask as any).checkin_date
-                        ? `${new Date((displayTask as any).checkin_date).toLocaleDateString("it-IT", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                          })}${
-                            (displayTask as any).checkin_time
-                              ? ` - ${(displayTask as any).checkin_time}`
-                              : " - orario non migrato"
-                          }`
-                        : "non migrato"
-                    }
-                    className={cn(displayClickableInputClass, !isReadOnly && "cursor-pointer hover:bg-muted/50")}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isReadOnly) toggleEditingField("checkin");
-                    }}
-                  />
-                )}
+                <Input
+                  readOnly
+                  value={
+                    (displayTask as any).checkin_date
+                      ? `${new Date((displayTask as any).checkin_date).toLocaleDateString("it-IT", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}${
+                          (displayTask as any).checkin_time
+                            ? ` - ${(displayTask as any).checkin_time}`
+                            : " - orario non migrato"
+                        }`
+                      : "non migrato"
+                  }
+                  className={cn(displayClickableInputClass, !isReadOnly && "cursor-pointer hover:bg-muted/50")}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isReadOnly) handleOpenCheckinDialog();
+                  }}
+                />
               </div>
             </div>
 
@@ -1543,45 +1854,26 @@ const displayClickableInputClass =
                   Tipologia intervento
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
+                <Input
+                  readOnly
+                  value={(() => {
+                    const taskKeyDisplay = getTaskKey(displayTask);
+                    const pendingEditsDisplay = getPendingEdits()[taskKeyDisplay];
+                    const userChoseNone =
+                      pendingEditsDisplay?.operationIdModified === true && pendingEditsDisplay?.operationId === null;
 
-                {editingFields.has("operation") && !isReadOnly ? (
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <Select value={editedOperationId} onValueChange={(value) => setEditedOperationId(value)}>
-                      <SelectTrigger className="text-sm">
-                        <SelectValue placeholder="Seleziona operazione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">— Nessuna operazione —</SelectItem>
-                        {(operationsData?.active_operations || []).map((op) => (
-                          <SelectItem key={op.id} value={String(op.id)}>
-                            {op.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : (
-                  <Input
-                    readOnly
-                    value={(() => {
-                      const taskKeyDisplay = getTaskKey(displayTask);
-                      const pendingEditsDisplay = getPendingEdits()[taskKeyDisplay];
-                      const userChoseNone =
-                        pendingEditsDisplay?.operationIdModified === true && pendingEditsDisplay?.operationId === null;
-
-                      if (userChoseNone) return "— Nessuna operazione —";
-                      if (!isConfirmedOperation) return "non migrato";
-                      const opId = (displayTask as any).operation_id;
-                      if (opId) return operationNames[opId] || `Operazione ${opId}`;
-                      return "-";
-                    })()}
-                    className={cn(displayClickableInputClass, !isReadOnly && "cursor-pointer hover:bg-muted/50")}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isReadOnly) toggleEditingField("operation");
-                    }}
-                  />
-                )}
+                    if (userChoseNone) return "— Nessuna operazione —";
+                    if (!isConfirmedOperation) return "non migrato";
+                    const opId = (displayTask as any).operation_id;
+                    if (opId) return operationNames[opId] || `Operazione ${opId}`;
+                    return "-";
+                  })()}
+                  className={cn(displayClickableInputClass, !isReadOnly && "cursor-pointer hover:bg-muted/50")}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isReadOnly) handleOpenOperationDialog();
+                  }}
+                />
               </div>
             </div>
 
@@ -1592,37 +1884,15 @@ const displayClickableInputClass =
                   Pax-In
                   {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
-
-                {editingFields.has("paxin") && !isReadOnly ? (
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      value={editedPaxIn}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, "");
-                        setEditedPaxIn(value);
-                      }}
-                      onFocus={(e) => e.stopPropagation()}
-                      onBlur={(e) => e.stopPropagation()}
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-sm w-20 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      min="0"
-                    />
-                    <span className="text-sm text-muted-foreground">persone</span>
-                  </div>
-                ) : (
-                  <Input
-                    readOnly
-                    value={String((displayTask as any).pax_in ?? "non migrato")}
-                    className={cn(displayClickableInputClass, !isReadOnly && "cursor-pointer hover:bg-muted/50")}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isReadOnly) toggleEditingField("paxin");
-                    }}
-                  />
-                )}
+                <Input
+                  readOnly
+                  value={String((displayTask as any).pax_in ?? "non migrato")}
+                  className={cn(displayClickableInputClass, !isReadOnly && "cursor-pointer hover:bg-muted/50")}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isReadOnly) handleOpenPaxInDialog();
+                  }}
+                />
               </div>
 
               <div>
@@ -1812,6 +2082,366 @@ const displayClickableInputClass =
               </div>
             )}
 
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Modifica Pax-In - stesso stile di Alias/Start Time in Dettagli Cleaner */}
+      <Dialog open={paxInDialogOpen} onOpenChange={(open) => !open && setPaxInDialogOpen(false)}>
+        <DialogContent className="sm:max-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-custom-blue" />
+              Modifica Pax-In
+            </DialogTitle>
+            <DialogDescription>
+              Task <strong>#{getTaskKey(displayTask)}</strong> — Inserisci il numero di ospiti (Pax-In).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm font-semibold text-muted-foreground mb-2 block">
+                Nuovo Pax-In
+              </label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={editingPaxInInDialog}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, "");
+                  setEditingPaxInInDialog(v);
+                }}
+                placeholder="0"
+                className="w-full"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSavePaxIn();
+                }}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPaxInDialogOpen(false)}
+              disabled={isSavingPaxIn}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSavePaxIn}
+              disabled={isSavingPaxIn}
+              className="border-2 border-custom-blue"
+            >
+              {isSavingPaxIn ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Salvataggio...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Salva
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Modifica Check-out - stesso stile di Pax-In */}
+      <Dialog open={checkoutDialogOpen} onOpenChange={(open) => !open && setCheckoutDialogOpen(false)}>
+        <DialogContent className="sm:max-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-custom-blue" />
+              Modifica Check-out
+            </DialogTitle>
+            <DialogDescription>
+              Task <strong>#{getTaskKey(displayTask)}</strong> — Inserisci data e orario di check-out.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm font-semibold text-muted-foreground mb-2 block">Data</label>
+              <Popover open={checkoutDatePickerOpen} onOpenChange={setCheckoutDatePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {editingCheckoutDateInDialog
+                      ? format(editingCheckoutDateInDialog.length === 10 ? parseISO(editingCheckoutDateInDialog) : new Date(editingCheckoutDateInDialog), "EEEE d MMMM yyyy", { locale: it })
+                      : "Seleziona data"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-2" align="start">
+                  <CalendarPicker
+                    mode="single"
+                    selected={editingCheckoutDateInDialog ? (editingCheckoutDateInDialog.length === 10 ? parseISO(editingCheckoutDateInDialog) : new Date(editingCheckoutDateInDialog)) : undefined}
+                    onSelect={(d) => {
+                      if (!d) return;
+                      setEditingCheckoutDateInDialog(format(d, "yyyy-MM-dd"));
+                      setCheckoutDatePickerOpen(false);
+                    }}
+                    locale={it}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-muted-foreground mb-2 block">Orario</label>
+              <div className="flex gap-2">
+                <Select
+                  value={(editingCheckoutTimeInDialog || "00:00").split(":")[0]}
+                  onValueChange={(hour) => {
+                    const [, m] = (editingCheckoutTimeInDialog || "00:00").split(":");
+                    setEditingCheckoutTimeInDialog(`${hour}:${m || "00"}`);
+                  }}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Ora" />
+                  </SelectTrigger>
+                  <SelectContent side="bottom" className="max-h-44">
+                    {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")).map((h) => (
+                      <SelectItem key={h} value={h}>{h}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={(editingCheckoutTimeInDialog || "00:00").split(":")[1] || "00"}
+                  onValueChange={(minute) => {
+                    const [h] = (editingCheckoutTimeInDialog || "00:00").split(":");
+                    setEditingCheckoutTimeInDialog(`${h || "00"}:${minute}`);
+                  }}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Min" />
+                  </SelectTrigger>
+                  <SelectContent side="bottom" className="max-h-44">
+                    {Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0")).map((m) => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCheckoutDialogOpen(false)}
+              disabled={isSavingCheckout}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSaveCheckout}
+              disabled={isSavingCheckout}
+              className="border-2 border-custom-blue"
+            >
+              {isSavingCheckout ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Salvataggio...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Salva
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Modifica Check-in - stesso stile di Pax-In */}
+      <Dialog open={checkinDialogOpen} onOpenChange={(open) => !open && setCheckinDialogOpen(false)}>
+        <DialogContent className="sm:max-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-custom-blue" />
+              Modifica Check-in
+            </DialogTitle>
+            <DialogDescription>
+              Task <strong>#{getTaskKey(displayTask)}</strong> — Inserisci data e orario di check-in.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm font-semibold text-muted-foreground mb-2 block">Data</label>
+              <Popover open={checkinDatePickerOpen} onOpenChange={setCheckinDatePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {editingCheckinDateInDialog
+                      ? format(editingCheckinDateInDialog.length === 10 ? parseISO(editingCheckinDateInDialog) : new Date(editingCheckinDateInDialog), "EEEE d MMMM yyyy", { locale: it })
+                      : "Seleziona data"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-2" align="start">
+                  <CalendarPicker
+                    mode="single"
+                    selected={editingCheckinDateInDialog ? (editingCheckinDateInDialog.length === 10 ? parseISO(editingCheckinDateInDialog) : new Date(editingCheckinDateInDialog)) : undefined}
+                    onSelect={(d) => {
+                      if (!d) return;
+                      setEditingCheckinDateInDialog(format(d, "yyyy-MM-dd"));
+                      setCheckinDatePickerOpen(false);
+                    }}
+                    locale={it}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-muted-foreground mb-2 block">Orario</label>
+              <div className="flex gap-2">
+                <Select
+                  value={(editingCheckinTimeInDialog || "00:00").split(":")[0]}
+                  onValueChange={(hour) => {
+                    const [, m] = (editingCheckinTimeInDialog || "00:00").split(":");
+                    setEditingCheckinTimeInDialog(`${hour}:${m || "00"}`);
+                  }}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Ora" />
+                  </SelectTrigger>
+                  <SelectContent side="bottom" className="max-h-44">
+                    {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")).map((h) => (
+                      <SelectItem key={h} value={h}>{h}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={(editingCheckinTimeInDialog || "00:00").split(":")[1] || "00"}
+                  onValueChange={(minute) => {
+                    const [h] = (editingCheckinTimeInDialog || "00:00").split(":");
+                    setEditingCheckinTimeInDialog(`${h || "00"}:${minute}`);
+                  }}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Min" />
+                  </SelectTrigger>
+                  <SelectContent side="bottom" className="max-h-44">
+                    {Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0")).map((m) => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCheckinDialogOpen(false)}
+              disabled={isSavingCheckin}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSaveCheckin}
+              disabled={isSavingCheckin}
+              className="border-2 border-custom-blue"
+            >
+              {isSavingCheckin ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Salvataggio...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Salva
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Modifica Tipologia intervento - stesso stile di Pax-In / Check-out / Check-in */}
+      <Dialog open={operationDialogOpen} onOpenChange={(open) => !open && setOperationDialogOpen(false)}>
+        <DialogContent className="sm:max-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-custom-blue" />
+              Modifica Tipologia intervento
+            </DialogTitle>
+            <DialogDescription>
+              Task <strong>#{getTaskKey(displayTask)}</strong> — Seleziona la tipologia di intervento.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm font-semibold text-muted-foreground mb-2 block">
+                Tipologia intervento
+              </label>
+              <Select
+                value={editingOperationIdInDialog}
+                onValueChange={setEditingOperationIdInDialog}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Seleziona operazione" />
+                </SelectTrigger>
+                <SelectContent side="bottom" className="max-h-44">
+                  <SelectItem value="none">— Nessuna operazione —</SelectItem>
+                  {(operationsData?.active_operations || []).map((op) => (
+                    <SelectItem key={op.id} value={String(op.id)}>
+                      {op.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOperationDialogOpen(false)}
+              disabled={isSavingOperation}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSaveOperation}
+              disabled={isSavingOperation}
+              className="border-2 border-custom-blue"
+            >
+              {isSavingOperation ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Salvataggio...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Salva
+                </>
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
