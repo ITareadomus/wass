@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -6,10 +6,11 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Users, CalendarIcon, ArrowLeft, Save, UserPlus, Search, RefreshCw } from "lucide-react";
-import { format } from "date-fns";
+import { Users, CalendarIcon, ArrowLeft, Save, UserPlus, Search, RefreshCw, AlertTriangle } from "lucide-react";
+import { format, differenceInCalendarDays } from "date-fns";
 import { it } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from 'wouter';
@@ -72,6 +73,7 @@ export default function Convocazioni() {
 
   // Aggiunto uno stato per i cleaners filtrati per evitare che vengano sovrascritti quando cambia la data
   const [filteredCleaners, setFilteredCleaners] = useState<Cleaner[]>([]);
+  const [showOnlyNotConvocatiDaDueGiorni, setShowOnlyNotConvocatiDaDueGiorni] = useState(false);
 
   useEffect(() => {
     const loadCleaners = async () => {
@@ -238,6 +240,32 @@ export default function Convocazioni() {
       console.error('Errore nel caricamento delle statistiche task:', error);
     }
   };
+
+    const notConvocatiDaDueGiorniCount = useMemo(() => {
+    const today = new Date();
+    return filteredCleaners.filter((c) => {
+      if (!c.last_worked_date) return false;
+      const s = String(c.last_worked_date).trim();
+      const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      const d = match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : null;
+      if (!d || isNaN(d.getTime())) return false;
+      const days = differenceInCalendarDays(today, d);
+      return days > 2;
+    }).length;
+  }, [filteredCleaners]);
+
+  const cleanersToShow = useMemo(() => {
+    if (!showOnlyNotConvocatiDaDueGiorni) return filteredCleaners;
+    const today = new Date();
+    return filteredCleaners.filter((c) => {
+      if (!c.last_worked_date) return false;
+      const s = String(c.last_worked_date).trim();
+      const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      const d = match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : null;
+      if (!d || isNaN(d.getTime())) return false;
+      return differenceInCalendarDays(today, d) > 2;
+    });
+  }, [filteredCleaners, showOnlyNotConvocatiDaDueGiorni]);
 
   const toggleCleanerSelection = (cleanerId: number, isAvailable: boolean) => {
     // Se il cleaner è già selezionato, lo deseleziona
@@ -508,13 +536,29 @@ export default function Convocazioni() {
 
           {/* Barra Contatore */}
           <div className="bg-custom-blue-light rounded-xl border-2 border-custom-blue shadow-lg p-6">
-            <div className="flex items-center gap-4">
-              <div className="text-lg font-semibold text-foreground">CLEANERS SELEZIONATI</div>
-              <div className="text-lg font-bold">
-                <span className="text-primary">{selectedCleaners.size}</span>
-                <span className="text-muted-foreground mx-1">/</span>
-                <span className="text-foreground">{filteredCleaners.length}</span> {/* Utilizza filteredCleaners per il conteggio totale */}
+            <div className="flex items-center gap-4 w-full">
+              <div className="flex items-center gap-4 shrink-0">
+                <div className="text-lg font-semibold text-foreground">CLEANERS SELEZIONATI</div>
+                <div className="text-lg font-bold">
+                  <span className="text-primary">{selectedCleaners.size}</span>
+                  <span className="text-muted-foreground mx-1">/</span>
+                  <span className="text-foreground">{filteredCleaners.length}</span> {/* Utilizza filteredCleaners per il conteggio totale */}
+                </div>
               </div>
+              <div className="flex-1 min-w-0" aria-hidden />
+              <button
+                type="button"
+                onClick={() => setShowOnlyNotConvocatiDaDueGiorni((prev) => !prev)}
+                className={cn(
+                  "text-sm shrink-0 text-right rounded px-2 py-1 -mx-2 -my-1 transition-colors",
+                  showOnlyNotConvocatiDaDueGiorni
+                    ? "text-yellow-600 dark:text-yellow-400 bg-amber-500/20 underline"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                Cleaners non convocati da due giorni o più: <span className="font-bold text-yellow-500 dark:text-yellow-400">{notConvocatiDaDueGiorniCount}</span>
+                {showOnlyNotConvocatiDaDueGiorni && " (clicca per mostrare tutti)"}
+              </button>
             </div>
           </div>
         </div>
@@ -535,7 +579,7 @@ export default function Convocazioni() {
             </div>
 
             <div className="space-y-3 flex-1 overflow-y-auto pr-2">
-              {filteredCleaners
+              {cleanersToShow
                 .filter((cleaner) =>
                   `${cleaner.name} ${cleaner.lastname}`
                     .toUpperCase()
@@ -546,7 +590,20 @@ export default function Convocazioni() {
                   const isPremium = cleaner.role === "Premium";
                   const isFormatore = cleaner.role === "Formatore";
                   const canDoStraordinaria = (cleaner as any).can_do_straordinaria === true;
-                
+                  const lastWorked = cleaner.last_worked_date
+                    ? (() => {
+                        const s = String(cleaner.last_worked_date).trim();
+                        const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                        return match
+                          ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+                          : null;
+                      })()
+                    : null;
+                  const daysSinceLastWorked =
+                    lastWorked != null ? differenceInCalendarDays(new Date(), lastWorked) : null;
+                  const showNotConvocatoWarning =
+                    daysSinceLastWorked != null && daysSinceLastWorked > 2;
+
                   const borderColor = "border-2 border-custom-blue";
                   const bgColor = "bg-white dark:bg-background";
 
@@ -612,6 +669,18 @@ export default function Convocazioni() {
                           const d = match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : new Date(s);
                           return isNaN(d.getTime()) ? "—" : format(d, "dd/MM/yyyy", { locale: it });
                         })() : "—"}
+                        {showNotConvocatoWarning && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex items-center align-middle ml-1">
+                                <AlertTriangle className="h-4 w-4 text-amber-500 -translate-y-px animate-pulse shrink-0" aria-hidden />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Non convocato da {daysSinceLastWorked} giorni</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                         <span className="mx-2">|</span>
                         <span className="font-semibold">Contratto:</span> {cleaner.contract_type}
                       </div>
