@@ -3126,7 +3126,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                               value={String(cleaner.id)}
                               data-testid={`option-cleaner-${cleaner.id}`}
                             >
-                              {cleaner.name} {cleaner.lastname}
+                              {cleanersAliases[cleaner.id]?.alias || `${cleaner.name || ''} ${cleaner.lastname || ''}`.trim() || String(cleaner.id)}
                             </SelectItem>
                           ))}
                       </SelectContent>

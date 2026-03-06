@@ -2129,21 +2129,16 @@ export class PgDailyAssignmentsService {
         ]);
       }
 
-      // Rimuovi da cleaner_aliases i cleaner non più nella lista salvata (solo attivi in ADAM + preservati)
-      const savedCleanerIds = cleaners.map((c: any) => c.id);
-      let removedAliases = 0;
-      if (savedCleanerIds.length > 0) {
-        const deleteAliases = await client.query(
-          `DELETE FROM cleaner_aliases WHERE NOT (cleaner_id = ANY($1::int[]))`,
-          [savedCleanerIds]
-        );
-        removedAliases = deleteAliases.rowCount ?? 0;
-      } else {
-        // Nessun cleaner salvato: rimuovi tutti gli alias
-        const deleteAll = await client.query(`DELETE FROM cleaner_aliases`);
-        removedAliases = deleteAll.rowCount ?? 0;
+      // Rimuovi da cleaner_aliases i cleaner che non compaiono in cleaners per la giornata corrente.
+      // Confronto: cleaner_aliases vs cleaners WHERE work_date = workDate.
+      const deleteAliases = await client.query(`
+        DELETE FROM cleaner_aliases
+        WHERE cleaner_id NOT IN (SELECT DISTINCT cleaner_id FROM cleaners WHERE work_date = $1)
+      `, [workDate]);
+      const removedAliases = deleteAliases.rowCount ?? 0;
+      if (removedAliases > 0) {
+        console.log(`✅ PG: cleaner_aliases aggiornato: rimossi ${removedAliases} alias (cleaner non presenti in cleaners)`);
       }
-      console.log(`✅ PG: cleaner_aliases aggiornato: rimossi ${removedAliases} alias (cleaner non più attivi)`);
 
       await client.query('COMMIT');
       console.log(`✅ PG: ${cleaners.length} cleaners salvati per ${workDate}`);

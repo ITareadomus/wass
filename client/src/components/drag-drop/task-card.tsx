@@ -1537,7 +1537,7 @@ const displayClickableInputClass =
 
                     {!isConfirmedOperation && !isSelected && (
                       <div className="absolute -top-1.5 -right-1.5 z-10">
-                        <div className="w-4 h-4 rounded-full flex items-center justify-center bg-gray-900 text-white border-2 border-gray-800 shadow-md">
+                        <div className="w-4 h-4 rounded-full flex items-center justify-center bg-gray-900/75 text-white border-2 border-gray-700/80 shadow-md backdrop-blur-sm">
                           <HelpCircle className="w-3 h-3" strokeWidth={2.5} />
                         </div>
                       </div>
