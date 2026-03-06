@@ -2129,16 +2129,10 @@ export class PgDailyAssignmentsService {
         ]);
       }
 
-      // Rimuovi da cleaner_aliases i cleaner che non compaiono in cleaners per la giornata corrente.
-      // Confronto: cleaner_aliases vs cleaners WHERE work_date = workDate.
-      const deleteAliases = await client.query(`
-        DELETE FROM cleaner_aliases
-        WHERE cleaner_id NOT IN (SELECT DISTINCT cleaner_id FROM cleaners WHERE work_date = $1)
-      `, [workDate]);
-      const removedAliases = deleteAliases.rowCount ?? 0;
-      if (removedAliases > 0) {
-        console.log(`✅ PG: cleaner_aliases aggiornato: rimossi ${removedAliases} alias (cleaner non presenti in cleaners)`);
-      }
+      // NON rimuovere da cleaner_aliases in base alla data: gli alias sono permanenti e
+      // indipendenti dalla data. Cancellarli quando si salvano le convocazioni per una
+      // nuova data (dove compaiono solo i convocati) cancellerebbe gli alias di tutti
+      // i cleaner non convocati in quella data.
 
       await client.query('COMMIT');
       console.log(`✅ PG: ${cleaners.length} cleaners salvati per ${workDate}`);
