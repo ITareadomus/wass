@@ -589,7 +589,7 @@ export default function Convocazioni() {
                   const isAvailable = cleaner.available !== false;
                   const isPremium = cleaner.role === "Premium";
                   const isFormatore = cleaner.role === "Formatore";
-                  const canDoStraordinaria = (cleaner as any).can_do_straordinaria === true;
+                  const canDoStraordinaria = cleaner.role === "Straordinario";
                   const lastWorked = cleaner.last_worked_date
                     ? (() => {
                         const s = String(cleaner.last_worked_date).trim();
@@ -1068,7 +1068,7 @@ export default function Convocazioni() {
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="8"
-                  strokeDasharray={`${filteredCleaners.length > 0 ? (filteredCleaners.filter(c => (c as any).can_do_straordinaria === true).length / filteredCleaners.length) * 251.2 : 0} 251.2`}
+                  strokeDasharray={`${filteredCleaners.length > 0 ? (filteredCleaners.filter(c => c.role === "Straordinario").length / filteredCleaners.length) * 251.2 : 0} 251.2`}
                   strokeDashoffset="0"
                   transform="rotate(-90 50 50)"
                   className="text-red-500 dark:text-red-600 transition-all duration-500"
@@ -1081,12 +1081,12 @@ export default function Convocazioni() {
                   dominantBaseline="middle"
                   className="text-lg font-bold fill-red-600 dark:fill-red-400"
                 >
-                  {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => (c as any).can_do_straordinaria === true).length / filteredCleaners.length) * 100) : 0}%
+                  {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.role === "Straordinario").length / filteredCleaners.length) * 100) : 0}%
                 </text>
               </svg>
               <span className="text-[10px] font-semibold text-red-800 dark:text-red-200 text-center">Straordinari</span>
               <span className="text-[9px] text-red-800 dark:text-red-200">
-                {filteredCleaners.filter(c => (c as any).can_do_straordinaria === true).length}/{filteredCleaners.length}
+                {filteredCleaners.filter(c => c.role === "Straordinario").length}/{filteredCleaners.length}
               </span>
             </div>
           </div>

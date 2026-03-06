@@ -128,7 +128,6 @@ export function canCleanerHandleTaskSync(
   cleanerRole: string,
   task: any,
   rules: TaskTypesByCleaner | null,
-  canDoStraordinaria: boolean = false
 ): boolean {
   // If no rules are provided, assume any task can be handled.
   if (!rules) return true;
@@ -144,9 +143,9 @@ export function canCleanerHandleTaskSync(
   // If there are no specific rules for this role, assume it can handle the task.
   if (!roleRules) return true;
 
-  // Special handling for 'straordinario_apt' tasks: rely on the canDoStraordinaria flag.
+  // Straordinario tasks: only cleaners with role "Straordinario" can handle them
   if (taskType === "straordinario_apt") {
-    return canDoStraordinaria;
+    return roleKey === 'straordinaria_cleaner';
   }
 
   // Check if the cleaner's role is allowed to handle this specific task type based on task_types rules.

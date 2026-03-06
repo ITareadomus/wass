@@ -73,7 +73,6 @@ async function loadCleanersForDate(workDate: string): Promise<CleanerInput[]> {
       name,
       role,
       contract_type as "contractType",
-      can_do_straordinaria as "canDoStraordinaria",
       preferred_customers as "preferredCustomers",
       counter_hours as "counterHours"
     FROM cleaners
@@ -88,7 +87,6 @@ async function loadCleanersForDate(workDate: string): Promise<CleanerInput[]> {
     name: row.name,
     role: row.role || 'Standard',
     contractType: row.contractType || 'C',
-    canDoStraordinaria: row.canDoStraordinaria || false,
     preferredCustomers: row.preferredCustomers || [],
     counterHours: parseFloat(row.counterHours) || 0
   }));

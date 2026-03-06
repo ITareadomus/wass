@@ -22,7 +22,6 @@ interface Cleaner {
   counter_hours?: number;
   weekly_hours?: number;
   role?: string;
-  can_do_straordinaria?: boolean;
   contract_type?: string;
 }
 
@@ -118,7 +117,6 @@ export function CleanerSelectorDialog({
         counter_hours: c.counter_hours,
         weekly_hours: c.weekly_hours,
         role: c.role,
-        can_do_straordinaria: c.can_do_straordinaria,
         contract_type: c.contract_type,
       }));
 
@@ -132,7 +130,7 @@ export function CleanerSelectorDialog({
         return list.sort((a: Cleaner, b: Cleaner) => {
           const getPriority = (cleaner: Cleaner) => {
             if (cleaner.role === "Formatore") return 1;
-            if (cleaner.can_do_straordinaria === true) return 2;
+            if (cleaner.role === "Straordinario") return 2;
             if (cleaner.role === "Premium") return 3;
             return 4;
           };
@@ -289,12 +287,12 @@ export function CleanerSelectorDialog({
                                 Standard
                               </span>
                             )}
-                            {cleaner.can_do_straordinaria && (
+                            {cleaner.role === "Straordinario" && (
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 border-red-300 dark:border-red-700">
                                 Straordinario
                               </span>
                             )}
-                            {cleaner.role === "Premium" && !cleaner.can_do_straordinaria && (
+                            {cleaner.role === "Premium" && (
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
                                 Premium
                               </span>
@@ -366,12 +364,12 @@ export function CleanerSelectorDialog({
                                 Standard
                               </span>
                             )}
-                            {cleaner.can_do_straordinaria && (
+                            {cleaner.role === "Straordinario" && (
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 border-red-300 dark:border-red-700">
                                 Straordinario
                               </span>
                             )}
-                            {cleaner.role === "Premium" && !cleaner.can_do_straordinaria && (
+                            {cleaner.role === "Premium" && (
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
                                 Premium
                               </span>

@@ -298,8 +298,7 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
             lastname: c.lastname || '',
             role: c.role || 'Standard',
             premium: c.premium || false,
-            start_time: c.start_time ?? '10:00', // Preserva il valore salvato, usa default SOLO se null/undefined
-            can_do_straordinaria: c.can_do_straordinaria || false,
+            start_time: c.start_time ?? '10:00',
             active: c.active !== false,
             available: c.available !== false,
             ranking: c.ranking || 0,
@@ -316,8 +315,7 @@ export async function loadSelectedCleaners(workDate: string): Promise<any | null
             lastname: '', 
             role: 'Standard', 
             premium: false,
-            start_time: '10:00', // Default per cleaner senza dati
-            can_do_straordinaria: false,
+            start_time: '10:00',
             alias: null
           }));
       

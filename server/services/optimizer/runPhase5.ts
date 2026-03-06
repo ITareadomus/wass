@@ -98,20 +98,18 @@ async function loadSchedulesFromAssignments(runId: string, workDate: string): Pr
   const capsResult = await pool.query(`
     SELECT cleaner_id, name, COALESCE(role, 'Standard') as role,
            COALESCE(contract_type, 'C') as contract_type,
-           COALESCE(can_do_straordinaria, false) as can_do_straordinaria,
            COALESCE(start_time, '09:00') as start_time
     FROM cleaners
     WHERE cleaner_id = ANY($1::int[]) AND work_date = $2
     ORDER BY cleaner_id
   `, [allCleanerIds, workDate]);
 
-  const caps = new Map<number, { name: string; role: string; contractType: string; canDoStraordinaria: boolean; startTime: string }>();
+  const caps = new Map<number, { name: string; role: string; contractType: string; startTime: string }>();
   for (const row of capsResult.rows) {
     caps.set(row.cleaner_id, {
       name: row.name || `Cleaner ${row.cleaner_id}`,
       role: row.role,
       contractType: row.contract_type,
-      canDoStraordinaria: row.can_do_straordinaria === true,
       startTime: row.start_time
     });
   }
@@ -138,7 +136,6 @@ async function loadSchedulesFromAssignments(runId: string, workDate: string): Pr
       totalPriorityPenalty: data.totalPriorityPenalty,
       role: cap?.role || 'Standard',
       contractType: cap?.contractType || 'C',
-      canDoStraordinaria: cap?.canDoStraordinaria || false,
       totalWorkMinutes
     });
   });

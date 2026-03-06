@@ -82,7 +82,6 @@ export interface CleanerSchedule {
   // Dati per vincoli hard (opzionali per retrocompatibilità)
   role?: string;
   contractType?: string;
-  canDoStraordinaria?: boolean;
   // Fairness tracking: ore totali lavorate (in minuti)
   totalWorkMinutes?: number;
 }
@@ -227,8 +226,8 @@ function checkHardConstraints(
     return { compatible: false, reason: `ROLE_APT_MISMATCH_${cleanerRole}_vs_${task.typeApt}` };
   }
   
-  // 1. Verifica straordinaria
-  if (task.straordinaria && schedule.canDoStraordinaria !== true) {
+  // 1. Verifica straordinaria: solo cleaner con role "Straordinario"
+  if (task.straordinaria && normalizedRole !== 'straordinario_cleaner') {
     return { compatible: false, reason: 'CANNOT_DO_STRAORDINARIA' };
   }
   
@@ -704,7 +703,6 @@ function applyInsertion(
     // Preserva i dati per vincoli hard
     role: schedule.role,
     contractType: schedule.contractType,
-    canDoStraordinaria: schedule.canDoStraordinaria,
     // Fairness tracking
     totalWorkMinutes
   };
@@ -855,7 +853,6 @@ function trySwapForTask(
               // Preserva i dati per vincoli hard
               role: schedule.role,
               contractType: schedule.contractType,
-              canDoStraordinaria: schedule.canDoStraordinaria,
               // Fairness tracking
               totalWorkMinutes: newTotalWorkMinutes
             },

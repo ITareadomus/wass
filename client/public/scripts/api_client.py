@@ -228,7 +228,7 @@ class ApiClient:
         Args:
             date: Data nel formato YYYY-MM-DD
             cleaners: Lista di dizionari cleaner con tutti i campi
-                      (id, name, lastname, role, can_do_straordinaria, etc.)
+                      (id, name, lastname, role, etc.)
             
         Returns:
             Risposta API con conferma

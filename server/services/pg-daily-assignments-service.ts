@@ -103,16 +103,10 @@ export interface PgDailyAssignmentRow {
 export class PgDailyAssignmentsService {
 
   /**
-   * Ensure cleaners table has alias column (migration)
-   * NOTE: cleaners_history è stata rimossa - gli alias sono ora in cleaner_aliases
+   * Ensure cleaner_aliases and selected_cleaners_revisions tables exist
    */
-  async ensureAliasColumn(): Promise<void> {
+  async ensureCleanerAliasesAndRevisionsTables(): Promise<void> {
     try {
-      // Ensure alias column exists on cleaners table (legacy, per backward compat)
-      await query(`
-        ALTER TABLE cleaners ADD COLUMN IF NOT EXISTS alias TEXT DEFAULT NULL
-      `);
-      // Create cleaner_aliases table if not exists
       await query(`
         CREATE TABLE IF NOT EXISTS cleaner_aliases (
           cleaner_id INTEGER PRIMARY KEY,
@@ -123,7 +117,6 @@ export class PgDailyAssignmentsService {
           updated_at TIMESTAMP DEFAULT NOW()
         )
       `);
-      // Create selected_cleaners_revisions table if not exists
       await query(`
         CREATE TABLE IF NOT EXISTS selected_cleaners_revisions (
           id SERIAL PRIMARY KEY,
@@ -143,9 +136,8 @@ export class PgDailyAssignmentsService {
         CREATE INDEX IF NOT EXISTS idx_sel_cleaners_revisions_date
         ON selected_cleaners_revisions(work_date)
       `);
-      // Drop deprecated cleaners_history table (no longer needed)
       await query(`DROP TABLE IF EXISTS cleaners_history CASCADE`);
-      console.log('✅ PG: Tabelle cleaner_aliases e selected_cleaners_revisions verificate, cleaners_history rimossa');
+      console.log('✅ PG: Tabelle cleaner_aliases e selected_cleaners_revisions verificate');
     } catch (error) {
       console.warn('⚠️ PG: Errore (ignorabile) nella migrazione:', error);
     }
@@ -2002,18 +1994,21 @@ export class PgDailyAssignmentsService {
   // ==================== CLEANERS (ANAGRAFICA) ====================
 
   /**
-   * Load all cleaners for a work_date from PostgreSQL
+   * Load all cleaners for a work_date from PostgreSQL.
+   * Alias comes from cleaner_aliases only (cleaners.alias no longer used).
    */
   async loadCleanersForDate(workDate: string): Promise<any[] | null> {
     try {
       const result = await query(`
         SELECT 
-          cleaner_id as id, name, lastname, role, active, ranking,
-          counter_hours, counter_days, available, contract_type,
-          preferred_customers, telegram_id, start_time, can_do_straordinaria, alias
-        FROM cleaners 
-        WHERE work_date = $1 AND active = true
-        ORDER BY counter_hours DESC
+          c.cleaner_id as id, c.name, c.lastname, c.role, c.active, c.ranking,
+          c.counter_hours, c.counter_days, c.available, c.contract_type,
+          c.preferred_customers, c.telegram_id, c.start_time,
+          ca.alias
+        FROM cleaners c
+        LEFT JOIN cleaner_aliases ca ON ca.cleaner_id = c.cleaner_id
+        WHERE c.work_date = $1 AND c.active = true
+        ORDER BY c.counter_hours DESC
       `, [workDate]);
 
       if (result.rows.length > 0) {
@@ -2028,17 +2023,19 @@ export class PgDailyAssignmentsService {
   }
 
   /**
-   * Load a single cleaner by ID and date
+   * Load a single cleaner by ID and date. Alias from cleaner_aliases only.
    */
   async loadCleanerById(cleanerId: number, workDate: string): Promise<any | null> {
     try {
       const result = await query(`
         SELECT 
-          cleaner_id as id, name, lastname, role, active, ranking,
-          counter_hours, counter_days, available, contract_type,
-          preferred_customers, telegram_id, start_time, can_do_straordinaria, alias
-        FROM cleaners 
-        WHERE cleaner_id = $1 AND work_date = $2
+          c.cleaner_id as id, c.name, c.lastname, c.role, c.active, c.ranking,
+          c.counter_hours, c.counter_days, c.available, c.contract_type,
+          c.preferred_customers, c.telegram_id, c.start_time,
+          ca.alias
+        FROM cleaners c
+        LEFT JOIN cleaner_aliases ca ON ca.cleaner_id = c.cleaner_id
+        WHERE c.cleaner_id = $1 AND c.work_date = $2
       `, [cleanerId, workDate]);
 
       if (result.rows.length > 0) {
@@ -2052,7 +2049,7 @@ export class PgDailyAssignmentsService {
   }
 
   /**
-   * Load multiple cleaners by IDs for a specific date
+   * Load multiple cleaners by IDs for a specific date. Alias from cleaner_aliases only.
    */
   async loadCleanersByIds(cleanerIds: number[], workDate: string): Promise<any[]> {
     if (!cleanerIds || cleanerIds.length === 0) return [];
@@ -2060,11 +2057,13 @@ export class PgDailyAssignmentsService {
     try {
       const result = await query(`
         SELECT 
-          cleaner_id as id, name, lastname, role, active, ranking,
-          counter_hours, counter_days, available, contract_type,
-          preferred_customers, telegram_id, start_time, can_do_straordinaria, alias
-        FROM cleaners 
-        WHERE cleaner_id = ANY($1) AND work_date = $2
+          c.cleaner_id as id, c.name, c.lastname, c.role, c.active, c.ranking,
+          c.counter_hours, c.counter_days, c.available, c.contract_type,
+          c.preferred_customers, c.telegram_id, c.start_time,
+          ca.alias
+        FROM cleaners c
+        LEFT JOIN cleaner_aliases ca ON ca.cleaner_id = c.cleaner_id
+        WHERE c.cleaner_id = ANY($1) AND c.work_date = $2
       `, [cleanerIds, workDate]);
 
       console.log(`✅ PG: ${result.rows.length} cleaners caricati per IDs ${cleanerIds.join(',')}`);
@@ -2094,11 +2093,8 @@ export class PgDailyAssignmentsService {
       // Delete existing cleaners for this date
       await client.query('DELETE FROM cleaners WHERE work_date = $1', [workDate]);
 
-      // Insert new cleaners (alias column kept for backward compat, but read from cleaner_aliases)
+      // Insert new cleaners; alias only in cleaner_aliases (cleaners.alias no longer used)
       for (const cleaner of cleaners) {
-        // Use alias from cleaner_aliases if exists, otherwise from cleaner object
-        const alias = aliasMap.get(cleaner.id) || cleaner.alias || null;
-        
         // If cleaner has a new alias, save it to cleaner_aliases (permanent)
         if (cleaner.alias && !aliasMap.has(cleaner.id)) {
           await client.query(`
@@ -2112,9 +2108,9 @@ export class PgDailyAssignmentsService {
           INSERT INTO cleaners 
           (cleaner_id, work_date, name, lastname, role, active, ranking,
            counter_hours, counter_days, available, contract_type,
-           preferred_customers, telegram_id, start_time, can_do_straordinaria, alias,
+           preferred_customers, telegram_id, start_time,
            created_at, updated_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
         `, [
           cleaner.id,
           workDate,
@@ -2129,11 +2125,25 @@ export class PgDailyAssignmentsService {
           cleaner.contract_type || null,
           cleaner.preferred_customers || [],
           cleaner.telegram_id || null,
-          cleaner.start_time ?? '10:00',
-          cleaner.can_do_straordinaria || false,
-          alias // Still write to cleaners.alias for backward compat
+          cleaner.start_time ?? '10:00'
         ]);
       }
+
+      // Rimuovi da cleaner_aliases i cleaner non più nella lista salvata (solo attivi in ADAM + preservati)
+      const savedCleanerIds = cleaners.map((c: any) => c.id);
+      let removedAliases = 0;
+      if (savedCleanerIds.length > 0) {
+        const deleteAliases = await client.query(
+          `DELETE FROM cleaner_aliases WHERE NOT (cleaner_id = ANY($1::int[]))`,
+          [savedCleanerIds]
+        );
+        removedAliases = deleteAliases.rowCount ?? 0;
+      } else {
+        // Nessun cleaner salvato: rimuovi tutti gli alias
+        const deleteAll = await client.query(`DELETE FROM cleaner_aliases`);
+        removedAliases = deleteAll.rowCount ?? 0;
+      }
+      console.log(`✅ PG: cleaner_aliases aggiornato: rimossi ${removedAliases} alias (cleaner non più attivi)`);
 
       await client.query('COMMIT');
       console.log(`✅ PG: ${cleaners.length} cleaners salvati per ${workDate}`);
@@ -2152,32 +2162,36 @@ export class PgDailyAssignmentsService {
    * NOTE: For alias updates, this also saves to cleaner_aliases table
    */
   async updateCleanerField(cleanerId: number, workDate: string, field: string, value: any): Promise<boolean> {
-    const allowedFields = ['start_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days', 'alias', 'can_do_straordinaria'];
+    const allowedFields = ['start_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days', 'alias'];
     if (!allowedFields.includes(field)) {
       console.error(`❌ PG: Campo non consentito: ${field}`);
       return false;
     }
 
     try {
-      // For alias updates, also save to permanent cleaner_aliases table
-      if (field === 'alias' && value) {
-        // Get cleaner name/lastname for the alias record
-        const cleanerData = await query(
-          'SELECT name, lastname FROM cleaners WHERE cleaner_id = $1 AND work_date = $2',
-          [cleanerId, workDate]
-        );
-        const name = cleanerData.rows[0]?.name || null;
-        const lastname = cleanerData.rows[0]?.lastname || null;
-        
-        await query(`
-          INSERT INTO cleaner_aliases (cleaner_id, alias, name, lastname, updated_at)
-          VALUES ($1, $2, $3, $4, NOW())
-          ON CONFLICT (cleaner_id) DO UPDATE SET alias = $2, updated_at = NOW()
-        `, [cleanerId, value, name, lastname]);
-        console.log(`✅ PG: Alias permanente salvato per cleaner ${cleanerId}: ${value}`);
+      // Alias: only update cleaner_aliases (cleaners.alias no longer used)
+      if (field === 'alias') {
+        if (value) {
+          const cleanerData = await query(
+            'SELECT name, lastname FROM cleaners WHERE cleaner_id = $1 AND work_date = $2',
+            [cleanerId, workDate]
+          );
+          const name = cleanerData.rows[0]?.name || null;
+          const lastname = cleanerData.rows[0]?.lastname || null;
+          await query(`
+            INSERT INTO cleaner_aliases (cleaner_id, alias, name, lastname, updated_at)
+            VALUES ($1, $2, $3, $4, NOW())
+            ON CONFLICT (cleaner_id) DO UPDATE SET alias = $2, updated_at = NOW()
+          `, [cleanerId, value, name, lastname]);
+          console.log(`✅ PG: Alias salvato in cleaner_aliases per cleaner ${cleanerId}: ${value}`);
+        } else {
+          await query('DELETE FROM cleaner_aliases WHERE cleaner_id = $1', [cleanerId]);
+          console.log(`✅ PG: Alias rimosso da cleaner_aliases per cleaner ${cleanerId}`);
+        }
+        return true;
       }
       
-      // Also update the cleaners table (for backward compat)
+      // Other fields: update cleaners table
       await query(`
         UPDATE cleaners 
         SET ${field} = $1, updated_at = NOW()
@@ -2290,23 +2304,6 @@ export class PgDailyAssignmentsService {
     }
   }
 
-  /**
-   * Update can_do_straordinaria for a cleaner across all dates
-   * Used for one-time migrations when changing straordinaria permissions
-   */
-  async updateCleanerStraordinariaAllDates(cleanerId: number, canDoStraordinaria: boolean): Promise<number> {
-    try {
-      const result = await query(
-        `UPDATE cleaners SET can_do_straordinaria = $1, updated_at = NOW() WHERE cleaner_id = $2`,
-        [canDoStraordinaria, cleanerId]
-      );
-      console.log(`✅ PG: Cleaner ${cleanerId} can_do_straordinaria=${canDoStraordinaria} aggiornato per ${result.rowCount} righe`);
-      return result.rowCount || 0;
-    } catch (error) {
-      console.error(`❌ PG: Errore nell'aggiornamento can_do_straordinaria per cleaner ${cleanerId}:`, error);
-      return 0;
-    }
-  }
 
   /**
    * Import aliases from JSON format (for migration)

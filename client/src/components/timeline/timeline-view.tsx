@@ -68,7 +68,6 @@ interface Cleaner {
   preferred_customers: number[];
   telegram_id: number | null;
   start_time: string | null;
-  can_do_straordinaria?: boolean;
 }
 
 export default function TimelineView({
@@ -866,7 +865,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               cleaner.role,
               task,
               validationRules,
-              cleaner.can_do_straordinaria ?? false
             )) return false;
             const key = getIncompatibleKey(task, cleaner.id);
             return !acknowledgedIncompatibleAssignments.has(key);
@@ -974,8 +972,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
         const getPriority = (cleaner: any) => {
           // 1. Formatore (massima priorità)
           if (cleaner.role === "Formatore") return 1;
-          // 2. Straordinario (flag can_do_straordinaria ha PRIORITÀ sul ruolo)
-          if (cleaner.can_do_straordinaria === true) return 2;
+          // 2. Straordinario (role ha PRIORITÀ)
+          if (cleaner.role === "Straordinario") return 2;
           // 3. Premium (solo se NON straordinario)
           if (cleaner.role === "Premium") return 3;
           // 4. Standard / qualsiasi altro
@@ -1571,7 +1569,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           cleaner.role,
           task,
           validationRules,
-          cleaner.can_do_straordinaria ?? false
         );
       });
 
@@ -2018,7 +2015,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                         cleaner.role,
                         task,
                         validationRules,
-                        cleaner.can_do_straordinaria ?? false
                       )) return false;
                       const key = getIncompatibleKey(task, cleaner.id);
                       return !acknowledgedIncompatibleAssignments.has(key);
@@ -2082,7 +2078,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           </div>
                         )}
                         {/* Se straordinario, mostra SOLO badge S */}
-                        {!isRemoved && cleaner.can_do_straordinaria ? (
+                        {!isRemoved && cleaner.role === "Straordinario" ? (
                           <div className="bg-red-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                             S
                           </div>
@@ -2275,7 +2271,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           cleaner.role,
                                           task,
                                           validationRules,
-                                          cleaner.can_do_straordinaria ?? false
                                         )
                                       : false;
 
@@ -2506,7 +2501,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           cleaner.role,
                           task,
                           validationRules,
-                          cleaner.can_do_straordinaria ?? false
                         )) {
                           const key = getIncompatibleKey(task, cleanerId);
                           next.add(key);
@@ -2764,12 +2758,12 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           Standard
                         </span>
                       )}
-                      {cleaner.can_do_straordinaria && (
+                      {cleaner.role === "Straordinario" && (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 border-red-300 dark:border-red-700">
                           Straordinario
                         </span>
                       )}
-                      {cleaner.role === "Premium" && !cleaner.can_do_straordinaria && (
+                      {cleaner.role === "Premium" && (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
                           Premium
                         </span>
@@ -2919,7 +2913,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 {selectedCleaner && (
                   <>
                     {/* Se straordinario, mostra SOLO badge straordinario (priorità assoluta) */}
-                    {selectedCleaner.can_do_straordinaria ? (
+                    {selectedCleaner.role === "Straordinario" ? (
                       <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-600/30 text-gray-900 dark:bg-red-500/40 dark:text-red-200 border-red-700 dark:border-red-400">
                         Straordinario
                       </span>

@@ -58,7 +58,7 @@ def get_cleaners_for_eo(all_cleaners):
     # Ordina: straordinari > premium > standard > ore lavorate DESC
     suitable.sort(
         key=lambda x: (
-            not x.can_do_straordinaria,  # Straordinari per primi
+            x.role.lower() != "straordinario",  # Straordinari per primi
             "premium" not in x.role.lower(),  # Premium dopo straordinari
             "standard" in x.role.lower(),  # Standard per ultimi
             -getattr(x, 'counter_hours', 0)

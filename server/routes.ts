@@ -350,12 +350,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
     
     await pgUsersService.ensureTable();
-    await pgDailyAssignmentsService.ensureAliasColumn();
+    await pgDailyAssignmentsService.ensureCleanerAliasesAndRevisionsTables();
     await pgDailyAssignmentsService.ensureLockedColumns();
     await pgDailyAssignmentsService.ensureTaskLocksTable();
-    
-    // One-time migration: Remove straordinaria permission from cleaner 1034 (Prince)
-    await pgDailyAssignmentsService.updateCleanerStraordinariaAllDates(1034, false);
     
     // Migrate existing users from JSON if table is empty
     const existingUsers = await pgUsersService.getAllUsers();

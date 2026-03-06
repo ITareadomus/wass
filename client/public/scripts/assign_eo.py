@@ -150,7 +150,6 @@ class Cleaner:
     name: str
     lastname: str
     role: str
-    can_do_straordinaria: bool = False
     home_lat: Optional[float] = None
     home_lng: Optional[float] = None
     start_time: str = "10:00"
@@ -341,8 +340,8 @@ def can_handle_premium(cleaner: Cleaner, task: Task) -> bool:
     # Premium task requires premium cleaner (role = "Premium")
     if task.is_premium and cleaner.role.lower() != "premium":
         return False
-    # Straordinaria requires cleaner with can_do_straordinaria=True
-    if task.straordinaria and not cleaner.can_do_straordinaria:
+    # Straordinaria requires cleaner with role "Straordinario"
+    if task.straordinaria and cleaner.role.lower() != "straordinario":
         return False
     return True
 
@@ -582,7 +581,6 @@ def load_cleaners() -> List[Cleaner]:
     all_cleaners: List[Cleaner] = []
     for c in cleaners_data:
         role = (c.get("role") or "Standard").strip()
-        can_do_straordinaria = bool(c.get("can_do_straordinaria", False))
 
         # Valida se il cleaner può gestire Early-Out basandosi su settings
         if not can_cleaner_handle_priority(role, "early_out"):
@@ -594,7 +592,6 @@ def load_cleaners() -> List[Cleaner]:
             name=c.get("name") or str(c.get("id")),
             lastname=c.get("lastname", ""),
             role=role,
-            can_do_straordinaria=can_do_straordinaria,
             home_lat=c.get("home_lat"),
             home_lng=c.get("home_lng"),
         )
@@ -726,7 +723,7 @@ def plan_day(
     """
     Assegna le task Early-Out con:
     - STRAORDINARIE: possono iniziare prima delle 10:00, assegnate al cleaner
-      con start_time minore che ha can_do_straordinaria=True
+      con start_time minore che ha role="Straordinario"
     - HARD CLUSTER edificio/via/blocco: stesso edificio o vicino + stesso cliente
     - FAIRNESS: evita che un cleaner abbia molte più task degli altri,
       ignorando i cleaner vuoti (non forziamo a usarli per forza)
@@ -750,7 +747,7 @@ def plan_day(
             # Filtra solo cleaner che possono fare straordinarie
             straordinaria_cleaners = [
                 c for c in cleaners
-                if c.can_do_straordinaria and can_cleaner_handle_apartment(c.role, task.apt_type)
+                if c.role.lower() == "straordinario" and can_cleaner_handle_apartment(c.role, task.apt_type)
             ]
 
             if not straordinaria_cleaners:
@@ -782,7 +779,7 @@ def plan_day(
         # 1) Trova tutti i cleaner che POSSONO prendere la task (vincoli gestiti da find_best_position)
         for cleaner in cleaners:
             # Validazione tipo di task (premium / straordinaria / standard)
-            if not can_cleaner_handle_task(cleaner.role, task.is_premium, task.straordinaria, cleaner.can_do_straordinaria):
+            if not can_cleaner_handle_task(cleaner.role, task.is_premium, task.straordinaria):
                 continue
 
             # Validazione tipo appartamento

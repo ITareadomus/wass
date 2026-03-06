@@ -3,9 +3,8 @@ import { estimateTravelMinutes, TaskInput } from './phase1';
 export interface CleanerInput {
   cleanerId: number;
   name: string;
-  role: string; // Premium, Standard
+  role: string; // Premium, Standard, Straordinario, Formatore
   contractType: string; // A, B, C, 'a chiamata'
-  canDoStraordinaria: boolean;
   preferredCustomers: number[];
   counterHours: number;
   lat?: number;
@@ -252,7 +251,7 @@ export function isCleanerCompatible(
     return { compatible: false, reason: 'ROLE_MISMATCH_PREMIUM_REQUIRED' };
   }
   
-  if (task.straordinaria && !cleaner.canDoStraordinaria) {
+  if (task.straordinaria && normalizedRole !== 'straordinario_cleaner') {
     return { compatible: false, reason: 'CANNOT_DO_STRAORDINARIA' };
   }
   
@@ -722,7 +721,7 @@ export function runPhase2Algorithm(
         
         // Rule 0: Riserva cleaner straordinari per OT TASK REALI non ancora assegnate
         // Skip OT reservation for anchored groups (the cleaner is fixed by the timeline)
-        if (!groupHasStraordinaria && remainingOtTasks > 0 && cleaner.canDoStraordinaria
+        if (!groupHasStraordinaria && remainingOtTasks > 0 && normalizeCleanerRole(cleaner.role) === 'straordinario_cleaner'
             && group.anchoredCleanerId === undefined) {
           incompatibleReasons.push({ cleanerId: cleaner.cleanerId, reasons: ['RESERVED_FOR_PENDING_OT'] });
           continue;

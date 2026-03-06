@@ -37,7 +37,9 @@ else:
     print("⚠️ Per usare una data specifica, passa il parametro YYYY-MM-DD")
 
 today = _today()
-yesterday = today - timedelta(days=1)
+# Per "giorni consecutivi": ultimo giorno che conta è il giorno PRIMA della data selezionata
+# (es. convocazioni per domani → conta fino a oggi; se oggi non ha lavorato → 0)
+day_before_target = target_date - timedelta(days=1)
 
 # IMPORTANTE: Calcola la settimana basandosi sulla target_date, NON su oggi
 # Questo permette di vedere le ore corrette anche per date future
@@ -48,12 +50,12 @@ week_end_excl = week_start + timedelta(days=7)  # [week_start, week_end_excl)
 conn = mysql.connector.connect(**db_config)
 cur = conn.cursor(dictionary=True)
 
-# 1) Lista cleaners (7=Standard, 13=Formatore, 15=Premium)
+# 1) Lista cleaners (7=Standard, 13=Formatore, 15=Premium, 20=Straordinario)
 # NOTA: Leggiamo tw_start da ADAM per usarlo come default se non c'è custom PostgreSQL
 cur.execute("""
     SELECT id, name, lastname, user_role_id, active, contract_type_id, telegram_id, tw_start
     FROM app_users 
-    WHERE user_role_id IN (7, 13, 15) AND active = 1;
+    WHERE user_role_id IN (7, 13, 15, 20) AND active = 1;
 """)
 cleaners = cur.fetchall()
 
@@ -75,28 +77,28 @@ cur.execute("""        SELECT user_id,
 weekly_rows = cur.fetchall()
 weekly_hours = {r["user_id"]: float(r["weekly_hours"] or 0.0) for r in weekly_rows}
 
-# 3) Tutte le date lavorate per ultimi 60 giorni (per streak fino a ieri) – UNA query
-start_window = today - timedelta(days=60)
+# 3) Date lavorate nei 60 giorni prima della data selezionata (per streak rispetto a target_date)
+# Streak = giorni consecutivi lavorati fino al giorno prima di target_date (es. convocazioni per domani → fino a oggi)
+start_window = target_date - timedelta(days=60)
 cur.execute("""        SELECT user_id, DATE(updated_at) AS d
     FROM app_housekeeping_report
     WHERE updated_at >= %s AND updated_at < %s
     GROUP BY user_id, DATE(updated_at)
     ORDER BY user_id, d DESC
-""", (start_window, today))  # fino a oggi escluso
+""", (start_window, target_date))  # date strettamente prima di target_date
 
 date_rows = cur.fetchall()
-# costruiamo set di date per utente per calcolare streak fino a "ieri"
 worked_dates = {}
 for r in date_rows:
     worked_dates.setdefault(r["user_id"], set()).add(r["d"])
 
-def streak_until_yesterday(uid):
+def streak_ending_at(uid, last_day):
+    """Conta i giorni consecutivi lavorati fino a last_day (incluso), andando indietro."""
     s = worked_dates.get(uid, set())
-    if yesterday not in s:
+    if last_day not in s:
         return 0
-    # conta indietro finché le date sono consecutive (ieri, -2, -3, ...)
     cnt = 0
-    day = yesterday
+    day = last_day
     while day in s:
         cnt += 1
         day = day - timedelta(days=1)
@@ -154,7 +156,7 @@ try:
             pg_cur.execute("""
                 SELECT cleaner_id, name, lastname, role, active, ranking,
                        counter_hours, counter_days, available, contract_type,
-                       preferred_customers, telegram_id, start_time, can_do_straordinaria
+                       preferred_customers, telegram_id, start_time
                 FROM cleaners
                 WHERE work_date = %s
             """, (target_date_str,))
@@ -174,7 +176,6 @@ try:
                     "preferred_customers": row["preferred_customers"] or [],
                     "telegram_id": row["telegram_id"],
                     "start_time": row["start_time"],
-                    "can_do_straordinaria": row["can_do_straordinaria"]
                 }
                 # Salva anche lo start_time custom per uso successivo
                 if row["start_time"]:
@@ -199,17 +200,15 @@ contract_map = {1: "A", 2: "B", 3: "C", 4: "a chiamata"}
 for u in cleaners:
     cid = u["id"] # cleaner ID
     role_id = u.get("user_role_id")
-    if role_id == 15:
+    if role_id == 20:
+        role = "Straordinario"
+    elif role_id == 15:
         role = "Premium"
     elif role_id == 13:
         role = "Formatore"
     else:
         role = "Standard"
     available = 0 if cid in leave_set else 1
-
-    # Lista ID cleaner autorizzati per task straordinarie
-    # Lopez (132), El Hadji (495), Chidi (249)
-    straordinaria_authorized = {132, 495, 249}
 
     # Gerarchia start_time:
     # 1. PostgreSQL custom (date-scoped) se disponibile
@@ -224,28 +223,8 @@ for u in cleaners:
         # Gestisci il caso di stringa vuota o None
         start_time = adam_tw_start if adam_tw_start else None
 
-    # counter_hours (somma delle ore lavorate nella settimana target, NON ieri)
-    # Ogni task nella settimana conta per task_duration in MINUTI diviso 60
-    counter_hours = 0.0
-    try:
-        cur.execute("""
-            SELECT SUM(task_duration) / 60.0
-            FROM cleaners_day_tasks
-            WHERE cleaner_id = %s
-              AND work_date >= %s AND work_date < %s
-        """, (cid, week_start, week_end_excl))
-        row = cur.fetchone()
-        counter_hours_value = row[0] if (row and row[0] is not None) else 0.0
-        # Ensure it's a float number, not a time string
-        counter_hours = float(counter_hours_value) if counter_hours_value is not None else 0.0
-    except mysql.connector.Error as e:
-        # Se la tabella cleaners_day_tasks non esiste, usa il counter_hours da weekly_hours
-        if "doesn't exist" in str(e) or "1146" in str(e):
-            counter_hours = weekly_hours.get(cid, 0.0)
-            print(f"⚠️ Tabella cleaners_day_tasks non trovata per cleaner {cid}, uso weekly_hours: {counter_hours}")
-        else:
-            raise
-
+    # counter_hours: ore lavorate nella settimana target da app_housekeeping_report (query #2)
+    counter_hours = weekly_hours.get(cid, 0.0)
 
     cleaner = {
         "id": cid,
@@ -255,13 +234,12 @@ for u in cleaners:
         "active": bool(u.get("active")),
         "ranking": 0,
         "counter_hours": counter_hours,
-        "counter_days": int(streak_until_yesterday(cid)),
+        "counter_days": int(streak_ending_at(cid, day_before_target)),
         "available": bool(available),
         "contract_type": contract_map.get(u.get("contract_type_id"), u.get("contract_type_id")),
         "preferred_customers": prefs_map.get(cid, []),
         "telegram_id": u.get("telegram_id"),
         "start_time": start_time,
-        "can_do_straordinaria": cid in straordinaria_authorized,
     }
     cleaners_data.append(cleaner)
 

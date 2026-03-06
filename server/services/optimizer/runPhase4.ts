@@ -181,7 +181,6 @@ async function loadPhase3Schedules(runId: string, workDate: string): Promise<Cle
       // Dati per vincoli hard
       role: caps?.role || 'Standard',
       contractType: caps?.contractType || 'C',
-      canDoStraordinaria: caps?.canDoStraordinaria || false,
       // Fairness tracking
       totalWorkMinutes
     });
@@ -194,7 +193,6 @@ interface CleanerCapabilities {
   name: string;
   role: string;
   contractType: string;
-  canDoStraordinaria: boolean;
 }
 
 async function loadCleanerCapabilitiesFromAll(cleanerIds: number[], workDate: string): Promise<Map<number, CleanerCapabilities>> {
@@ -205,8 +203,7 @@ async function loadCleanerCapabilitiesFromAll(cleanerIds: number[], workDate: st
       cleaner_id, 
       name, 
       COALESCE(role, 'Standard') as role,
-      COALESCE(contract_type, 'C') as contract_type,
-      COALESCE(can_do_straordinaria, false) as can_do_straordinaria
+      COALESCE(contract_type, 'C') as contract_type
     FROM cleaners 
     WHERE cleaner_id = ANY($1::int[])
       AND work_date = $2
@@ -219,7 +216,6 @@ async function loadCleanerCapabilitiesFromAll(cleanerIds: number[], workDate: st
       name: row.name || `Cleaner ${row.cleaner_id}`,
       role: row.role,
       contractType: row.contract_type,
-      canDoStraordinaria: row.can_do_straordinaria === true
     });
   }
   return map;

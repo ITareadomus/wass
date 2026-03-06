@@ -96,7 +96,6 @@ class Cleaner:
     name: str
     lastname: str
     role: str
-    can_do_straordinaria: bool = False
     available_from: Optional[int] = None  # in minuti da mezzanotte
     last_address: Optional[str] = None
     last_lat: Optional[float] = None
@@ -231,8 +230,8 @@ def can_handle_premium(cleaner: Cleaner, task: Task) -> bool:
     # Premium task requires premium cleaner (role = "Premium")
     if task.is_premium and cleaner.role.lower() != "premium":
         return False
-    # Straordinaria requires cleaner with can_do_straordinaria=True
-    if task.straordinaria and not cleaner.can_do_straordinaria:
+    # Straordinaria requires cleaner with role "Straordinario"
+    if task.straordinaria and cleaner.role.lower() != "straordinario":
         return False
     return True
 
@@ -628,7 +627,6 @@ def load_cleaners() -> List[Cleaner]:
     cleaners: List[Cleaner] = []
     for c in data:
         role = (c.get("role") or "Standard").strip()
-        can_do_straordinaria = bool(c.get("can_do_straordinaria", False))
 
         if not can_cleaner_handle_priority(role, "low_priority"):
             print(f"   ⏭️  Cleaner {c.get('name')} ({role}) escluso da Low-Priority (priority_types settings)")
@@ -640,7 +638,6 @@ def load_cleaners() -> List[Cleaner]:
                 name=c.get("name") or str(c.get("id")),
                 lastname=c.get("lastname", ""),
                 role=role,
-                can_do_straordinaria=can_do_straordinaria,
             ))
     return cleaners
 
@@ -762,7 +759,7 @@ def plan_day(
         if task.straordinaria:
             straordinaria_cleaners = [
                 c for c in cleaners
-                if c.can_do_straordinaria and can_cleaner_handle_apartment(c.role, task.apt_type)
+                if c.role.lower() == "straordinario" and can_cleaner_handle_apartment(c.role, task.apt_type)
             ]
 
             if not straordinaria_cleaners:
@@ -795,7 +792,7 @@ def plan_day(
 
         for cleaner in cleaners:
             # Validazione tipo di task (premium / straordinaria / standard)
-            if not can_cleaner_handle_task(cleaner.role, task.is_premium, task.straordinaria, cleaner.can_do_straordinaria):
+            if not can_cleaner_handle_task(cleaner.role, task.is_premium, task.straordinaria):
                 continue
 
             if not can_cleaner_handle_apartment(cleaner.role, task.apt_type):

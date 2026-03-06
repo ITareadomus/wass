@@ -33,18 +33,18 @@ class TaskValidator:
             return 'formatore_cleaner'
         return normalized
 
-    def can_cleaner_handle_task(self, cleaner_role: str, task_premium: bool, task_straordinaria: bool, can_do_straordinaria: bool = False) -> bool:
+    def can_cleaner_handle_task(self, cleaner_role: str, task_premium: bool, task_straordinaria: bool) -> bool:
         """
         Valida se un cleaner può gestire una task in base a:
         - Task standard: tutti i cleaner possono gestirla
         - Task premium: solo cleaner con role = "Premium"
-        - Task straordinaria: solo cleaner con can_do_straordinaria = True
+        - Task straordinaria: solo cleaner con role = "Straordinario"
         """
         role_key = self._normalize_cleaner_role(cleaner_role)
         
-        # Task straordinaria: solo cleaner con flag can_do_straordinaria
+        # Task straordinaria: solo cleaner con ruolo Straordinario
         if task_straordinaria:
-            return bool(can_do_straordinaria)
+            return role_key == 'straordinario_cleaner'
         
         # Task premium: solo cleaner Premium possono gestirla
         if task_premium:
@@ -103,14 +103,14 @@ class TaskValidator:
 _validator = TaskValidator()
 
 # Funzioni standalone per l'import negli script di assegnazione
-def can_cleaner_handle_task(cleaner_role: str, task_premium: bool, task_straordinaria: bool, can_do_straordinaria: bool = False) -> bool:
+def can_cleaner_handle_task(cleaner_role: str, task_premium: bool, task_straordinaria: bool) -> bool:
     """
     Valida se un cleaner può gestire una task:
     - Task standard: tutti i cleaner
     - Task premium: solo cleaner con role = "Premium"
-    - Task straordinaria: solo cleaner con can_do_straordinaria = True
+    - Task straordinaria: solo cleaner con role = "Straordinario"
     """
-    return _validator.can_cleaner_handle_task(cleaner_role, task_premium, task_straordinaria, can_do_straordinaria)
+    return _validator.can_cleaner_handle_task(cleaner_role, task_premium, task_straordinaria)
 
 def can_cleaner_handle_priority(cleaner_role: str, priority: str) -> bool:
     """Verifica se un cleaner può gestire una task con una certa priorità (EO/HP/LP)."""

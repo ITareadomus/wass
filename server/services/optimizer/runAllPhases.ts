@@ -521,11 +521,11 @@ async function collectDetailedMetrics(
 
     // Query per dettagli dei non assegnati (incluso OT)
     // Calcola i cleaners compatibili basandosi sui selected_cleaners e le regole di compatibilità
-    // NOTA: La compatibilità si basa su role (Premium/Standard) + can_do_straordinaria
+    // NOTA: La compatibilità si basa su role (Premium/Standard/Straordinario)
     // Le settings apartment_types sono caricate in Phase2/Phase4 per la logica completa
     // Qui usiamo una versione semplificata che considera:
     // - Premium task → richiede cleaner Premium
-    // - Straordinaria → richiede can_do_straordinaria
+    // - Straordinaria → richiede cleaner con role = 'Straordinario'
     // - typeApt: tutti i ruoli possono fare tutti i tipi di appartamento (secondo current settings)
     const unassignedDetails = await pool.query(`
       WITH selected_cleaners AS (
@@ -534,8 +534,7 @@ async function collectDetailedMetrics(
       cleaner_details AS (
         SELECT 
           c.cleaner_id,
-          COALESCE(c.role, 'Standard') as role,
-          COALESCE(c.can_do_straordinaria, false) as can_do_straordinaria
+          COALESCE(c.role, 'Standard') as role
         FROM cleaners c
         WHERE c.work_date = $2 AND c.cleaner_id IN (SELECT cleaner_id FROM selected_cleaners)
       ),
@@ -552,7 +551,7 @@ async function collectDetailedMetrics(
             FROM cleaner_details cd
             WHERE 
               (NOT COALESCE(dc.premium, false) OR cd.role = 'Premium')
-              AND (NOT COALESCE(dc.straordinaria, false) OR cd.can_do_straordinaria)
+              AND (NOT COALESCE(dc.straordinaria, false) OR cd.role = 'Straordinario')
           ) as compatible_cleaners_count
         FROM optimizer.optimizer_unassigned ou
         LEFT JOIN daily_containers dc ON dc.task_id = ou.task_id AND dc.work_date = $2
