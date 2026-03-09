@@ -111,28 +111,6 @@ def get_operation_names(operation_ids):
 
     return operation_names
 
-def save_operations_to_file(operation_ids):
-    # Recupera i nomi delle operazioni
-    operation_names_map = get_operation_names(operation_ids)
-
-    # Crea array con oggetti {id, name}
-    active_operations = []
-    for op_id in operation_ids:
-        active_operations.append({
-            "id": op_id,
-            "name": operation_names_map.get(op_id, f"Operazione {op_id}")
-        })
-
-    operations_data = {
-        "timestamp": datetime.now().isoformat(),
-        "active_operations": active_operations,
-        "total_operations": len(operation_ids)
-    }
-    ops_file = INPUT_DIR / "operations.json"
-    with open(ops_file, "w", encoding="utf-8") as f:
-        json.dump(operations_data, f, indent=4, ensure_ascii=False)
-    print(f"Salvati {len(operation_ids)} operation_id validi in {ops_file}")
-
 # ---------- Estrazione task dal DB ----------
 def get_tasks_from_db(selected_date, assigned_task_ids=None):
     if assigned_task_ids is None:
@@ -140,7 +118,6 @@ def get_tasks_from_db(selected_date, assigned_task_ids=None):
 
     print(f"Aggiorno la lista delle operazioni attive dal DB...")
     ops = get_active_operations()
-    save_operations_to_file(ops)
 
     valid_operation_ids = ops + [0, None]
     non_null_operation_ids = [op for op in valid_operation_ids if op is not None]
@@ -502,8 +479,8 @@ def main():
     else:
         raise RuntimeError("❌ Errore: --use-api è obbligatorio. Lo script usa solo API, non filesystem.")
 
-    # Aggiorna operations.json
-    print("Aggiorno la lista delle operazioni attive dal DB...")
+    # Esegui script clienti attivi per la data
+    print("Eseguo extract_active_clients per la data...")
     subprocess.run(["python3", str(EXTRACT_ACTIVE_CLIENTS_SCRIPT), "--date", target_date], check=True)
 
     # Estrai i cleaners per la data target SOLO se non usiamo dati salvati
@@ -650,7 +627,6 @@ def extract_tasks_from_db(work_date=None, assigned_task_ids=None):
 
     # Ottieni le operation_ids attive
     ops = get_active_operations()
-    save_operations_to_file(ops)
 
     valid_operation_ids = ops + [0, None]
     non_null_operation_ids = [op for op in valid_operation_ids if op is not None]

@@ -651,13 +651,12 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     (window as any).globalTimeSlotsCount = globalTimeSlots.length;
   }, [globalTimelineMinutes, globalTimeSlots.length]);
 
-  // Misura la larghezza della timeline row e esponila su window per TaskCard
+  // Misura la larghezza della timeline row per TaskCard (state React → rerender)
   React.useEffect(() => {
     const measureWidth = () => {
       if (timelineRowRef.current) {
         const width = timelineRowRef.current.offsetWidth;
         setTimelineWidthPx(width);
-        (window as any).timelineWidthPx = width;
       }
     };
 
@@ -2222,7 +2221,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     // Usa la stessa base di calcolo dei task (slot * 60 minuti virtuali)
                                     const effectiveTravelMinutes = seq >= 2 && travelTime > 0 && !snapshot.isDraggingOver ? travelTime : 0;
                                     const virtualMinutes = globalTimeSlots.length * 60;
-                                    const timelineWidth = (window as any).timelineWidthPx || 0;
+                                    const timelineWidth = timelineWidthPx || 0;
                                     const travelWidthPx = effectiveTravelMinutes > 0 && virtualMinutes > 0 && timelineWidth > 0
                                       ? (effectiveTravelMinutes / virtualMinutes) * timelineWidth
                                       : 0;
@@ -2330,6 +2329,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           isReadOnly={isReadOnly}
                                           timeOffset={seq === 1 ? timeOffset : 0}
                                           globalTimeSlots={globalTimeSlots.length}
+                                          timelineWidthPx={timelineWidthPx}
                                           isHighlighted={highlightedTaskIds.has(String(task.id))}
                                           cleanerId={cleaner.id}
                                           isPriorityWindowViolation={isPriorityWindowViolation(task)}

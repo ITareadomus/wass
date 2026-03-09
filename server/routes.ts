@@ -1184,6 +1184,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/operations - Operazioni attive da DB (app_structure_operation + langs)
+  app.get("/api/operations", async (req, res) => {
+    let connection: mysql.Connection | null = null;
+    try {
+      connection = await mysql.createConnection({
+        host: databaseConfig.mysql.host,
+        port: databaseConfig.mysql.port,
+        user: databaseConfig.mysql.user,
+        password: databaseConfig.mysql.password,
+        database: databaseConfig.mysql.database,
+      });
+      const [rows]: any = await connection.execute(
+        `SELECT o.id, l.name
+         FROM app_structure_operation o
+         INNER JOIN app_structure_operation_langs l
+           ON l.structure_operation_id = o.id AND l.id_lang = 1
+         WHERE o.active = 1 AND o.enable_wass = 1
+         ORDER BY o.id`
+      );
+      const list = Array.isArray(rows) ? rows : [];
+      const active_operations = list.map((r: any) => ({
+        id: Number(r?.id),
+        name: r?.name != null ? String(r.name) : "",
+      })).filter((op: { id: number }) => Number.isFinite(op.id));
+      res.json({
+        active_operations,
+        total_operations: active_operations.length,
+      });
+    } catch (error: any) {
+      console.error("Errore GET /api/operations:", error?.message);
+      res.status(500).json({ success: false, error: error?.message || "Server error" });
+    } finally {
+      if (connection) {
+        try {
+          await connection.end();
+        } catch {
+          // ignore
+        }
+      }
+    }
+  });
+
   // GET /api/cleaners-aliases - Carica alias cleaners da cleaner_aliases (permanente)
   app.get("/api/cleaners-aliases", async (req, res) => {
     try {
@@ -4381,65 +4423,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per estrarre statistiche task per convocazioni
-  app.post("/api/extract-convocazioni-tasks", async (req, res) => {
+  // GET statistiche task per convocazioni (logica in Node, niente script né file)
+  app.get("/api/convocazioni-task-stats", async (req, res) => {
+    const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      return res.status(400).json({ success: false, error: "Parametro date richiesto (yyyy-MM-dd)" });
+    }
+    let connection: any = null;
     try {
-      const { date } = req.body;
-      const scriptPath = path.join(process.cwd(), 'client', 'public', 'scripts', 'extract_tasks_for_convocazioni.py');
-      const convocazioniFilePath = path.join(process.cwd(), 'client', 'public', 'data', 'output', 'convocazioni_tasks.json');
-
-      // Se la data è fornita, passala come argomento allo script
-      const command = date
-        ? `python3 ${scriptPath} ${date}`
-        : `python3 ${scriptPath}`;
-
-      console.log("Eseguendo extract_tasks_for_convocazioni.py con comando:", command);
-
-      try {
-        const { stdout, stderr } = await execAsync(command, { maxBuffer: 1024 * 1024 * 10 });
-
-        if (stderr && !stderr.includes('Browserslist')) {
-          console.warn("⚠️ Warning extract_tasks_for_convocazioni:", stderr);
-        }
-
-        console.log("extract_tasks_for_convocazioni output:", stdout);
-
-        res.json({
-          success: true,
-          message: 'Statistiche task per convocazioni estratte con successo',
-          output: stdout
-        });
-      } catch (scriptError: any) {
-        // Se lo script fallisce (es. connessione DB non disponibile), carica il file statico
-        console.warn("⚠️ Script fallito, caricamento file statico:", scriptError.message);
-        
-        try {
-          const fileContent = await fs.readFile(convocazioniFilePath, 'utf8');
-          const fileData = JSON.parse(fileContent);
-          
-          console.log("✅ Statistiche task caricate dal file statico");
-          res.json({
-            success: true,
-            message: 'Statistiche task per convocazioni caricate dal file locale',
-            output: JSON.stringify(fileData)
-          });
-        } catch (fileError: any) {
-          console.error("❌ Errore caricamento file statico:", fileError.message);
-          res.status(500).json({
-            success: false,
-            message: "Errore durante l'estrazione delle statistiche task per convocazioni",
-            error: scriptError.message,
-            fileError: fileError.message
-          });
-        }
+      connection = await mysql.createConnection({
+        host: databaseConfig.mysql.host,
+        port: databaseConfig.mysql.port,
+        user: databaseConfig.mysql.user,
+        password: databaseConfig.mysql.password,
+        database: databaseConfig.mysql.database,
+      });
+      const [opRows]: any = await connection.execute(
+        `SELECT id FROM app_structure_operation WHERE active = 1 AND enable_wass = 1`
+      );
+      const activeOpIds = (Array.isArray(opRows) ? opRows : [])
+        .map((r: any) => Number(r?.id))
+        .filter((n: number) => Number.isFinite(n));
+      const placeholders = activeOpIds.length > 0
+        ? activeOpIds.map(() => "?").join(",")
+        : "";
+      const opCondition = activeOpIds.length > 0
+        ? `AND (h.operation_id IN (${placeholders}) OR h.operation_id IS NULL OR h.operation_id = 0)`
+        : "";
+      const params: any[] = [dateParam];
+      if (activeOpIds.length > 0) params.push(...activeOpIds);
+      const [rows]: any = await connection.execute(
+        `SELECT h.id AS task_id, s.premium, h.operation_id
+         FROM app_housekeeping h
+         JOIN app_structures s ON h.structure_id = s.id
+         WHERE h.checkout = ?
+           AND h.deleted_at IS NULL
+           AND h.deleted_at_client IS NULL
+           AND s.lat IS NOT NULL AND s.lng IS NOT NULL
+           AND s.lat != '' AND s.lng != ''
+           AND s.lat != '0' AND s.lng != '0'
+         ${opCondition}`,
+        params
+      );
+      const list = Array.isArray(rows) ? rows : [];
+      const task_stats = {
+        total: 0,
+        premium: 0,
+        standard: 0,
+        straordinarie: 0,
+      };
+      for (const r of list) {
+        const premium = r?.premium === 1 || r?.premium === true || r?.premium === "1";
+        const opId = r?.operation_id != null ? Number(r.operation_id) : null;
+        task_stats.total += 1;
+        if (premium) task_stats.premium += 1;
+        else task_stats.standard += 1;
+        if (opId === 3) task_stats.straordinarie += 1;
       }
+      res.json({
+        success: true,
+        task_stats,
+        metadata: { date: dateParam, last_updated: getRomeTimestamp() },
+      });
     } catch (error: any) {
-      console.error("Errore durante l'estrazione delle statistiche task per convocazioni:", error);
       res.status(500).json({
         success: false,
-        message: "Errore durante l'estrazione delle statistiche task per convocazioni",
-        error: error.message
+        error: error?.message || "Server error",
       });
+    } finally {
+      if (connection) {
+        try {
+          await connection.end();
+        } catch {
+          // ignore
+        }
+      }
     }
   });
 

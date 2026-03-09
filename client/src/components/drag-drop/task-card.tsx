@@ -163,6 +163,7 @@ interface TaskCardProps {
   isIncompatible?: boolean;
   timeOffset?: number;
   globalTimeSlots?: number;
+  timelineWidthPx?: number;
   travelTime?: number;
   travelWidthPx?: number;
   waitingGap?: number;
@@ -193,6 +194,7 @@ export default function TaskCard({
   isIncompatible = false,
   timeOffset = 0,
   globalTimeSlots = 0,
+  timelineWidthPx = 0,
   travelTime = 0,
   travelWidthPx = 0,
   waitingGap = 0,
@@ -214,11 +216,11 @@ export default function TaskCard({
 const displayClickableInputClass =
   "h-9 border-transparent bg-transparent shadow-none focus-visible:ring-0 px-0";
 
-  // Carica le operazioni da operations.json
+  // Carica le operazioni da API (DB)
   const { data: operationsData } = useQuery<{ active_operations: { id: number; name: string }[] }>({
-    queryKey: ["/data/input/operations.json"],
+    queryKey: ["/api/operations"],
     queryFn: async () => {
-      const response = await fetch("/data/input/operations.json");
+      const response = await fetch("/api/operations");
       if (!response.ok) throw new Error("Failed to fetch operations");
       return response.json();
     },
@@ -1310,8 +1312,8 @@ const displayClickableInputClass =
     const effectiveMinutes = totalMinutes === 0 ? 30 : totalMinutes;
 
     if (forTimeline) {
-      // Usa la larghezza della timeline in pixel se disponibile
-      const timelineWidth = (window as any).timelineWidthPx || 0;
+      // Usa la larghezza della timeline in pixel (passata da timeline-view via props)
+      const timelineWidth = timelineWidthPx || 0;
       const slotsCount = (window as any).globalTimeSlotsCount || 10;
       const virtualMinutes = slotsCount * 60; // Minuti virtuali basati su slot
       
@@ -1429,8 +1431,8 @@ const displayClickableInputClass =
   // Determina se il drag è disabilitato in base alla data, se la task è già salvata, o se è bloccata
   const shouldDisableDrag = isDragDisabled || (displayTask as any).checkin_date || isLocked;
 
-  // Calcola offset in pixel
-  const timelineWidth = (window as any).timelineWidthPx || 0;
+  // Calcola offset in pixel (usa timelineWidthPx da props)
+  const timelineWidth = timelineWidthPx || 0;
   const virtualMinutes = globalTimeSlots * 60;
   
   const offsetWidthPx = timeOffset > 0 && virtualMinutes > 0 && timelineWidth > 0 

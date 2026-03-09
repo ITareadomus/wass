@@ -102,9 +102,9 @@ export default function UnconfirmedTasks() {
   const [expandedTaskId, setExpandedTaskId] = useState<string | number | null>(null);
 
   const { data: operationsData } = useQuery<OperationsData>({
-    queryKey: ["/data/input/operations.json"],
+    queryKey: ["/api/operations"],
     queryFn: async () => {
-      const response = await fetch("/data/input/operations.json");
+      const response = await fetch("/api/operations");
       if (!response.ok) throw new Error("Failed to fetch operations");
       return response.json();
     },

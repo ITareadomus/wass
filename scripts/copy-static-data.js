@@ -11,7 +11,6 @@ const staticFiles = [
   'client/public/data/cleaners/cleaners_aliases.json',
   'client/public/data/accounts.json',
   'client/public/data/input/settings.json',
-  'client/public/data/input/operations.json',
 ];
 
 async function copyStaticData() {

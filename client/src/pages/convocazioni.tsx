@@ -206,36 +206,25 @@ export default function Convocazioni() {
 
   const loadTaskStats = async (dateStr: string) => {
     try {
-      // Esegui extract_tasks_for_convocazioni per avere i dati freschi
-      const extractStatsResponse = await fetch('/api/extract-convocazioni-tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
-      });
-
-      if (!extractStatsResponse.ok) {
-        throw new Error('Errore durante l\'estrazione delle statistiche task');
+      const res = await fetch(`/api/containers?date=${encodeURIComponent(dateStr)}`);
+      if (!res.ok) throw new Error('Errore durante il caricamento dei containers');
+      const data = await res.json();
+      const c = data.containers || {};
+      const allTasks = [
+        ...(c.early_out?.tasks || []),
+        ...(c.high_priority?.tasks || []),
+        ...(c.low_priority?.tasks || []),
+      ];
+      let total = 0, premium = 0, standard = 0, straordinarie = 0;
+      for (const t of allTasks) {
+        const isStraordinaria = t.straordinaria === true || (t as any).is_straordinaria === true || Number(t.operation_id) === 3;
+        const isPremium = t.premium === true || t.premium === 1 || t.premium === "1";
+        total += 1;
+        if (isStraordinaria) straordinarie += 1;
+        else if (isPremium) premium += 1;
+        else standard += 1;
       }
-
-      // Carica convocazioni_tasks.json
-      const statsResponse = await fetch('/data/output/convocazioni_tasks.json');
-      if (!statsResponse.ok) {
-        console.warn('convocazioni_tasks.json non trovato');
-        return;
-      }
-
-      const statsData = await statsResponse.json();
-
-      // Usa le statistiche direttamente
-      const stats = statsData.task_stats || {
-        total: 0,
-        premium: 0,
-        standard: 0,
-        straordinarie: 0
-      };
-
-      console.log('Statistiche task da convocazioni_tasks.json:', stats);
-      setTaskStats(stats);
+      setTaskStats({ total, premium, standard, straordinarie });
     } catch (error) {
       console.error('Errore nel caricamento delle statistiche task:', error);
     }
