@@ -711,8 +711,8 @@ export function runPhase2Algorithm(
         // Cap = maxTarget (from fairness targets calculation)
         if (newLoadMinValue > targets.maxTarget) continue;
         
-        // Also keep a sanity check on task count for extreme cases
-        const maxTasksPerCleaner = 6; // Hard limit regardless of minutes
+        // Max task count per cleaner: dynamic (baseMax+1, aligned with Phase 1 maxGroupSize) or fallback 6
+        const maxTasksPerCleaner = params.dynamicMaxTasks != null ? params.dynamicMaxTasks + 1 : 4;
         if (taskCount + tasks.length > maxTasksPerCleaner) continue;
         
         // Straordinaria constraints

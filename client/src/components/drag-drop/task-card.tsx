@@ -1683,7 +1683,10 @@ const displayClickableInputClass =
         }}
       </Draggable>
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent
+          className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <div className="flex items-center justify-between w-full">
               <Button
@@ -1757,11 +1760,11 @@ const displayClickableInputClass =
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Codice ADAM</p>
-                <Input value={String(displayTask.name ?? "")} readOnly className={displayInputClass} />
+                <Input value={String(displayTask.name ?? "")} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Cliente</p>
-                <Input value={String(displayTask.customer_name ?? "non migrato")} readOnly className={displayInputClass} />
+                <Input value={String(displayTask.customer_name ?? "non migrato")} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
               </div>
             </div>
 
@@ -1773,6 +1776,8 @@ const displayClickableInputClass =
                   value={String(displayTask.address?.toUpperCase() ?? "NON MIGRATO")}
                   readOnly
                   className={displayInputClass}
+                  tabIndex={-1}
+                  onFocus={(e) => e.currentTarget.blur()}
                 />
               </div>
               <div>
@@ -1781,6 +1786,8 @@ const displayClickableInputClass =
                   value={`${(displayTask.duration || "0.0").replace(".", ":")} ore`}
                   readOnly
                   className={displayInputClass}
+                  tabIndex={-1}
+                  onFocus={(e) => e.currentTarget.blur()}
                 />
               </div>
             </div>
@@ -1848,7 +1855,7 @@ const displayClickableInputClass =
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Tipologia appartamento</p>
-                <Input value={String((displayTask as any).type_apt ?? "non migrato")} readOnly className={displayInputClass} />
+                <Input value={String((displayTask as any).type_apt ?? "non migrato")} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
               </div>
 
               <div>
@@ -1899,7 +1906,7 @@ const displayClickableInputClass =
 
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Pax-Out</p>
-                <Input value={String((displayTask as any).pax_out ?? "non migrato")} readOnly className={displayInputClass} />
+                <Input value={String((displayTask as any).pax_out ?? "non migrato")} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
               </div>
             </div>
 
@@ -1911,18 +1918,20 @@ const displayClickableInputClass =
                   value={assignmentTimes.travel_time !== undefined ? `${assignmentTimes.travel_time} minuti` : "non assegnato"}
                   readOnly
                   className={displayInputClass}
+                  tabIndex={-1}
+                  onFocus={(e) => e.currentTarget.blur()}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Start Time</p>
-                  <Input value={String(assignmentTimes.start_time ?? "non assegnato")} readOnly className={displayInputClass} />
+                  <Input value={String(assignmentTimes.start_time ?? "non assegnato")} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
                 </div>
 
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">End Time</p>
-                  <Input value={String(assignmentTimes.end_time ?? "non assegnato")} readOnly className={displayInputClass} />
+                  <Input value={String(assignmentTimes.end_time ?? "non assegnato")} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
                 </div>
               </div>
             </div>

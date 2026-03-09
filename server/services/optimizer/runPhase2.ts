@@ -1,6 +1,5 @@
 import pool from '../../../shared/pg-db';
 import { 
-  runPhase2Algorithm, 
   Phase2Params, 
   DEFAULT_PHASE2_PARAMS,
   CleanerInput,
@@ -10,6 +9,7 @@ import {
   ApartmentTypes,
   DEFAULT_APARTMENT_TYPES
 } from './phase2';
+import { runPhase2WithOrTools } from './phase2OrTools';
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, loadLockedCleanerIds } from './db';
 import { TimelineContext } from './timelineContext';
 
@@ -335,7 +335,7 @@ export async function runPhase2(
       return result;
     }
 
-    const phase2Result = runPhase2Algorithm(selectedGroups, tasksMap, cleaners, fullParams);
+    const phase2Result = await runPhase2WithOrTools(selectedGroups, tasksMap, cleaners, fullParams, { timeoutMs: 85000 });
 
     result.groupsAssigned = phase2Result.stats.groupsAssigned;
     result.groupsUnassigned = phase2Result.stats.groupsUnassigned;
@@ -363,8 +363,8 @@ export async function runPhase2(
 
   } catch (error: any) {
     result.status = 'failed';
-    result.error = error.message || 'Unknown error';
-    console.error('Phase 2 error:', error);
+    result.error = error?.message || 'Unknown error';
+    console.error('Phase 2 OR-Tools error:', error);
   }
 
   result.durationMs = Date.now() - startTime;
