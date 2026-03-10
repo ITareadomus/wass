@@ -1087,6 +1087,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Arricchisci con last_worked_date e show_plus_one (stessa logica di GET /api/cleaners) per la timeline
+      const cleanersList = selectedCleaners.cleaners || [];
+      if (cleanersList.length > 0) {
+        const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+        const lastTransfer = await pgDailyAssignmentsService.getLastTransferToAdamTimestamp(workDate);
+        let inProgramIds: Set<number>;
+        if (!lastTransfer) {
+          const selectedIds = await pgDailyAssignmentsService.loadSelectedCleaners(workDate);
+          inProgramIds = new Set(selectedIds ?? []);
+        } else {
+          inProgramIds = new Set();
+        }
+        const hasReportIds = new Set<number>();
+        const lastWorkedByCleanerId = new Map<number, string>();
+
+        try {
+          const adamConnection = await mysql.createConnection({
+            host: databaseConfig.mysql.host,
+            port: databaseConfig.mysql.port,
+            user: databaseConfig.mysql.user,
+            password: databaseConfig.mysql.password,
+            database: databaseConfig.mysql.database,
+          });
+          try {
+            const [rows]: any = await adamConnection.execute(
+              `SELECT cleaned_by_us, MAX(checkout) AS latest_cleaning
+               FROM app_housekeeping
+               WHERE cleaned = 1
+               GROUP BY cleaned_by_us`
+            );
+            const list = Array.isArray(rows) ? rows : [];
+            for (const r of list) {
+              const id = Number(r?.cleaned_by_us);
+              const checkout = r?.latest_cleaning;
+              if (!Number.isFinite(id) || checkout == null) continue;
+              let dateStr: string;
+              if (checkout instanceof Date) {
+                dateStr = format(checkout, "yyyy-MM-dd");
+              } else {
+                const s = String(checkout).trim();
+                const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                if (isoMatch) {
+                  dateStr = `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+                } else {
+                  const d = new Date(s);
+                  dateStr = !isNaN(d.getTime()) ? format(d, "yyyy-MM-dd") : "";
+                }
+              }
+              if (dateStr) lastWorkedByCleanerId.set(id, dateStr);
+            }
+
+            if (lastTransfer) {
+              const [titRows]: any = await adamConnection.execute(
+                `SELECT DISTINCT cleaned_by_us FROM app_housekeeping
+                 WHERE checkout = ? AND deleted_at IS NULL AND deleted_at_client IS NULL`,
+                [workDate]
+              );
+              const [collabRows]: any = await adamConnection.execute(
+                `SELECT DISTINCT c.user_id FROM app_housekeeping_collaborations c
+                 INNER JOIN app_housekeeping h ON c.housekeeping_id = h.id
+                 WHERE h.checkout = ? AND h.deleted_at IS NULL AND h.deleted_at_client IS NULL AND (c.deleted_at IS NULL OR c.deleted_at = 0)`,
+                [workDate]
+              );
+              for (const r of Array.isArray(titRows) ? titRows : []) {
+                const id = Number(r?.cleaned_by_us);
+                if (Number.isFinite(id)) inProgramIds.add(id);
+              }
+              for (const r of Array.isArray(collabRows) ? collabRows : []) {
+                const id = Number(r?.user_id);
+                if (Number.isFinite(id)) inProgramIds.add(id);
+              }
+            }
+
+            const [reportRows]: any = await adamConnection.execute(
+              `SELECT user_id FROM app_housekeeping_report WHERE DATE(updated_at) = ?`,
+              [workDate]
+            );
+            for (const r of Array.isArray(reportRows) ? reportRows : []) {
+              const id = Number(r?.user_id);
+              if (Number.isFinite(id)) hasReportIds.add(id);
+            }
+          } finally {
+            await adamConnection.end();
+          }
+        } catch (adamErr: any) {
+          console.warn("⚠️ ADAM non disponibile per selected-cleaners enrichment:", adamErr?.message);
+        }
+
+        selectedCleaners.cleaners = cleanersList.map((c: any) => {
+          const cId = Number(c.id);
+          return {
+            ...c,
+            last_worked_date: lastWorkedByCleanerId.get(cId) ?? null,
+            show_plus_one: inProgramIds.has(cId) && !hasReportIds.has(cId),
+          };
+        });
+      }
+
       console.log(`✅ Selected cleaners caricati per ${workDate}: ${selectedCleaners.cleaners?.length || 0} cleaners`);
       res.json(selectedCleaners);
     } catch (error: any) {
@@ -1120,7 +1218,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Arricchisci con last_worked_date da app_housekeeping (ADAM MySQL)
+      // show_plus_one: in programma per la data ma senza report ancora. Fonte "in programma": prima invio = selected_cleaners, dopo invio = ADAM (titolari + collaboratori)
+      const lastTransfer = await pgDailyAssignmentsService.getLastTransferToAdamTimestamp(workDate);
+      let inProgramIds: Set<number>;
+      if (!lastTransfer) {
+        const selectedIds = await pgDailyAssignmentsService.loadSelectedCleaners(workDate);
+        inProgramIds = new Set(selectedIds ?? []);
+      } else {
+        inProgramIds = new Set();
+      }
+      const hasReportIds = new Set<number>();
+
+      // Arricchisci con last_worked_date, in_program (se post-invio) e has_report da ADAM
       const lastWorkedByCleanerId = new Map<number, string>();
       try {
         const adamConnection = await mysql.createConnection({
@@ -1157,17 +1266,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             if (dateStr) lastWorkedByCleanerId.set(id, dateStr);
           }
+
+          // Dopo invio ADAM: "in programma" = titolari + collaboratori da app_housekeeping
+          if (lastTransfer) {
+            const [titRows]: any = await adamConnection.execute(
+              `SELECT DISTINCT cleaned_by_us FROM app_housekeeping
+               WHERE checkout = ? AND deleted_at IS NULL AND deleted_at_client IS NULL`,
+              [workDate]
+            );
+            const [collabRows]: any = await adamConnection.execute(
+              `SELECT DISTINCT c.user_id FROM app_housekeeping_collaborations c
+               INNER JOIN app_housekeeping h ON c.housekeeping_id = h.id
+               WHERE h.checkout = ? AND h.deleted_at IS NULL AND h.deleted_at_client IS NULL AND (c.deleted_at IS NULL OR c.deleted_at = 0)`,
+              [workDate]
+            );
+            for (const r of Array.isArray(titRows) ? titRows : []) {
+              const id = Number(r?.cleaned_by_us);
+              if (Number.isFinite(id)) inProgramIds.add(id);
+            }
+            for (const r of Array.isArray(collabRows) ? collabRows : []) {
+              const id = Number(r?.user_id);
+              if (Number.isFinite(id)) inProgramIds.add(id);
+            }
+          }
+
+          // Chi ha già report per questa data (app_housekeeping_report)
+          const [reportRows]: any = await adamConnection.execute(
+            `SELECT user_id FROM app_housekeeping_report WHERE DATE(updated_at) = ?`,
+            [workDate]
+          );
+          for (const r of Array.isArray(reportRows) ? reportRows : []) {
+            const id = Number(r?.user_id);
+            if (Number.isFinite(id)) hasReportIds.add(id);
+          }
         } finally {
           await adamConnection.end();
         }
       } catch (adamErr: any) {
-        console.warn("⚠️ ADAM non disponibile per last_worked_date:", adamErr?.message);
+        console.warn("⚠️ ADAM non disponibile per last_worked_date / show_plus_one:", adamErr?.message);
       }
 
-      cleaners = cleaners.map((c: any) => ({
-        ...c,
-        last_worked_date: lastWorkedByCleanerId.get(Number(c.id)) ?? null,
-      }));
+      cleaners = cleaners.map((c: any) => {
+        const cId = Number(c.id);
+        const show_plus_one = inProgramIds.has(cId) && !hasReportIds.has(cId);
+        return {
+          ...c,
+          last_worked_date: lastWorkedByCleanerId.get(cId) ?? null,
+          show_plus_one,
+        };
+      });
 
       console.log(`✅ Cleaners caricati da PostgreSQL per ${workDate}: ${cleaners.length}`);
       res.json({

@@ -30,6 +30,7 @@ interface Cleaner {
   preferred_customers: number[];
   telegram_id: number | null;
   start_time: string | null;
+  show_plus_one?: boolean;
 }
 
 interface TaskStats {
@@ -264,6 +265,9 @@ export default function Convocazioni() {
         newSet.delete(cleanerId);
         return newSet;
       });
+      // (+1) istantaneo: nascondi quando deselezioni
+      setCleaners(prev => prev.map(c => c.id === cleanerId ? { ...c, show_plus_one: false } : c));
+      setFilteredCleaners(prev => prev.map(c => c.id === cleanerId ? { ...c, show_plus_one: false } : c));
       return;
     }
 
@@ -279,19 +283,34 @@ export default function Convocazioni() {
       newSet.add(cleanerId);
       return newSet;
     });
+    // (+1) istantaneo: mostra quando convochi
+    setCleaners(prev => prev.map(c => c.id === cleanerId ? { ...c, show_plus_one: true } : c));
+    setFilteredCleaners(prev => prev.map(c => c.id === cleanerId ? { ...c, show_plus_one: true } : c));
   };
 
   const handleConfirmUnavailable = () => {
-    if (confirmDialog.cleanerId !== null) {
+    if (confirmDialog.cleanerId === null) {
+      setConfirmDialog({ open: false, cleanerId: null });
+      return;
+    }
+    const id = confirmDialog.cleanerId;
+    const isCurrentlySelected = selectedCleaners.has(id);
+    if (isCurrentlySelected) {
       setSelectedCleaners(prev => {
         const newSet = new Set(prev);
-        if (newSet.has(confirmDialog.cleanerId!)) {
-          newSet.delete(confirmDialog.cleanerId!);
-        } else {
-          newSet.add(confirmDialog.cleanerId!);
-        }
+        newSet.delete(id);
         return newSet;
       });
+      setCleaners(prev => prev.map(c => c.id === id ? { ...c, show_plus_one: false } : c));
+      setFilteredCleaners(prev => prev.map(c => c.id === id ? { ...c, show_plus_one: false } : c));
+    } else {
+      setSelectedCleaners(prev => {
+        const newSet = new Set(prev);
+        newSet.add(id);
+        return newSet;
+      });
+      setCleaners(prev => prev.map(c => c.id === id ? { ...c, show_plus_one: true } : c));
+      setFilteredCleaners(prev => prev.map(c => c.id === id ? { ...c, show_plus_one: true } : c));
     }
     setConfirmDialog({ open: false, cleanerId: null });
   };
@@ -650,7 +669,20 @@ export default function Convocazioni() {
                           return Number(hours || 0).toFixed(2);
                         })()}h
                         <span className="mx-2">|</span>
-                        <span className="font-semibold">Giorni consecutivi:</span> {cleaner.counter_days}
+                        <span className="font-semibold">Giorni consecutivi:</span>{' '}
+                        <span className="inline-flex items-center gap-1">
+                          {cleaner.counter_days}
+                          {cleaner.show_plus_one && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="font-semibold text-yellow-600 dark:text-yellow-500">(+1)</span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>In programma per questa data ma report non ancora compilato</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </span>
                         <span className="mx-2">|</span>
                         <span className="font-semibold">Ultimo giorno lavorato:</span> {cleaner.last_worked_date ? (() => {
                           const s = String(cleaner.last_worked_date).trim();
