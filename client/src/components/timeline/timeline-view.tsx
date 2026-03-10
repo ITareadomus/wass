@@ -40,6 +40,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface TimelineViewProps {
   personnel: Personnel[];
@@ -68,6 +69,7 @@ interface Cleaner {
   preferred_customers: number[];
   telegram_id: number | null;
   start_time: string | null;
+  show_plus_one?: boolean;
 }
 
 export default function TimelineView({
@@ -3052,11 +3054,23 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 {/* Giorni lavorati (2/4) */}
                 <div className="col-span-2">
                   <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">Giorni lavorati</p>
-                  <Input
-                    value={String(selectedCleaner.counter_days ?? "")}
-                    readOnly
-                    className={displayInputClass}
-                  />
+                  <div className={cn("flex items-center h-9 min-h-9", displayInputClass)}>
+                    <span className="text-sm tabular-nums">
+                      {selectedCleaner.counter_days ?? ""}
+                    </span>
+                    {selectedCleaner.show_plus_one && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-500 ml-1">
+                            (+1)
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>In programma per questa data ma report non ancora compilato</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
                 </div>
 
                 {/* Ore lavorate (2/4) */}
