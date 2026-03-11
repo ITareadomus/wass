@@ -9,6 +9,7 @@ import {
 import { PriorityWindows, priorityPenalty, Priority } from './priorityWindows';
 import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, FairnessParams, DEFAULT_FAIRNESS_PARAMS, MinutesBasedTargets } from './phase2';
 import { TravelPolicy, getWaveLevelConstraints } from './travelPolicy';
+import { runPhase4RepairBatch } from './phase4OrTools';
 
 export interface Phase4Params {
   maxInsertionAttempts: number;
@@ -984,7 +985,7 @@ function calculateUnassignedPenalty(
   };
 }
 
-export function runPhase4Algorithm(
+export async function runPhase4Algorithm(
   workDate: string,
   initialSchedules: CleanerSchedule[],
   unassignedTasks: { taskId: number; reasonCode: string; details: Record<string, any> }[],
@@ -994,7 +995,7 @@ export function runPhase4Algorithm(
   params: Phase4Params = DEFAULT_PHASE4_PARAMS,
   constraintsByCleaner: Map<string, Phase3TimelineConstraints> = new Map(),
   lockedCleanerIds: number[] = []
-): Phase4Result {
+): Promise<Phase4Result> {
   const events: Phase4Event[] = [];
   const taskResults: Phase4TaskResult[] = [];
   let schedules = [...initialSchedules];
@@ -1108,7 +1109,151 @@ export function runPhase4Algorithm(
         tasks_to_process: levelQueue.length
       }
     });
-    
+
+    // OR-Tools batch repair: assign as many tasks as possible (append-only) in one CP-SAT solve
+    const assignableSchedules = getAssignableSchedules();
+    const queueForBatch = levelQueue.filter((u) => !finalizedTaskIds.has(u.taskId));
+    if (queueForBatch.length > 0 && assignableSchedules.length > 0) {
+      const allowed: { taskId: number; cleanerId: number; deltaTravel: number }[] = [];
+      const repairTasks: { taskId: number; cleaningTimeMinutes: number }[] = [];
+      const seenTaskIds = new Set<number>();
+      for (const u of queueForBatch) {
+        const task = tasksMap.get(u.taskId);
+        if (!task) continue;
+        if (!seenTaskIds.has(task.taskId)) {
+          seenTaskIds.add(task.taskId);
+          repairTasks.push({
+            taskId: task.taskId,
+            cleaningTimeMinutes: task.cleaningTimeMinutes ?? 60
+          });
+        }
+        for (const schedule of assignableSchedules) {
+          const cleanerConstraints = constraintsByCleaner.get(String(schedule.cleanerId)) ?? null;
+          const candidate = tryInsertTask(
+            schedule,
+            task,
+            schedule.tasks.length,
+            workDate,
+            tasksMap,
+            priorityWindows,
+            params,
+            targets,
+            currentRelaxLevel,
+            cleanerConstraints,
+            schedule.anchorTask ?? null
+          );
+          if (candidate.feasible) {
+            allowed.push({
+              taskId: task.taskId,
+              cleanerId: schedule.cleanerId,
+              deltaTravel: candidate.deltaTravel
+            });
+          }
+        }
+      }
+      const repairCleaners: {
+        cleanerId: number;
+        currentLoadMin: number;
+        currentTaskCount: number;
+        maxLoad: number;
+        maxTasks: number;
+      }[] = [];
+      for (const schedule of assignableSchedules) {
+        const currentWorkMinutes = (schedule.fixedWorkMinutes ?? 0) + (schedule.totalWorkMinutes ?? 0);
+        const currentTravelMinutes = (schedule.fixedTravelMinutes ?? 0) + (schedule.totalTravel ?? 0);
+        const currentLoadMin = currentWorkMinutes + params.fairness.wT * currentTravelMinutes;
+        const currentTaskCount = (schedule.fixedTaskCount ?? 0) + schedule.tasks.length;
+        const avgTravel = schedule.tasks.length > 0 ? schedule.totalTravel / schedule.tasks.length : 0;
+        const travelBonus = avgTravel <= 10 ? 1 : 0;
+        const maxTasks =
+          (params.dynamicMaxTasks !== undefined ? params.dynamicMaxTasks : 3) + travelBonus;
+        repairCleaners.push({
+          cleanerId: schedule.cleanerId,
+          currentLoadMin,
+          currentTaskCount,
+          maxLoad: targets.maxTarget,
+          maxTasks
+        });
+      }
+      try {
+        const batchResult = await runPhase4RepairBatch(
+          allowed,
+          repairTasks,
+          repairCleaners,
+          params.fairness.wT,
+          { timeoutMs: 60000 }
+        );
+        const sortedAssignments = [...batchResult.assignments].sort(
+          (a, b) => a.cleanerId - b.cleanerId || a.taskId - b.taskId
+        );
+        const appliedTaskIds = new Set<number>();
+        for (const { taskId, cleanerId } of sortedAssignments) {
+          const scheduleIdx = schedules.findIndex((s) => s.cleanerId === cleanerId);
+          if (scheduleIdx < 0) continue;
+          const schedule = schedules[scheduleIdx];
+          const task = tasksMap.get(taskId);
+          if (!task) continue;
+          const cleanerConstraints = constraintsByCleaner.get(String(cleanerId)) ?? null;
+          const candidate = tryInsertTask(
+            schedule,
+            task,
+            schedule.tasks.length,
+            workDate,
+            tasksMap,
+            priorityWindows,
+            params,
+            targets,
+            currentRelaxLevel,
+            cleanerConstraints,
+            schedule.anchorTask ?? null
+          );
+          if (!candidate.feasible) continue;
+          const updatedSchedule = applyInsertion(
+            schedule,
+            task,
+            schedule.tasks.length,
+            workDate,
+            tasksMap,
+            priorityWindows,
+            schedule.anchorTask ?? null,
+            cleanerConstraints
+          );
+          schedules[scheduleIdx] = updatedSchedule;
+          taskResults.push({
+            taskId: task.taskId,
+            logisticCode: task.logisticCode,
+            status: 'inserted',
+            cleanerId: candidate.cleanerId,
+            position: schedule.tasks.length,
+            score: candidate.totalScore
+          });
+          finalizedTaskIds.add(task.taskId);
+          appliedTaskIds.add(task.taskId);
+          insertedCount++;
+          events.push({
+            eventType: 'PHASE4_TASK_REASSIGNED_INSERTION',
+            payload: {
+              task_id: task.taskId,
+              logistic_code: task.logisticCode,
+              cleaner_id: candidate.cleanerId,
+              position: schedule.tasks.length,
+              delta_travel: candidate.deltaTravel,
+              delta_wait: candidate.deltaWait,
+              priority_penalty: candidate.priorityPenalty,
+              underfilled_bonus: candidate.underfilledBonus,
+              total_score: candidate.totalScore,
+              ortools_batch: true
+            }
+          });
+        }
+        for (let i = levelQueue.length - 1; i >= 0; i--) {
+          if (appliedTaskIds.has(levelQueue[i].taskId)) levelQueue.splice(i, 1);
+        }
+      } catch (_err) {
+        // Fallback to greedy only for this level
+      }
+    }
+
     while (levelQueue.length > 0) {
       const unassigned = levelQueue.shift()!;
       

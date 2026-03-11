@@ -671,7 +671,7 @@ export async function runPhase4(
       });
     }
     
-    const phase4Result = runPhase4Algorithm(
+    const phase4Result = await runPhase4Algorithm(
       resolvedWorkDate,
       schedules,
       unassignedTasks,
