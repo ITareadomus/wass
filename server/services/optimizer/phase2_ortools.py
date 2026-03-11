@@ -168,13 +168,9 @@ def main():
 
         for c_idx in range(n_c):
             cleaner = cleaners[c_idx]
-            cid = cleaner.get("cleanerId")
 
-            # Anchored: only this cleaner (or none if overloaded handled later)
-            if anchored is not None and cid != anchored:
-                continue
-
-            # Compatibility: all tasks in group compatible with cleaner
+            # Compatibility: all tasks in group compatible with cleaner.
+            # Anchor is informational only; group can go to any compatible cleaner by default.
             compat = True
             for task in tasks:
                 if not task_cleaner_compatible(cleaner, task, apartment_types):
