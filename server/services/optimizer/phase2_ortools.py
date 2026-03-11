@@ -79,6 +79,14 @@ def main():
     w_t = float(fairness.get("wT", 1.0))
     targets = data.get("targets") or {}
     max_target = int(targets.get("maxTarget", 600)) * SCALE
+    min_target_scaled = int((targets.get("minTarget") or 0) * SCALE)
+    target_load_scaled = int((targets.get("targetLoadMin") or 0) * SCALE)
+    travel_to_first = data.get("travelToFirstTaskMin") or []  # [g][c] in minutes
+    travel_weight = float(data.get("travelWeight", 2))
+    k_under = float(fairness.get("k_under", 6))
+    k_balance = float(fairness.get("k_balance", 2))
+    k_over = float(fairness.get("k_over", 0.05))
+    zero_bonus = float(fairness.get("zeroBonus", 30))
     initial_load = data.get("initialLoadByCleanerMin") or {}
     fixed_stats = data.get("initialFixedStatsByCleaner") or {}
     max_tasks_per_cleaner = int(data.get("maxTasksPerCleaner", 4))
@@ -259,30 +267,62 @@ def main():
                 if x[g2][c] is not None:
                     model.add(x[g][c] + x[g2][c] <= 1)
 
-    # Objective: maximize tasks assigned (high), then priority tasks, then -travel, then balance
-    # Scaled integer objective
-    task_weight = 1000000
-    priority_weight = 10000
-    travel_weight = 1
+    # Build load expression per cleaner (scaled) for fairness auxiliary variables
+    def load_expr(c_idx):
+        expr = initial_load_min(c_idx)
+        for g in range(n_g):
+            if x[g][c_idx] is not None:
+                expr = expr + x[g][c_idx] * (group_work[g] + int(w_t * group_travel[g]))
+        return expr
 
-    total_tasks_assigned = []
-    priority_tasks_assigned = []
-    total_travel = []
+    # Auxiliary variables for legacy fairness weights
+    max_aux = max(max_target, min_target_scaled, target_load_scaled)
+    under_c = [model.new_int_var(0, max_aux, f"under_{c}") for c in range(n_c)]
+    balance_c = [model.new_int_var(0, max_aux, f"balance_{c}") for c in range(n_c)]
+    over_c = [model.new_int_var(0, max_aux, f"over_{c}") for c in range(n_c)]
+    product_over_c = [model.new_int_var(0, max_aux * max_aux, f"product_over_{c}") for c in range(n_c)]
+    for c in range(n_c):
+        load_c = load_expr(c)
+        model.add(under_c[c] >= min_target_scaled - load_c)
+        model.add(under_c[c] >= 0)
+        model.add(balance_c[c] >= load_c - target_load_scaled)
+        model.add(balance_c[c] >= 0)
+        model.add(over_c[c] >= load_c - max_target)
+        model.add(over_c[c] >= 0)
+        model.add_multiplication_equality(product_over_c[c], [over_c[c], over_c[c]])
+
+    has_any_c = []
+    for c in range(n_c):
+        if initial_load_min(c) == 0:
+            h = model.new_bool_var(f"has_any_{c}")
+            model.add(sum(x[g][c] for g in range(n_g) if x[g][c] is not None) >= 1).OnlyEnforceIf(h)
+            model.add(sum(x[g][c] for g in range(n_g) if x[g][c] is not None) == 0).OnlyEnforceIf(h.Not())
+            has_any_c.append((c, h))
+        else:
+            has_any_c.append((c, None))
+
+    # Objective: legacy weights (task_weight dominant, then travel, under, balance, over, zeroBonus)
+    task_weight = 100000
+    obj_terms = []
 
     for g in range(n_g):
         for c in range(n_c):
             if x[g][c] is None:
                 continue
-            total_tasks_assigned.append(x[g][c] * group_ntasks[g])
-            # Priority: treat high priority groups (e.g. by score) - use group score as proxy if needed
-            priority_tasks_assigned.append(x[g][c] * group_ntasks[g])  # simplify: same as task count
-            total_travel.append(x[g][c] * group_travel[g])
+            obj_terms.append(task_weight * x[g][c] * group_ntasks[g])
+            travel_first_min = float(travel_to_first[g][c] if g < len(travel_to_first) and c < len(travel_to_first[g]) else 0) or 0
+            travel_min = travel_first_min + (group_travel[g] / SCALE)
+            obj_terms.append((-travel_weight * travel_min) * x[g][c])
+    for c in range(n_c):
+        obj_terms.append((k_under / SCALE) * under_c[c])
+        obj_terms.append(-(k_balance / SCALE) * balance_c[c])
+        obj_terms.append(-(k_over / (SCALE * SCALE)) * product_over_c[c])
+    for (c, h) in has_any_c:
+        if h is not None:
+            obj_terms.append(zero_bonus)
+            obj_terms.append(-zero_bonus * h)
 
-    model.maximize(
-        task_weight * sum(total_tasks_assigned)
-        + priority_weight * sum(priority_tasks_assigned)
-        - travel_weight * sum(total_travel)
-    )
+    model.maximize(sum(obj_terms))
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 60.0

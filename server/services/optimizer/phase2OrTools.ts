@@ -26,6 +26,7 @@ import {
   ApartmentTypes,
   DEFAULT_APARTMENT_TYPES
 } from './phase2';
+import { estimateTravelMinutes } from './phase1';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -107,6 +108,27 @@ function buildPayload(
 
   const maxTasksPerCleaner = params.dynamicMaxTasks != null ? params.dynamicMaxTasks + 1 : 4;
 
+  const travelToFirstTaskMin: number[][] = [];
+  for (let g = 0; g < groups.length; g++) {
+    const firstTaskId = groups[g].taskIds?.[0];
+    const firstTask = firstTaskId != null ? tasksMap.get(firstTaskId) : null;
+    const row: number[] = [];
+    for (let c = 0; c < cleaners.length; c++) {
+      const cleaner = cleaners[c];
+      const fromPos = params.initialLastPositionByCleaner?.get(cleaner.cleanerId) ??
+        (cleaner.lat != null && cleaner.lng != null ? { lat: cleaner.lat, lng: cleaner.lng } : null);
+      if (fromPos && firstTask) {
+        row.push(estimateTravelMinutes(
+          { taskId: 0, logisticCode: 0, lat: fromPos.lat, lng: fromPos.lng },
+          firstTask
+        ));
+      } else {
+        row.push(0);
+      }
+    }
+    travelToFirstTaskMin.push(row);
+  }
+
   const payload = {
     groups: groupsPayload,
     tasks: tasksPayload,
@@ -125,7 +147,9 @@ function buildPayload(
     initialFixedStatsByCleaner: mapToObject(params.initialFixedStatsByCleaner),
     maxTasksPerCleaner,
     straordinariaLongThresholdMin: STRAORDINARIA_LONG_THRESHOLD_MIN,
-    straordinariaExtraTaskMaxMin: STRAORDINARIA_EXTRA_TASK_MAX_MIN
+    straordinariaExtraTaskMaxMin: STRAORDINARIA_EXTRA_TASK_MAX_MIN,
+    travelToFirstTaskMin,
+    travelWeight: params.travelWeight ?? 2
   };
 
   return JSON.stringify(payload);
