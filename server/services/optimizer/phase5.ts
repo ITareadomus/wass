@@ -2,6 +2,12 @@ import { TaskForScheduling, simulateSequence, Phase3TimelineConstraints } from '
 import { PriorityWindows } from './priorityWindows';
 import { CleanerSchedule } from './phase4';
 import { FairnessParams, DEFAULT_FAIRNESS_PARAMS } from './phase2';
+import {
+  runPhase5NeighborhoodBatch,
+  Phase5CandidateRelocation,
+  Phase5CandidateSwap,
+  Phase5NeighborhoodCleaner
+} from './phase5OrTools';
 
 export interface Phase5Params {
   maxIterations: number;
@@ -12,6 +18,11 @@ export interface Phase5Params {
   maxTravelIncreaseForFairness: number; // max acceptable net travel increase (min) for a fairness move
   fairnessOverloadedRatio: number;      // threshold: cleaner is overloaded when load > avg * ratio
   fairnessUnderloadedRatio: number;     // threshold: cleaner is underloaded when load < avg * ratio
+  // Optional OR-Tools neighborhood optimization (small subsets of candidate moves)
+  useOrToolsNeighborhood?: boolean;
+  ortoolsNeighborhoodMaxCandidates?: number;   // max relocations + swaps to send (e.g. 40)
+  ortoolsNeighborhoodEveryNIterations?: number; // call every N iterations (e.g. 1 or 5)
+  ortoolsTimeoutMs?: number;
 }
 
 export const DEFAULT_PHASE5_PARAMS: Phase5Params = {
@@ -22,7 +33,11 @@ export const DEFAULT_PHASE5_PARAMS: Phase5Params = {
   maxFairnessIterations: 30,
   maxTravelIncreaseForFairness: 20,
   fairnessOverloadedRatio: 1.20,
-  fairnessUnderloadedRatio: 0.80
+  fairnessUnderloadedRatio: 0.80,
+  useOrToolsNeighborhood: false,
+  ortoolsNeighborhoodMaxCandidates: 40,
+  ortoolsNeighborhoodEveryNIterations: 1,
+  ortoolsTimeoutMs: 10000
 };
 
 export interface Phase5Event {
@@ -169,7 +184,7 @@ interface FairnessCandidate {
   netTravelIncrease: number;
 }
 
-export function runPhase5Algorithm(
+export async function runPhase5Algorithm(
   workDate: string,
   schedules: CleanerSchedule[],
   tasksMap: Map<number, TaskForScheduling>,
@@ -177,7 +192,7 @@ export function runPhase5Algorithm(
   params: Phase5Params = DEFAULT_PHASE5_PARAMS,
   constraintsByCleaner: Map<string, Phase3TimelineConstraints> = new Map(),
   lockedCleanerIds: number[] = []
-): Phase5Result {
+): Promise<Phase5Result> {
   const events: Phase5Event[] = [];
   let relocationsExecuted = 0;
   let swapsExecuted = 0;
@@ -201,9 +216,21 @@ export function runPhase5Algorithm(
     }
   });
 
+  const useOrTools = params.useOrToolsNeighborhood === true;
+  const ortoolsEveryN = params.ortoolsNeighborhoodEveryNIterations ?? 1;
+  const ortoolsMaxCand = params.ortoolsNeighborhoodMaxCandidates ?? 40;
+  const ortoolsTimeoutMs = params.ortoolsTimeoutMs ?? 10000;
+  const maxRelCand = Math.ceil(ortoolsMaxCand / 2);
+  const maxSwapCand = ortoolsMaxCand - maxRelCand;
+
   for (let iteration = 0; iteration < params.maxIterations; iteration++) {
     iterationsUsed++;
     let bestMove: MoveCandidate | null = null;
+    const relocationCandidates: MoveCandidate[] = [];
+    const swapCandidates: MoveCandidate[] = [];
+    const relPayload: Phase5CandidateRelocation[] = [];
+    const swapPayload: Phase5CandidateSwap[] = [];
+    const collectForOrTools = useOrTools && iteration % ortoolsEveryN === 0;
 
     // === RELOCATIONS: move a task from cleaner A to cleaner B ===
     for (let aIdx = 0; aIdx < current.length; aIdx++) {
@@ -254,6 +281,23 @@ export function runPhase5Algorithm(
               ((simAWithout.ok ? simAWithout.totalPriorityPenalty : 0) - schedA.totalPriorityPenalty);
 
             if (net >= params.minImprovementMin && penaltyDelta <= 10) {
+              if (collectForOrTools && relocationCandidates.length < maxRelCand) {
+                relocationCandidates.push({
+                  type: 'relocation',
+                  improvement: net,
+                  fromIdx: aIdx,
+                  fromTaskIdx: tIdx,
+                  toIdx: bIdx,
+                  toPosition: pos
+                });
+                relPayload.push({
+                  taskId: task.taskId,
+                  fromCleanerId: schedA.cleanerId,
+                  toCleanerId: schedB.cleanerId,
+                  toPosition: pos,
+                  improvement: net
+                });
+              }
               if (!bestMove || net > bestMove.improvement) {
                 bestMove = {
                   type: 'relocation',
@@ -315,6 +359,23 @@ export function runPhase5Algorithm(
             const penaltyDelta = newPenalty - oldPenalty;
 
             if (improvement >= params.minImprovementMin && penaltyDelta <= 10) {
+              if (collectForOrTools && swapCandidates.length < maxSwapCand) {
+                swapCandidates.push({
+                  type: 'swap',
+                  improvement,
+                  cleanerAIdx: aIdx,
+                  taskAIdx: tA,
+                  cleanerBIdx: bIdx,
+                  taskBIdx: tB
+                });
+                swapPayload.push({
+                  taskAId: taskA.taskId,
+                  taskBId: taskB.taskId,
+                  cleanerAId: schedA.cleanerId,
+                  cleanerBId: schedB.cleanerId,
+                  improvement
+                });
+              }
               if (!bestMove || improvement > bestMove.improvement) {
                 bestMove = {
                   type: 'swap',
@@ -328,6 +389,132 @@ export function runPhase5Algorithm(
             }
           }
         }
+      }
+    }
+
+    // Optional OR-Tools neighborhood batch: apply subset of non-conflicting moves
+    if (
+      collectForOrTools &&
+      (relocationCandidates.length > 0 || swapCandidates.length > 0)
+    ) {
+      const cleanersPayload: Phase5NeighborhoodCleaner[] = current.map((s) => ({
+        cleanerId: s.cleanerId,
+        currentTaskCount: s.tasks.length + (s.fixedTaskCount ?? 0),
+        maxTasks: (params.dynamicMaxTasks ?? 6) + 1
+      }));
+      const batchResult = await runPhase5NeighborhoodBatch(
+        relPayload,
+        swapPayload,
+        cleanersPayload,
+        { timeoutMs: ortoolsTimeoutMs }
+      );
+      const applyRel = batchResult.applyRelocationIndices ?? [];
+      const applySwap = batchResult.applySwapIndices ?? [];
+      if (applyRel.length > 0 || applySwap.length > 0) {
+        // Apply relocations first (by index); resolve current position by taskId after prior moves
+        for (const idx of applyRel) {
+          const m = relocationCandidates[idx];
+          if (!m || m.type !== 'relocation') continue;
+          const taskId = relPayload[idx]?.taskId;
+          if (taskId == null) continue;
+          const task = tasksMap.get(taskId);
+          if (!task) continue;
+          const fromSched = current[m.fromIdx!];
+          const fromTaskIdx = fromSched.tasks.findIndex((r) => r.taskId === taskId);
+          if (fromTaskIdx < 0) continue; // already moved
+          const toSched = current[m.toIdx!];
+          const toPosition = Math.min(m.toPosition!, toSched.tasks.length);
+          const listA = tasksWithout(fromSched, tasksMap, fromTaskIdx);
+          const cA = constraintsByCleaner.get(String(fromSched.cleanerId)) || null;
+          const simA = simulateSequence(
+            workDate, listA, fromSched.startTime, tasksMap,
+            fromSched.anchorTask ?? null, priorityWindows, cA
+          );
+          const listB = tasksWithInsert(toSched, tasksMap, task, toPosition);
+          const cB = constraintsByCleaner.get(String(toSched.cleanerId)) || null;
+          const simB = simulateSequence(
+            workDate, listB, toSched.startTime, tasksMap,
+            toSched.anchorTask ?? null, priorityWindows, cB
+          );
+          if (simA.ok || listA.length === 0) {
+            current[m.fromIdx!] = applySimResult(
+              fromSched,
+              simA.ok ? simA : { scheduleRows: [], totalTravel: 0, totalWait: 0, totalPriorityPenalty: 0, endTime: null },
+              listA
+            );
+          }
+          if (simB.ok) {
+            current[m.toIdx!] = applySimResult(toSched, simB, listB);
+          }
+          relocationsExecuted++;
+          events.push({
+            eventType: 'PHASE5_RELOCATION',
+            payload: {
+              task_id: task.taskId,
+              logistic_code: task.logisticCode,
+              from_cleaner: fromSched.cleanerId,
+              from_cleaner_name: fromSched.cleanerName,
+              to_cleaner: toSched.cleanerId,
+              to_cleaner_name: toSched.cleanerName,
+              position: toPosition,
+              travel_saved: m.improvement,
+              iteration,
+              ortools_batch: true
+            }
+          });
+        }
+        // Apply swaps (by index); resolve current positions by taskId after prior moves
+        for (const idx of applySwap) {
+          const m = swapCandidates[idx];
+          if (!m || m.type !== 'swap') continue;
+          const { taskAId, taskBId, cleanerAId, cleanerBId } = swapPayload[idx] ?? {};
+          if (taskAId == null || taskBId == null) continue;
+          const taskA = tasksMap.get(taskAId);
+          const taskB = tasksMap.get(taskBId);
+          if (!taskA || !taskB) continue;
+          const aIdx = current.findIndex((s) => s.cleanerId === cleanerAId);
+          const bIdx = current.findIndex((s) => s.cleanerId === cleanerBId);
+          if (aIdx < 0 || bIdx < 0) continue;
+          const schedA = current[aIdx];
+          const schedB = current[bIdx];
+          const taskAIdx = schedA.tasks.findIndex((r) => r.taskId === taskAId);
+          const taskBIdx = schedB.tasks.findIndex((r) => r.taskId === taskBId);
+          if (taskAIdx < 0 || taskBIdx < 0) continue; // already moved
+          const cA = constraintsByCleaner.get(String(schedA.cleanerId)) || null;
+          const listA = tasksWithReplace(schedA, tasksMap, taskAIdx, taskB);
+          const simA = simulateSequence(
+            workDate, listA, schedA.startTime, tasksMap,
+            schedA.anchorTask ?? null, priorityWindows, cA
+          );
+          const cB = constraintsByCleaner.get(String(schedB.cleanerId)) || null;
+          const listB = tasksWithReplace(schedB, tasksMap, taskBIdx, taskA);
+          const simB = simulateSequence(
+            workDate, listB, schedB.startTime, tasksMap,
+            schedB.anchorTask ?? null, priorityWindows, cB
+          );
+          if (simA.ok && simB.ok) {
+            current[aIdx] = applySimResult(schedA, simA, listA);
+            current[bIdx] = applySimResult(schedB, simB, listB);
+            swapsExecuted++;
+            events.push({
+              eventType: 'PHASE5_SWAP',
+              payload: {
+                taskA_id: taskA.taskId,
+                taskA_logistic_code: taskA.logisticCode,
+                cleanerA: schedA.cleanerId,
+                cleanerA_name: schedA.cleanerName,
+                taskB_id: taskB.taskId,
+                taskB_logistic_code: taskB.logisticCode,
+                cleanerB: schedB.cleanerId,
+                cleanerB_name: schedB.cleanerName,
+                travel_saved: m.improvement,
+                iteration,
+                ortools_batch: true
+              }
+            });
+          }
+        }
+        continue; // next iteration
       }
     }
 
