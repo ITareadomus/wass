@@ -15,14 +15,25 @@ import { TimelineContext } from './timelineContext';
 async function loadApartmentTypes(): Promise<ApartmentTypes> {
   try {
     const result = await pool.query(`
-      SELECT value FROM app_settings WHERE key = 'apartment_types'
+      SELECT value FROM app_settings WHERE key = 'app_settings'
     `);
-    if (result.rows.length > 0 && result.rows[0].value) {
+    const apt = result.rows[0]?.value?.apartment_types;
+    if (apt && typeof apt === 'object') {
       return {
-        standard_apt: result.rows[0].value.standard_apt || DEFAULT_APARTMENT_TYPES.standard_apt,
-        premium_apt: result.rows[0].value.premium_apt || DEFAULT_APARTMENT_TYPES.premium_apt,
-        straordinario_apt: result.rows[0].value.straordinario_apt || DEFAULT_APARTMENT_TYPES.straordinario_apt,
-        formatore_apt: result.rows[0].value.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt
+        standard_apt: apt.standard_apt || DEFAULT_APARTMENT_TYPES.standard_apt,
+        premium_apt: apt.premium_apt || DEFAULT_APARTMENT_TYPES.premium_apt,
+        straordinario_apt: apt.straordinario_apt || DEFAULT_APARTMENT_TYPES.straordinario_apt,
+        formatore_apt: apt.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt
+      };
+    }
+    const legacy = await pool.query(`SELECT value FROM app_settings WHERE key = 'apartment_types'`);
+    if (legacy.rows.length > 0 && legacy.rows[0].value) {
+      const v = legacy.rows[0].value;
+      return {
+        standard_apt: v.standard_apt || DEFAULT_APARTMENT_TYPES.standard_apt,
+        premium_apt: v.premium_apt || DEFAULT_APARTMENT_TYPES.premium_apt,
+        straordinario_apt: v.straordinario_apt || DEFAULT_APARTMENT_TYPES.straordinario_apt,
+        formatore_apt: v.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt
       };
     }
   } catch (e) {
