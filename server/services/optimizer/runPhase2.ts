@@ -71,7 +71,7 @@ async function loadSelectedCleanerIds(workDate: string): Promise<number[]> {
   }
   const ids = (result.rows[0].cleaners || [])
     .map((x: any) => Number(x))
-    .filter((n: number) => Number.isFinite(n));
+    .filter((n: number) => Number.isFinite(n)) as number[];
   // Determinismo: l'ordine dell'array in DB può variare tra ambienti.
   ids.sort((a, b) => a - b);
   return ids;
@@ -175,19 +175,61 @@ async function getLatestPhase1RunId(workDate: string): Promise<string | null> {
   return result.rows.length > 0 ? result.rows[0].run_id : null;
 }
 
-function selectNonOverlappingGroups(groups: GroupCandidate[]): GroupCandidate[] {
-  const usedTasks = new Set<number>();
-  const selected: GroupCandidate[] = [];
+/**
+ * Selects a set of non-overlapping groups that covers all tasks (partition with full coverage).
+ * Uses a greedy: process hardest-to-cover tasks first, pick the best group (by score, then anchored, size, travel) for each.
+ * Returns selected groups and any task IDs that could not be covered (Phase 4 will handle them).
+ */
+function selectPartitionCoveringAllTasks(
+  groups: GroupCandidate[],
+  allTaskIds: Set<number>
+): { selected: GroupCandidate[]; uncoveredTaskIds: number[] } {
+  const sorted = [...groups].sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    const aAnchored = a.anchoredCleanerId !== undefined ? 1 : 0;
+    const bAnchored = b.anchoredCleanerId !== undefined ? 1 : 0;
+    if (aAnchored !== bAnchored) return bAnchored - aAnchored;
+    if (b.taskIds.length !== a.taskIds.length) return b.taskIds.length - a.taskIds.length;
+    return (a.avgTravelMin ?? 0) - (b.avgTravelMin ?? 0);
+  });
 
-  for (const group of groups) {
-    const hasOverlap = group.taskIds.some(t => usedTasks.has(t));
-    if (!hasOverlap) {
-      selected.push(group);
-      group.taskIds.forEach(t => usedTasks.add(t));
+  const covered = new Set<number>();
+  const selected: GroupCandidate[] = [];
+  const uncovered = new Set(allTaskIds);
+  const uncoveredTaskIds: number[] = [];
+
+  const isCandidate = (g: GroupCandidate, t: number): boolean =>
+    g.taskIds.includes(t) && g.taskIds.every((id) => !covered.has(id));
+
+  const getCandidatesForTask = (t: number): GroupCandidate[] =>
+    sorted.filter((g) => isCandidate(g, t));
+
+  while (uncovered.size > 0) {
+    let bestT: number | null = null;
+    let minCandidates = Infinity;
+    for (const t of uncovered) {
+      const candidates = getCandidatesForTask(t);
+      if (candidates.length < minCandidates) {
+        minCandidates = candidates.length;
+        bestT = t;
+      }
+    }
+    if (bestT === null) break;
+    const candidates = getCandidatesForTask(bestT);
+    if (candidates.length === 0) {
+      uncoveredTaskIds.push(bestT);
+      uncovered.delete(bestT);
+      continue;
+    }
+    const chosen = candidates[0];
+    selected.push(chosen);
+    for (const id of chosen.taskIds) {
+      covered.add(id);
+      uncovered.delete(id);
     }
   }
 
-  return selected;
+  return { selected, uncoveredTaskIds };
 }
 
 function eventToDecision(runId: string, event: Phase2Event): OptimizerDecision {
@@ -294,21 +336,13 @@ export async function runPhase2(
     
     result.cleanersLoaded = cleaners.length;
 
-    // Re-sort: anchored groups first (wave continuity), then size DESC, then avgTravel ASC
-    const sortedGroups = [...allGroups].sort((a, b) => {
-      const aAnchored = a.anchoredCleanerId !== undefined ? 1 : 0;
-      const bAnchored = b.anchoredCleanerId !== undefined ? 1 : 0;
-      if (aAnchored !== bAnchored) return bAnchored - aAnchored;
-
-      const sizeA = a.taskIds.length;
-      const sizeB = b.taskIds.length;
-      if (sizeA !== sizeB) return sizeB - sizeA;
-      
-      return (a.avgTravelMin ?? 0) - (b.avgTravelMin ?? 0);
-    });
-    
-    const selectedGroups = selectNonOverlappingGroups(sortedGroups);
+    const allTaskIds = new Set(allGroups.flatMap((g) => g.taskIds));
+    const { selected: selectedGroups, uncoveredTaskIds } = selectPartitionCoveringAllTasks(allGroups, allTaskIds);
     result.groupsProcessed = selectedGroups.length;
+
+    if (uncoveredTaskIds.length > 0) {
+      console.warn(`[Phase2] Partition left ${uncoveredTaskIds.length} tasks without group (Phase 4 will try to assign them)`);
+    }
 
     if (cleaners.length === 0) {
       const noCleanerEvents: Phase2Event[] = selectedGroups.map(g => ({
