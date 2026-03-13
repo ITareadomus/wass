@@ -4750,6 +4750,26 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     const legacyCleanupErrorDetails: string[] = [];
 
     try {
+      // Base sequence per cleaner su ADAM (task già presenti per questa data, anche fuori WASS)
+      const baseSeqByCleaner = new Map<number, number>();
+      const workDateFormatted = formatDateForMySQL(workDate);
+      if (workDateFormatted) {
+        const [seqRows]: any = await connection.execute(
+          `SELECT cleaned_by_us, COALESCE(MAX(sequence), 0) AS max_seq
+           FROM app_housekeeping
+           WHERE checkout = ? AND deleted_at IS NULL AND deleted_at_client IS NULL
+           GROUP BY cleaned_by_us`,
+          [workDateFormatted]
+        );
+        for (const row of Array.isArray(seqRows) ? seqRows : []) {
+          const cid = Number(row?.cleaned_by_us);
+          const maxSeq = Number(row?.max_seq);
+          if (Number.isFinite(cid) && Number.isFinite(maxSeq)) {
+            baseSeqByCleaner.set(cid, maxSeq);
+          }
+        }
+      }
+
       for (const cleanerEntry of timelineData.cleaners_assignments) {
         const cleanerId = Number(cleanerEntry.cleaner?.id);
         const tasks = cleanerEntry.tasks || [];
@@ -4796,7 +4816,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
             const assignedAtUs = nowRome;
             const assignedAtMilliseconds = Date.now();
 
-            const sequence = task.sequence ?? 0;
+            const baseSeq = baseSeqByCleaner.get(primaryCleanerId) ?? 0;
+            const sequence = baseSeq + (task.sequence ?? 1);
 
             const cleanedBy = primaryCleanerId ?? null;
 
