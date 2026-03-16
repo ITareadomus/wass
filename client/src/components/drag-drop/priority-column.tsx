@@ -25,6 +25,7 @@ interface PriorityColumnProps {
   droppableId: string;
   icon: "clock" | "alert-circle" | "arrow-down";
   assignAction?: () => Promise<void>;
+  assignButtonDisabled?: boolean;
   isDragDisabled?: boolean;
   containerMultiSelectState?: ContainerMultiSelectState;
   highlightedTaskIds?: Set<string>;
@@ -37,6 +38,7 @@ export default function PriorityColumn({
   droppableId,
   icon,
   assignAction,
+  assignButtonDisabled = false,
   isDragDisabled = false,
   containerMultiSelectState,
   highlightedTaskIds = new Set(),
@@ -274,7 +276,7 @@ export default function PriorityColumn({
             variant="outline"
             size="sm"
             onClick={handleAssign}
-            disabled={!assignAction || tasks.length === 0 || isDateInPast || isAssigning}
+            disabled={!assignAction || assignButtonDisabled || tasks.length === 0 || isDateInPast || isAssigning}
             className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
             title="Assegna"
             data-testid="button-assign-priority"

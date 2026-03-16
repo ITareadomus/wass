@@ -83,6 +83,17 @@ function dedupeById(list: Task[]): Task[] {
   return out;
 }
 
+type WavePriorityState = 'early_out' | 'high_priority' | 'low_priority' | null;
+
+function normalizeWavePriority(value: unknown): WavePriorityState {
+  if (typeof value !== 'string') return null;
+  const normalized = value.toLowerCase();
+  if (normalized === 'early_out' || normalized === 'early-out') return 'early_out';
+  if (normalized === 'high_priority' || normalized === 'high') return 'high_priority';
+  if (normalized === 'low_priority' || normalized === 'low') return 'low_priority';
+  return null;
+}
+
 // Indice per id (1:1)
 function indexById(list: Task[]): Map<string, Task> {
   const m = new Map<string, Task>();
@@ -1867,8 +1878,26 @@ export default function GenerateAssignments() {
   const isHistoricalMode = isDateInPast(selectedDate);
 
   // Filtra le task non assegnate
-  const unassignedTasks = allTasksWithAssignments.filter(task => !task.assignedCleaner);
-  const hasAssignedTasks = allTasksWithAssignments.some(task => task.assignedCleaner);
+  const unassignedTasks = allTasksWithAssignments.filter(task => !(task as any).assignedCleaner);
+  const hasAssignedTasks = allTasksWithAssignments.some(task => Boolean((task as any).assignedCleaner));
+  const timelinePriorityState = useMemo(() => {
+    let hasEoOnTimeline = false;
+    let hasHpOnTimeline = false;
+    let hasLpOnTimeline = false;
+
+    for (const task of allTasksWithAssignments) {
+      if (!(task as any).assignedCleaner) continue;
+      const normalizedPriority =
+        normalizeWavePriority((task as any).priority) ??
+        normalizeWavePriority((task as any).priority_type) ??
+        normalizeWavePriority((task as any).priorityType);
+      if (normalizedPriority === 'early_out') hasEoOnTimeline = true;
+      if (normalizedPriority === 'high_priority') hasHpOnTimeline = true;
+      if (normalizedPriority === 'low_priority') hasLpOnTimeline = true;
+    }
+
+    return { hasEoOnTimeline, hasHpOnTimeline, hasLpOnTimeline };
+  }, [allTasksWithAssignments]);
 
   // Mostra loader durante l'estrazione
   if (isExtracting || isLoadingTasks || isLoading) {
@@ -2142,6 +2171,7 @@ export default function GenerateAssignments() {
                     droppableId="early-out"
                     icon="clock"
                     assignAction={assignEarlyOutToTimeline}
+                    assignButtonDisabled={timelinePriorityState.hasEoOnTimeline}
                     containerMultiSelectState={getContainerMultiSelectState('early_out')}
                     highlightedTaskIds={highlightedEarlyOut}
                   />
@@ -2152,6 +2182,7 @@ export default function GenerateAssignments() {
                     droppableId="high"
                     icon="alert-circle"
                     assignAction={assignHighPriorityToTimeline}
+                    assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || timelinePriorityState.hasHpOnTimeline}
                     containerMultiSelectState={getContainerMultiSelectState('high_priority')}
                     highlightedTaskIds={highlightedHighPriority}
                   />
@@ -2162,6 +2193,7 @@ export default function GenerateAssignments() {
                     droppableId="low"
                     icon="arrow-down"
                     assignAction={assignLowPriorityToTimeline}
+                    assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || !timelinePriorityState.hasHpOnTimeline}
                     containerMultiSelectState={getContainerMultiSelectState('low_priority')}
                     highlightedTaskIds={highlightedLowPriority}
                   />

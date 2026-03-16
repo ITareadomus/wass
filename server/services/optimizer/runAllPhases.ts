@@ -6,11 +6,18 @@ import { runPhase2, Phase2RunResult } from './runPhase2';
 import { runPhase3, Phase3RunResult } from './runPhase3';
 import { runPhase4, Phase4RunResult } from './runPhase4';
 import { runPhase5, Phase5RunResult } from './runPhase5';
-import { createRun, updateRunStatus, OptimizerRun } from './db';
+import {
+  createRun,
+  updateRunStatus,
+  OptimizerRun,
+  getPlanRunIdForDate,
+  setPlanRunIdForDate
+} from './db';
 import { DEFAULT_PHASE1_PARAMS, TaskInput } from './phase1';
 import { calculateDynamicLimits } from './phase2';
 import { DEFAULT_TRAVEL_POLICY } from './travelPolicy';
 import path from 'path';
+import { TimelineContext } from './timelineContext';
 
 export type WavePriority = 'early_out' | 'high_priority' | 'low_priority';
 
@@ -233,6 +240,164 @@ export interface RunAllPhasesOptions {
   skipPhase4?: boolean;
   applyToProduction?: boolean;
   forceFullPipeline?: boolean;
+  anchorTaskIds?: number[];
+}
+
+interface TimelineAnchorBuildResult {
+  timelineSeeds?: Map<number, number>;
+  timelineSeedTasks?: TaskInput[];
+  remainingSlotsPerCleaner?: Map<number, number>;
+}
+
+function filterMapByCleaner<T>(source: Map<number, T>, cleanerIds: Set<number>): Map<number, T> {
+  const filtered = new Map<number, T>();
+  source.forEach((value, key) => {
+    if (cleanerIds.has(key)) filtered.set(key, value);
+  });
+  return filtered;
+}
+
+function buildPhase2TimelineContextForAnchors(
+  fullContext: TimelineContext,
+  anchorCleanerIds: Set<number>
+): TimelineContext | undefined {
+  if (anchorCleanerIds.size === 0) return undefined;
+
+  return {
+    alreadyOnTimelineTaskIds: new Set<string>(),
+    occupiedBlocksByCleaner: filterMapByCleaner(fullContext.occupiedBlocksByCleaner, anchorCleanerIds),
+    initialLoadByCleanerMin: filterMapByCleaner(fullContext.initialLoadByCleanerMin, anchorCleanerIds),
+    anchorPointsByCleaner: filterMapByCleaner(fullContext.anchorPointsByCleaner, anchorCleanerIds),
+    collaborationIndex: new Map<string, number[]>(),
+    lastFixedByCleaner: filterMapByCleaner(fullContext.lastFixedByCleaner, anchorCleanerIds),
+    fixedStatsByCleaner: filterMapByCleaner(fullContext.fixedStatsByCleaner, anchorCleanerIds),
+  };
+}
+
+async function buildTimelineAnchorsForPhase1(
+  workDate: string,
+  timelineContext: TimelineContext,
+  unlockedTaskData: TaskInput[],
+  unlockedTasksCount: number,
+  numCleaners: number,
+  anchorTaskIds: number[]
+): Promise<TimelineAnchorBuildResult> {
+  const timelineSeeds = new Map<number, number>();
+  const timelineSeedTasks: TaskInput[] = [];
+  const remainingSlotsPerCleaner = new Map<number, number>();
+
+  const newTasksTotalMin = unlockedTaskData.reduce((sum, t) => sum + (t.cleaningTimeMinutes || 60), 0);
+  const avgNewTaskMin = unlockedTasksCount > 0 ? newTasksTotalMin / unlockedTasksCount : 60;
+  const preExistingTotalMin = Array.from(timelineContext.initialLoadByCleanerMin.values()).reduce((s, v) => s + v, 0);
+  const targetMinPerCleaner = (newTasksTotalMin + preExistingTotalMin) / Math.max(1, numCleaners);
+
+  if (anchorTaskIds.length === 0) {
+    timelineContext.lastFixedByCleaner.forEach((lastFixed, cleanerId) => {
+      if (lastFixed.lat === null || lastFixed.lng === null) return;
+      timelineSeeds.set(lastFixed.taskId, cleanerId);
+      timelineSeedTasks.push({
+        taskId: lastFixed.taskId,
+        logisticCode: lastFixed.logisticCode,
+        lat: lastFixed.lat,
+        lng: lastFixed.lng,
+        straordinaria: lastFixed.straordinaria,
+        cleaningTimeMinutes: lastFixed.baseCleaningTimeMinutes ?? lastFixed.cleaningTimeMinutes ?? 60
+      });
+
+      const fixedStats = timelineContext.fixedStatsByCleaner.get(cleanerId);
+      const fixedMinutes = fixedStats?.fixedWorkMinutes ?? 0;
+      const remainingMinutes = Math.max(0, targetMinPerCleaner - fixedMinutes);
+      const remainingSlots = Math.max(0, Math.round(remainingMinutes / avgNewTaskMin));
+      remainingSlotsPerCleaner.set(cleanerId, remainingSlots);
+    });
+  } else {
+    const anchorsResult = await pool.query<{
+      task_id: number;
+      logistic_code: number | null;
+      cleaner_id: number;
+      sequence: number | null;
+      start_time: string | null;
+      end_time: string | null;
+      lat: number | null;
+      lng: number | null;
+      straordinaria: boolean | null;
+      cleaning_time: number | null;
+      base_cleaning_time: number | null;
+    }>(`
+      SELECT
+        task_id,
+        logistic_code,
+        cleaner_id,
+        sequence,
+        start_time,
+        end_time,
+        lat,
+        lng,
+        straordinaria,
+        cleaning_time,
+        base_cleaning_time
+      FROM daily_assignments_current
+      WHERE work_date = $1
+        AND task_id = ANY($2::int[])
+    `, [workDate, anchorTaskIds]);
+
+    const ranked = new Map<number, (typeof anchorsResult.rows)[number]>();
+    const rank = (row: (typeof anchorsResult.rows)[number]) => {
+      const hasEnd = !!row.end_time ? 3 : 0;
+      const hasStart = !hasEnd && !!row.start_time ? 2 : 0;
+      const time = row.end_time || row.start_time || '';
+      const seq = row.sequence ?? -1;
+      return { kind: Math.max(hasEnd, hasStart, 1), time, seq };
+    };
+
+    for (const row of anchorsResult.rows) {
+      if (row.lat === null || row.lng === null) continue;
+      const current = ranked.get(row.cleaner_id);
+      if (!current) {
+        ranked.set(row.cleaner_id, row);
+        continue;
+      }
+      const a = rank(row);
+      const b = rank(current);
+      const shouldReplace =
+        a.kind > b.kind ||
+        (a.kind === b.kind && (a.time > b.time || (a.time === b.time && a.seq > b.seq)));
+      if (shouldReplace) ranked.set(row.cleaner_id, row);
+    }
+
+    ranked.forEach((row, cleanerId) => {
+      timelineSeeds.set(row.task_id, cleanerId);
+      timelineSeedTasks.push({
+        taskId: row.task_id,
+        logisticCode: Number(row.logistic_code ?? 0),
+        lat: row.lat as number,
+        lng: row.lng as number,
+        straordinaria: row.straordinaria === true,
+        cleaningTimeMinutes: row.base_cleaning_time ?? row.cleaning_time ?? 60
+      });
+
+      const fixedStats = timelineContext.fixedStatsByCleaner.get(cleanerId);
+      const fixedMinutes = fixedStats?.fixedWorkMinutes ?? 0;
+      const remainingMinutes = Math.max(0, targetMinPerCleaner - fixedMinutes);
+      const remainingSlots = Math.max(0, Math.round(remainingMinutes / avgNewTaskMin));
+      remainingSlotsPerCleaner.set(cleanerId, remainingSlots);
+    });
+  }
+
+  if (timelineSeeds.size === 0) {
+    return {};
+  }
+
+  const totalRemaining = Array.from(remainingSlotsPerCleaner.values()).reduce((s, v) => s + v, 0);
+  console.log(
+    `[runAllPhases] Existing timeline: ${timelineSeeds.size} seed tasks, target=${Math.round(targetMinPerCleaner)}min/cleaner, avgTask=${Math.round(avgNewTaskMin)}min, total remaining slots: ${totalRemaining}`
+  );
+
+  return {
+    timelineSeeds,
+    timelineSeedTasks,
+    remainingSlotsPerCleaner
+  };
 }
 
 export async function runAllPhases(
@@ -241,7 +406,12 @@ export async function runAllPhases(
 ): Promise<AllPhasesRunResult> {
   const startTime = Date.now();
   const runId = uuidv4();
-  const { skipPhase4 = false, applyToProduction = false, forceFullPipeline = false } = options;
+  const {
+    skipPhase4 = false,
+    applyToProduction = false,
+    forceFullPipeline = false,
+    anchorTaskIds = []
+  } = options;
 
   const result: AllPhasesRunResult = {
     runId,
@@ -300,14 +470,20 @@ export async function runAllPhases(
       [workDate]
     );
     const numCleaners = cleanersRes.rows[0]?.cleaners?.length || 1;
-    const totalTasks = result.phase0.unlockedTasks;
-    const dynamicLimits = calculateDynamicLimits(totalTasks, numCleaners);
+    const timelineTasksCount = result.phase0?.alreadyOnTimelineTasks ?? 0;
+    const unlockedTasksCount = result.phase0?.unlockedTasks ?? 0;
+    // Use day-total workload (already on timeline + still to assign) for dynamic limits.
+    // In wave runs this avoids over-tight caps based only on residual slice (e.g. LP only).
+    const totalTasksForDynamicLimits = timelineTasksCount + unlockedTasksCount;
+    const dynamicLimits = calculateDynamicLimits(totalTasksForDynamicLimits, numCleaners);
 
     const hasExistingTimeline = (result.phase0?.timelineContext?.alreadyOnTimelineTaskIds?.size ?? 0) > 0;
 
     const phase1MaxGroupSize = dynamicLimits.baseMax + 1;
     
-    console.log(`[runAllPhases] Dynamic limits: ${totalTasks} tasks / ${numCleaners} cleaners = baseMax=${dynamicLimits.baseMax}, phase1MaxGroup=${phase1MaxGroupSize}`);
+    console.log(
+      `[runAllPhases] Dynamic limits: total=${totalTasksForDynamicLimits} (timeline=${timelineTasksCount}, unlocked=${unlockedTasksCount}) / ${numCleaners} cleaners = baseMax=${dynamicLimits.baseMax}, phase1MaxGroup=${phase1MaxGroupSize}`
+    );
 
     // When timeline has existing tasks, use them as seeds so Phase 1 creates groups anchored to cleaners
     let timelineSeeds: Map<number, number> | undefined;
@@ -315,48 +491,34 @@ export async function runAllPhases(
     let remainingSlotsPerCleaner: Map<number, number> | undefined;
 
     if (hasExistingTimeline && result.phase0?.timelineContext?.lastFixedByCleaner) {
-      timelineSeeds = new Map<number, number>();
-      timelineSeedTasks = [];
-      remainingSlotsPerCleaner = new Map<number, number>();
+      const anchorResult = await buildTimelineAnchorsForPhase1(
+        workDate,
+        result.phase0.timelineContext,
+        result.phase0.unlockedTaskData,
+        result.phase0.unlockedTasks,
+        numCleaners,
+        anchorTaskIds
+      );
+      timelineSeeds = anchorResult.timelineSeeds;
+      timelineSeedTasks = anchorResult.timelineSeedTasks;
+      remainingSlotsPerCleaner = anchorResult.remainingSlotsPerCleaner;
+    }
 
-      // Compute minutes-based remaining capacity so Phase 1 limits anchored groups
-      // proportionally to how much work each cleaner already has.
-      const newTasksTotalMin = result.phase0.unlockedTaskData
-        .reduce((sum, t) => sum + (t.cleaningTimeMinutes || 60), 0);
-      const avgNewTaskMin = result.phase0.unlockedTasks > 0
-        ? newTasksTotalMin / result.phase0.unlockedTasks
-        : 60;
-      const preExistingTotalMin = Array.from(
-        result.phase0.timelineContext.initialLoadByCleanerMin.values()
-      ).reduce((s, v) => s + v, 0);
-      const targetMinPerCleaner = (newTasksTotalMin + preExistingTotalMin) / numCleaners;
-
-      result.phase0.timelineContext.lastFixedByCleaner.forEach((lastFixed, cleanerId) => {
-        if (lastFixed.lat !== null && lastFixed.lng !== null) {
-          timelineSeeds!.set(lastFixed.taskId, cleanerId);
-          timelineSeedTasks!.push({
-            taskId: lastFixed.taskId,
-            logisticCode: lastFixed.logisticCode,
-            lat: lastFixed.lat,
-            lng: lastFixed.lng,
-            straordinaria: lastFixed.straordinaria,
-            cleaningTimeMinutes: lastFixed.baseCleaningTimeMinutes ?? lastFixed.cleaningTimeMinutes ?? 60
-          });
-
-          // Remaining minutes = target − already assigned minutes for this cleaner.
-          // Convert to "task slots" using the average new-task duration so Phase 1
-          // knows how many neighbors to consider for this anchor.
-          const fixedStats = result.phase0.timelineContext!.fixedStatsByCleaner.get(cleanerId);
-          const fixedMinutes = fixedStats?.fixedWorkMinutes ?? 0;
-          const remainingMinutes = Math.max(0, targetMinPerCleaner - fixedMinutes);
-          const remainingSlots = Math.max(0, Math.round(remainingMinutes / avgNewTaskMin));
-          remainingSlotsPerCleaner!.set(cleanerId, remainingSlots);
-        }
-      });
-
-      if (timelineSeeds.size > 0) {
-        const totalRemaining = Array.from(remainingSlotsPerCleaner.values()).reduce((s, v) => s + v, 0);
-        console.log(`[runAllPhases] Existing timeline: ${timelineSeeds.size} seed tasks, target=${Math.round(targetMinPerCleaner)}min/cleaner, avgTask=${Math.round(avgNewTaskMin)}min, total remaining slots: ${totalRemaining}`);
+    let phase2TimelineContext: TimelineContext | undefined = result.phase0?.timelineContext;
+    if (anchorTaskIds.length > 0) {
+      const anchorCleanerIds = new Set<number>(Array.from(timelineSeeds?.values() ?? []));
+      phase2TimelineContext = buildPhase2TimelineContextForAnchors(
+        result.phase0.timelineContext,
+        anchorCleanerIds
+      );
+      if (phase2TimelineContext) {
+        const fixedCount = Array.from(phase2TimelineContext.fixedStatsByCleaner.values())
+          .reduce((s, v) => s + v.fixedTaskCount, 0);
+        console.log(
+          `[runAllPhases] Phase2 anchor context: ${phase2TimelineContext.fixedStatsByCleaner.size} cleaners, ${fixedCount} fixed tasks`
+        );
+      } else {
+        console.log(`[runAllPhases] Phase2 anchor context empty: no anchored cleaners found`);
       }
     }
 
@@ -386,7 +548,7 @@ export async function runAllPhases(
     // Passa timelineContext per fairness scoring (pre-existing load)
     result.phase2 = await runPhase2(workDate, runId, { 
       params: { dynamicMaxTasks: dynamicLimits.baseMax },
-      timelineContext: result.phase0?.timelineContext
+      timelineContext: phase2TimelineContext
     });
     if (result.phase2.status === 'failed') {
       result.status = 'failed';
@@ -467,6 +629,13 @@ export async function runAllPhases(
 
     result.status = 'success';
     await updateRunStatus(runId, 'success', result.summary);
+
+    // Persist plan only for full runs without pre-existing timeline.
+    // This is the "single solve" baseline used by wave applies.
+    if (!hasExistingTimeline) {
+      await setPlanRunIdForDate(workDate, runId);
+      console.log(`[runAllPhases] Plan run updated for ${workDate}: ${runId}`);
+    }
 
   } catch (error: any) {
     result.status = 'failed';
@@ -861,50 +1030,285 @@ const WAVE_PRIORITY_ALIASES: Record<string, WavePriority> = {
   high: 'high_priority',
   low_priority: 'low_priority',
   low: 'low_priority',
+  'early-out': 'early_out'
 };
 
 function matchesWavePriority(taskPriority: string | null | undefined, wavePriority: WavePriority): boolean {
   if (!taskPriority) return false;
-  const normalized = WAVE_PRIORITY_ALIASES[taskPriority];
+  const normalized = WAVE_PRIORITY_ALIASES[String(taskPriority).toLowerCase()];
   return normalized === wavePriority;
 }
 
-async function findReusableOptimizerRun(workDate: string): Promise<string | null> {
-  // Find the latest successful optimizer run for this date
-  const runResult = await pool.query(`
-    SELECT run_id, created_at
-    FROM optimizer.optimizer_run
-    WHERE work_date = $1 AND status = 'success'
-    ORDER BY created_at DESC
-    LIMIT 1
+type TimelinePriorityState = {
+  hasEoOnTimeline: boolean;
+  hasHpOnTimeline: boolean;
+  hasLpOnTimeline: boolean;
+};
+
+type CompareTimelineWithPlanResult = {
+  match: boolean;
+  diffTaskIds: number[];
+  currentWaveTaskIds: number[];
+  anchorTaskIds: number[];
+};
+
+function expectedSliceForWave(wavePriority: WavePriority): WavePriority[] {
+  if (wavePriority === 'high_priority') return ['early_out'];
+  if (wavePriority === 'low_priority') return ['early_out', 'high_priority'];
+  return [];
+}
+
+function normalizePriorityValue(priority: string | null | undefined): WavePriority | null {
+  if (!priority) return null;
+  return WAVE_PRIORITY_ALIASES[String(priority).toLowerCase()] ?? null;
+}
+
+async function getTimelinePriorityState(workDate: string): Promise<TimelinePriorityState> {
+  const rows = await pool.query<{ priority: string | null }>(`
+    SELECT priority
+    FROM daily_assignments_current
+    WHERE work_date = $1
   `, [workDate]);
 
-  if (runResult.rows.length === 0) return null;
+  let hasEoOnTimeline = false;
+  let hasHpOnTimeline = false;
+  let hasLpOnTimeline = false;
 
-  const { run_id, created_at } = runResult.rows[0];
-
-  // Check if the timeline was modified by something OTHER than wave applies
-  // since this optimizer run was created. If so, the result is stale.
-  const manualEditCount = await pool.query(`
-    SELECT COUNT(*) as count
-    FROM daily_assignments_revisions
-    WHERE work_date = $1
-      AND modification_type NOT IN ('optimizer_wave_assign', 'optimizer_auto_assign')
-      AND created_at > $2
-  `, [workDate, created_at]);
-
-  if (parseInt(manualEditCount.rows[0]?.count || '0') > 0) {
-    return null;
+  for (const row of rows.rows) {
+    const normalized = normalizePriorityValue(row.priority);
+    if (normalized === 'early_out') hasEoOnTimeline = true;
+    if (normalized === 'high_priority') hasHpOnTimeline = true;
+    if (normalized === 'low_priority') hasLpOnTimeline = true;
   }
 
-  // Verify the run still has assignments we can use
-  const hasAssignments = await pool.query(`
-    SELECT COUNT(*) as count FROM optimizer.optimizer_assignment WHERE run_id = $1
-  `, [run_id]);
+  return { hasEoOnTimeline, hasHpOnTimeline, hasLpOnTimeline };
+}
 
-  if (parseInt(hasAssignments.rows[0]?.count || '0') === 0) return null;
+async function getTimelineTaskIdsByPriority(workDate: string, priority: WavePriority): Promise<number[]> {
+  const rows = await pool.query<{ task_id: number; priority: string | null }>(`
+    SELECT task_id, priority
+    FROM daily_assignments_current
+    WHERE work_date = $1
+  `, [workDate]);
 
-  return run_id;
+  return rows.rows
+    .filter((row) => matchesWavePriority(row.priority, priority))
+    .map((row) => Number(row.task_id))
+    .filter((id) => Number.isFinite(id));
+}
+
+async function getAllTimelineTaskIds(workDate: string): Promise<number[]> {
+  const rows = await pool.query<{ task_id: number }>(`
+    SELECT DISTINCT task_id
+    FROM daily_assignments_current
+    WHERE work_date = $1
+  `, [workDate]);
+
+  return rows.rows
+    .map((row) => Number(row.task_id))
+    .filter((id) => Number.isFinite(id));
+}
+
+async function getValidPlanRunIdForDate(workDate: string): Promise<string | null> {
+  const planRunId = await getPlanRunIdForDate(workDate);
+  if (!planRunId) return null;
+
+  const runCheck = await pool.query<{ count: string }>(`
+    SELECT COUNT(*) as count
+    FROM optimizer.optimizer_run
+    WHERE run_id = $1
+      AND work_date = $2
+      AND status = 'success'
+  `, [planRunId, workDate]);
+
+  if (parseInt(runCheck.rows[0]?.count || '0', 10) === 0) return null;
+
+  const assignmentCheck = await pool.query<{ count: string }>(`
+    SELECT COUNT(*) as count
+    FROM optimizer.optimizer_assignment
+    WHERE run_id = $1
+  `, [planRunId]);
+
+  if (parseInt(assignmentCheck.rows[0]?.count || '0', 10) === 0) return null;
+
+  return planRunId;
+}
+
+async function compareTimelineWithPlan(
+  workDate: string,
+  planRunId: string,
+  expectedSlice: WavePriority[],
+  currentWavePriority: WavePriority
+): Promise<CompareTimelineWithPlanResult> {
+  const planRows = await pool.query<{
+    task_id: number;
+    cleaner_id: number;
+    sequence: number | null;
+    priority_type: string | null;
+  }>(`
+    SELECT task_id, cleaner_id, sequence, priority_type
+    FROM optimizer.optimizer_assignment
+    WHERE run_id = $1
+  `, [planRunId]);
+
+  const expectedPlanRows = planRows.rows.filter((row) => {
+    const normalized = normalizePriorityValue(row.priority_type);
+    return normalized !== null && expectedSlice.includes(normalized);
+  });
+
+  const timelineRows = await pool.query<{
+    task_id: number;
+    cleaner_id: number;
+    sequence: number | null;
+    priority: string | null;
+  }>(`
+    SELECT task_id, cleaner_id, sequence, priority
+    FROM daily_assignments_current
+    WHERE work_date = $1
+  `, [workDate]);
+
+  const expectedTimelineRows = timelineRows.rows.filter((row) => {
+    const normalized = normalizePriorityValue(row.priority);
+    return normalized !== null && expectedSlice.includes(normalized);
+  });
+  const currentWaveRows = timelineRows.rows.filter((row) =>
+    matchesWavePriority(row.priority, currentWavePriority)
+  );
+
+  const planMap = new Map<number, { cleanerId: number; sequence: number | null }>();
+  for (const row of expectedPlanRows) {
+    planMap.set(Number(row.task_id), {
+      cleanerId: Number(row.cleaner_id),
+      sequence: row.sequence === null ? null : Number(row.sequence),
+    });
+  }
+
+  const timelineMap = new Map<number, { cleanerId: number; sequence: number | null }>();
+  for (const row of expectedTimelineRows) {
+    timelineMap.set(Number(row.task_id), {
+      cleanerId: Number(row.cleaner_id),
+      sequence: row.sequence === null ? null : Number(row.sequence),
+    });
+  }
+
+  const unionTaskIds = new Set<number>([...planMap.keys(), ...timelineMap.keys()]);
+  const diffTaskIds: number[] = [];
+  for (const taskId of unionTaskIds) {
+    const plan = planMap.get(taskId);
+    const current = timelineMap.get(taskId);
+    if (!plan || !current) {
+      diffTaskIds.push(taskId);
+      continue;
+    }
+    if (plan.cleanerId !== current.cleanerId || plan.sequence !== current.sequence) {
+      diffTaskIds.push(taskId);
+    }
+  }
+
+  const currentWaveTaskIds = currentWaveRows
+    .map((row) => Number(row.task_id))
+    .filter((id) => Number.isFinite(id));
+
+  const anchorTaskIds = Array.from(new Set<number>([...diffTaskIds, ...currentWaveTaskIds]));
+  const match = diffTaskIds.length === 0 && currentWaveTaskIds.length === 0;
+
+  return {
+    match,
+    diffTaskIds,
+    currentWaveTaskIds,
+    anchorTaskIds,
+  };
+}
+
+function appliedSliceForWave(wavePriority: WavePriority): WavePriority[] {
+  if (wavePriority === 'early_out') return ['early_out'];
+  if (wavePriority === 'high_priority') return ['early_out', 'high_priority'];
+  return ['early_out', 'high_priority', 'low_priority'];
+}
+
+function futureSliceForWave(wavePriority: WavePriority): WavePriority[] {
+  if (wavePriority === 'early_out') return ['high_priority', 'low_priority'];
+  if (wavePriority === 'high_priority') return ['low_priority'];
+  return [];
+}
+
+async function synchronizeTimelineWithRunAfterRerun(
+  workDate: string,
+  runId: string,
+  wavePriority: WavePriority
+): Promise<{ success: boolean; checkinViolations: CheckinViolation[]; error?: string }> {
+  const inScopePriorities = appliedSliceForWave(wavePriority);
+  const futurePriorities = futureSliceForWave(wavePriority);
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Enforce wave stage: drop future-priority rows that should not remain in timeline yet.
+    if (futurePriorities.length > 0) {
+      await client.query(
+        `
+          DELETE FROM daily_assignments_current
+          WHERE work_date = $1
+            AND priority = ANY($2::text[])
+        `,
+        [workDate, futurePriorities]
+      );
+    }
+
+    // Align already-applied priorities (EO / EO+HP / EO+HP+LP) to the same run used as plan.
+    await client.query(
+      `
+        UPDATE daily_assignments_current dac
+        SET
+          cleaner_id = oa.cleaner_id,
+          reasons = oa.reasons,
+          priority = oa.priority_type,
+          start_time = oa.start_time::time,
+          end_time = oa.end_time::time,
+          followup = CASE WHEN oa.sequence > 1 THEN true ELSE false END,
+          sequence = oa.sequence,
+          travel_time = COALESCE(oa.travel_minutes_from_prev, 0),
+          cleaner_name = c.name,
+          cleaner_lastname = c.lastname,
+          cleaner_role = c.role,
+          cleaner_start_time = COALESCE(c.start_time, '10:00')
+        FROM optimizer.optimizer_assignment oa
+        LEFT JOIN cleaners c
+          ON c.cleaner_id = oa.cleaner_id
+         AND c.work_date = $1
+        WHERE dac.work_date = $1
+          AND dac.priority = ANY($3::text[])
+          AND oa.run_id = $2
+          AND oa.task_id = dac.task_id
+          AND oa.priority_type = ANY($3::text[])
+      `,
+      [workDate, runId, inScopePriorities]
+    );
+
+    const affectedCleanersResult = await client.query(
+      `
+        SELECT DISTINCT cleaner_id
+        FROM daily_assignments_current
+        WHERE work_date = $1
+          AND priority = ANY($2::text[])
+      `,
+      [workDate, inScopePriorities]
+    );
+    const cleanerIds: number[] = affectedCleanersResult.rows
+      .map((r: any) => Number(r.cleaner_id))
+      .filter((n: number) => Number.isFinite(n));
+
+    const checkinViolations = await recalculateAffectedCleaners(client, workDate, runId, cleanerIds);
+    await client.query('COMMIT');
+
+    return { success: true, checkinViolations };
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    return { success: false, checkinViolations: [], error: error.message };
+  } finally {
+    client.release();
+  }
 }
 
 export async function runSingleWave(
@@ -929,27 +1333,43 @@ export async function runSingleWave(
   try {
     console.log(`[runSingleWave] === WAVE ${wavePriority} === workDate=${workDate}`);
 
-    // Check if there's already a timeline for this date.
-    // When a timeline exists, we MUST run a fresh optimizer so Phase 1 creates
-    // groups anchored to cleaner positions (timelineSeeds). Reusing a stale run
-    // would give groups based on mutual task proximity instead.
-    const timelineCheck = await pool.query(
+    const timelineCheck = await pool.query<{ count: string }>(
       `SELECT COUNT(*) as count FROM daily_assignments_current WHERE work_date = $1`,
       [workDate]
     );
-    const hasTimeline = parseInt(timelineCheck.rows[0]?.count || '0') > 0;
+    const hasTimeline = parseInt(timelineCheck.rows[0]?.count || '0', 10) > 0;
 
-    let runId: string;
+    let runId = '';
+    let usedRerun = false;
+    const currentPlanRunId = await getValidPlanRunIdForDate(workDate);
 
-    if (!hasTimeline) {
-      // No timeline yet (first wave): reuse if available for consistency
-      const reusableRunId = await findReusableOptimizerRun(workDate);
-      if (reusableRunId) {
-        console.log(`[runSingleWave] Reusing existing optimizer run ${reusableRunId} (no timeline)`);
-        runId = reusableRunId;
+    if (wavePriority === 'early_out') {
+      if (!hasTimeline) {
+        if (currentPlanRunId) {
+          runId = currentPlanRunId;
+          console.log(`[runSingleWave] Wave EO: using existing plan run ${runId}`);
+        } else {
+          console.log(`[runSingleWave] Wave EO: creating plan run for ${workDate}`);
+          const allPhasesResult = await runAllPhases(workDate, { forceFullPipeline: true });
+          if (allPhasesResult.status === 'failed') {
+            result.status = 'failed';
+            result.error = allPhasesResult.error;
+            result.runId = allPhasesResult.runId;
+            result.durationMs = Date.now() - startTime;
+            return result;
+          }
+          runId = allPhasesResult.runId;
+          await setPlanRunIdForDate(workDate, runId);
+          console.log(`[runSingleWave] Wave EO: saved new plan run ${runId}`);
+        }
       } else {
-        console.log(`[runSingleWave] Running fresh optimizer (no reusable run)`);
-        const allPhasesResult = await runAllPhases(workDate, { forceFullPipeline: true });
+        const timelineTaskIds = await getAllTimelineTaskIds(workDate);
+        console.log(`[runSingleWave] Wave EO: timeline present (${timelineTaskIds.length} tasks), rerun with timeline anchors`);
+        const allPhasesResult = await runAllPhases(workDate, {
+          forceFullPipeline: true,
+          anchorTaskIds: timelineTaskIds
+        });
+        usedRerun = true;
         if (allPhasesResult.status === 'failed') {
           result.status = 'failed';
           result.error = allPhasesResult.error;
@@ -958,21 +1378,44 @@ export async function runSingleWave(
           return result;
         }
         runId = allPhasesResult.runId;
-        console.log(`[runSingleWave] Optimizer complete: ${allPhasesResult.summary.tasksAssigned} total assigned, applying only ${wavePriority}`);
+        await setPlanRunIdForDate(workDate, runId);
+        console.log(`[runSingleWave] Wave EO: rerun complete and plan updated to ${runId}`);
       }
     } else {
-      // Timeline exists: always run fresh so Phase 1 anchors groups to cleaner positions
-      console.log(`[runSingleWave] Timeline exists (${timelineCheck.rows[0].count} tasks) — running fresh optimizer with timeline seeds`);
-      const allPhasesResult = await runAllPhases(workDate, { forceFullPipeline: true });
-      if (allPhasesResult.status === 'failed') {
+      const planRunId = currentPlanRunId;
+      if (!planRunId) {
         result.status = 'failed';
-        result.error = allPhasesResult.error;
-        result.runId = allPhasesResult.runId;
+        result.error = 'Plan run non disponibile per la data. Esegui prima la wave Early Out.';
         result.durationMs = Date.now() - startTime;
         return result;
       }
-      runId = allPhasesResult.runId;
-      console.log(`[runSingleWave] Fresh optimizer complete: ${allPhasesResult.summary.tasksAssigned} total assigned, applying only ${wavePriority}`);
+
+      const expectedSlice = expectedSliceForWave(wavePriority);
+      const compareResult = await compareTimelineWithPlan(workDate, planRunId, expectedSlice, wavePriority);
+
+      if (compareResult.match) {
+        runId = planRunId;
+        console.log(`[runSingleWave] Wave ${wavePriority}: timeline allineata al piano, apply diretto dal piano ${planRunId}`);
+      } else {
+        console.log(
+          `[runSingleWave] Wave ${wavePriority}: diff=${compareResult.diffTaskIds.length}, samePriorityOnTimeline=${compareResult.currentWaveTaskIds.length}, rerun with ${compareResult.anchorTaskIds.length} anchors`
+        );
+        const allPhasesResult = await runAllPhases(workDate, {
+          forceFullPipeline: true,
+          anchorTaskIds: compareResult.anchorTaskIds
+        });
+        usedRerun = true;
+        if (allPhasesResult.status === 'failed') {
+          result.status = 'failed';
+          result.error = allPhasesResult.error;
+          result.runId = allPhasesResult.runId;
+          result.durationMs = Date.now() - startTime;
+          return result;
+        }
+        runId = allPhasesResult.runId;
+        await setPlanRunIdForDate(workDate, runId);
+        console.log(`[runSingleWave] Wave ${wavePriority}: rerun complete, plan updated to ${runId}`);
+      }
     }
 
     result.runId = runId;
@@ -1014,6 +1457,24 @@ export async function runSingleWave(
         `Task ${v.logisticCode}: finisce alle ${v.endTime} ma checkin alle ${v.checkinTime}`
       );
       console.warn(`[runSingleWave] ${applyResult.checkinViolations.length} checkin violations detected`);
+    }
+
+    if (usedRerun) {
+      const syncResult = await synchronizeTimelineWithRunAfterRerun(workDate, runId, wavePriority);
+      if (!syncResult.success) {
+        result.status = 'failed';
+        result.error = `Timeline sync failed after rerun: ${syncResult.error || 'unknown error'}`;
+        result.durationMs = Date.now() - startTime;
+        return result;
+      }
+
+      if (syncResult.checkinViolations.length > 0) {
+        const extraWarnings = syncResult.checkinViolations.map(v =>
+          `Task ${v.logisticCode}: finisce alle ${v.endTime} ma checkin alle ${v.checkinTime}`
+        );
+        result.warnings = [...(result.warnings || []), ...extraWarnings];
+        console.warn(`[runSingleWave] ${syncResult.checkinViolations.length} checkin violations detected after rerun sync`);
+      }
     }
 
     result.status = 'success';

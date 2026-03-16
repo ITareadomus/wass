@@ -6785,6 +6785,42 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       console.log(`POST /api/optimizer/run-wave - Wave ${priority} for ${workDate}`);
 
+      const { query } = await import("../shared/pg-db");
+      const timelinePriorityRows = await query(
+        `
+          SELECT priority
+          FROM daily_assignments_current
+          WHERE work_date = $1
+        `,
+        [workDate]
+      );
+
+      const normalizePriority = (value: string | null | undefined) => {
+        if (!value) return null;
+        const normalized = String(value).toLowerCase();
+        if (normalized === 'early_out' || normalized === 'early-out') return 'early_out';
+        if (normalized === 'high_priority' || normalized === 'high') return 'high_priority';
+        if (normalized === 'low_priority' || normalized === 'low') return 'low_priority';
+        return null;
+      };
+
+      const hasEoOnTimeline = timelinePriorityRows.rows.some((row: any) => normalizePriority(row.priority) === 'early_out');
+      const hasHpOnTimeline = timelinePriorityRows.rows.some((row: any) => normalizePriority(row.priority) === 'high_priority');
+
+      if (priority === 'high_priority' && !hasEoOnTimeline) {
+        return res.status(400).json({
+          success: false,
+          error: "Esegui prima la wave Early Out",
+        });
+      }
+
+      if (priority === 'low_priority' && (!hasEoOnTimeline || !hasHpOnTimeline)) {
+        return res.status(400).json({
+          success: false,
+          error: "Esegui prima le wave Early Out e High Priority",
+        });
+      }
+
       const { runSingleWave } = await import('./services/optimizer/runAllPhases');
 
       const waveResult = await runSingleWave(workDate, priority);
