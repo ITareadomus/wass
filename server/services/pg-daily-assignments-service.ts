@@ -885,6 +885,24 @@ export class PgDailyAssignmentsService {
     }
   }
 
+  /**
+   * Count how many transfer_to_adam revisions exist for a work_date.
+   * Used to detect "second or later transfer" for cleanup phase (clear unassigned tasks on ADAM).
+   */
+  async countTransferToAdamForDate(workDate: string): Promise<number> {
+    try {
+      const result = await query(
+        `SELECT COUNT(*)::int AS cnt FROM daily_assignments_revisions
+         WHERE work_date = $1 AND modification_type = 'transfer_to_adam'`,
+        [workDate]
+      );
+      return result.rows[0]?.cnt ?? 0;
+    } catch (error) {
+      console.error('❌ PG History: Errore nel conteggio trasferimenti ADAM:', error);
+      return 0;
+    }
+  }
+
   // ==================== CONTAINERS (FLAT STRUCTURE) ====================
 
   /**
