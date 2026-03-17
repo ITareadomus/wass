@@ -185,6 +185,23 @@ function runPythonScript(
     proc.on('close', (code, signal) => {
       clearTimeout(timer);
       if (code !== 0) {
+        console.error('[Phase2 OR-Tools] Process exited with code', code, signal || '');
+        if (stderr) console.error('[Phase2 OR-Tools] stderr:', stderr.slice(0, 2000));
+        if (stdout) console.error('[Phase2 OR-Tools] stdout (last 1500 chars):', stdout.slice(-1500));
+        // Python may still print JSON to stdout before exit(1) (e.g. status "error" or "infeasible")
+        try {
+          const data = JSON.parse(stdout) as { status?: string; message?: string };
+          if (data.status === 'infeasible') {
+            reject(new Error(`Phase 2 OR-Tools infeasible${data.message ? `: ${data.message}` : ''}`));
+            return;
+          }
+          if (data.status === 'error' && data.message) {
+            reject(new Error(`Phase 2 OR-Tools error: ${data.message}`));
+            return;
+          }
+        } catch {
+          // stdout was not valid JSON, use exit code and stderr
+        }
         reject(new Error(`Phase 2 OR-Tools exit ${code}${signal ? ` (${signal})` : ''}${stderr ? `: ${stderr.slice(0, 500)}` : ''}`));
         return;
       }

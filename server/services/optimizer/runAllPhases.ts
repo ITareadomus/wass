@@ -969,7 +969,7 @@ export async function applyOptimizerToProduction(
         premium, address, lat, lng, cleaning_time,
         checkin_date, checkout_date, checkin_time, checkout_time,
         pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
-        type_apt, alias, customer_name, reasons,
+        type_apt, alias, customer_name, reasons, manually_moved,
         priority, start_time, end_time, followup, sequence, travel_time,
         created_by
       )
@@ -978,7 +978,7 @@ export async function applyOptimizerToProduction(
         premium, address, lat, lng, cleaning_time,
         checkin_date, checkout_date, checkin_time, checkout_time,
         pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
-        type_apt, alias, customer_name, reasons,
+        type_apt, alias, customer_name, reasons, COALESCE(manually_moved, false),
         priority, start_time, end_time, followup, sequence, travel_time,
         'optimizer-' || $1
       FROM daily_assignments_current
@@ -1045,17 +1045,15 @@ type TimelinePriorityState = {
   hasLpOnTimeline: boolean;
 };
 
-type CompareTimelineWithPlanResult = {
-  match: boolean;
-  diffTaskIds: number[];
-  currentWaveTaskIds: number[];
-  anchorTaskIds: number[];
-};
-
-function expectedSliceForWave(wavePriority: WavePriority): WavePriority[] {
-  if (wavePriority === 'high_priority') return ['early_out'];
-  if (wavePriority === 'low_priority') return ['early_out', 'high_priority'];
-  return [];
+async function getManuallyMovedTaskIds(workDate: string): Promise<number[]> {
+  const rows = await pool.query<{ task_id: number }>(`
+    SELECT task_id
+    FROM daily_assignments_current
+    WHERE work_date = $1 AND manually_moved = true
+  `, [workDate]);
+  return rows.rows
+    .map((row) => Number(row.task_id))
+    .filter((id) => Number.isFinite(id));
 }
 
 function normalizePriorityValue(priority: string | null | undefined): WavePriority | null {
@@ -1097,18 +1095,6 @@ async function getTimelineTaskIdsByPriority(workDate: string, priority: WavePrio
     .filter((id) => Number.isFinite(id));
 }
 
-async function getAllTimelineTaskIds(workDate: string): Promise<number[]> {
-  const rows = await pool.query<{ task_id: number }>(`
-    SELECT DISTINCT task_id
-    FROM daily_assignments_current
-    WHERE work_date = $1
-  `, [workDate]);
-
-  return rows.rows
-    .map((row) => Number(row.task_id))
-    .filter((id) => Number.isFinite(id));
-}
-
 async function getValidPlanRunIdForDate(workDate: string): Promise<string | null> {
   const planRunId = await getPlanRunIdForDate(workDate);
   if (!planRunId) return null;
@@ -1132,92 +1118,6 @@ async function getValidPlanRunIdForDate(workDate: string): Promise<string | null
   if (parseInt(assignmentCheck.rows[0]?.count || '0', 10) === 0) return null;
 
   return planRunId;
-}
-
-async function compareTimelineWithPlan(
-  workDate: string,
-  planRunId: string,
-  expectedSlice: WavePriority[],
-  currentWavePriority: WavePriority
-): Promise<CompareTimelineWithPlanResult> {
-  const planRows = await pool.query<{
-    task_id: number;
-    cleaner_id: number;
-    sequence: number | null;
-    priority_type: string | null;
-  }>(`
-    SELECT task_id, cleaner_id, sequence, priority_type
-    FROM optimizer.optimizer_assignment
-    WHERE run_id = $1
-  `, [planRunId]);
-
-  const expectedPlanRows = planRows.rows.filter((row) => {
-    const normalized = normalizePriorityValue(row.priority_type);
-    return normalized !== null && expectedSlice.includes(normalized);
-  });
-
-  const timelineRows = await pool.query<{
-    task_id: number;
-    cleaner_id: number;
-    sequence: number | null;
-    priority: string | null;
-  }>(`
-    SELECT task_id, cleaner_id, sequence, priority
-    FROM daily_assignments_current
-    WHERE work_date = $1
-  `, [workDate]);
-
-  const expectedTimelineRows = timelineRows.rows.filter((row) => {
-    const normalized = normalizePriorityValue(row.priority);
-    return normalized !== null && expectedSlice.includes(normalized);
-  });
-  const currentWaveRows = timelineRows.rows.filter((row) =>
-    matchesWavePriority(row.priority, currentWavePriority)
-  );
-
-  const planMap = new Map<number, { cleanerId: number; sequence: number | null }>();
-  for (const row of expectedPlanRows) {
-    planMap.set(Number(row.task_id), {
-      cleanerId: Number(row.cleaner_id),
-      sequence: row.sequence === null ? null : Number(row.sequence),
-    });
-  }
-
-  const timelineMap = new Map<number, { cleanerId: number; sequence: number | null }>();
-  for (const row of expectedTimelineRows) {
-    timelineMap.set(Number(row.task_id), {
-      cleanerId: Number(row.cleaner_id),
-      sequence: row.sequence === null ? null : Number(row.sequence),
-    });
-  }
-
-  const unionTaskIds = new Set<number>([...planMap.keys(), ...timelineMap.keys()]);
-  const diffTaskIds: number[] = [];
-  for (const taskId of unionTaskIds) {
-    const plan = planMap.get(taskId);
-    const current = timelineMap.get(taskId);
-    if (!plan || !current) {
-      diffTaskIds.push(taskId);
-      continue;
-    }
-    if (plan.cleanerId !== current.cleanerId || plan.sequence !== current.sequence) {
-      diffTaskIds.push(taskId);
-    }
-  }
-
-  const currentWaveTaskIds = currentWaveRows
-    .map((row) => Number(row.task_id))
-    .filter((id) => Number.isFinite(id));
-
-  const anchorTaskIds = Array.from(new Set<number>([...diffTaskIds, ...currentWaveTaskIds]));
-  const match = diffTaskIds.length === 0 && currentWaveTaskIds.length === 0;
-
-  return {
-    match,
-    diffTaskIds,
-    currentWaveTaskIds,
-    anchorTaskIds,
-  };
 }
 
 function appliedSliceForWave(wavePriority: WavePriority): WavePriority[] {
@@ -1363,23 +1263,43 @@ export async function runSingleWave(
           console.log(`[runSingleWave] Wave EO: saved new plan run ${runId}`);
         }
       } else {
-        const timelineTaskIds = await getAllTimelineTaskIds(workDate);
-        console.log(`[runSingleWave] Wave EO: timeline present (${timelineTaskIds.length} tasks), rerun with timeline anchors`);
-        const allPhasesResult = await runAllPhases(workDate, {
-          forceFullPipeline: true,
-          anchorTaskIds: timelineTaskIds
-        });
-        usedRerun = true;
-        if (allPhasesResult.status === 'failed') {
-          result.status = 'failed';
-          result.error = allPhasesResult.error;
-          result.runId = allPhasesResult.runId;
-          result.durationMs = Date.now() - startTime;
-          return result;
+        const anchorTaskIds = await getManuallyMovedTaskIds(workDate);
+        if (anchorTaskIds.length === 0) {
+          if (currentPlanRunId) {
+            runId = currentPlanRunId;
+            console.log(`[runSingleWave] Wave EO: no manually moved tasks, apply from plan ${runId}`);
+          } else {
+            console.log(`[runSingleWave] Wave EO: timeline present but no plan, creating plan run for ${workDate}`);
+            const allPhasesResult = await runAllPhases(workDate, { forceFullPipeline: true });
+            if (allPhasesResult.status === 'failed') {
+              result.status = 'failed';
+              result.error = allPhasesResult.error;
+              result.runId = allPhasesResult.runId;
+              result.durationMs = Date.now() - startTime;
+              return result;
+            }
+            runId = allPhasesResult.runId;
+            await setPlanRunIdForDate(workDate, runId);
+            console.log(`[runSingleWave] Wave EO: saved new plan run ${runId}`);
+          }
+        } else {
+          console.log(`[runSingleWave] Wave EO: timeline present (${anchorTaskIds.length} manually moved), rerun with anchors`);
+          const allPhasesResult = await runAllPhases(workDate, {
+            forceFullPipeline: true,
+            anchorTaskIds
+          });
+          usedRerun = true;
+          if (allPhasesResult.status === 'failed') {
+            result.status = 'failed';
+            result.error = allPhasesResult.error;
+            result.runId = allPhasesResult.runId;
+            result.durationMs = Date.now() - startTime;
+            return result;
+          }
+          runId = allPhasesResult.runId;
+          await setPlanRunIdForDate(workDate, runId);
+          console.log(`[runSingleWave] Wave EO: rerun complete and plan updated to ${runId}`);
         }
-        runId = allPhasesResult.runId;
-        await setPlanRunIdForDate(workDate, runId);
-        console.log(`[runSingleWave] Wave EO: rerun complete and plan updated to ${runId}`);
       }
     } else {
       const planRunId = currentPlanRunId;
@@ -1390,19 +1310,15 @@ export async function runSingleWave(
         return result;
       }
 
-      const expectedSlice = expectedSliceForWave(wavePriority);
-      const compareResult = await compareTimelineWithPlan(workDate, planRunId, expectedSlice, wavePriority);
-
-      if (compareResult.match) {
+      const anchorTaskIds = await getManuallyMovedTaskIds(workDate);
+      if (anchorTaskIds.length === 0) {
         runId = planRunId;
-        console.log(`[runSingleWave] Wave ${wavePriority}: timeline allineata al piano, apply diretto dal piano ${planRunId}`);
+        console.log(`[runSingleWave] Wave ${wavePriority}: no manually moved tasks, apply from plan ${planRunId}`);
       } else {
-        console.log(
-          `[runSingleWave] Wave ${wavePriority}: diff=${compareResult.diffTaskIds.length}, samePriorityOnTimeline=${compareResult.currentWaveTaskIds.length}, rerun with ${compareResult.anchorTaskIds.length} anchors`
-        );
+        console.log(`[runSingleWave] Wave ${wavePriority}: ${anchorTaskIds.length} manually moved, rerun with anchors`);
         const allPhasesResult = await runAllPhases(workDate, {
           forceFullPipeline: true,
-          anchorTaskIds: compareResult.anchorTaskIds
+          anchorTaskIds
         });
         usedRerun = true;
         if (allPhasesResult.status === 'failed') {
@@ -1666,7 +1582,7 @@ export async function applyWaveToProduction(
         premium, address, lat, lng, cleaning_time,
         checkin_date, checkout_date, checkin_time, checkout_time,
         pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
-        type_apt, alias, customer_name, reasons,
+        type_apt, alias, customer_name, reasons, manually_moved,
         priority, start_time, end_time, followup, sequence, travel_time,
         created_by
       )
@@ -1675,7 +1591,7 @@ export async function applyWaveToProduction(
         premium, address, lat, lng, cleaning_time,
         checkin_date, checkout_date, checkin_time, checkout_time,
         pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
-        type_apt, alias, customer_name, reasons,
+        type_apt, alias, customer_name, reasons, COALESCE(manually_moved, false),
         priority, start_time, end_time, followup, sequence, travel_time,
         'wave-' || $1
       FROM daily_assignments_current

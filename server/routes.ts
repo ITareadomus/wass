@@ -681,6 +681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       taskToMove.reasons = taskToMove.reasons.filter((r: string) =>
         !['auto_assignment', 'early_out_assignment', 'high_priority_assignment', 'low_priority_assignment'].includes(r)
       );
+      taskToMove.manually_moved = true;
 
       destEntry.tasks.splice(targetIndex, 0, taskToMove);
 
@@ -900,6 +901,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       markTasksAsManual(sourceEntry.tasks);
       markTasksAsManual(destEntry.tasks);
+      for (const task of sourceEntry.tasks) task.manually_moved = true;
+      for (const task of destEntry.tasks) task.manually_moved = true;
 
       // CRITICAL: Non modificare timelineData.cleaners_assignments
       // Gli entry sourceEntry e destEntry sono riferimenti diretti agli oggetti nell'array
@@ -1823,6 +1826,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...(fullTaskData.reasons || []),
           'manually_moved_to_timeline'
         ],
+        manually_moved: true,
 
         // Campi specifici timeline (formato orario HH:MM)
         priority: priority || sourceContainerType || 'low_priority',
@@ -6163,10 +6167,13 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       let modificationType = 'task_moved';
       if (fromContainer && typeof fromCleanerId !== 'number') {
         modificationType = `dnd_from_${fromContainer}`;
+        moved.manually_moved = true;
       } else if (fromCleanerId === toCleanerId) {
         modificationType = 'task_reordered_same_cleaner';
+        for (const t of dstEntry.tasks) t.manually_moved = true;
       } else if (typeof fromCleanerId === 'number') {
         modificationType = 'dnd_between_cleaners';
+        moved.manually_moved = true;
       }
 
       // Save the updated timeline
@@ -6276,6 +6283,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         0
       );
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
+
+      for (const t of cleanerEntry.tasks) t.manually_moved = true;
 
       // Salva timeline (dual-write: filesystem + Object Storage)
       await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUser, 'task_reordered_same_cleaner');
