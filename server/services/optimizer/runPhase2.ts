@@ -7,7 +7,8 @@ import {
   GroupCandidate,
   Phase2Event,
   ApartmentTypes,
-  DEFAULT_APARTMENT_TYPES
+  DEFAULT_APARTMENT_TYPES,
+  FormatoreRules
 } from './phase2';
 import { runPhase2WithOrTools } from './phase2OrTools';
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, loadLockedCleanerIds } from './db';
@@ -42,6 +43,42 @@ async function loadApartmentTypes(): Promise<ApartmentTypes> {
   }
   return DEFAULT_APARTMENT_TYPES;
 }
+
+async function loadFormatoreRules(): Promise<FormatoreRules | null> {
+  try {
+    const result = await pool.query(`
+      SELECT value FROM app_settings WHERE key = 'app_settings'
+    `);
+    const value = result.rows[0]?.value;
+    if (!value || typeof value !== 'object') return null;
+
+    const pt = value.priority_types?.formatore_cleaner;
+    const tt = value.task_types?.formatore_cleaner;
+    const allowedPriorities: string[] = [];
+    if (pt && typeof pt === 'object') {
+      if (pt.early_out) allowedPriorities.push('early_out');
+      if (pt.high_priority) allowedPriorities.push('high_priority');
+      if (pt.low_priority) allowedPriorities.push('low_priority');
+    }
+    return {
+      allowedPriorities: allowedPriorities.length > 0 ? allowedPriorities : ['early_out', 'high_priority', 'low_priority'],
+      standardApt: tt && typeof tt === 'object' ? Boolean(tt.standard_apt) : true,
+      premiumApt: tt && typeof tt === 'object' ? Boolean(tt.premium_apt) : false,
+      straordinarioApt: tt && typeof tt === 'object' ? Boolean(tt.straordinario_apt) : false
+    };
+  } catch (e) {
+    console.error('Failed to load formatore rules from app_settings:', e);
+    return null;
+  }
+}
+
+/** Default restrittivo per formatori quando app_settings non ha priority_types/task_types: solo LP. */
+const DEFAULT_FORMATORE_RULES: FormatoreRules = {
+  allowedPriorities: ['low_priority'],
+  standardApt: true,
+  premiumApt: false,
+  straordinarioApt: false
+};
 
 export interface Phase2RunResult {
   runId: string;
@@ -286,7 +323,7 @@ export async function runPhase2(
   }
 
   try {
-    const apartmentTypes = await loadApartmentTypes();
+    const [apartmentTypes, formatoreRules] = await Promise.all([loadApartmentTypes(), loadFormatoreRules()]);
     let initialLastPositionByCleaner: Map<number, { lat: number; lng: number }> | undefined;
     if (timelineContext?.anchorPointsByCleaner) {
       initialLastPositionByCleaner = new Map();
@@ -301,6 +338,7 @@ export async function runPhase2(
       ...DEFAULT_PHASE2_PARAMS, 
       ...params,
       apartmentTypes,
+      formatoreRules: formatoreRules ?? DEFAULT_FORMATORE_RULES,
       initialLoadByCleanerMin: timelineContext?.initialLoadByCleanerMin,
       initialLastPositionByCleaner,
       initialFixedStatsByCleaner: timelineContext?.fixedStatsByCleaner

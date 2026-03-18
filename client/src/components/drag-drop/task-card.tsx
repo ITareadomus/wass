@@ -768,12 +768,12 @@ const displayClickableInputClass =
       }
     };
 
-    // CRITICAL: Carica assignmentTimes sempre per le task in timeline (per isOverdue),
-    // non solo quando il modale si apre
-    if (isInTimeline || isModalOpen) {
+    // Aggiorna assignmentTimes solo quando il modale è aperto (contenuto dialog).
+    // In timeline layout/barra usiamo sempre task (Fix timeline shift bug).
+    if (isModalOpen) {
       calculateAssignmentTimes();
     }
-  }, [isInTimeline, isModalOpen, displayTask]);
+  }, [isModalOpen, displayTask]);
 
   // Supporto navigazione con frecce da tastiera
   useEffect(() => {
@@ -1349,11 +1349,18 @@ const displayClickableInputClass =
   const shouldShowTooltipTimes = totalMinutes < 60 && !shouldShowCheckInOutArrows;
 
   // Verifica violazioni temporali (considerando le date!)
+  // In timeline la barra deve riflettere la task che rappresenta (task), non la task nel dialog (displayTask)
   const isOverdue = (() => {
-    const taskObj = displayTask as any;
+    const taskForBar = isInTimeline ? task : displayTask;
+    const taskObj = taskForBar as any;
     // CRITICAL: Normalizza TUTTI i tempi per evitare date invalide (es. "15:55:00" -> "15:55")
-    const startTime = normalizeTime(assignmentTimes.start_time || taskObj.start_time || taskObj.startTime);
-    const endTime = normalizeTime(assignmentTimes.end_time || taskObj.end_time || taskObj.endTime);
+    // In timeline usa solo i tempi della task della card; fuori timeline usa assignmentTimes per pending edits
+    const startTime = normalizeTime(
+      isInTimeline ? (taskObj.start_time || taskObj.startTime) : (assignmentTimes.start_time || taskObj.start_time || taskObj.startTime)
+    );
+    const endTime = normalizeTime(
+      isInTimeline ? (taskObj.end_time || taskObj.endTime) : (assignmentTimes.end_time || taskObj.end_time || taskObj.endTime)
+    );
     const checkoutTime = normalizeTime(taskObj.checkout_time);
     const checkinTime = normalizeTime(taskObj.checkin_time);
     const checkoutDate = normalizeDate(taskObj.checkout_date);
@@ -1440,7 +1447,8 @@ const displayClickableInputClass =
     : 0;
 
   // Usa sequence per determinare se è la prima task o successive (più robusto di index)
-  const seq = (displayTask as any).sequence ?? (index + 1);
+  // CRITICAL: In timeline usare sempre task (la card rappresenta questa task), non displayTask (dialog)
+  const seq = (task as any).sequence ?? (index + 1);
 
   return (
     <>

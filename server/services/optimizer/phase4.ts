@@ -7,7 +7,7 @@ import {
   Phase3TimelineConstraints
 } from './phase3';
 import { PriorityWindows, priorityPenalty, Priority } from './priorityWindows';
-import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, FairnessParams, DEFAULT_FAIRNESS_PARAMS, MinutesBasedTargets } from './phase2';
+import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, FairnessParams, DEFAULT_FAIRNESS_PARAMS, MinutesBasedTargets, FormatoreRules } from './phase2';
 import { TravelPolicy, getWaveLevelConstraints } from './travelPolicy';
 import { runPhase4RepairBatch } from './phase4OrTools';
 
@@ -28,6 +28,8 @@ export interface Phase4Params {
   maxCleanersToTryPerTask: number;     // Max cleaners da provare per task (performance cap)
   // Compatibilità appartamento (role-based)
   apartmentTypes: ApartmentTypes;
+  /** Regole formatori da app_settings (priorità + tipi task ammessi). Se assente, nessuna restrizione extra. */
+  formatoreRules?: FormatoreRules | null;
   // Dynamic max tasks per cleaner (calcolato da totalTasks/numCleaners)
   dynamicMaxTasks?: number;
   // Minutes-based fairness parameters
@@ -204,11 +206,20 @@ interface HardConstraintResult {
   reason?: string;
 }
 
+function priorityTypeToKey(priorityType: Priority | null | undefined): string | null {
+  if (!priorityType) return null;
+  if (priorityType === 'EO') return 'early_out';
+  if (priorityType === 'HP') return 'high_priority';
+  if (priorityType === 'LP') return 'low_priority';
+  return null;
+}
+
 function checkHardConstraints(
   schedule: CleanerSchedule,
   task: TaskForScheduling,
   tasksMap: Map<number, TaskForScheduling>,
-  apartmentTypes: ApartmentTypes = DEFAULT_APARTMENT_TYPES
+  apartmentTypes: ApartmentTypes = DEFAULT_APARTMENT_TYPES,
+  formatoreRules?: FormatoreRules | null
 ): HardConstraintResult {
   const cleanerRole = schedule.role || 'Standard';
   const normalizedRole = normalizeCleanerRole(cleanerRole);
@@ -230,6 +241,29 @@ function checkHardConstraints(
   // 1. Verifica straordinaria: solo cleaner con role "Straordinario"
   if (task.straordinaria && normalizedRole !== 'straordinario_cleaner') {
     return { compatible: false, reason: 'CANNOT_DO_STRAORDINARIA' };
+  }
+
+  // 1b. Formatori: vincoli da app_settings (priorità + tipo task ammessi)
+  if (normalizedRole === 'formatore_cleaner' && formatoreRules) {
+    const taskPriorityKey = priorityTypeToKey(task.priorityType ?? null);
+    if (formatoreRules.allowedPriorities.length > 0) {
+      if (taskPriorityKey == null) {
+        return { compatible: false, reason: 'FORMATORE_TASK_PRIORITY_MISSING' };
+      }
+      const allowedSet = new Set(formatoreRules.allowedPriorities.map(p => p.toLowerCase().replace(/-/g, '_')));
+      if (!allowedSet.has(taskPriorityKey)) {
+        return { compatible: false, reason: `FORMATORE_PRIORITY_NOT_ALLOWED_${taskPriorityKey}` };
+      }
+    }
+    if (task.premium && !formatoreRules.premiumApt) {
+      return { compatible: false, reason: 'FORMATORE_TASK_TYPE_PREMIUM_NOT_ALLOWED' };
+    }
+    if (task.straordinaria && !formatoreRules.straordinarioApt) {
+      return { compatible: false, reason: 'FORMATORE_TASK_TYPE_OT_NOT_ALLOWED' };
+    }
+    if (!task.premium && !task.straordinaria && !formatoreRules.standardApt) {
+      return { compatible: false, reason: 'FORMATORE_TASK_TYPE_STANDARD_NOT_ALLOWED' };
+    }
   }
   
   // 2. Regole OT per il nuovo task da inserire
@@ -424,7 +458,7 @@ function tryInsertTask(
   // VINCOLI HARD: compatibilità cleaner-task, regole OT
   // Questi vincoli NON possono essere rilassati
   // =====================================================
-  const hardCheck = checkHardConstraints(schedule, task, tasksMap, params.apartmentTypes);
+  const hardCheck = checkHardConstraints(schedule, task, tasksMap, params.apartmentTypes, params.formatoreRules);
   if (!hardCheck.compatible) {
     return {
       cleanerId: schedule.cleanerId,
@@ -758,7 +792,7 @@ function trySwapForTask(
         ...schedule,
         tasks: tasksWithoutRemoved
       };
-      const hardCheck = checkHardConstraints(tempSchedule, task, tasksMap, params.apartmentTypes);
+      const hardCheck = checkHardConstraints(tempSchedule, task, tasksMap, params.apartmentTypes, params.formatoreRules);
       if (!hardCheck.compatible) {
         continue;
       }

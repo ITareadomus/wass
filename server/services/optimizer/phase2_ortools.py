@@ -64,6 +64,52 @@ def task_cleaner_compatible(cleaner, task, apartment_types):
     return True
 
 
+def normalize_task_priority(priority):
+    """Normalize task priority to early_out / high_priority / low_priority."""
+    if priority is None or (isinstance(priority, str) and not priority.strip()):
+        return None
+    s = (priority or "").lower().strip().replace("-", "_")
+    if s in ("early_out", "earlyout", "eo"):
+        return "early_out"
+    if s in ("high_priority", "highpriority", "hp", "high"):
+        return "high_priority"
+    if s in ("low_priority", "lowpriority", "lp", "low"):
+        return "low_priority"
+    return s if s else None
+
+
+def task_formatore_compatible(task, formatore_rules, apartment_types):
+    """True iff task is allowed for a formatore by app_settings (priority + task type + typeApt)."""
+    if not formatore_rules:
+        return True
+    allowed_priorities = formatore_rules.get("allowedPriorities") or []
+    if allowed_priorities:
+        task_pri = normalize_task_priority(task.get("priority"))
+        allowed_set = set()
+        for p in allowed_priorities:
+            n = normalize_task_priority(p)
+            if n:
+                allowed_set.add(n)
+            elif p:
+                allowed_set.add(p.lower().replace("-", "_"))
+        # Task must have a recognized priority that is in the allowed list
+        if not allowed_set:
+            pass
+        elif task_pri is None:
+            return False
+        elif task_pri not in allowed_set:
+            return False
+    if task.get("premium") and not formatore_rules.get("premiumApt", False):
+        return False
+    if task.get("straordinaria") and not formatore_rules.get("straordinarioApt", False):
+        return False
+    if not task.get("premium") and not task.get("straordinaria") and not formatore_rules.get("standardApt", True):
+        return False
+    if not can_handle_apt("formatore_cleaner", task.get("typeApt"), apartment_types):
+        return False
+    return True
+
+
 def main():
     try:
         data = json.load(sys.stdin)
@@ -75,6 +121,7 @@ def main():
     tasks_list = data.get("tasks") or []
     cleaners = data.get("cleaners") or []
     apartment_types = data.get("apartmentTypes") or {}
+    formatore_rules = data.get("formatoreRules")
     fairness = data.get("fairness") or {}
     w_t = float(fairness.get("wT", 1.0))
     targets = data.get("targets") or {}
@@ -165,6 +212,8 @@ def main():
     # Allowed (g, c): compatibility + straordinaria rules (business rules)
     allowed = [[False] * n_c for _ in range(n_g)]
 
+    cleaner_is_formatore = [normalize_role(cleaners[c].get("role")) == "formatore_cleaner" for c in range(n_c)]
+
     for g_idx in range(n_g):
         group = groups[g_idx]
         task_ids = group.get("taskIds") or []
@@ -178,10 +227,13 @@ def main():
             cleaner = cleaners[c_idx]
 
             # Compatibility: all tasks in group compatible with cleaner.
-            # Anchor is informational only; group can go to any compatible cleaner by default.
+            # For formatori, also enforce formatore_rules (priority + task type).
             compat = True
             for task in tasks:
                 if not task_cleaner_compatible(cleaner, task, apartment_types):
+                    compat = False
+                    break
+                if cleaner_is_formatore[c_idx] and not task_formatore_compatible(task, formatore_rules, apartment_types):
                     compat = False
                     break
             if not compat:
@@ -220,6 +272,20 @@ def main():
                 continue
 
             allowed[g_idx][c_idx] = True
+
+    group_is_formatore_compatible = []
+    for g_idx in range(n_g):
+        group = groups[g_idx]
+        task_ids = group.get("taskIds") or []
+        tasks = [tasks_by_id[tid] for tid in task_ids if tasks_by_id.get(tid)]
+        ok = True
+        for task in tasks:
+            if not task_formatore_compatible(task, formatore_rules, apartment_types):
+                ok = False
+                break
+        group_is_formatore_compatible.append(ok)
+
+    FORMATORE_BONUS = 80000
 
     model = cp_model.CpModel()
 
@@ -313,6 +379,8 @@ def main():
             travel_first_min = float(travel_to_first[g][c] if g < len(travel_to_first) and c < len(travel_to_first[g]) else 0) or 0
             travel_min = travel_first_min + (group_travel[g] / SCALE)
             obj_terms.append((-travel_weight * travel_min) * x[g][c])
+            if c < len(cleaner_is_formatore) and cleaner_is_formatore[c] and g < len(group_is_formatore_compatible) and group_is_formatore_compatible[g]:
+                obj_terms.append(FORMATORE_BONUS * x[g][c])
     for c in range(n_c):
         obj_terms.append((k_under / SCALE) * under_c[c])
         obj_terms.append(-(k_balance / SCALE) * balance_c[c])

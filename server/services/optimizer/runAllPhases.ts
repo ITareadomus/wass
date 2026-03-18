@@ -624,6 +624,13 @@ export async function runAllPhases(
     if (applyToProduction) {
       console.log(`[runAllPhases] === APPLYING TO PRODUCTION ===`);
       const applyResult = await applyOptimizerToProduction(runId, workDate);
+      if (!applyResult.success) {
+        result.status = 'failed';
+        result.error = applyResult.error ?? 'Apply to production failed (checkin violations)';
+        await updateRunStatus(runId, 'failed', { error: result.error });
+        result.totalDurationMs = Date.now() - startTime;
+        return result;
+      }
       console.log(`[runAllPhases] Applied ${applyResult.insertedCount} assignments to production`);
     }
 
@@ -926,6 +933,7 @@ export async function applyOptimizerToProduction(
     result.insertedCount = insertResult.rowCount || 0;
     console.log(`[applyToProduction] MERGE MODE: Inserted ${result.insertedCount} new assignments (existing preserved)`);
 
+    let violations: CheckinViolation[] = [];
     if (result.insertedCount > 0) {
       try {
         const affectedCleanersResult = await client.query(
@@ -939,14 +947,20 @@ export async function applyOptimizerToProduction(
           .map((r: any) => Number(r.cleaner_id))
           .filter((n: number) => Number.isFinite(n));
 
-        const violations = await recalculateAffectedCleaners(client, workDate, runId, cleanerIds);
+        violations = await recalculateAffectedCleaners(client, workDate, runId, cleanerIds);
         console.log(`[applyToProduction] Recalculated travel/start/end times for ${cleanerIds.length} cleaners`);
-        if (violations.length > 0) {
-          console.warn(`[applyToProduction] ${violations.length} checkin violations detected after recalc`);
-        }
       } catch (recalcError: any) {
         console.warn(`[applyToProduction] Warning: failed to recalculate travel times: ${recalcError.message}`);
       }
+    }
+
+    if (violations.length > 0) {
+      const msg = formatCheckinViolationsMessage(violations);
+      console.warn(`[applyToProduction] Checkin violations detected, rolling back: ${msg}`);
+      await client.query('ROLLBACK');
+      result.success = false;
+      result.error = msg;
+      return result;
     }
 
     // Get next revision number for history table
@@ -1200,6 +1214,11 @@ async function synchronizeTimelineWithRunAfterRerun(
       .filter((n: number) => Number.isFinite(n));
 
     const checkinViolations = await recalculateAffectedCleaners(client, workDate, runId, cleanerIds);
+    if (checkinViolations.length > 0) {
+      const msg = formatCheckinViolationsMessage(checkinViolations);
+      await client.query('ROLLBACK');
+      return { success: false, checkinViolations, error: msg };
+    }
     await client.query('COMMIT');
 
     return { success: true, checkinViolations };
@@ -1414,6 +1433,10 @@ export interface CheckinViolation {
   checkinTime: string;
 }
 
+function formatCheckinViolationsMessage(violations: CheckinViolation[]): string {
+  return violations.map(v => `Task ${v.logisticCode}: finisce alle ${v.endTime} ma checkin alle ${v.checkinTime}`).join('; ');
+}
+
 export interface ApplyWaveResult {
   runId: string;
   workDate: string;
@@ -1559,6 +1582,14 @@ export async function applyWaveToProduction(
       const violations = await recalculateAffectedCleaners(client, workDate, runId, cleanerIds);
       result.checkinViolations = violations;
       console.log(`[applyWave] Recalculated times for ${cleanerIds.length} cleaners`);
+      if (violations.length > 0) {
+        const msg = formatCheckinViolationsMessage(violations);
+        console.warn(`[applyWave] Checkin violations detected, rolling back: ${msg}`);
+        await client.query('ROLLBACK');
+        result.success = false;
+        result.error = msg;
+        return result;
+      }
     } catch (recalcError: any) {
       console.warn(`[applyWave] Warning: recalculation failed: ${recalcError.message}`);
     }

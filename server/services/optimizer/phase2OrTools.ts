@@ -24,7 +24,8 @@ import {
   AssignmentResult,
   calculateMinutesBasedTargets,
   ApartmentTypes,
-  DEFAULT_APARTMENT_TYPES
+  DEFAULT_APARTMENT_TYPES,
+  FormatoreRules
 } from './phase2';
 import { estimateTravelMinutes } from './phase1';
 
@@ -129,11 +130,19 @@ function buildPayload(
     travelToFirstTaskMin.push(row);
   }
 
+  const formatoreRules: FormatoreRules | null = params.formatoreRules ?? null;
+
   const payload = {
     groups: groupsPayload,
     tasks: tasksPayload,
     cleaners: cleanersPayload,
     apartmentTypes: params.apartmentTypes ?? DEFAULT_APARTMENT_TYPES,
+    formatoreRules: formatoreRules ? {
+      allowedPriorities: formatoreRules.allowedPriorities,
+      standardApt: formatoreRules.standardApt,
+      premiumApt: formatoreRules.premiumApt,
+      straordinarioApt: formatoreRules.straordinarioApt
+    } : null,
     fairness: params.fairness,
     wT: params.fairness.wT,
     targets: {

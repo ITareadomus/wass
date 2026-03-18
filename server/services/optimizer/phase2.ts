@@ -80,11 +80,20 @@ export interface CleanerFixedStats {
   fixedTravelMinutes: number;
 }
 
+/** Regole da app_settings per i formatori: priorità e tipi task ammessi (bloccante). */
+export interface FormatoreRules {
+  allowedPriorities: string[];  // es. ['low_priority'] da priority_types.formatore_cleaner
+  standardApt: boolean;
+  premiumApt: boolean;
+  straordinarioApt: boolean;
+}
+
 export interface Phase2Params {
   travelWeight: number;
   loadWeight: number;
   preferenceBonus: number;
   apartmentTypes: ApartmentTypes;
+  formatoreRules?: FormatoreRules | null;  // se assente, nessuna restrizione extra per formatori
   dynamicMaxTasks?: number;  // base max from totalTasks/numCleaners, bonus +1 per-cleaner if avgTravel ≤ 10min
   fairness: FairnessParams;  // minutes-based fairness parameters
   initialLoadByCleanerMin?: Map<number, number>; // Pre-existing load from timeline (minutes)
