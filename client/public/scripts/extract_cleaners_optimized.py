@@ -226,13 +226,22 @@ for u in cleaners:
     # counter_hours: ore lavorate nella settimana target da app_housekeeping_report (query #2)
     counter_hours = weekly_hours.get(cid, 0.0)
 
-    # counter_days: streak fino all'ultimo giorno con report (non day_before_target), così non si azzera se oggi lavora ma non ha ancora compilato il report
-    last_reported = None
-    if cid in worked_dates:
-        candidates = [d for d in worked_dates[cid] if d <= day_before_target]
-        if candidates:
-            last_reported = max(candidates)
-    counter_days = int(streak_ending_at(cid, last_reported)) if last_reported is not None else 0
+    # counter_days: giorni consecutivi lavorati fino al giorno prima della data target.
+    # - Se target_date > oggi (es. programma di domani): lo streak si basa su day_before_target (oggi).
+    #   Se oggi non ha report → streak = 0 (corretto: per domani partiamo da 0).
+    # - Se target_date == oggi: usiamo last_reported così non si azzera se è in programma oggi ma non ha ancora compilato il report.
+    if target_date > today:
+        if cid in worked_dates and day_before_target in worked_dates[cid]:
+            counter_days = int(streak_ending_at(cid, day_before_target))
+        else:
+            counter_days = 0
+    else:
+        last_reported = None
+        if cid in worked_dates:
+            candidates = [d for d in worked_dates[cid] if d <= day_before_target]
+            if candidates:
+                last_reported = max(candidates)
+        counter_days = int(streak_ending_at(cid, last_reported)) if last_reported is not None else 0
 
     cleaner = {
         "id": cid,
