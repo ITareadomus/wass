@@ -133,7 +133,7 @@ export function ThemeToggle() {
           <Moon className="h-5 w-5" />
         )}
       </Button>
-      {location !== "/" && location !== "/generate-assignments" && (
+      {location !== "/" && location !== "/generate-assignments" && location !== "/login" && (
         <Button 
           onClick={() => setLocation("/generate-assignments")} 
           variant="outline" 

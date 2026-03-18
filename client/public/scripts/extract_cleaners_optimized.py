@@ -226,6 +226,14 @@ for u in cleaners:
     # counter_hours: ore lavorate nella settimana target da app_housekeeping_report (query #2)
     counter_hours = weekly_hours.get(cid, 0.0)
 
+    # counter_days: streak fino all'ultimo giorno con report (non day_before_target), così non si azzera se oggi lavora ma non ha ancora compilato il report
+    last_reported = None
+    if cid in worked_dates:
+        candidates = [d for d in worked_dates[cid] if d <= day_before_target]
+        if candidates:
+            last_reported = max(candidates)
+    counter_days = int(streak_ending_at(cid, last_reported)) if last_reported is not None else 0
+
     cleaner = {
         "id": cid,
         "name": u.get("name"),
@@ -234,7 +242,7 @@ for u in cleaners:
         "active": bool(u.get("active")),
         "ranking": 0,
         "counter_hours": counter_hours,
-        "counter_days": int(streak_ending_at(cid, day_before_target)),
+        "counter_days": counter_days,
         "available": bool(available),
         "contract_type": contract_map.get(u.get("contract_type_id"), u.get("contract_type_id")),
         "preferred_customers": prefs_map.get(cid, []),
