@@ -4679,6 +4679,10 @@ app.post("/api/transfer-to-adam", async (req, res) => {
                 assigned_at_us = ?,
                 assigned_at_milliseconds = ?,
 
+                travel_time = ?,
+                start_time = ?,
+                end_time = ?,
+
                 collaboration = 0,
                 collaboration_by = NULL,
                 collaboration_at = NULL,
@@ -4712,6 +4716,10 @@ app.post("/api/transfer-to-adam", async (req, res) => {
               nowRome,
               assignedAtUs,
               assignedAtMilliseconds,
+
+              task.travel_time != null ? Number(task.travel_time) : null,
+              task.start_time ?? null,
+              task.end_time ?? null,
 
               taskId
             ];
