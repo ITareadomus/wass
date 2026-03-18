@@ -81,6 +81,8 @@ async function createTable() {
 
           reasons              TEXT[]       NOT NULL DEFAULT '{}',
 
+          manually_moved       BOOLEAN      NOT NULL DEFAULT false,
+
           priority             TEXT,
 
           start_time           TIME,

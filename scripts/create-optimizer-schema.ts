@@ -76,7 +76,18 @@ async function createOptimizerSchema() {
     `);
     console.log('✅ Tabella optimizer.optimizer_unassigned creata');
 
-    // 6) Indici
+    // 6) Tabella optimizer_plan_for_date (un solve, tre apply)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS optimizer.optimizer_plan_for_date (
+        work_date date PRIMARY KEY,
+        plan_run_id uuid NOT NULL REFERENCES optimizer.optimizer_run(run_id) ON DELETE CASCADE,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+    console.log('✅ Tabella optimizer.optimizer_plan_for_date creata');
+
+    // 7) Indici
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_optimizer_run_work_date
         ON optimizer.optimizer_run(work_date);
@@ -89,9 +100,13 @@ async function createOptimizerSchema() {
       CREATE INDEX IF NOT EXISTS idx_optimizer_decision_run_phase
         ON optimizer.optimizer_decision(run_id, phase);
     `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_optimizer_plan_for_date_run_id
+        ON optimizer.optimizer_plan_for_date(plan_run_id);
+    `);
     console.log('✅ Indici creati');
 
-    // 7) Verifica
+    // 8) Verifica
     const result = await pool.query(`
       SELECT table_schema, table_name
       FROM information_schema.tables

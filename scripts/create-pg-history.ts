@@ -31,6 +31,7 @@ async function createHistoryTable() {
         alias VARCHAR(255),
         customer_name VARCHAR(255),
         reasons TEXT[] DEFAULT '{}',
+        manually_moved BOOLEAN NOT NULL DEFAULT false,
         priority VARCHAR(50),
         start_time VARCHAR(10),
         end_time VARCHAR(10),

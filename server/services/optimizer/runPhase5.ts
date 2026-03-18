@@ -315,7 +315,7 @@ export async function runPhase5(
       });
     }
 
-    const phase5Result = runPhase5Algorithm(
+    const phase5Result = await runPhase5Algorithm(
       resolvedWorkDate,
       schedules,
       tasksMap,

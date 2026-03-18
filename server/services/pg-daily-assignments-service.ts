@@ -96,6 +96,7 @@ export interface PgDailyAssignmentRow {
   followup?: boolean | null;
   sequence: number;
   travel_time: number;
+  manually_moved?: boolean;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -367,6 +368,7 @@ export class PgDailyAssignmentsService {
           followup: task.followup != null ? Boolean(task.followup) : null,
           sequence: Number(task.sequence || 0),
           travel_time: Number(task.travel_time || 0),
+          manually_moved: Boolean(task.manually_moved),
         };
 
         rows.push(row);
@@ -410,7 +412,7 @@ export class PgDailyAssignmentsService {
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
-            type_apt, alias, customer_name, customer_reference, reasons, priority,
+            type_apt, alias, customer_name, customer_reference, reasons, manually_moved, priority,
             start_time, end_time, followup, sequence, travel_time
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7,
@@ -418,8 +420,8 @@ export class PgDailyAssignmentsService {
             $11, $12, $13, $14, $15, $16,
             $17, $18, $19, $20,
             $21, $22, $23, $24, $25, $26,
-            $27, $28, $29, $30, $31, $32,
-            $33, $34, $35, $36, $37
+            $27, $28, $29, $30, $31, $32, $33,
+            $34, $35, $36, $37, $38
           )
         `, [
           row.work_date,
@@ -453,6 +455,7 @@ export class PgDailyAssignmentsService {
           row.customer_name,
           row.customer_reference,
           row.reasons,
+          row.manually_moved === true,
           row.priority,
           row.start_time,
           row.end_time,
@@ -595,6 +598,7 @@ export class PgDailyAssignmentsService {
         if (row.customer_name) task.customer_name = row.customer_name;
         if (row.customer_reference) task.customer_reference = row.customer_reference;
         if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
+        task.manually_moved = row.manually_moved === true;
         if (row.priority) task.priority = row.priority;
         if (row.start_time) task.start_time = row.start_time;
         if (row.end_time) task.end_time = row.end_time;
@@ -731,7 +735,7 @@ export class PgDailyAssignmentsService {
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
-            type_apt, alias, customer_name, customer_reference, reasons, priority,
+            type_apt, alias, customer_name, customer_reference, reasons, manually_moved, priority,
             start_time, end_time, followup, sequence, travel_time, created_by
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8,
@@ -739,8 +743,8 @@ export class PgDailyAssignmentsService {
             $12, $13, $14, $15, $16, $17,
             $18, $19, $20, $21,
             $22, $23, $24, $25, $26, $27,
-            $28, $29, $30, $31, $32, $33,
-            $34, $35, $36, $37, $38, $39
+            $28, $29, $30, $31, $32, $33, $34,
+            $35, $36, $37, $38, $39, $40
           )
         `, [
           row.work_date,
@@ -775,6 +779,7 @@ export class PgDailyAssignmentsService {
           row.customer_name,
           row.customer_reference,
           row.reasons,
+          row.manually_moved === true,
           row.priority,
           row.start_time,
           row.end_time,
@@ -882,6 +887,24 @@ export class PgDailyAssignmentsService {
     } catch (error) {
       console.error('❌ PG History: Errore nel recupero ultimo trasferimento ADAM:', error);
       return null;
+    }
+  }
+
+  /**
+   * Count how many transfer_to_adam revisions exist for a work_date.
+   * Used to detect "second or later transfer" for cleanup phase (clear unassigned tasks on ADAM).
+   */
+  async countTransferToAdamForDate(workDate: string): Promise<number> {
+    try {
+      const result = await query(
+        `SELECT COUNT(*)::int AS cnt FROM daily_assignments_revisions
+         WHERE work_date = $1 AND modification_type = 'transfer_to_adam'`,
+        [workDate]
+      );
+      return result.rows[0]?.cnt ?? 0;
+    } catch (error) {
+      console.error('❌ PG History: Errore nel conteggio trasferimenti ADAM:', error);
+      return 0;
     }
   }
 

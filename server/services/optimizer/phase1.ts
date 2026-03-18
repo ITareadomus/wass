@@ -15,7 +15,7 @@ export type TaskInput = {
 
 export type Phase1Params = {
   nearbySeedMaxMin: number;        // 15 (soglia vicino)
-  fallbackSeedMaxMin: number;      // 20 (soglia fallback)
+  fallbackSeedMaxMin: number;      // 25 (soglia fallback, allineata a travelPolicy.fallbackNearbyMin)
   minNearbyBeforeFallback: number; // 8 (quando attivare fallback)
   createSingleGroups: boolean;     // true
   neighborLimit: number;
@@ -189,7 +189,7 @@ export function generateCandidateGroups(
       if (usedFallback) {
         fallbackSeedCount++;
         events.push({
-          eventType: "PHASE1_USED_FALLBACK_20",
+          eventType: "PHASE1_USED_FALLBACK",
           payload: {
             seed_task: seed.taskId,
             seed_logistic_code: seed.logisticCode,
@@ -233,26 +233,15 @@ export function generateCandidateGroups(
       const anchoredMinGS = 2;
       // Also cap maxGroupSize: a cleaner with 1 remaining slot should only form pairs
       // (seed + 1 new task), not larger groups.
-      const maxGS = Math.min(params.maxGroupSize ?? 4, 1 + remainingSlots);
+      const maxGS = Math.min(params.maxGroupSize ?? 4, 1 + remainingSlots, Math.max(neighbors.length + 1, 2));
 
-      for (const a of neighbors) {
-        addGroup([seed, a], seed, seedZone, groupMap, anchoredMinGS, maxGS);
-      }
-
-      const candidates2 = comb2(neighbors);
-      for (const [a, b] of candidates2) {
-        addGroup([seed, a, b], seed, seedZone, groupMap, anchoredMinGS, maxGS);
-      }
-
-      const candidates3 = comb3(neighbors);
-      for (const [a, b, c] of candidates3) {
-        const g4 = [seed, a, b, c];
-        if (allowFourth(g4) && maxGS >= 4) {
-          addGroup(g4, seed, seedZone, groupMap, anchoredMinGS, maxGS);
+      for (let groupSize = 2; groupSize <= maxGS; groupSize++) {
+        const subsets = combN(neighbors, groupSize - 1);
+        for (const subset of subsets) {
+          const g = [seed, ...subset];
+          if (groupSize >= 4 && !allowGroupOfSize(g)) continue;
+          addGroup(g, seed, seedZone, groupMap, anchoredMinGS, maxGS);
         }
-        addGroup([seed, a, b], seed, seedZone, groupMap, anchoredMinGS, maxGS);
-        addGroup([seed, a, c], seed, seedZone, groupMap, anchoredMinGS, maxGS);
-        addGroup([seed, b, c], seed, seedZone, groupMap, anchoredMinGS, maxGS);
       }
 
       for (const n of neighbors) {
@@ -390,7 +379,7 @@ export function generateCandidateGroups(
       if (usedFallback) {
         fallbackSeedCount++;
         events.push({
-          eventType: "PHASE1_USED_FALLBACK_20",
+          eventType: "PHASE1_USED_FALLBACK",
           payload: {
             seed_task: seed.taskId,
             seed_logistic_code: seed.logisticCode,
@@ -409,26 +398,15 @@ export function generateCandidateGroups(
       const countBefore = groupMap.size;
 
       const minGS = params.minGroupSize ?? 1;
-      const maxGS = params.maxGroupSize ?? 4;
+      const maxGS = Math.min(params.maxGroupSize ?? 4, Math.max(neighbors.length + 1, 2));
 
-      for (const a of neighbors) {
-        addGroup([seed, a], seed, seedZone, groupMap, minGS, maxGS);
-      }
-
-      const candidates2 = comb2(neighbors);
-      for (const [a, b] of candidates2) {
-        addGroup([seed, a, b], seed, seedZone, groupMap, minGS, maxGS);
-      }
-
-      const candidates3 = comb3(neighbors);
-      for (const [a, b, c] of candidates3) {
-        const g4 = [seed, a, b, c];
-        if (allowFourth(g4) && maxGS >= 4) {
-          addGroup(g4, seed, seedZone, groupMap, minGS, maxGS);
+      for (let groupSize = 2; groupSize <= maxGS; groupSize++) {
+        const subsets = combN(neighbors, groupSize - 1);
+        for (const subset of subsets) {
+          const g = [seed, ...subset];
+          if (groupSize >= 4 && !allowGroupOfSize(g)) continue;
+          addGroup(g, seed, seedZone, groupMap, minGS, maxGS);
         }
-        addGroup([seed, a, b], seed, seedZone, groupMap, minGS, maxGS);
-        addGroup([seed, a, c], seed, seedZone, groupMap, minGS, maxGS);
-        addGroup([seed, b, c], seed, seedZone, groupMap, minGS, maxGS);
       }
 
       groupsAddedForSeed = groupMap.size - countBefore;
@@ -514,8 +492,10 @@ function addGroup(
 ): void {
   if (groupTasks.length < minGroupSize || groupTasks.length > maxGroupSize) return;
 
-  // Regola OT: riduci gruppi con straordinaria a forma valida
-  const straordinariaTask = groupTasks.find(t => t.straordinaria === true);
+  // Regola OT: al massimo una straordinaria per gruppo (allineato a Phase 2)
+  const allOts = groupTasks.filter(t => t.straordinaria === true);
+  if (allOts.length > 1) return;
+  const straordinariaTask = allOts[0];
   if (straordinariaTask) {
     const otCleaningTime = straordinariaTask.cleaningTimeMinutes ?? 60;
     const isLongOT = otCleaningTime >= 360; // ≥6h
@@ -581,16 +561,18 @@ function addGroup(
   });
 }
 
-const MAX_TOTAL_TRAVEL_FOR_FOUR_TASKS = 30;
+/** Max total travel (MST) per size: 4=30, 5=35, 6+=40 min (dynamic group size quality). */
+function maxAllowedTotalTravelForSize(size: number): number {
+  if (size <= 3) return Infinity;
+  if (size === 4) return 30;
+  if (size === 5) return 35;
+  return 40;
+}
 
-function allowFourth(tasks: TaskInput[]): boolean {
-  if (tasks.length !== 4) return false;
-  
-  // Calculate total travel for 4 tasks using MST approximation
+function allowGroupOfSize(tasks: TaskInput[]): boolean {
+  if (tasks.length < 4) return true;
   const { totalTravelMin } = travelStats(tasks);
-  
-  // Allow 4th task only if total travel < 30 min
-  return totalTravelMin < MAX_TOTAL_TRAVEL_FOR_FOUR_TASKS;
+  return totalTravelMin < maxAllowedTotalTravelForSize(tasks.length);
 }
 
 function travelStats(tasks: TaskInput[]): { avgTravelMin: number; maxTravelMin: number; totalTravelMin: number } {
@@ -667,6 +649,26 @@ function comb3<T>(arr: T[]): [T, T, T][] {
       }
     }
   }
+  return out;
+}
+
+/** All combinations of arr of size n (for dynamic maxGroupSize). */
+function combN<T>(arr: T[], n: number): T[][] {
+  if (n <= 0 || n > arr.length) return [];
+  if (n === 1) return arr.map((x) => [x]);
+  const out: T[][] = [];
+  function recurse(start: number, acc: T[]) {
+    if (acc.length === n) {
+      out.push([...acc]);
+      return;
+    }
+    for (let i = start; i < arr.length; i++) {
+      acc.push(arr[i]);
+      recurse(i + 1, acc);
+      acc.pop();
+    }
+  }
+  recurse(0, []);
   return out;
 }
 

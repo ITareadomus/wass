@@ -112,7 +112,7 @@ export async function runPhase1(
     const groupDecisions = phase1Result.groups.map(g => groupToDecision(runId, g));
     
     const eventDecisions = phase1Result.events
-      .filter(e => e.eventType === 'PHASE1_USED_FALLBACK_20')
+      .filter(e => e.eventType === 'PHASE1_USED_FALLBACK')
       .map(e => eventToDecision(runId, e));
     
     const allDecisions = [...groupDecisions, ...eventDecisions];

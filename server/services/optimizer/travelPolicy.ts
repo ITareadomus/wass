@@ -2,9 +2,8 @@
  * Centralised travel-quality policy for Phase 4 recovery when an existing
  * timeline is present (both merge mode and wave assignments).
  *
- * The thresholds mirror Phase 1 grouping (15 → 25 min) so that tasks
- * inserted during recovery obey the same geographic constraints
- * as the normal optimizer pipeline.
+ * Semantica unica: 15 = ideale, 25 = fallback/max leg (allineato a Phase 1 fallbackSeedMaxMin),
+ * 30 = hard cap. Phase 1 usa nearbySeedMaxMin=15 e fallbackSeedMaxMin=25.
  *
  * When `travelPolicy` is NOT provided (fresh optimizer, no timeline), Phase 4
  * falls back to its legacy deltaTravel / getRelaxConstraints checks.
@@ -19,7 +18,7 @@ export interface TravelPolicy {
 
 export const DEFAULT_TRAVEL_POLICY: TravelPolicy = {
   idealNearbyMin: 15,
-  fallbackNearbyMin: 20,
+  fallbackNearbyMin: 25,
   maxLegMin: 25,
   hardCapMin: 30,
 };

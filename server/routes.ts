@@ -681,6 +681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       taskToMove.reasons = taskToMove.reasons.filter((r: string) =>
         !['auto_assignment', 'early_out_assignment', 'high_priority_assignment', 'low_priority_assignment'].includes(r)
       );
+      taskToMove.manually_moved = true;
 
       destEntry.tasks.splice(targetIndex, 0, taskToMove);
 
@@ -900,6 +901,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       markTasksAsManual(sourceEntry.tasks);
       markTasksAsManual(destEntry.tasks);
+      for (const task of sourceEntry.tasks) task.manually_moved = true;
+      for (const task of destEntry.tasks) task.manually_moved = true;
 
       // CRITICAL: Non modificare timelineData.cleaners_assignments
       // Gli entry sourceEntry e destEntry sono riferimenti diretti agli oggetti nell'array
@@ -1087,6 +1090,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Arricchisci con last_worked_date e show_plus_one (stessa logica di GET /api/cleaners) per la timeline
+      const cleanersList = selectedCleaners.cleaners || [];
+      if (cleanersList.length > 0) {
+        const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+        const lastTransfer = await pgDailyAssignmentsService.getLastTransferToAdamTimestamp(workDate);
+        let inProgramIds: Set<number>;
+        if (!lastTransfer) {
+          const selectedIds = await pgDailyAssignmentsService.loadSelectedCleaners(workDate);
+          inProgramIds = new Set(selectedIds ?? []);
+        } else {
+          inProgramIds = new Set();
+        }
+        const hasReportIds = new Set<number>();
+        const lastWorkedByCleanerId = new Map<number, string>();
+
+        try {
+          const adamConnection = await mysql.createConnection({
+            host: databaseConfig.mysql.host,
+            port: databaseConfig.mysql.port,
+            user: databaseConfig.mysql.user,
+            password: databaseConfig.mysql.password,
+            database: databaseConfig.mysql.database,
+          });
+          try {
+            const [rows]: any = await adamConnection.execute(
+              `SELECT cleaned_by_us, MAX(checkout) AS latest_cleaning
+               FROM app_housekeeping
+               WHERE cleaned = 1
+               GROUP BY cleaned_by_us`
+            );
+            const list = Array.isArray(rows) ? rows : [];
+            for (const r of list) {
+              const id = Number(r?.cleaned_by_us);
+              const checkout = r?.latest_cleaning;
+              if (!Number.isFinite(id) || checkout == null) continue;
+              let dateStr: string;
+              if (checkout instanceof Date) {
+                dateStr = format(checkout, "yyyy-MM-dd");
+              } else {
+                const s = String(checkout).trim();
+                const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                if (isoMatch) {
+                  dateStr = `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+                } else {
+                  const d = new Date(s);
+                  dateStr = !isNaN(d.getTime()) ? format(d, "yyyy-MM-dd") : "";
+                }
+              }
+              if (dateStr) lastWorkedByCleanerId.set(id, dateStr);
+            }
+
+            if (lastTransfer) {
+              const [titRows]: any = await adamConnection.execute(
+                `SELECT DISTINCT cleaned_by_us FROM app_housekeeping
+                 WHERE checkout = ? AND deleted_at IS NULL AND deleted_at_client IS NULL`,
+                [workDate]
+              );
+              const [collabRows]: any = await adamConnection.execute(
+                `SELECT DISTINCT c.user_id FROM app_housekeeping_collaborations c
+                 INNER JOIN app_housekeeping h ON c.housekeeping_id = h.id
+                 WHERE h.checkout = ? AND h.deleted_at IS NULL AND h.deleted_at_client IS NULL AND (c.deleted_at IS NULL OR c.deleted_at = 0)`,
+                [workDate]
+              );
+              for (const r of Array.isArray(titRows) ? titRows : []) {
+                const id = Number(r?.cleaned_by_us);
+                if (Number.isFinite(id)) inProgramIds.add(id);
+              }
+              for (const r of Array.isArray(collabRows) ? collabRows : []) {
+                const id = Number(r?.user_id);
+                if (Number.isFinite(id)) inProgramIds.add(id);
+              }
+            }
+
+            const [reportRows]: any = await adamConnection.execute(
+              `SELECT user_id FROM app_housekeeping_report WHERE DATE(updated_at) = ?`,
+              [workDate]
+            );
+            for (const r of Array.isArray(reportRows) ? reportRows : []) {
+              const id = Number(r?.user_id);
+              if (Number.isFinite(id)) hasReportIds.add(id);
+            }
+          } finally {
+            await adamConnection.end();
+          }
+        } catch (adamErr: any) {
+          console.warn("⚠️ ADAM non disponibile per selected-cleaners enrichment:", adamErr?.message);
+        }
+
+        selectedCleaners.cleaners = cleanersList.map((c: any) => {
+          const cId = Number(c.id);
+          return {
+            ...c,
+            last_worked_date: lastWorkedByCleanerId.get(cId) ?? null,
+            show_plus_one: inProgramIds.has(cId) && !hasReportIds.has(cId),
+          };
+        });
+      }
+
       console.log(`✅ Selected cleaners caricati per ${workDate}: ${selectedCleaners.cleaners?.length || 0} cleaners`);
       res.json(selectedCleaners);
     } catch (error: any) {
@@ -1120,7 +1221,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Arricchisci con last_worked_date da app_housekeeping (ADAM MySQL)
+      // show_plus_one: in programma per la data ma senza report ancora. Fonte "in programma": prima invio = selected_cleaners, dopo invio = ADAM (titolari + collaboratori)
+      const lastTransfer = await pgDailyAssignmentsService.getLastTransferToAdamTimestamp(workDate);
+      let inProgramIds: Set<number>;
+      if (!lastTransfer) {
+        const selectedIds = await pgDailyAssignmentsService.loadSelectedCleaners(workDate);
+        inProgramIds = new Set(selectedIds ?? []);
+      } else {
+        inProgramIds = new Set();
+      }
+      const hasReportIds = new Set<number>();
+
+      // Arricchisci con last_worked_date, in_program (se post-invio) e has_report da ADAM
       const lastWorkedByCleanerId = new Map<number, string>();
       try {
         const adamConnection = await mysql.createConnection({
@@ -1157,17 +1269,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             if (dateStr) lastWorkedByCleanerId.set(id, dateStr);
           }
+
+          // Dopo invio ADAM: "in programma" = titolari + collaboratori da app_housekeeping
+          if (lastTransfer) {
+            const [titRows]: any = await adamConnection.execute(
+              `SELECT DISTINCT cleaned_by_us FROM app_housekeeping
+               WHERE checkout = ? AND deleted_at IS NULL AND deleted_at_client IS NULL`,
+              [workDate]
+            );
+            const [collabRows]: any = await adamConnection.execute(
+              `SELECT DISTINCT c.user_id FROM app_housekeeping_collaborations c
+               INNER JOIN app_housekeeping h ON c.housekeeping_id = h.id
+               WHERE h.checkout = ? AND h.deleted_at IS NULL AND h.deleted_at_client IS NULL AND (c.deleted_at IS NULL OR c.deleted_at = 0)`,
+              [workDate]
+            );
+            for (const r of Array.isArray(titRows) ? titRows : []) {
+              const id = Number(r?.cleaned_by_us);
+              if (Number.isFinite(id)) inProgramIds.add(id);
+            }
+            for (const r of Array.isArray(collabRows) ? collabRows : []) {
+              const id = Number(r?.user_id);
+              if (Number.isFinite(id)) inProgramIds.add(id);
+            }
+          }
+
+          // Chi ha già report per questa data (app_housekeeping_report)
+          const [reportRows]: any = await adamConnection.execute(
+            `SELECT user_id FROM app_housekeeping_report WHERE DATE(updated_at) = ?`,
+            [workDate]
+          );
+          for (const r of Array.isArray(reportRows) ? reportRows : []) {
+            const id = Number(r?.user_id);
+            if (Number.isFinite(id)) hasReportIds.add(id);
+          }
         } finally {
           await adamConnection.end();
         }
       } catch (adamErr: any) {
-        console.warn("⚠️ ADAM non disponibile per last_worked_date:", adamErr?.message);
+        console.warn("⚠️ ADAM non disponibile per last_worked_date / show_plus_one:", adamErr?.message);
       }
 
-      cleaners = cleaners.map((c: any) => ({
-        ...c,
-        last_worked_date: lastWorkedByCleanerId.get(Number(c.id)) ?? null,
-      }));
+      cleaners = cleaners.map((c: any) => {
+        const cId = Number(c.id);
+        const show_plus_one = inProgramIds.has(cId) && !hasReportIds.has(cId);
+        return {
+          ...c,
+          last_worked_date: lastWorkedByCleanerId.get(cId) ?? null,
+          show_plus_one,
+        };
+      });
 
       console.log(`✅ Cleaners caricati da PostgreSQL per ${workDate}: ${cleaners.length}`);
       res.json({
@@ -1823,6 +1973,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...(fullTaskData.reasons || []),
           'manually_moved_to_timeline'
         ],
+        manually_moved: true,
 
         // Campi specifici timeline (formato orario HH:MM)
         priority: priority || sourceContainerType || 'low_priority',
@@ -4564,10 +4715,14 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       });
     }
 
-    // === Crea sempre una revision (timestamp transfer) ===
+    // === Controllo "secondo invio o successivo" (prima di creare la nuova revisione) ===
     const { pgDailyAssignmentsService } = await import(
       "./services/pg-daily-assignments-service"
     );
+    const transferCount = await pgDailyAssignmentsService.countTransferToAdamForDate(workDate);
+    const isSecondOrLaterTransfer = transferCount >= 1;
+
+    // === Crea sempre una revision (timestamp transfer) ===
     console.log(`📝 Creazione revision per trasferimento ADAM da utente: ${username}`);
     await pgDailyAssignmentsService.saveToHistory(
       workDate,
@@ -4613,7 +4768,18 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     }
 
     const processedTaskIds = new Set<number>();
+    const assignedTaskIds = new Set<number>();
+    for (const cleanerEntry of timelineData.cleaners_assignments) {
+      for (const task of cleanerEntry.tasks || []) {
+        const tid = Number(task.task_id);
+        if (tid) assignedTaskIds.add(tid);
+      }
+    }
+
     let totalUpdated = 0;
+    let totalCleared = 0;
+    let clearErrors = 0;
+    const clearErrorDetails: string[] = [];
 
     // Contatori separati (importante)
     let taskErrors = 0; // errori su UPDATE/cleanup (critici)
@@ -4625,6 +4791,26 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     const legacyCleanupErrorDetails: string[] = [];
 
     try {
+      // Base sequence per cleaner su ADAM (task già presenti per questa data, anche fuori WASS)
+      const baseSeqByCleaner = new Map<number, number>();
+      const workDateFormatted = formatDateForMySQL(workDate);
+      if (workDateFormatted) {
+        const [seqRows]: any = await connection.execute(
+          `SELECT cleaned_by_us, COALESCE(MAX(sequence), 0) AS max_seq
+           FROM app_housekeeping
+           WHERE checkout = ? AND deleted_at IS NULL AND deleted_at_client IS NULL
+           GROUP BY cleaned_by_us`,
+          [workDateFormatted]
+        );
+        for (const row of Array.isArray(seqRows) ? seqRows : []) {
+          const cid = Number(row?.cleaned_by_us);
+          const maxSeq = Number(row?.max_seq);
+          if (Number.isFinite(cid) && Number.isFinite(maxSeq)) {
+            baseSeqByCleaner.set(cid, maxSeq);
+          }
+        }
+      }
+
       for (const cleanerEntry of timelineData.cleaners_assignments) {
         const cleanerId = Number(cleanerEntry.cleaner?.id);
         const tasks = cleanerEntry.tasks || [];
@@ -4671,7 +4857,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
             const assignedAtUs = nowRome;
             const assignedAtMilliseconds = Date.now();
 
-            const sequence = task.sequence ?? 0;
+            const baseSeq = baseSeqByCleaner.get(primaryCleanerId) ?? 0;
+            const sequence = baseSeq + (task.sequence ?? 1);
 
             const cleanedBy = primaryCleanerId ?? null;
 
@@ -5073,6 +5260,94 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           }
         }
       }
+
+      // ========== Cleanup ADAM: clear tasks not in timeline (solo dal secondo invio) ==========
+      if (isSecondOrLaterTransfer && workDateFormatted) {
+        const idsToClear: number[] = [];
+        const [rowsToClear]: any[] = await connection.execute(
+          `SELECT id FROM app_housekeeping
+           WHERE checkout = ? AND deleted_at IS NULL AND deleted_at_client IS NULL
+             AND cleaned_by_us IS NOT NULL
+           ORDER BY id`,
+          [workDateFormatted]
+        );
+        for (const row of Array.isArray(rowsToClear) ? rowsToClear : []) {
+          const id = Number(row?.id);
+          if (Number.isFinite(id) && !assignedTaskIds.has(id)) idsToClear.push(id);
+        }
+
+        const nowRome = format(new Date(), "yyyy-MM-dd HH:mm:ss");
+        for (const taskId of idsToClear) {
+          const taskLabel = `${taskId}`;
+          try {
+            await connection.execute(
+              `UPDATE app_housekeeping
+               SET
+                 cleaned_by_us = NULL,
+                 sequence = NULL,
+                 updated_by = ?,
+                 updated_at = ?,
+                 assigned_at_us = NULL,
+                 assigned_at_milliseconds = NULL,
+                 collaboration = 0,
+                 collaboration_by = NULL,
+                 collaboration_at = NULL,
+                 collaboration_bypass = 0,
+                 helpwork = 0,
+                 helpwork_by = 0,
+                 helpwork_at = NULL,
+                 startwork = 0,
+                 startwork_at = NULL,
+                 startreport = 0,
+                 startreport_at = NULL,
+                 extratimes = ''
+               WHERE id = ?`,
+              [adamUpdatedBy, nowRome, taskId]
+            );
+            totalCleared++;
+
+            const [reportLockRows] = await connection.execute(
+              `SELECT 1 FROM app_housekeeping_report r
+               WHERE r.housekeeping_id = ? AND (r.deleted = 0 OR r.deleted IS NULL)
+               LIMIT 1`,
+              [taskId]
+            );
+            const hasReportLock =
+              Array.isArray(reportLockRows) && reportLockRows.length > 0;
+
+            if (!hasReportLock) {
+              try {
+                await connection.execute(
+                  `UPDATE app_housekeeping_extratimes
+                   SET deleted_at = NOW(), deleted_by = ?, updated_at = NOW(), updated_by = ?
+                   WHERE housekeeping_id = ? AND deleted_at IS NULL`,
+                  [adamUpdatedBy, adamUpdatedBy, taskId]
+                );
+              } catch (e: any) {
+                clearErrors++;
+                clearErrorDetails.push(`Task ${taskId}: extratimes clear -> ${e.message}`);
+              }
+              try {
+                await connection.execute(
+                  `DELETE FROM app_housekeeping_collaborations
+                   WHERE housekeeping_id = ? AND deleted_at IS NULL`,
+                  [taskId]
+                );
+              } catch (e: any) {
+                clearErrors++;
+                clearErrorDetails.push(`Task ${taskId}: collaborations clear -> ${e.message}`);
+              }
+            }
+          } catch (e: any) {
+            clearErrors++;
+            clearErrorDetails.push(`Task ${taskLabel}: ${e.message}`);
+            console.error(`❌ CLEAR ADAM FAIL - Task ${taskLabel}:`, e?.message || e);
+          }
+        }
+        if (idsToClear.length > 0) {
+          console.log(`Cleanup ADAM: cleared ${totalCleared} tasks (second or later transfer)`);
+        }
+      }
     } finally {
       try {
         if (connection) await connection.end();
@@ -5083,7 +5358,10 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       success: taskErrors === 0,
       workDate,
       totalUpdated,
+      totalCleared,
       taskErrors,
+      clearErrors,
+      clearErrorDetails,
       collaborationErrors,
       legacyCleanupErrors,
       errors,
@@ -6193,10 +6471,13 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       let modificationType = 'task_moved';
       if (fromContainer && typeof fromCleanerId !== 'number') {
         modificationType = `dnd_from_${fromContainer}`;
+        moved.manually_moved = true;
       } else if (fromCleanerId === toCleanerId) {
         modificationType = 'task_reordered_same_cleaner';
+        for (const t of dstEntry.tasks) t.manually_moved = true;
       } else if (typeof fromCleanerId === 'number') {
         modificationType = 'dnd_between_cleaners';
+        moved.manually_moved = true;
       }
 
       // Save the updated timeline
@@ -6306,6 +6587,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         0
       );
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
+
+      for (const t of cleanerEntry.tasks) t.manually_moved = true;
 
       // Salva timeline (dual-write: filesystem + Object Storage)
       await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUser, 'task_reordered_same_cleaner');
@@ -6814,6 +7097,42 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       console.log(`POST /api/optimizer/run-wave - Wave ${priority} for ${workDate}`);
+
+      const { query } = await import("../shared/pg-db");
+      const timelinePriorityRows = await query(
+        `
+          SELECT priority
+          FROM daily_assignments_current
+          WHERE work_date = $1
+        `,
+        [workDate]
+      );
+
+      const normalizePriority = (value: string | null | undefined) => {
+        if (!value) return null;
+        const normalized = String(value).toLowerCase();
+        if (normalized === 'early_out' || normalized === 'early-out') return 'early_out';
+        if (normalized === 'high_priority' || normalized === 'high') return 'high_priority';
+        if (normalized === 'low_priority' || normalized === 'low') return 'low_priority';
+        return null;
+      };
+
+      const hasEoOnTimeline = timelinePriorityRows.rows.some((row: any) => normalizePriority(row.priority) === 'early_out');
+      const hasHpOnTimeline = timelinePriorityRows.rows.some((row: any) => normalizePriority(row.priority) === 'high_priority');
+
+      if (priority === 'high_priority' && !hasEoOnTimeline) {
+        return res.status(400).json({
+          success: false,
+          error: "Esegui prima la wave Early Out",
+        });
+      }
+
+      if (priority === 'low_priority' && (!hasEoOnTimeline || !hasHpOnTimeline)) {
+        return res.status(400).json({
+          success: false,
+          error: "Esegui prima le wave Early Out e High Priority",
+        });
+      }
 
       const { runSingleWave } = await import('./services/optimizer/runAllPhases');
 

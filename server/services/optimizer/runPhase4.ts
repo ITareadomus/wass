@@ -9,20 +9,31 @@ import {
 import { TaskForScheduling, Phase3TimelineConstraints } from './phase3';
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, getLatestRunForDate, loadLockedCleanerIds } from './db';
 import { loadPriorityStartWindows, mapPriorityType, priorityToDbFormat } from './priorityWindows';
-import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, calculateMinutesBasedTargets, TaskForPhase2, DEFAULT_FAIRNESS_PARAMS } from './phase2';
+import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, calculateMinutesBasedTargets, TaskForPhase2, DEFAULT_FAIRNESS_PARAMS, FormatoreRules } from './phase2';
 import { TimelineContext } from './timelineContext';
 
 async function loadApartmentTypes(): Promise<ApartmentTypes> {
   try {
     const result = await pool.query(`
-      SELECT value FROM app_settings WHERE key = 'apartment_types'
+      SELECT value FROM app_settings WHERE key = 'app_settings'
     `);
-    if (result.rows.length > 0 && result.rows[0].value) {
+    const apt = result.rows[0]?.value?.apartment_types;
+    if (apt && typeof apt === 'object') {
       return {
-        standard_apt: result.rows[0].value.standard_apt || DEFAULT_APARTMENT_TYPES.standard_apt,
-        premium_apt: result.rows[0].value.premium_apt || DEFAULT_APARTMENT_TYPES.premium_apt,
-        straordinario_apt: result.rows[0].value.straordinario_apt || DEFAULT_APARTMENT_TYPES.straordinario_apt,
-        formatore_apt: result.rows[0].value.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt
+        standard_apt: apt.standard_apt || DEFAULT_APARTMENT_TYPES.standard_apt,
+        premium_apt: apt.premium_apt || DEFAULT_APARTMENT_TYPES.premium_apt,
+        straordinario_apt: apt.straordinario_apt || DEFAULT_APARTMENT_TYPES.straordinario_apt,
+        formatore_apt: apt.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt
+      };
+    }
+    const legacy = await pool.query(`SELECT value FROM app_settings WHERE key = 'apartment_types'`);
+    if (legacy.rows.length > 0 && legacy.rows[0].value) {
+      const v = legacy.rows[0].value;
+      return {
+        standard_apt: v.standard_apt || DEFAULT_APARTMENT_TYPES.standard_apt,
+        premium_apt: v.premium_apt || DEFAULT_APARTMENT_TYPES.premium_apt,
+        straordinario_apt: v.straordinario_apt || DEFAULT_APARTMENT_TYPES.straordinario_apt,
+        formatore_apt: v.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt
       };
     }
   } catch (e) {
@@ -30,6 +41,42 @@ async function loadApartmentTypes(): Promise<ApartmentTypes> {
   }
   return DEFAULT_APARTMENT_TYPES;
 }
+
+async function loadFormatoreRules(): Promise<FormatoreRules | null> {
+  try {
+    const result = await pool.query(`
+      SELECT value FROM app_settings WHERE key = 'app_settings'
+    `);
+    const value = result.rows[0]?.value;
+    if (!value || typeof value !== 'object') return null;
+
+    const pt = value.priority_types?.formatore_cleaner;
+    const tt = value.task_types?.formatore_cleaner;
+    const allowedPriorities: string[] = [];
+    if (pt && typeof pt === 'object') {
+      if (pt.early_out) allowedPriorities.push('early_out');
+      if (pt.high_priority) allowedPriorities.push('high_priority');
+      if (pt.low_priority) allowedPriorities.push('low_priority');
+    }
+    return {
+      allowedPriorities: allowedPriorities.length > 0 ? allowedPriorities : ['early_out', 'high_priority', 'low_priority'],
+      standardApt: tt && typeof tt === 'object' ? Boolean(tt.standard_apt) : true,
+      premiumApt: tt && typeof tt === 'object' ? Boolean(tt.premium_apt) : false,
+      straordinarioApt: tt && typeof tt === 'object' ? Boolean(tt.straordinario_apt) : false
+    };
+  } catch (e) {
+    console.error('Failed to load formatore rules from app_settings:', e);
+    return null;
+  }
+}
+
+/** Default restrittivo per formatori quando app_settings non ha priority_types/task_types: solo LP. */
+const DEFAULT_FORMATORE_RULES: FormatoreRules = {
+  allowedPriorities: ['low_priority'],
+  standardApt: true,
+  premiumApt: false,
+  straordinarioApt: false
+};
 
 export interface Phase4RunResult {
   runId: string;
@@ -539,11 +586,12 @@ export async function runPhase4(
   }
 
   try {
-    const apartmentTypes = await loadApartmentTypes();
+    const [apartmentTypes, formatoreRules] = await Promise.all([loadApartmentTypes(), loadFormatoreRules()]);
     const fullParams: Phase4Params = { 
       ...DEFAULT_PHASE4_PARAMS, 
       ...params,
-      apartmentTypes 
+      apartmentTypes,
+      formatoreRules: formatoreRules ?? DEFAULT_FORMATORE_RULES
     };
 
     const [schedules, unassignedTasks, tasksMap, priorityWindows, lockedCleanerIds] = await Promise.all([
@@ -671,7 +719,7 @@ export async function runPhase4(
       });
     }
     
-    const phase4Result = runPhase4Algorithm(
+    const phase4Result = await runPhase4Algorithm(
       resolvedWorkDate,
       schedules,
       unassignedTasks,
