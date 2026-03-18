@@ -80,11 +80,20 @@ export interface CleanerFixedStats {
   fixedTravelMinutes: number;
 }
 
+/** Regole da app_settings per i formatori: priorità e tipi task ammessi (bloccante). */
+export interface FormatoreRules {
+  allowedPriorities: string[];  // es. ['low_priority'] da priority_types.formatore_cleaner
+  standardApt: boolean;
+  premiumApt: boolean;
+  straordinarioApt: boolean;
+}
+
 export interface Phase2Params {
   travelWeight: number;
   loadWeight: number;
   preferenceBonus: number;
   apartmentTypes: ApartmentTypes;
+  formatoreRules?: FormatoreRules | null;  // se assente, nessuna restrizione extra per formatori
   dynamicMaxTasks?: number;  // base max from totalTasks/numCleaners, bonus +1 per-cleaner if avgTravel ≤ 10min
   fairness: FairnessParams;  // minutes-based fairness parameters
   initialLoadByCleanerMin?: Map<number, number>; // Pre-existing load from timeline (minutes)
@@ -711,8 +720,8 @@ export function runPhase2Algorithm(
         // Cap = maxTarget (from fairness targets calculation)
         if (newLoadMinValue > targets.maxTarget) continue;
         
-        // Also keep a sanity check on task count for extreme cases
-        const maxTasksPerCleaner = 6; // Hard limit regardless of minutes
+        // Max task count per cleaner: dynamic (baseMax+1, aligned with Phase 1 maxGroupSize) or fallback 6
+        const maxTasksPerCleaner = params.dynamicMaxTasks != null ? params.dynamicMaxTasks + 1 : 4;
         if (taskCount + tasks.length > maxTasksPerCleaner) continue;
         
         // Straordinaria constraints

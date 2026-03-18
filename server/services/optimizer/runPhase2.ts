@@ -1,6 +1,5 @@
 import pool from '../../../shared/pg-db';
 import { 
-  runPhase2Algorithm, 
   Phase2Params, 
   DEFAULT_PHASE2_PARAMS,
   CleanerInput,
@@ -8,22 +7,35 @@ import {
   GroupCandidate,
   Phase2Event,
   ApartmentTypes,
-  DEFAULT_APARTMENT_TYPES
+  DEFAULT_APARTMENT_TYPES,
+  FormatoreRules
 } from './phase2';
+import { runPhase2WithOrTools } from './phase2OrTools';
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, loadLockedCleanerIds } from './db';
 import { TimelineContext } from './timelineContext';
 
 async function loadApartmentTypes(): Promise<ApartmentTypes> {
   try {
     const result = await pool.query(`
-      SELECT value FROM app_settings WHERE key = 'apartment_types'
+      SELECT value FROM app_settings WHERE key = 'app_settings'
     `);
-    if (result.rows.length > 0 && result.rows[0].value) {
+    const apt = result.rows[0]?.value?.apartment_types;
+    if (apt && typeof apt === 'object') {
       return {
-        standard_apt: result.rows[0].value.standard_apt || DEFAULT_APARTMENT_TYPES.standard_apt,
-        premium_apt: result.rows[0].value.premium_apt || DEFAULT_APARTMENT_TYPES.premium_apt,
-        straordinario_apt: result.rows[0].value.straordinario_apt || DEFAULT_APARTMENT_TYPES.straordinario_apt,
-        formatore_apt: result.rows[0].value.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt
+        standard_apt: apt.standard_apt || DEFAULT_APARTMENT_TYPES.standard_apt,
+        premium_apt: apt.premium_apt || DEFAULT_APARTMENT_TYPES.premium_apt,
+        straordinario_apt: apt.straordinario_apt || DEFAULT_APARTMENT_TYPES.straordinario_apt,
+        formatore_apt: apt.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt
+      };
+    }
+    const legacy = await pool.query(`SELECT value FROM app_settings WHERE key = 'apartment_types'`);
+    if (legacy.rows.length > 0 && legacy.rows[0].value) {
+      const v = legacy.rows[0].value;
+      return {
+        standard_apt: v.standard_apt || DEFAULT_APARTMENT_TYPES.standard_apt,
+        premium_apt: v.premium_apt || DEFAULT_APARTMENT_TYPES.premium_apt,
+        straordinario_apt: v.straordinario_apt || DEFAULT_APARTMENT_TYPES.straordinario_apt,
+        formatore_apt: v.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt
       };
     }
   } catch (e) {
@@ -31,6 +43,42 @@ async function loadApartmentTypes(): Promise<ApartmentTypes> {
   }
   return DEFAULT_APARTMENT_TYPES;
 }
+
+async function loadFormatoreRules(): Promise<FormatoreRules | null> {
+  try {
+    const result = await pool.query(`
+      SELECT value FROM app_settings WHERE key = 'app_settings'
+    `);
+    const value = result.rows[0]?.value;
+    if (!value || typeof value !== 'object') return null;
+
+    const pt = value.priority_types?.formatore_cleaner;
+    const tt = value.task_types?.formatore_cleaner;
+    const allowedPriorities: string[] = [];
+    if (pt && typeof pt === 'object') {
+      if (pt.early_out) allowedPriorities.push('early_out');
+      if (pt.high_priority) allowedPriorities.push('high_priority');
+      if (pt.low_priority) allowedPriorities.push('low_priority');
+    }
+    return {
+      allowedPriorities: allowedPriorities.length > 0 ? allowedPriorities : ['early_out', 'high_priority', 'low_priority'],
+      standardApt: tt && typeof tt === 'object' ? Boolean(tt.standard_apt) : true,
+      premiumApt: tt && typeof tt === 'object' ? Boolean(tt.premium_apt) : false,
+      straordinarioApt: tt && typeof tt === 'object' ? Boolean(tt.straordinario_apt) : false
+    };
+  } catch (e) {
+    console.error('Failed to load formatore rules from app_settings:', e);
+    return null;
+  }
+}
+
+/** Default restrittivo per formatori quando app_settings non ha priority_types/task_types: solo LP. */
+const DEFAULT_FORMATORE_RULES: FormatoreRules = {
+  allowedPriorities: ['low_priority'],
+  standardApt: true,
+  premiumApt: false,
+  straordinarioApt: false
+};
 
 export interface Phase2RunResult {
   runId: string;
@@ -60,7 +108,7 @@ async function loadSelectedCleanerIds(workDate: string): Promise<number[]> {
   }
   const ids = (result.rows[0].cleaners || [])
     .map((x: any) => Number(x))
-    .filter((n: number) => Number.isFinite(n));
+    .filter((n: number) => Number.isFinite(n)) as number[];
   // Determinismo: l'ordine dell'array in DB può variare tra ambienti.
   ids.sort((a, b) => a - b);
   return ids;
@@ -164,19 +212,61 @@ async function getLatestPhase1RunId(workDate: string): Promise<string | null> {
   return result.rows.length > 0 ? result.rows[0].run_id : null;
 }
 
-function selectNonOverlappingGroups(groups: GroupCandidate[]): GroupCandidate[] {
-  const usedTasks = new Set<number>();
-  const selected: GroupCandidate[] = [];
+/**
+ * Selects a set of non-overlapping groups that covers all tasks (partition with full coverage).
+ * Uses a greedy: process hardest-to-cover tasks first, pick the best group (by score, then anchored, size, travel) for each.
+ * Returns selected groups and any task IDs that could not be covered (Phase 4 will handle them).
+ */
+function selectPartitionCoveringAllTasks(
+  groups: GroupCandidate[],
+  allTaskIds: Set<number>
+): { selected: GroupCandidate[]; uncoveredTaskIds: number[] } {
+  const sorted = [...groups].sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    const aAnchored = a.anchoredCleanerId !== undefined ? 1 : 0;
+    const bAnchored = b.anchoredCleanerId !== undefined ? 1 : 0;
+    if (aAnchored !== bAnchored) return bAnchored - aAnchored;
+    if (b.taskIds.length !== a.taskIds.length) return b.taskIds.length - a.taskIds.length;
+    return (a.avgTravelMin ?? 0) - (b.avgTravelMin ?? 0);
+  });
 
-  for (const group of groups) {
-    const hasOverlap = group.taskIds.some(t => usedTasks.has(t));
-    if (!hasOverlap) {
-      selected.push(group);
-      group.taskIds.forEach(t => usedTasks.add(t));
+  const covered = new Set<number>();
+  const selected: GroupCandidate[] = [];
+  const uncovered = new Set(allTaskIds);
+  const uncoveredTaskIds: number[] = [];
+
+  const isCandidate = (g: GroupCandidate, t: number): boolean =>
+    g.taskIds.includes(t) && g.taskIds.every((id) => !covered.has(id));
+
+  const getCandidatesForTask = (t: number): GroupCandidate[] =>
+    sorted.filter((g) => isCandidate(g, t));
+
+  while (uncovered.size > 0) {
+    let bestT: number | null = null;
+    let minCandidates = Infinity;
+    for (const t of uncovered) {
+      const candidates = getCandidatesForTask(t);
+      if (candidates.length < minCandidates) {
+        minCandidates = candidates.length;
+        bestT = t;
+      }
+    }
+    if (bestT === null) break;
+    const candidates = getCandidatesForTask(bestT);
+    if (candidates.length === 0) {
+      uncoveredTaskIds.push(bestT);
+      uncovered.delete(bestT);
+      continue;
+    }
+    const chosen = candidates[0];
+    selected.push(chosen);
+    for (const id of chosen.taskIds) {
+      covered.add(id);
+      uncovered.delete(id);
     }
   }
 
-  return selected;
+  return { selected, uncoveredTaskIds };
 }
 
 function eventToDecision(runId: string, event: Phase2Event): OptimizerDecision {
@@ -233,7 +323,7 @@ export async function runPhase2(
   }
 
   try {
-    const apartmentTypes = await loadApartmentTypes();
+    const [apartmentTypes, formatoreRules] = await Promise.all([loadApartmentTypes(), loadFormatoreRules()]);
     let initialLastPositionByCleaner: Map<number, { lat: number; lng: number }> | undefined;
     if (timelineContext?.anchorPointsByCleaner) {
       initialLastPositionByCleaner = new Map();
@@ -248,6 +338,7 @@ export async function runPhase2(
       ...DEFAULT_PHASE2_PARAMS, 
       ...params,
       apartmentTypes,
+      formatoreRules: formatoreRules ?? DEFAULT_FORMATORE_RULES,
       initialLoadByCleanerMin: timelineContext?.initialLoadByCleanerMin,
       initialLastPositionByCleaner,
       initialFixedStatsByCleaner: timelineContext?.fixedStatsByCleaner
@@ -283,21 +374,13 @@ export async function runPhase2(
     
     result.cleanersLoaded = cleaners.length;
 
-    // Re-sort: anchored groups first (wave continuity), then size DESC, then avgTravel ASC
-    const sortedGroups = [...allGroups].sort((a, b) => {
-      const aAnchored = a.anchoredCleanerId !== undefined ? 1 : 0;
-      const bAnchored = b.anchoredCleanerId !== undefined ? 1 : 0;
-      if (aAnchored !== bAnchored) return bAnchored - aAnchored;
-
-      const sizeA = a.taskIds.length;
-      const sizeB = b.taskIds.length;
-      if (sizeA !== sizeB) return sizeB - sizeA;
-      
-      return (a.avgTravelMin ?? 0) - (b.avgTravelMin ?? 0);
-    });
-    
-    const selectedGroups = selectNonOverlappingGroups(sortedGroups);
+    const allTaskIds = new Set(allGroups.flatMap((g) => g.taskIds));
+    const { selected: selectedGroups, uncoveredTaskIds } = selectPartitionCoveringAllTasks(allGroups, allTaskIds);
     result.groupsProcessed = selectedGroups.length;
+
+    if (uncoveredTaskIds.length > 0) {
+      console.warn(`[Phase2] Partition left ${uncoveredTaskIds.length} tasks without group (Phase 4 will try to assign them)`);
+    }
 
     if (cleaners.length === 0) {
       const noCleanerEvents: Phase2Event[] = selectedGroups.map(g => ({
@@ -335,7 +418,7 @@ export async function runPhase2(
       return result;
     }
 
-    const phase2Result = runPhase2Algorithm(selectedGroups, tasksMap, cleaners, fullParams);
+    const phase2Result = await runPhase2WithOrTools(selectedGroups, tasksMap, cleaners, fullParams, { timeoutMs: 85000 });
 
     result.groupsAssigned = phase2Result.stats.groupsAssigned;
     result.groupsUnassigned = phase2Result.stats.groupsUnassigned;
@@ -363,8 +446,8 @@ export async function runPhase2(
 
   } catch (error: any) {
     result.status = 'failed';
-    result.error = error.message || 'Unknown error';
-    console.error('Phase 2 error:', error);
+    result.error = error?.message || 'Unknown error';
+    console.error('Phase 2 OR-Tools error:', error);
   }
 
   result.durationMs = Date.now() - startTime;

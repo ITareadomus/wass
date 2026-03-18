@@ -1,6 +1,8 @@
 import pool from '../../../shared/pg-db';
 import { TaskInput, Phase1Params, CandidateGroup, Phase1Event } from './phase1';
 
+let planTableEnsured = false;
+
 export interface OptimizerRun {
   runId: string;
   workDate: string;
@@ -300,4 +302,63 @@ export async function loadLockedCleanerIds(workDate: string): Promise<number[]> 
   return result.rows
     .map((r: any) => Number(r.cleaner_id))
     .filter((n: number) => Number.isFinite(n));
+}
+
+async function ensureOptimizerPlanTable(): Promise<void> {
+  if (planTableEnsured) return;
+
+  await pool.query(`
+    CREATE SCHEMA IF NOT EXISTS optimizer;
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS optimizer.optimizer_plan_for_date (
+      work_date date PRIMARY KEY,
+      plan_run_id uuid NOT NULL REFERENCES optimizer.optimizer_run(run_id) ON DELETE CASCADE,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_optimizer_plan_for_date_run_id
+      ON optimizer.optimizer_plan_for_date(plan_run_id);
+  `);
+
+  planTableEnsured = true;
+}
+
+export async function getPlanRunIdForDate(workDate: string): Promise<string | null> {
+  if (!workDate || workDate.trim() === '') return null;
+  await ensureOptimizerPlanTable();
+
+  const result = await pool.query<{ plan_run_id: string }>(`
+    SELECT plan_run_id
+    FROM optimizer.optimizer_plan_for_date
+    WHERE work_date = $1
+    LIMIT 1
+  `, [workDate]);
+
+  if (result.rows.length === 0) return null;
+  return result.rows[0].plan_run_id;
+}
+
+export async function setPlanRunIdForDate(workDate: string, planRunId: string): Promise<void> {
+  if (!workDate || workDate.trim() === '') {
+    throw new Error('workDate is required');
+  }
+  if (!planRunId || planRunId.trim() === '') {
+    throw new Error('planRunId is required');
+  }
+
+  await ensureOptimizerPlanTable();
+
+  await pool.query(`
+    INSERT INTO optimizer.optimizer_plan_for_date (work_date, plan_run_id, updated_at)
+    VALUES ($1, $2, now())
+    ON CONFLICT (work_date)
+    DO UPDATE SET
+      plan_run_id = EXCLUDED.plan_run_id,
+      updated_at = now()
+  `, [workDate, planRunId]);
 }

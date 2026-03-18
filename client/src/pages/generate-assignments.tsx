@@ -83,6 +83,17 @@ function dedupeById(list: Task[]): Task[] {
   return out;
 }
 
+type WavePriorityState = 'early_out' | 'high_priority' | 'low_priority' | null;
+
+function normalizeWavePriority(value: unknown): WavePriorityState {
+  if (typeof value !== 'string') return null;
+  const normalized = value.toLowerCase();
+  if (normalized === 'early_out' || normalized === 'early-out') return 'early_out';
+  if (normalized === 'high_priority' || normalized === 'high') return 'high_priority';
+  if (normalized === 'low_priority' || normalized === 'low') return 'low_priority';
+  return null;
+}
+
 // Indice per id (1:1)
 function indexById(list: Task[]): Map<string, Task> {
   const m = new Map<string, Task>();
@@ -102,14 +113,33 @@ const isDateInPast = (date: Date): boolean => {
   return targetDate < today;
 };
 
+// Tipo per risposta API timeline (evita inferenza never[] su assignments/cleaners_assignments)
+interface TimelineCleanerEntry {
+  cleaner: { id: number; name?: string };
+  tasks?: Array<{ task_id: number; id?: number; logistic_code?: number; sequence?: number; priority?: string }>;
+}
+interface TimelineAssignmentEntry {
+  task_id: number;
+  cleanerId?: number;
+  cleaner_id?: number;
+  id?: number;
+  logistic_code?: number;
+  priority?: string;
+}
+interface TimelineAssignmentsData {
+  assignments: TimelineAssignmentEntry[];
+  metadata: { date?: string };
+  cleaners_assignments: TimelineCleanerEntry[];
+}
+
 
 
 // MultiSelect Context per gestire selezione multipla task
 interface MultiSelectContextType {
   isMultiSelectMode: boolean;
-  selectedTasks: Array<{taskId: string; order: number}>;
+  selectedTasks: Array<{taskId: string; order: number; container?: string}>;
   toggleMode: () => void;
-  toggleTask: (taskId: string) => void;
+  toggleTask: (taskId: string, container?: string) => void;
   clearSelection: () => void;
   isTaskSelected: (taskId: string) => boolean;
   getTaskOrder: (taskId: string) => number | undefined;
@@ -215,14 +245,14 @@ export default function GenerateAssignments() {
     }
   }, [isAnyMultiSelectActive]);
 
-  const toggleTask = useCallback((taskId: string, container: string) => {
+  const toggleTask = useCallback((taskId: string, container?: string) => {
     setSelectedTasks(prev => {
       const existing = prev.find(t => t.taskId === taskId);
       if (existing) {
         return prev.filter(t => t.taskId !== taskId);
       } else {
         const maxOrder = prev.length > 0 ? Math.max(...prev.map(t => t.order)) : 0;
-        return [...prev, { taskId, order: maxOrder + 1, container }];
+        return [...prev, { taskId, order: maxOrder + 1, container: container ?? 'high_priority' }];
       }
     });
   }, []);
@@ -340,6 +370,18 @@ export default function GenerateAssignments() {
   // Stati per pulsanti Assegna e Refresh Containers
   const [isAssigning, setIsAssigning] = useState(false);
   const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
+
+  // Disabilitazione pulsanti Assegna solo dopo aver premuto il pulsante (non per D&D)
+  const [hasRunAssignEo, setHasRunAssignEo] = useState(false);
+  const [hasRunAssignHp, setHasRunAssignHp] = useState(false);
+  const [hasRunAssignLp, setHasRunAssignLp] = useState(false);
+
+  // Reset flag "ha premuto Assegna" al cambio data
+  useEffect(() => {
+    setHasRunAssignEo(false);
+    setHasRunAssignHp(false);
+    setHasRunAssignLp(false);
+  }, [selectedDate]);
 
   // Polling ADAM: fingerprint su campi "di interesse" per segnalare aggiornamenti disponibili
   type AdamFingerprint = {
@@ -845,7 +887,7 @@ export default function GenerateAssignments() {
       pax_out: rawTask.pax_out,
       operation_id: rawTask.operation_id,
       customer_name: (rawTask as any).customer_name,
-      customer_reference: rawTask.customer_reference,
+      customer_reference: rawTask.customer_reference != null ? String(rawTask.customer_reference) : undefined,
       type_apt: (rawTask as any).type_apt,
       locked: (rawTask as any).locked,
       locked_reason: (rawTask as any).locked_reason,
@@ -885,7 +927,7 @@ export default function GenerateAssignments() {
       const containersData = await containersResponse.json();
 
       // Carica da /api/timeline (DB source) con gestione errori robusta
-      let timelineAssignmentsData = {
+      let timelineAssignmentsData: TimelineAssignmentsData = {
         assignments: [],
         metadata: { date: dateStr },
         cleaners_assignments: []
@@ -900,9 +942,9 @@ export default function GenerateAssignments() {
             // Verifica che il contenuto sia JSON valido
             if (!timelineText.trim().startsWith('{') && !timelineText.trim().startsWith('[')) {
               console.warn('Timeline corrotta, non è JSON:', timelineText.substring(0, 100));
-              timelineAssignmentsData = { metadata: {}, cleaners_assignments: [] };
+              timelineAssignmentsData = { assignments: [], metadata: { date: dateStr }, cleaners_assignments: [] };
             } else {
-              timelineAssignmentsData = JSON.parse(timelineText);
+              timelineAssignmentsData = JSON.parse(timelineText) as TimelineAssignmentsData;
               dlog("Timeline assignments data:", timelineAssignmentsData);
               dlog("Cleaners assignments count:", timelineAssignmentsData.cleaners_assignments?.length || 0);
               dlog("Total tasks in timeline:", timelineAssignmentsData.cleaners_assignments?.reduce((sum: number, c: any) => sum + (c.tasks?.length || 0), 0) || 0);
@@ -913,7 +955,7 @@ export default function GenerateAssignments() {
         } catch (e) {
           console.error('Errore parsing timeline:', e);
           // In caso di errore, usa timeline vuota
-          timelineAssignmentsData = { metadata: {}, cleaners_assignments: [] };
+          timelineAssignmentsData = { assignments: [], metadata: { date: dateStr }, cleaners_assignments: [] };
         }
       } else {
         console.warn(`Timeline not found (${timelineResponse.status}), using empty timeline`);
@@ -972,7 +1014,7 @@ export default function GenerateAssignments() {
             const compositeKey = `${taskId}-${cleanerId}`;
             assignedTaskIds.add(taskId); // Per filtrare containers
             timelineAssignmentsMap.set(compositeKey, taskWithAssignment);
-            timelineTasks.push(taskWithAssignment as Task);
+            timelineTasks.push(taskWithAssignment as unknown as Task);
           }
         }
       } else if (timelineAssignmentsData.assignments) {
@@ -991,7 +1033,7 @@ export default function GenerateAssignments() {
           const compositeKey = `${taskId}-${cleanerId}`;
           assignedTaskIds.add(taskId);
           timelineAssignmentsMap.set(compositeKey, taskWithAssignment);
-          timelineTasks.push(taskWithAssignment as Task);
+          timelineTasks.push(taskWithAssignment as unknown as Task);
         }
       }
 
@@ -1201,6 +1243,10 @@ export default function GenerateAssignments() {
       const result = await response.json();
 
       if (result.success) {
+        if (priority === 'early_out') setHasRunAssignEo(true);
+        if (priority === 'high_priority') setHasRunAssignHp(true);
+        if (priority === 'low_priority') setHasRunAssignLp(true);
+
         toast({
           title: `${label} Assegnati!`,
           description: result.message || `${result.applied?.insertedCount || 0} task assegnati`,
@@ -1538,11 +1584,12 @@ export default function GenerateAssignments() {
       // 🔹 Ramo TIMELINE (drag tra cleaners o riordino nello stesso cleaner)
 
       // Caso: Riordino nella stessa timeline
-      if (fromCleanerId === toCleanerId && fromCleanerId !== null) {
-        console.log(`🔄 Riordino task ${taskId} per cleaner ${toCleanerId} da ${source.index} a ${destination.index}`);
+      if (fromCleanerId === toCleanerId && fromCleanerId !== null && toCleanerId !== null) {
+        const cleanerId = toCleanerId;
+        console.log(`🔄 Riordino task ${taskId} per cleaner ${cleanerId} da ${source.index} a ${destination.index}`);
 
         try {
-          await reorderTimelineAssignment(taskId, logisticCode, toCleanerId, source.index, destination.index);
+          await reorderTimelineAssignment(taskId, logisticCode, cleanerId, source.index, destination.index);
 
           // CRITICAL: Marca modifiche dopo riordino
           setHasUnsavedChanges(true);
@@ -1867,8 +1914,26 @@ export default function GenerateAssignments() {
   const isHistoricalMode = isDateInPast(selectedDate);
 
   // Filtra le task non assegnate
-  const unassignedTasks = allTasksWithAssignments.filter(task => !task.assignedCleaner);
-  const hasAssignedTasks = allTasksWithAssignments.some(task => task.assignedCleaner);
+  const unassignedTasks = allTasksWithAssignments.filter(task => !(task as any).assignedCleaner);
+  const hasAssignedTasks = allTasksWithAssignments.some(task => Boolean((task as any).assignedCleaner));
+  const timelinePriorityState = useMemo(() => {
+    let hasEoOnTimeline = false;
+    let hasHpOnTimeline = false;
+    let hasLpOnTimeline = false;
+
+    for (const task of allTasksWithAssignments) {
+      if (!(task as any).assignedCleaner) continue;
+      const normalizedPriority =
+        normalizeWavePriority((task as any).priority) ??
+        normalizeWavePriority((task as any).priority_type) ??
+        normalizeWavePriority((task as any).priorityType);
+      if (normalizedPriority === 'early_out') hasEoOnTimeline = true;
+      if (normalizedPriority === 'high_priority') hasHpOnTimeline = true;
+      if (normalizedPriority === 'low_priority') hasLpOnTimeline = true;
+    }
+
+    return { hasEoOnTimeline, hasHpOnTimeline, hasLpOnTimeline };
+  }, [allTasksWithAssignments]);
 
   // Mostra loader durante l'estrazione
   if (isExtracting || isLoadingTasks || isLoading) {
@@ -2142,6 +2207,7 @@ export default function GenerateAssignments() {
                     droppableId="early-out"
                     icon="clock"
                     assignAction={assignEarlyOutToTimeline}
+                    assignButtonDisabled={hasRunAssignEo}
                     containerMultiSelectState={getContainerMultiSelectState('early_out')}
                     highlightedTaskIds={highlightedEarlyOut}
                   />
@@ -2152,6 +2218,7 @@ export default function GenerateAssignments() {
                     droppableId="high"
                     icon="alert-circle"
                     assignAction={assignHighPriorityToTimeline}
+                    assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || hasRunAssignHp}
                     containerMultiSelectState={getContainerMultiSelectState('high_priority')}
                     highlightedTaskIds={highlightedHighPriority}
                   />
@@ -2162,6 +2229,7 @@ export default function GenerateAssignments() {
                     droppableId="low"
                     icon="arrow-down"
                     assignAction={assignLowPriorityToTimeline}
+                    assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || !timelinePriorityState.hasHpOnTimeline || hasRunAssignLp}
                     containerMultiSelectState={getContainerMultiSelectState('low_priority')}
                     highlightedTaskIds={highlightedLowPriority}
                   />

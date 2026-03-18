@@ -681,6 +681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       taskToMove.reasons = taskToMove.reasons.filter((r: string) =>
         !['auto_assignment', 'early_out_assignment', 'high_priority_assignment', 'low_priority_assignment'].includes(r)
       );
+      taskToMove.manually_moved = true;
 
       destEntry.tasks.splice(targetIndex, 0, taskToMove);
 
@@ -900,6 +901,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       markTasksAsManual(sourceEntry.tasks);
       markTasksAsManual(destEntry.tasks);
+      for (const task of sourceEntry.tasks) task.manually_moved = true;
+      for (const task of destEntry.tasks) task.manually_moved = true;
 
       // CRITICAL: Non modificare timelineData.cleaners_assignments
       // Gli entry sourceEntry e destEntry sono riferimenti diretti agli oggetti nell'array
@@ -1970,6 +1973,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...(fullTaskData.reasons || []),
           'manually_moved_to_timeline'
         ],
+        manually_moved: true,
 
         // Campi specifici timeline (formato orario HH:MM)
         priority: priority || sourceContainerType || 'low_priority',
@@ -4858,6 +4862,10 @@ app.post("/api/transfer-to-adam", async (req, res) => {
                 assigned_at_us = ?,
                 assigned_at_milliseconds = ?,
 
+                travel_time = ?,
+                start_time = ?,
+                end_time = ?,
+
                 collaboration = 0,
                 collaboration_by = NULL,
                 collaboration_at = NULL,
@@ -4891,6 +4899,10 @@ app.post("/api/transfer-to-adam", async (req, res) => {
               nowRome,
               assignedAtUs,
               assignedAtMilliseconds,
+
+              task.travel_time != null ? Number(task.travel_time) : null,
+              task.start_time ?? null,
+              task.end_time ?? null,
 
               taskId
             ];
@@ -6437,10 +6449,13 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       let modificationType = 'task_moved';
       if (fromContainer && typeof fromCleanerId !== 'number') {
         modificationType = `dnd_from_${fromContainer}`;
+        moved.manually_moved = true;
       } else if (fromCleanerId === toCleanerId) {
         modificationType = 'task_reordered_same_cleaner';
+        for (const t of dstEntry.tasks) t.manually_moved = true;
       } else if (typeof fromCleanerId === 'number') {
         modificationType = 'dnd_between_cleaners';
+        moved.manually_moved = true;
       }
 
       // Save the updated timeline
@@ -6550,6 +6565,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         0
       );
       timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
+
+      for (const t of cleanerEntry.tasks) t.manually_moved = true;
 
       // Salva timeline (dual-write: filesystem + Object Storage)
       await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUser, 'task_reordered_same_cleaner');
@@ -7058,6 +7075,42 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       console.log(`POST /api/optimizer/run-wave - Wave ${priority} for ${workDate}`);
+
+      const { query } = await import("../shared/pg-db");
+      const timelinePriorityRows = await query(
+        `
+          SELECT priority
+          FROM daily_assignments_current
+          WHERE work_date = $1
+        `,
+        [workDate]
+      );
+
+      const normalizePriority = (value: string | null | undefined) => {
+        if (!value) return null;
+        const normalized = String(value).toLowerCase();
+        if (normalized === 'early_out' || normalized === 'early-out') return 'early_out';
+        if (normalized === 'high_priority' || normalized === 'high') return 'high_priority';
+        if (normalized === 'low_priority' || normalized === 'low') return 'low_priority';
+        return null;
+      };
+
+      const hasEoOnTimeline = timelinePriorityRows.rows.some((row: any) => normalizePriority(row.priority) === 'early_out');
+      const hasHpOnTimeline = timelinePriorityRows.rows.some((row: any) => normalizePriority(row.priority) === 'high_priority');
+
+      if (priority === 'high_priority' && !hasEoOnTimeline) {
+        return res.status(400).json({
+          success: false,
+          error: "Esegui prima la wave Early Out",
+        });
+      }
+
+      if (priority === 'low_priority' && (!hasEoOnTimeline || !hasHpOnTimeline)) {
+        return res.status(400).json({
+          success: false,
+          error: "Esegui prima le wave Early Out e High Priority",
+        });
+      }
 
       const { runSingleWave } = await import('./services/optimizer/runAllPhases');
 

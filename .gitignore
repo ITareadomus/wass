@@ -6,6 +6,11 @@ vite.config.ts.*
 *.tar.gz
 .env.local
 
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
 # Local tools & secrets
 replacements.txt
 git-filter-repo/
