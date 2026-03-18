@@ -4776,6 +4776,20 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       }
     }
 
+    const containerTaskIds = new Set<number>();
+    const containersData = await workspaceFiles.loadContainers(workDate);
+    if (containersData?.containers) {
+      for (const key of ['early_out', 'high_priority', 'low_priority']) {
+        const bucket = containersData.containers[key];
+        if (bucket?.tasks) {
+          for (const t of bucket.tasks) {
+            const tid = Number(t.task_id);
+            if (tid) containerTaskIds.add(tid);
+          }
+        }
+      }
+    }
+
     let totalUpdated = 0;
     let totalCleared = 0;
     let clearErrors = 0;
@@ -4791,25 +4805,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     const legacyCleanupErrorDetails: string[] = [];
 
     try {
-      // Base sequence per cleaner su ADAM (task già presenti per questa data, anche fuori WASS)
-      const baseSeqByCleaner = new Map<number, number>();
       const workDateFormatted = formatDateForMySQL(workDate);
-      if (workDateFormatted) {
-        const [seqRows]: any = await connection.execute(
-          `SELECT cleaned_by_us, COALESCE(MAX(sequence), 0) AS max_seq
-           FROM app_housekeeping
-           WHERE checkout = ? AND deleted_at IS NULL AND deleted_at_client IS NULL
-           GROUP BY cleaned_by_us`,
-          [workDateFormatted]
-        );
-        for (const row of Array.isArray(seqRows) ? seqRows : []) {
-          const cid = Number(row?.cleaned_by_us);
-          const maxSeq = Number(row?.max_seq);
-          if (Number.isFinite(cid) && Number.isFinite(maxSeq)) {
-            baseSeqByCleaner.set(cid, maxSeq);
-          }
-        }
-      }
 
       for (const cleanerEntry of timelineData.cleaners_assignments) {
         const cleanerId = Number(cleanerEntry.cleaner?.id);
@@ -4857,8 +4853,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
             const assignedAtUs = nowRome;
             const assignedAtMilliseconds = Date.now();
 
-            const baseSeq = baseSeqByCleaner.get(primaryCleanerId) ?? 0;
-            const sequence = baseSeq + (task.sequence ?? 1);
+            const sequence = task.sequence ?? 1;
 
             const cleanedBy = primaryCleanerId ?? null;
 
@@ -5273,7 +5268,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         );
         for (const row of Array.isArray(rowsToClear) ? rowsToClear : []) {
           const id = Number(row?.id);
-          if (Number.isFinite(id) && !assignedTaskIds.has(id)) idsToClear.push(id);
+          if (Number.isFinite(id) && !assignedTaskIds.has(id) && containerTaskIds.has(id)) idsToClear.push(id);
         }
 
         const nowRome = format(new Date(), "yyyy-MM-dd HH:mm:ss");
