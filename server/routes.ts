@@ -4519,6 +4519,28 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     return null;
   };
 
+  /** Formatta un orario per MySQL TIME (HH:MM:SS o HH:MM). Accetta stringa, Date o null. */
+  const formatTimeForMySQL = (timeValue?: string | Date | null): string | null => {
+    if (timeValue == null || timeValue === '') return null;
+    if (typeof timeValue === 'string') {
+      const trimmed = timeValue.trim();
+      if (!trimmed) return null;
+      // Già in formato HH:MM o HH:MM:SS
+      if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+        const parts = trimmed.split(':');
+        return parts.length === 2 ? `${parts[0].padStart(2, '0')}:${parts[1]}:00` : trimmed;
+      }
+      return null;
+    }
+    if (timeValue instanceof Date && !isNaN(timeValue.getTime())) {
+      const h = timeValue.getHours();
+      const m = timeValue.getMinutes();
+      const s = timeValue.getSeconds();
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+    return null;
+  };
+
   try {
     const { date, username: reqUsername, pendingTaskEdits = {} } = req.body;
     const workDate = date || format(new Date(), "yyyy-MM-dd");
@@ -4675,6 +4697,10 @@ app.post("/api/transfer-to-adam", async (req, res) => {
                 assigned_at_us = ?,
                 assigned_at_milliseconds = ?,
 
+                travel_time = ?,
+                start_time = ?,
+                end_time = ?,
+
                 collaboration = 0,
                 collaboration_by = NULL,
                 collaboration_at = NULL,
@@ -4708,6 +4734,10 @@ app.post("/api/transfer-to-adam", async (req, res) => {
               nowRome,
               assignedAtUs,
               assignedAtMilliseconds,
+
+              task.travel_time != null ? Number(task.travel_time) : (task as any).travelTime != null ? Number((task as any).travelTime) : null,
+              formatTimeForMySQL(task.start_time ?? (task as any).startTime),
+              formatTimeForMySQL(task.end_time ?? (task as any).endTime),
 
               taskId
             ];
