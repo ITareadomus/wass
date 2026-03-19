@@ -9,6 +9,67 @@ export interface RefreshContainersResult {
   error?: string;
 }
 
+/** Logistics: create_containers.py --workflow logistics → daily_logistics_* */
+export async function refreshLogisticsContainersFromAdam(
+  workDate: string,
+  modifiedBy: string = 'system'
+): Promise<RefreshContainersResult> {
+  console.log(`🔄 refreshLogisticsContainersFromAdam: ${workDate}...`);
+  try {
+    const createContainersPath = path.join(process.cwd(), 'client/public/scripts/create_containers.py');
+    await new Promise<string>((resolve, reject) => {
+      exec(
+        `python3 "${createContainersPath}" --date "${workDate}" --skip-extract --use-api --workflow logistics`,
+        (error, stdout, stderr) => {
+          if (error) {
+            console.error(`❌ Errore create_containers (logistics): ${error.message}`);
+            reject(new Error(stderr || error.message));
+          } else {
+            console.log(`create_containers (logistics) output: ${stdout}`);
+            resolve(stdout);
+          }
+        }
+      );
+    });
+
+    let containersData = await workspaceFiles.loadLogisticsContainers(workDate);
+    if (!containersData) {
+      containersData = {
+        containers: {
+          early_out: { tasks: [], count: 0 },
+          high_priority: { tasks: [], count: 0 },
+          low_priority: { tasks: [], count: 0 },
+        },
+        summary: { early_out: 0, high_priority: 0, low_priority: 0, total_tasks: 0 },
+        metadata: { date: workDate },
+      };
+    }
+
+    await workspaceFiles.saveLogisticsContainers(workDate, containersData);
+    const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
+    await pgDailyAssignmentsService.saveLogisticsContainersToHistory(
+      workDate,
+      modifiedBy,
+      'logistics_synced_from_adam'
+    );
+    console.log(`✅ Logistics containers sincronizzati per ${workDate}`);
+
+    return {
+      success: true,
+      containersData,
+      removedCount: 0,
+    };
+  } catch (error: any) {
+    console.error('❌ refreshLogisticsContainersFromAdam:', error);
+    return {
+      success: false,
+      containersData: null,
+      removedCount: 0,
+      error: error.message,
+    };
+  }
+}
+
 export async function refreshContainersFromAdam(
   workDate: string,
   modifiedBy: string = 'system'

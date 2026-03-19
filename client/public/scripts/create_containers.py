@@ -84,6 +84,21 @@ def get_active_operations():
     connection.close()
     return [row['id'] for row in results]
 
+
+def get_active_operations_logistics():
+    """Operazioni WASS Logistics (route drivers) — stesso schema di enable_wass per housekeeping."""
+    connection = mysql.connector.connect(**DB_CONFIG)
+    cursor = connection.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT id
+        FROM app_structure_operation
+        WHERE active = 1 AND enable_route_drivers = 1
+    """)
+    results = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return [row['id'] for row in results]
+
 def get_operation_names(operation_ids):
     """Recupera i nomi delle operazioni dalla tabella app_structure_operation_langs"""
     if not operation_ids:
@@ -112,12 +127,16 @@ def get_operation_names(operation_ids):
     return operation_names
 
 # ---------- Estrazione task dal DB ----------
-def get_tasks_from_db(selected_date, assigned_task_ids=None):
+def get_tasks_from_db(selected_date, assigned_task_ids=None, workflow="housekeeping"):
     if assigned_task_ids is None:
         assigned_task_ids = set()
 
-    print(f"Aggiorno la lista delle operazioni attive dal DB...")
-    ops = get_active_operations()
+    if workflow == "logistics":
+        print(f"Aggiorno la lista delle operazioni attive (enable_route_drivers) dal DB...")
+        ops = get_active_operations_logistics()
+    else:
+        print(f"Aggiorno la lista delle operazioni attive (enable_wass) dal DB...")
+        ops = get_active_operations()
 
     valid_operation_ids = ops + [0, None]
     non_null_operation_ids = [op for op in valid_operation_ids if op is not None]
@@ -460,7 +479,15 @@ def main():
     parser.add_argument('--date', type=str, help='Data nel formato YYYY-MM-DD (es. 2025-11-17)')
     parser.add_argument('--skip-extract', action='store_true', help='Salta estrazione cleaners (usa quelli già presenti)')
     parser.add_argument('--use-api', action='store_true', help='Usa API per salvare i dati (OBBLIGATORIO)')
+    parser.add_argument(
+        '--workflow',
+        type=str,
+        choices=['housekeeping', 'logistics'],
+        default='housekeeping',
+        help='housekeeping: enable_wass (default). logistics: enable_route_drivers → /api/logistics-containers',
+    )
     args = parser.parse_args()
+    workflow = getattr(args, 'workflow', 'housekeeping') or 'housekeeping'
 
     target_date = args.date if args.date else None
     if target_date:
@@ -491,28 +518,33 @@ def main():
         print("⏭️ Salto estrazione cleaners (--skip-extract attivo), uso selected_cleaners.json esistente")
 
 
-    # Leggi timeline da API per aggiornare i dati delle task assegnate
+    # Leggi timeline da API per aggiornare i dati delle task assegnate (solo housekeeping)
     assigned_task_ids = set()
     timeline_data = None
 
-    try:
-        timeline_data = api_client.load_timeline(target_date)
-        if timeline_data:
-            for cleaner_entry in timeline_data.get("cleaners_assignments", []):
-                for task in cleaner_entry.get("tasks", []):
-                    task_id = task.get("task_id")
-                    if task_id:
-                        assigned_task_ids.add(int(task_id))
-            if assigned_task_ids:
-                print(f"✅ Task già assegnate nella timeline: {len(assigned_task_ids)}")
-    except Exception as e:
-        print(f"⚠️ Errore lettura timeline da API: {e}")
+    if workflow == "housekeeping":
+        try:
+            timeline_data = api_client.load_timeline(target_date)
+            if timeline_data:
+                for cleaner_entry in timeline_data.get("cleaners_assignments", []):
+                    for task in cleaner_entry.get("tasks", []):
+                        task_id = task.get("task_id")
+                        if task_id:
+                            assigned_task_ids.add(int(task_id))
+                if assigned_task_ids:
+                    print(f"✅ Task già assegnate nella timeline: {len(assigned_task_ids)}")
+        except Exception as e:
+            print(f"⚠️ Errore lettura timeline da API: {e}")
+    else:
+        print("⏭️ Workflow logistics: salto lettura/merge timeline housekeeping")
 
     # Estrai TUTTE le task dal database (anche quelle assegnate per aggiornarle)
-    all_tasks_from_db = get_tasks_from_db(target_date, assigned_task_ids=set())  # Non filtrare
+    all_tasks_from_db = get_tasks_from_db(
+        target_date, assigned_task_ids=set(), workflow=workflow
+    )  # Non filtrare
 
     # CRITICAL: Preserva timeline.json aggiornando SOLO i dati modificati dal DB
-    if timeline_data and assigned_task_ids:
+    if workflow == "housekeeping" and timeline_data and assigned_task_ids:
         db_tasks_map = {task["task_id"]: task for task in all_tasks_from_db}
         updated_count = 0
 
@@ -545,8 +577,11 @@ def main():
             api_client.save_timeline(target_date, timeline_data)
             print(f"✅ Aggiornate {updated_count} task in timeline via API (preservati campi timeline: start_time, end_time, travel_time, sequence)")
 
-    # Filtra le task già assegnate per containers.json
-    all_tasks = [t for t in all_tasks_from_db if t["task_id"] not in assigned_task_ids]
+    # Filtra le task già assegnate per containers.json (solo housekeeping)
+    if workflow == "housekeeping":
+        all_tasks = [t for t in all_tasks_from_db if t["task_id"] not in assigned_task_ids]
+    else:
+        all_tasks = list(all_tasks_from_db)
 
     # Classifica task (senza deduplica - le task duplicate rimangono visibili)
     print(f"🔄 Classificazione task in containers...")
@@ -581,9 +616,12 @@ def main():
     }
 
     # Salva containers via API
-    api_client.save_containers(target_date, output)
-
-    print(f"\n✅ Containers salvati via API con successo!")
+    if workflow == "logistics":
+        api_client.save_logistics_containers(target_date, output)
+        print(f"\n✅ Logistics containers salvati via API con successo!")
+    else:
+        api_client.save_containers(target_date, output)
+        print(f"\n✅ Containers salvati via API con successo!")
     print(f"   📅 Data: {target_date}")
     print(f"   📦 Task totali: {len(all_tasks)}")
     print(f"   🔴 Early-Out: {len(early_out)}")
@@ -591,7 +629,7 @@ def main():
     print(f"   🟢 Low-Priority: {len(low_priority)}")
 
 # ---------- Funzione per estrazione task con filtro già assegnate ----------
-def extract_tasks_from_db(work_date=None, assigned_task_ids=None):
+def extract_tasks_from_db(work_date=None, assigned_task_ids=None, workflow="housekeeping"):
     """
     Estrae task dal database per la data specificata (o oggi se non specificata)
     Ritorna una lista di task con tutti i campi necessari
@@ -625,8 +663,7 @@ def extract_tasks_from_db(work_date=None, assigned_task_ids=None):
 
     print(f"📋 Estrazione task dal database per {work_date}...")
 
-    # Ottieni le operation_ids attive
-    ops = get_active_operations()
+    ops = get_active_operations_logistics() if workflow == "logistics" else get_active_operations()
 
     valid_operation_ids = ops + [0, None]
     non_null_operation_ids = [op for op in valid_operation_ids if op is not None]

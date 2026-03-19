@@ -1985,7 +1985,7 @@ export default function GenerateAssignments() {
         <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <h1 className="text-3xl flex items-center gap-2 font-bold text-foreground">
-              GENERA ASSEGNAZIONI del
+              WASS HOUSEKEEPING del
             </h1>
             <Popover>
               <PopoverTrigger asChild>

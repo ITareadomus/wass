@@ -56,6 +56,7 @@ type ActiveAdamOpsCache = {
 };
 
 let activeAdamOpsCache: ActiveAdamOpsCache | null = null;
+let activeAdamRouteDriversOpsCache: ActiveAdamOpsCache | null = null;
 const ACTIVE_ADAM_OPS_CACHE_TTL_MS = 60_000; // 60s: evita query continue durante polling
 
 async function getCachedActiveAdamOperationIds(connection: any): Promise<number[]> {
@@ -77,6 +78,32 @@ async function getCachedActiveAdamOperationIds(connection: any): Promise<number[
     .filter((n: number) => Number.isFinite(n));
 
   activeAdamOpsCache = { fetchedAtMs: now, ids };
+  return ids;
+}
+
+/** Operazioni WASS Logistics (coerente con create_containers.py: enable_route_drivers) */
+async function getCachedActiveAdamRouteDriversOperationIds(connection: any): Promise<number[]> {
+  const now = Date.now();
+  if (
+    activeAdamRouteDriversOpsCache &&
+    now - activeAdamRouteDriversOpsCache.fetchedAtMs < ACTIVE_ADAM_OPS_CACHE_TTL_MS
+  ) {
+    return activeAdamRouteDriversOpsCache.ids;
+  }
+
+  const [rows]: any = await connection.execute(
+    `
+      SELECT id
+      FROM app_structure_operation
+      WHERE active = 1 AND enable_route_drivers = 1
+    `
+  );
+
+  const ids = (Array.isArray(rows) ? rows : [])
+    .map((r: any) => Number(r?.id))
+    .filter((n: number) => Number.isFinite(n));
+
+  activeAdamRouteDriversOpsCache = { fetchedAtMs: now, ids };
   return ids;
 }
 
@@ -1335,9 +1362,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/operations - Operazioni attive da DB (app_structure_operation + langs)
+  // Query: for=logistics → enable_route_drivers (pagina WASS Logistics); default → enable_wass (housekeeping)
   app.get("/api/operations", async (req, res) => {
     let connection: mysql.Connection | null = null;
     try {
+      const forLogistics =
+        String(req.query.for || "").toLowerCase() === "logistics" ||
+        String(req.query.workflow || "").toLowerCase() === "logistics";
       connection = await mysql.createConnection({
         host: databaseConfig.mysql.host,
         port: databaseConfig.mysql.port,
@@ -1345,12 +1376,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         password: databaseConfig.mysql.password,
         database: databaseConfig.mysql.database,
       });
+      const enableClause = forLogistics ? "o.enable_route_drivers = 1" : "o.enable_wass = 1";
       const [rows]: any = await connection.execute(
         `SELECT o.id, l.name
          FROM app_structure_operation o
          INNER JOIN app_structure_operation_langs l
            ON l.structure_operation_id = o.id AND l.id_lang = 1
-         WHERE o.active = 1 AND o.enable_wass = 1
+         WHERE o.active = 1 AND ${enableClause}
          ORDER BY o.id`
       );
       const list = Array.isArray(rows) ? rows : [];
@@ -1572,6 +1604,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false,
         error: error.message,
       });
+    }
+  });
+
+  // --- WASS Logistics containers (daily_logistics_*, enable_route_drivers ADAM) ---
+  app.get("/api/logistics-containers", async (req, res) => {
+    try {
+      const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const workDate = dateParam;
+      console.log(`📖 GET /api/logistics-containers - ${workDate}`);
+      const containers = await workspaceFiles.loadLogisticsContainers(workDate);
+      if (!containers) {
+        return res.json({
+          containers: {
+            early_out: { tasks: [], count: 0 },
+            high_priority: { tasks: [], count: 0 },
+            low_priority: { tasks: [], count: 0 },
+          },
+          summary: {
+            early_out: 0,
+            high_priority: 0,
+            low_priority: 0,
+            total_tasks: 0,
+          },
+          metadata: { date: workDate },
+        });
+      }
+      res.json({
+        ...containers,
+        metadata: { ...(containers as any).metadata, date: workDate },
+      });
+    } catch (error: any) {
+      console.error("Errore GET logistics-containers:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/logistics-containers", async (req, res) => {
+    try {
+      const { date, containers } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      if (!containers) {
+        return res.status(400).json({ success: false, error: "containers data required" });
+      }
+      const containersData = containers.containers ? containers : { containers };
+      if (!containersData.metadata) {
+        containersData.metadata = { date: workDate, last_updated: getRomeTimestamp() };
+      }
+      containersData.metadata.date = workDate;
+      containersData.metadata.last_updated = getRomeTimestamp();
+      const eoTasks = containersData.containers?.early_out?.tasks || [];
+      const hpTasks = containersData.containers?.high_priority?.tasks || [];
+      const lpTasks = containersData.containers?.low_priority?.tasks || [];
+      containersData.summary = {
+        early_out: eoTasks.length,
+        high_priority: hpTasks.length,
+        low_priority: lpTasks.length,
+        total_tasks: eoTasks.length + hpTasks.length + lpTasks.length,
+      };
+      await workspaceFiles.saveLogisticsContainers(workDate, containersData);
+      res.json({
+        success: true,
+        message: `Logistics containers salvati per ${workDate}`,
+        summary: containersData.summary,
+      });
+    } catch (error: any) {
+      console.error("Errore POST logistics-containers:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/logistics-containers/refresh", async (req, res) => {
+    try {
+      const { date, modified_by } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const currentUsername = modified_by || getCurrentUsername(req);
+      const { refreshLogisticsContainersFromAdam } = await import("./services/containers-refresh-service");
+      const refreshResult = await refreshLogisticsContainersFromAdam(workDate, currentUsername);
+      if (!refreshResult.success) {
+        return res.status(500).json({
+          success: false,
+          error: refreshResult.error || "Errore refresh logistics containers",
+        });
+      }
+      res.json({
+        success: true,
+        message: `Logistics containers rigenerati da ADAM per ${workDate}`,
+        removedDuplicates: refreshResult.removedCount,
+      });
+    } catch (error: any) {
+      console.error("Errore refresh logistics-containers:", error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -5499,6 +5622,90 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       });
     } catch (error: any) {
       console.error("❌ Errore fingerprint ADAM:", error?.message || error);
+      res.status(500).json({ success: false, error: error.message || "Server error" });
+    } finally {
+      if (connection) {
+        try {
+          await connection.end();
+        } catch {
+          // ignore
+        }
+      }
+    }
+  });
+
+  // Fingerprint ADAM per logistics (stessi campi housekeeping, filtro enable_route_drivers come create_containers.py)
+  // GET /api/adam/logistics/fingerprint?date=YYYY-MM-DD
+  app.get("/api/adam/logistics/fingerprint", async (req, res) => {
+    let connection: any = null;
+    try {
+      const date = (req.query.date as string) || "";
+      if (!date || !isValidWorkDate(date)) {
+        return res.status(400).json({
+          success: false,
+          error: "date parameter required (YYYY-MM-DD)",
+        });
+      }
+
+      connection = await mysql.createConnection({
+        host: databaseConfig.mysql.host,
+        port: databaseConfig.mysql.port,
+        user: databaseConfig.mysql.user,
+        password: databaseConfig.mysql.password,
+        database: databaseConfig.mysql.database,
+      });
+
+      const activeOps = await getCachedActiveAdamRouteDriversOperationIds(connection);
+      const nonNullOpIds = Array.from(new Set<number>([...activeOps, 0]));
+      const opPlaceholders = nonNullOpIds.map(() => "?").join(",");
+
+      const signatureExpr = `
+        CRC32(CONCAT_WS('|',
+          h.id,
+          COALESCE(DATE_FORMAT(h.checkin, '%Y-%m-%d'), ''),
+          COALESCE(TRIM(h.checkin_time), ''),
+          COALESCE(DATE_FORMAT(h.checkout, '%Y-%m-%d'), ''),
+          COALESCE(TRIM(h.checkout_time), ''),
+          COALESCE(h.operation_id, 0),
+          COALESCE(h.checkin_pax, 0),
+          COALESCE(h.checkout_pax, 0)
+        ))
+      `;
+
+      const sql = `
+        SELECT
+          COUNT(*) AS cnt,
+          MAX(h.updated_at) AS max_upd,
+          UNIX_TIMESTAMP(MAX(h.updated_at)) AS max_upd_unix,
+          BIT_XOR(${signatureExpr}) AS sig_xor,
+          SUM(${signatureExpr}) AS sig_sum
+        FROM app_housekeeping h
+        JOIN app_structures s ON h.structure_id = s.id
+        WHERE h.checkout = ?
+          AND h.deleted_at IS NULL
+          AND h.deleted_at_client IS NULL
+          AND s.lat IS NOT NULL AND s.lng IS NOT NULL
+          AND s.lat != '' AND s.lng != ''
+          AND s.lat != '0' AND s.lng != '0'
+          AND (h.operation_id IN (${opPlaceholders}) OR h.operation_id IS NULL OR h.operation_id = 0)
+      `;
+
+      const params: any[] = [date, ...nonNullOpIds];
+      const [rows]: any = await connection.execute(sql, params);
+      const row = Array.isArray(rows) ? rows[0] : rows;
+
+      res.json({
+        success: true,
+        date,
+        count: Number(row?.cnt ?? 0),
+        max_updated_at: row?.max_upd ?? null,
+        max_updated_at_unix: row?.max_upd_unix !== null && row?.max_upd_unix !== undefined ? Number(row.max_upd_unix) : null,
+        signature_xor: row?.sig_xor !== null && row?.sig_xor !== undefined ? Number(row.sig_xor) : null,
+        signature_sum: row?.sig_sum ?? null,
+        active_operations_count: activeOps.length,
+      });
+    } catch (error: any) {
+      console.error("❌ Errore fingerprint ADAM logistics:", error?.message || error);
       res.status(500).json({ success: false, error: error.message || "Server error" });
     } finally {
       if (connection) {

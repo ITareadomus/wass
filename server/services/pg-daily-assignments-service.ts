@@ -1067,6 +1067,135 @@ export class PgDailyAssignmentsService {
     }
   }
 
+  // ==================== LOGISTICS CONTAINERS (daily_logistics_*) ====================
+
+  async loadLogisticsContainers(workDate: string): Promise<any | null> {
+    try {
+      const result = await query(
+        'SELECT * FROM daily_logistics_containers WHERE work_date = $1 ORDER BY priority, task_id',
+        [workDate]
+      );
+
+      if (result.rows.length === 0) {
+        console.log(`📖 PG: Nessun logistics container trovato per ${workDate}`);
+        return null;
+      }
+
+      const locksMap = await this.getLocksMap(workDate);
+
+      const tasksByPriority: { [key: string]: any[] } = {
+        early_out: [],
+        high_priority: [],
+        low_priority: []
+      };
+
+      const priorityMap: { [key: string]: string } = {
+        'early_out': 'early_out',
+        'high': 'high_priority',
+        'high_priority': 'high_priority',
+        'low': 'low_priority',
+        'low_priority': 'low_priority'
+      };
+
+      for (const row of result.rows) {
+        const task: any = {
+          task_id: row.task_id,
+          logistic_code: row.logistic_code,
+          priority: row.priority
+        };
+        if (row.client_id) task.client_id = row.client_id;
+        if (row.premium !== null) task.premium = row.premium;
+        if (row.address) task.address = row.address;
+        if (row.lat !== null) task.lat = String(row.lat);
+        if (row.lng !== null) task.lng = String(row.lng);
+        if (row.cleaning_time) task.cleaning_time = row.cleaning_time;
+        task.checkin_date = normalizeDateToYmd(row.checkin_date) ?? undefined;
+        task.checkout_date = normalizeDateToYmd(row.checkout_date) ?? undefined;
+        if (row.checkin_time) task.checkin_time = row.checkin_time.substring(0, 5);
+        if (row.checkout_time) task.checkout_time = row.checkout_time.substring(0, 5);
+        if (row.pax_in !== null) task.pax_in = row.pax_in;
+        if (row.pax_out !== null) task.pax_out = row.pax_out;
+        if (row.small_equipment !== null) task.small_equipment = row.small_equipment;
+        if (row.operation_id !== null) task.operation_id = row.operation_id;
+        if (row.confirmed_operation !== null) task.confirmed_operation = row.confirmed_operation;
+        if (row.straordinaria !== null) task.straordinaria = row.straordinaria;
+        if (row.type_apt) task.type_apt = row.type_apt;
+        if (row.alias) task.alias = row.alias;
+        if (row.customer_name) task.customer_name = row.customer_name;
+        if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
+        if (row.customer_reference) task.customer_reference = row.customer_reference;
+
+        const lockInfo = locksMap.get(row.task_id);
+        if (lockInfo) {
+          task.locked = lockInfo.locked;
+          task.locked_reason = lockInfo.lockedReason;
+          task.locked_by = lockInfo.lockedBy;
+        } else {
+          task.locked = row.locked || false;
+          task.locked_reason = row.locked_reason || undefined;
+        }
+
+        const dbPriority = row.priority || 'low';
+        const frontendPriority = priorityMap[dbPriority] || 'low_priority';
+        tasksByPriority[frontendPriority].push(task);
+      }
+
+      const allTasks = [...tasksByPriority.early_out, ...tasksByPriority.high_priority, ...tasksByPriority.low_priority];
+      const tasksNeedingRef = allTasks.filter(t => t.client_id === 3 && !t.customer_reference);
+      if (tasksNeedingRef.length > 0) {
+        try {
+          const mysql = await import('mysql2/promise');
+          const adamConnection = await mysql.createConnection({
+            host: process.env.DB_HOST,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_NAME
+          });
+          const logisticCodes = tasksNeedingRef.map(t => t.logistic_code);
+          const [rows] = await adamConnection.execute(
+            `SELECT logistic_code, customer_structure_reference 
+             FROM app_structures 
+             WHERE logistic_code IN (${logisticCodes.map(() => '?').join(',')})`,
+            logisticCodes
+          );
+          const refMap = new Map<number, string>();
+          for (const row of rows as any[]) {
+            if (row.customer_structure_reference) {
+              refMap.set(row.logistic_code, row.customer_structure_reference);
+            }
+          }
+          for (const task of tasksNeedingRef) {
+            const ref = refMap.get(task.logistic_code);
+            if (ref) task.customer_reference = ref;
+          }
+          await adamConnection.end();
+        } catch (adamError) {
+          console.error('⚠️ PG: Errore customer_reference ADAM (logistics):', adamError);
+        }
+      }
+
+      const containers = {
+        early_out: { tasks: tasksByPriority.early_out, count: tasksByPriority.early_out.length },
+        high_priority: { tasks: tasksByPriority.high_priority, count: tasksByPriority.high_priority.length },
+        low_priority: { tasks: tasksByPriority.low_priority, count: tasksByPriority.low_priority.length }
+      };
+      const totalTasks = containers.early_out.count + containers.high_priority.count + containers.low_priority.count;
+      console.log(`✅ PG: Logistics containers caricati per ${workDate} (${totalTasks} task)`);
+      return {
+        containers,
+        summary: {
+          total_tasks: totalTasks,
+          early_out: containers.early_out.count,
+          high_priority: containers.high_priority.count,
+          low_priority: containers.low_priority.count
+        }
+      };
+    } catch (error) {
+      console.error('❌ PG: Errore nel caricamento logistics containers:', error);
+      return null;
+    }
+  }
+
   /**
    * Save containers for a work_date
    * Converts JSON structure to flat PostgreSQL rows
@@ -1323,6 +1452,185 @@ export class PgDailyAssignmentsService {
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('❌ PG: Errore nel salvataggio containers:', error);
+      return false;
+    } finally {
+      client.release();
+    }
+  }
+
+  async saveLogisticsContainers(workDate: string, containersData: any): Promise<boolean> {
+    const client = await pool.connect();
+    const autoDuplicateLockedBy = 'system:auto_duplicate_adam_logistics';
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM daily_logistics_containers WHERE work_date = $1', [workDate]);
+
+      const containers = containersData?.containers || {};
+      let totalInserted = 0;
+      const autoDuplicateLockReason = 'task doppio (bloccato automaticamente)';
+
+      const priorityConfigs = [
+        { dbName: 'early_out', keys: ['early_out'] },
+        { dbName: 'high_priority', keys: ['high_priority', 'high'] },
+        { dbName: 'low_priority', keys: ['low_priority', 'low'] }
+      ];
+
+      for (const config of priorityConfigs) {
+        let tasks: any[] = [];
+        for (const key of config.keys) {
+          const containerData = containers[key];
+          if (containerData) {
+            tasks = Array.isArray(containerData) ? containerData : (containerData.tasks || []);
+            break;
+          }
+        }
+
+        for (const task of tasks) {
+          if (!task.task_id) continue;
+
+          await client.query(`
+            INSERT INTO daily_logistics_containers (
+              work_date, priority,
+              task_id, logistic_code, client_id, premium, address, lat, lng,
+              cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
+              pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
+              straordinaria, type_apt, alias, customer_name, reasons, customer_reference,
+              locked, locked_reason
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6, $7, $8, $9,
+              $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
+              $20, $21, $22, $23, $24, $25, $26, $27
+            )
+          `, [
+            workDate,
+            config.dbName,
+            task.task_id,
+            task.logistic_code || 0,
+            task.client_id || null,
+            task.premium || false,
+            task.address || null,
+            task.lat || null,
+            task.lng || null,
+            task.cleaning_time || 0,
+            normalizeDateToYmd(task.checkin_date),
+            normalizeDateToYmd(task.checkout_date),
+            task.checkin_time || null,
+            task.checkout_time || null,
+            task.pax_in ?? null,
+            task.pax_out ?? null,
+            task.small_equipment || false,
+            task.operation_id ?? null,
+            task.confirmed_operation || false,
+            task.straordinaria || false,
+            task.type_apt || null,
+            task.alias || null,
+            task.customer_name || null,
+            task.reasons || [],
+            task.customer_reference || null,
+            task.locked || false,
+            task.locked_reason || null
+          ]);
+          totalInserted++;
+        }
+      }
+
+      const lockDupesUpdate = await client.query(`
+        WITH ranked AS (
+          SELECT work_date, logistic_code, task_id,
+            ROW_NUMBER() OVER (
+              PARTITION BY work_date, logistic_code
+              ORDER BY
+                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+                task_id DESC
+            ) AS rn
+          FROM daily_logistics_containers
+          WHERE work_date = $1 AND logistic_code IS NOT NULL AND logistic_code <> 0
+        ),
+        to_lock AS (SELECT work_date, task_id FROM ranked WHERE rn > 1)
+        UPDATE daily_logistics_containers dc
+        SET locked = TRUE, locked_reason = $2
+        FROM to_lock tl
+        WHERE dc.work_date = tl.work_date AND dc.task_id = tl.task_id
+          AND COALESCE(dc.locked, FALSE) = FALSE
+      `, [workDate, autoDuplicateLockReason]);
+
+      const lockDupesUpsert = await client.query(`
+        WITH ranked AS (
+          SELECT work_date, logistic_code, task_id,
+            ROW_NUMBER() OVER (
+              PARTITION BY work_date, logistic_code
+              ORDER BY
+                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+                task_id DESC
+            ) AS rn
+          FROM daily_logistics_containers
+          WHERE work_date = $1 AND logistic_code IS NOT NULL AND logistic_code <> 0
+        ),
+        to_lock AS (SELECT work_date, task_id FROM ranked WHERE rn > 1)
+        INSERT INTO daily_task_locks (work_date, task_id, locked, locked_reason, locked_by)
+        SELECT work_date, task_id, TRUE, $2, $3 FROM to_lock
+        ON CONFLICT (work_date, task_id) DO UPDATE SET
+          locked = TRUE,
+          locked_reason = CASE
+            WHEN daily_task_locks.locked_reason IS NULL OR daily_task_locks.locked_reason = ''
+              THEN EXCLUDED.locked_reason
+            ELSE daily_task_locks.locked_reason END,
+          locked_by = COALESCE(daily_task_locks.locked_by, EXCLUDED.locked_by),
+          updated_at = NOW()
+      `, [workDate, autoDuplicateLockReason, autoDuplicateLockedBy]);
+
+      await client.query(`
+        WITH ranked AS (
+          SELECT work_date, logistic_code, task_id,
+            ROW_NUMBER() OVER (
+              PARTITION BY work_date, logistic_code
+              ORDER BY
+                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+                task_id DESC
+            ) AS rn
+          FROM daily_logistics_containers
+          WHERE work_date = $1 AND logistic_code IS NOT NULL AND logistic_code <> 0
+        ),
+        winners AS (SELECT work_date, task_id FROM ranked WHERE rn = 1)
+        UPDATE daily_logistics_containers dc
+        SET locked = FALSE, locked_reason = NULL
+        FROM winners w
+        WHERE dc.work_date = w.work_date AND dc.task_id = w.task_id
+          AND dc.locked = TRUE AND dc.locked_reason = $2
+      `, [workDate, autoDuplicateLockReason]);
+
+      await client.query(`
+        WITH ranked AS (
+          SELECT work_date, logistic_code, task_id,
+            ROW_NUMBER() OVER (
+              PARTITION BY work_date, logistic_code
+              ORDER BY
+                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+                task_id DESC
+            ) AS rn
+          FROM daily_logistics_containers
+          WHERE work_date = $1 AND logistic_code IS NOT NULL AND logistic_code <> 0
+        ),
+        winners AS (SELECT work_date, task_id FROM ranked WHERE rn = 1)
+        UPDATE daily_task_locks l
+        SET locked = FALSE, locked_reason = NULL, locked_by = $3, updated_at = NOW()
+        FROM winners w
+        WHERE l.work_date = w.work_date AND l.task_id = w.task_id
+          AND l.locked = TRUE AND l.locked_reason = $2 AND l.locked_by = $3
+      `, [workDate, autoDuplicateLockReason, autoDuplicateLockedBy]);
+
+      if ((lockDupesUpdate.rowCount || 0) > 0 || (lockDupesUpsert.rowCount || 0) > 0) {
+        console.log(
+          `🔒 PG: Auto-lock duplicati logistics ${workDate} -> rows=${lockDupesUpdate.rowCount || 0}, locks=${lockDupesUpsert.rowCount || 0}`
+        );
+      }
+
+      await client.query('COMMIT');
+      console.log(`✅ PG: Logistics containers salvati per ${workDate} (${totalInserted} task)`);
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG: Errore nel salvataggio logistics containers:', error);
       return false;
     } finally {
       client.release();
@@ -1808,6 +2116,230 @@ export class PgDailyAssignmentsService {
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('❌ PG Containers: Errore nel ripristino:', error);
+      return false;
+    } finally {
+      client.release();
+    }
+  }
+
+  // ==================== LOGISTICS CONTAINERS HISTORY ====================
+
+  async saveLogisticsContainersToHistory(
+    workDate: string,
+    createdBy: string = 'system',
+    modificationType: string = 'manual'
+  ): Promise<number> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        'SELECT 1 FROM daily_logistics_containers_revisions WHERE work_date = $1 FOR UPDATE',
+        [workDate]
+      );
+      const revResult = await client.query(
+        'SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_logistics_containers_revisions WHERE work_date = $1',
+        [workDate]
+      );
+      const revision = parseInt(revResult.rows[0]?.next_revision || '1');
+      const currentContainers = await client.query(
+        'SELECT * FROM daily_logistics_containers WHERE work_date = $1',
+        [workDate]
+      );
+      console.log(`📜 PG Logistics History: revisione ${revision}, ${currentContainers.rows.length} task per ${workDate}...`);
+      await client.query(`
+        INSERT INTO daily_logistics_containers_revisions (work_date, revision, task_count, created_by, modification_type)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [workDate, revision, currentContainers.rows.length, createdBy, modificationType]);
+
+      for (const row of currentContainers.rows) {
+        await client.query(`
+          INSERT INTO daily_logistics_containers_history (
+            work_date, revision, priority,
+            task_id, logistic_code, client_id, premium, address, lat, lng,
+            cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
+            pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
+            straordinaria, type_apt, alias, customer_name, reasons, customer_reference, created_by,
+            locked, locked_reason
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+            $21, $22, $23, $24, $25, $26, $27, $28, $29
+          )
+        `, [
+          workDate,
+          revision,
+          row.priority,
+          row.task_id,
+          row.logistic_code,
+          row.client_id,
+          row.premium,
+          row.address,
+          row.lat,
+          row.lng,
+          row.cleaning_time,
+          row.checkin_date,
+          row.checkout_date,
+          row.checkin_time,
+          row.checkout_time,
+          row.pax_in,
+          row.pax_out,
+          row.small_equipment,
+          row.operation_id,
+          row.confirmed_operation,
+          row.straordinaria,
+          row.type_apt,
+          row.alias,
+          row.customer_name,
+          row.reasons || [],
+          row.customer_reference ?? null,
+          createdBy,
+          row.locked || false,
+          row.locked_reason || null
+        ]);
+      }
+      await client.query('COMMIT');
+      console.log(`✅ PG Logistics History: revisione ${revision} salvata`);
+      return revision;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG Logistics History: errore salvataggio:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getLogisticsContainersRevisions(workDate: string): Promise<any[]> {
+    try {
+      const result = await query(
+        `SELECT revision, task_count, created_at, created_by, modification_type
+         FROM daily_logistics_containers_revisions
+         WHERE work_date = $1 ORDER BY revision DESC`,
+        [workDate]
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('❌ PG Logistics History: errore revisioni:', error);
+      return [];
+    }
+  }
+
+  async getLogisticsContainersAtRevision(workDate: string, revision: number): Promise<any | null> {
+    try {
+      const result = await query(
+        'SELECT * FROM daily_logistics_containers_history WHERE work_date = $1 AND revision = $2 ORDER BY priority, task_id',
+        [workDate, revision]
+      );
+      if (result.rows.length === 0) return null;
+      const containers: { [key: string]: any[] } = { early_out: [], high: [], low: [] };
+      for (const row of result.rows) {
+        const task: any = {
+          task_id: row.task_id,
+          logistic_code: row.logistic_code,
+          priority: row.priority,
+          client_id: row.client_id,
+          premium: row.premium,
+          address: row.address,
+          lat: row.lat,
+          lng: row.lng,
+          cleaning_time: row.cleaning_time,
+          checkin_date: row.checkin_date,
+          checkout_date: row.checkout_date,
+          checkin_time: row.checkin_time,
+          checkout_time: row.checkout_time,
+          pax_in: row.pax_in,
+          pax_out: row.pax_out,
+          small_equipment: row.small_equipment,
+          operation_id: row.operation_id,
+          confirmed_operation: row.confirmed_operation,
+          straordinaria: row.straordinaria,
+          type_apt: row.type_apt,
+          alias: row.alias,
+          customer_name: row.customer_name,
+          reasons: row.reasons || [],
+          locked: row.locked || false,
+          locked_reason: row.locked_reason || null
+        };
+        if (row.customer_reference) task.customer_reference = row.customer_reference;
+        const priority = row.priority || 'low';
+        if (!containers[priority]) containers[priority] = [];
+        containers[priority].push(task);
+      }
+      return { containers };
+    } catch (error) {
+      console.error('❌ PG Logistics History: errore caricamento revisione:', error);
+      return null;
+    }
+  }
+
+  async restoreLogisticsContainersFromRevision(
+    workDate: string,
+    revision: number,
+    createdBy: string = 'system'
+  ): Promise<boolean> {
+    const client = await pool.connect();
+    try {
+      await this.saveLogisticsContainersToHistory(workDate, createdBy, 'pre_restore');
+      await client.query('BEGIN');
+      const historyResult = await client.query(
+        'SELECT * FROM daily_logistics_containers_history WHERE work_date = $1 AND revision = $2',
+        [workDate, revision]
+      );
+      if (historyResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return false;
+      }
+      await client.query('DELETE FROM daily_logistics_containers WHERE work_date = $1', [workDate]);
+      for (const row of historyResult.rows) {
+        await client.query(`
+          INSERT INTO daily_logistics_containers (
+            work_date, priority,
+            task_id, logistic_code, client_id, premium, address, lat, lng,
+            cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
+            pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
+            straordinaria, type_apt, alias, customer_name, reasons, customer_reference,
+            locked, locked_reason
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9,
+            $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
+            $20, $21, $22, $23, $24, $25, $26, $27
+          )
+        `, [
+          workDate,
+          row.priority,
+          row.task_id,
+          row.logistic_code,
+          row.client_id,
+          row.premium,
+          row.address,
+          row.lat,
+          row.lng,
+          row.cleaning_time,
+          row.checkin_date,
+          row.checkout_date,
+          row.checkin_time,
+          row.checkout_time,
+          row.pax_in,
+          row.pax_out,
+          row.small_equipment,
+          row.operation_id,
+          row.confirmed_operation,
+          row.straordinaria,
+          row.type_apt,
+          row.alias,
+          row.customer_name,
+          row.reasons || [],
+          row.customer_reference ?? null,
+          row.locked || false,
+          row.locked_reason || null
+        ]);
+      }
+      await client.query('COMMIT');
+      console.log(`✅ PG Logistics: ripristinati ${historyResult.rows.length} task da revisione ${revision}`);
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG Logistics: errore ripristino:', error);
       return false;
     } finally {
       client.release();

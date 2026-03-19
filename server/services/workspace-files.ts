@@ -252,6 +252,38 @@ export async function saveContainers(workDate: string, data: any, createdBy: str
   }
 }
 
+/** WASS Logistics: containers in daily_logistics_containers (separate from housekeeping) */
+export async function loadLogisticsContainers(workDate: string): Promise<any | null> {
+  try {
+    const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
+    const data = await pgDailyAssignmentsService.loadLogisticsContainers(workDate);
+    if (data) {
+      console.log(`✅ Logistics containers loaded from PostgreSQL for ${workDate}`);
+    }
+    return data;
+  } catch (err) {
+    console.error(`❌ Error loading logistics containers for ${workDate}:`, err);
+    return null;
+  }
+}
+
+export async function saveLogisticsContainers(
+  workDate: string,
+  data: any,
+  _createdBy: string = 'system',
+  _modificationType: string = 'manual'
+): Promise<boolean> {
+  try {
+    const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
+    await pgDailyAssignmentsService.saveLogisticsContainers(workDate, data);
+    console.log(`✅ Logistics containers saved to PostgreSQL for ${workDate}`);
+    return true;
+  } catch (err) {
+    console.error(`❌ Error saving logistics containers for ${workDate}:`, err);
+    return false;
+  }
+}
+
 /**
  * Load selected_cleaners from PostgreSQL for internal operations
  * No filesystem fallback - PostgreSQL is the only source

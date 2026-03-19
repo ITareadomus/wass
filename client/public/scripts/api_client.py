@@ -175,7 +175,16 @@ class ApiClient:
             "containers": containers_data
         }
         return self._post("/api/containers", payload)
-    
+
+    def get_logistics_containers(self, date: str) -> Dict:
+        """Carica logistics containers (enable_route_drivers) da PostgreSQL."""
+        return self._get("/api/logistics-containers", {"date": date})
+
+    def save_logistics_containers(self, date: str, containers_data: Dict) -> Dict:
+        """Salva logistics containers su PostgreSQL (tabella daily_logistics_containers)."""
+        payload = {"date": date, "containers": containers_data}
+        return self._post("/api/logistics-containers", payload)
+
     # ==================== CLEANERS ====================
     
     def get_cleaners(self, date: str) -> List[Dict]:

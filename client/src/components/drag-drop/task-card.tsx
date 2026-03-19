@@ -171,6 +171,8 @@ interface TaskCardProps {
   isHighlighted?: boolean;
   cleanerId?: number | null;
   isPriorityWindowViolation?: boolean;
+  /** housekeeping → /api/operations (enable_wass); logistics → enable_route_drivers */
+  operationsScope?: "housekeeping" | "logistics";
 }
 
 interface AssignedTask {
@@ -202,6 +204,7 @@ export default function TaskCard({
   isHighlighted = false,
   cleanerId = null,
   isPriorityWindowViolation = false,
+  operationsScope = "housekeeping",
 }: TaskCardProps) {
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -218,9 +221,10 @@ const displayClickableInputClass =
 
   // Carica le operazioni da API (DB)
   const { data: operationsData } = useQuery<{ active_operations: { id: number; name: string }[] }>({
-    queryKey: ["/api/operations"],
+    queryKey: ["/api/operations", operationsScope],
     queryFn: async () => {
-      const response = await fetch("/api/operations");
+      const q = operationsScope === "logistics" ? "?for=logistics" : "";
+      const response = await fetch(`/api/operations${q}`);
       if (!response.ok) throw new Error("Failed to fetch operations");
       return response.json();
     },
