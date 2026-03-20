@@ -30,6 +30,28 @@ export const insertSelectedCleanersRevisionSchema = createInsertSchema(selectedC
 export type InsertSelectedCleanersRevision = z.infer<typeof insertSelectedCleanersRevisionSchema>;
 export type SelectedCleanersRevision = typeof selectedCleanersRevisions.$inferSelect;
 
+// ==================== LG_SELECTED_DRIVERS (logistics convocati) ====================
+export const lgSelectedDrivers = pgTable("lg_selected_drivers", {
+  id: serial("id").primaryKey(),
+  workDate: date("work_date").notNull().unique(),
+  drivers: integer("drivers").array().notNull().default(sql`'{}'`),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+export const lgSelectedDriversRevisions = pgTable("lg_selected_drivers_revisions", {
+  id: serial("id").primaryKey(),
+  selectedDriversId: integer("selected_drivers_id").notNull(),
+  workDate: date("work_date").notNull(),
+  revisionNumber: integer("revision_number").notNull(),
+  driversBefore: integer("drivers_before").array().notNull().default(sql`'{}'`),
+  driversAfter: integer("drivers_after").array().notNull().default(sql`'{}'`),
+  actionType: varchar("action_type", { length: 30 }).notNull(),
+  actionPayload: jsonb("action_payload"),
+  performedBy: varchar("performed_by", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // ==================== CLEANER_ALIASES ====================
 // Tabella permanente per gli alias dei cleaners (indipendente dalla data)
 export const cleanerAliases = pgTable("cleaner_aliases", {

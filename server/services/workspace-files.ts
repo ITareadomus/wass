@@ -97,6 +97,31 @@ function getNormalizedTimeline(timelineData: any): any {
   return cloned;
 }
 
+function getNormalizedDriver(driver: any): any {
+  if (!driver) return driver;
+  const n: any = {};
+  if (driver.id !== undefined) n.id = driver.id;
+  if (driver.name !== undefined) n.name = driver.name;
+  if (driver.lastname !== undefined) n.lastname = driver.lastname;
+  if (driver.role !== undefined) n.role = driver.role;
+  if (driver.premium !== undefined) n.premium = driver.premium;
+  n.start_time = driver.start_time ?? '10:00';
+  return n;
+}
+
+function getNormalizedLogisticsTimeline(data: any): any {
+  if (!data) return data;
+  const cloned = JSON.parse(JSON.stringify(data));
+  if (!cloned.drivers_assignments || !Array.isArray(cloned.drivers_assignments)) {
+    return cloned;
+  }
+  cloned.drivers_assignments = cloned.drivers_assignments.map((entry: any) => ({
+    driver: getNormalizedDriver(entry.driver),
+    tasks: (entry.tasks || []).map((task: any) => getNormalizedTask(task)),
+  }));
+  return cloned;
+}
+
 
 /**
  * Load timeline for a specific work date
@@ -436,6 +461,201 @@ export async function saveSelectedCleaners(
 /**
  * Reset timeline: svuota assegnazioni
  */
+/**
+ * Logistics timeline (PostgreSQL daily_logistics_assignments_*)
+ */
+export async function loadLogisticsTimeline(workDate: string): Promise<any | null> {
+  try {
+    const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
+    const tl = await pgDailyAssignmentsService.loadLogisticsTimeline(workDate);
+    if (tl) {
+      return getNormalizedLogisticsTimeline(tl);
+    }
+  } catch (err) {
+    console.error(`❌ loadLogisticsTimeline:`, err);
+  }
+  return null;
+}
+
+export async function saveLogisticsTimeline(
+  workDate: string,
+  data: any,
+  skipRevision: boolean = false,
+  createdBy: string = 'system',
+  modificationType: string = 'manual',
+  editOptions?: {
+    editedField?: string;
+    oldValue?: string;
+    newValue?: string;
+    editedFields?: string[];
+    oldValues?: string[];
+    newValues?: string[];
+  }
+): Promise<boolean> {
+  try {
+    const normalized = getNormalizedLogisticsTimeline(data);
+    normalized.metadata = normalized.metadata || {};
+    normalized.metadata.date = workDate;
+    normalized.metadata.last_updated = getRomeTimestamp();
+    const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
+    await pgDailyAssignmentsService.saveLogisticsTimeline(workDate, normalized);
+    let editedFields: string[] = [];
+    let oldValues: string[] = [];
+    let newValues: string[] = [];
+    if (editOptions) {
+      if (editOptions.editedFields?.length) {
+        editedFields = editOptions.editedFields;
+        oldValues = editOptions.oldValues || [];
+        newValues = editOptions.newValues || [];
+      } else if (editOptions.editedField) {
+        editedFields = [editOptions.editedField];
+        oldValues = editOptions.oldValue ? [editOptions.oldValue] : [];
+        newValues = editOptions.newValue ? [editOptions.newValue] : [];
+      }
+    }
+    if (!skipRevision) {
+      await pgDailyAssignmentsService.saveLogisticsTimelineToHistory(
+        workDate,
+        normalized,
+        createdBy,
+        modificationType,
+        editedFields,
+        oldValues,
+        newValues
+      );
+    }
+    return true;
+  } catch (err) {
+    console.error(`❌ saveLogisticsTimeline:`, err);
+    return false;
+  }
+}
+
+export async function resetLogisticsTimeline(
+  workDate: string,
+  createdBy: string = 'system',
+  modificationType: string = 'reset'
+): Promise<boolean> {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const targetDate = new Date(workDate);
+    targetDate.setHours(0, 0, 0, 0);
+    if (targetDate < today) {
+      console.log(`🚫 resetLogisticsTimeline data passata ${workDate} — bloccato`);
+      return false;
+    }
+    const empty = {
+      metadata: {
+        date: workDate,
+        last_updated: getRomeTimestamp(),
+        created_by: createdBy,
+      },
+      drivers_assignments: [],
+      meta: { total_drivers: 0, used_drivers: 0, assigned_tasks: 0 },
+    };
+    const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
+    await pgDailyAssignmentsService.saveLogisticsTimeline(workDate, empty);
+    await pgDailyAssignmentsService.saveLogisticsTimelineToHistory(
+      workDate,
+      empty,
+      createdBy,
+      modificationType,
+      [],
+      [],
+      []
+    );
+    return true;
+  } catch (err) {
+    console.error(`❌ resetLogisticsTimeline:`, err);
+    return false;
+  }
+}
+
+export async function loadSelectedLogisticsDrivers(workDate: string): Promise<any | null> {
+  try {
+    const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
+    const ids = await pgDailyAssignmentsService.loadSelectedLogisticsDrivers(workDate);
+    if (ids && ids.length > 0) {
+      const rows = await pgDailyAssignmentsService.loadLgDriversByIds(ids, workDate);
+      const byId = new Map<number, any>(rows.map((r: any) => [Number(r.id), r]));
+      const driversData = ids.map((id) => {
+        const row = byId.get(id);
+        if (row) {
+          return {
+            id,
+            name: row.name ?? 'Driver',
+            lastname: row.lastname ?? String(id),
+            role: row.role ?? 'Driver',
+            premium: row.role === 'Premium',
+            start_time: row.start_time ?? '10:00',
+            active: row.active !== false,
+            available: row.available !== false,
+            counter_hours: row.counter_hours ?? 0,
+            counter_days: row.counter_days ?? 0,
+            contract_type: row.contract_type ?? null,
+            alias: row.alias ?? undefined,
+          };
+        }
+        return {
+          id,
+          name: 'Driver',
+          lastname: String(id),
+          role: 'Driver',
+          premium: false,
+          start_time: '10:00',
+          active: true,
+          available: true,
+          counter_hours: 0,
+          counter_days: 0,
+          contract_type: null,
+        };
+      });
+      return {
+        drivers: driversData,
+        total_selected: driversData.length,
+        metadata: { date: workDate, loaded_at: getRomeTimestamp() },
+      };
+    }
+    return {
+      drivers: [],
+      total_selected: 0,
+      metadata: { date: workDate, loaded_at: getRomeTimestamp() },
+    };
+  } catch (err) {
+    console.error(`❌ loadSelectedLogisticsDrivers:`, err);
+    return null;
+  }
+}
+
+export async function saveSelectedLogisticsDrivers(
+  workDate: string,
+  data: any,
+  skipRevision: boolean = false,
+  createdBy: string = 'system',
+  modificationType: string = 'MANUAL'
+): Promise<boolean> {
+  try {
+    data.metadata = data.metadata || {};
+    data.metadata.date = workDate;
+    data.metadata.last_updated = getRomeTimestamp();
+    const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
+    const arr = data.drivers || [];
+    const driverIds = arr.map((d: any) => (typeof d === 'number' ? d : d.id)).filter((id: any) => id != null);
+    const actionType = skipRevision ? 'INIT' : modificationType.toUpperCase();
+    return await pgDailyAssignmentsService.saveSelectedLogisticsDrivers(
+      workDate,
+      driverIds,
+      actionType,
+      data.actionPayload || null,
+      createdBy
+    );
+  } catch (err) {
+    console.error(`❌ saveSelectedLogisticsDrivers:`, err);
+    return false;
+  }
+}
+
 export async function resetTimeline(workDate: string, createdBy: string = 'system', modificationType: string = 'reset'): Promise<boolean> {
   try {
     const today = new Date();

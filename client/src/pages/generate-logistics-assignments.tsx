@@ -1,17 +1,15 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { DragDropContext } from "react-beautiful-dnd";
+import { DragDropContext, type DropResult } from "react-beautiful-dnd";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
 import PriorityColumn from "@/components/drag-drop/priority-column";
+import LogisticsTimelineView from "@/components/timeline/logistics-timeline-view";
 import type { TaskType } from "@shared/schema";
 import {
   CalendarIcon,
   RefreshCw,
   HelpCircle,
   Search,
-  Users,
-  RotateCcw,
-  UserMinus,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Link } from "wouter";
@@ -20,11 +18,8 @@ import { it } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-/** Allineato a timeline-view: colonna cleaner senza convocati + slot 10:00–19:00 */
-const TIMELINE_SKELETON_CLEANER_COL = 96;
 function getCurrentUsername(): string {
   try {
     const raw = localStorage.getItem("user");
@@ -216,190 +211,44 @@ function parseLogisticsSummary(data: any): LogisticsSummaryState {
   };
 }
 
-const TIMELINE_SKELETON_SLOTS = [
-  "10:00",
-  "11:00",
-  "12:00",
-  "13:00",
-  "14:00",
-  "15:00",
-  "16:00",
-  "17:00",
-  "18:00",
-  "19:00",
-];
+const isDateInPast = (date: Date): boolean => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  return target < today;
+};
 
-function TimelineSkeleton() {
-  return (
-    <div
-      data-print-timeline
-      className="bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm relative"
-    >
-      <div className="px-4 py-4 border-b border-border">
-        <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-          <div>
-            <h2 className="text-xl font-bold text-foreground flex items-center">
-              <CalendarIcon className="w-5 h-5 mr-2 text-custom-blue" />
-              Timeline Assegnazioni - 0 Cleaners
-            </h2>
-          </div>
-          <div className="flex gap-3 print:hidden">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled
-              title="In arrivo"
-              className="flex items-center gap-2 border-2 border-custom-blue"
-            >
-              <Users className="w-4 h-4" />
-              Convocazioni
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled
-              title="In arrivo"
-              className="flex items-center gap-2 border-2 border-custom-blue"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Reset Assegnazioni
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="px-4 pt-4 pb-4 overflow-x-auto">
-        {/* Fascie indicative EO / HP / LP (solo grafica) */}
-        <div className="flex items-stretch mb-1 px-4 h-[26px]">
-          <div
-            className="flex-shrink-0 h-full print:hidden"
-            style={{ width: TIMELINE_SKELETON_CLEANER_COL }}
-          />
-          <div className="flex-1 h-full relative">
-            <div className="absolute inset-0 flex justify-between items-end px-1">
-              {(
-                [
-                  { key: "EO", left: "2%", width: "22%" },
-                  { key: "HP", left: "28%", width: "32%" },
-                  { key: "LP", left: "64%", width: "34%" },
-                ] as const
-              ).map((w) => (
-                <div
-                  key={w.key}
-                  className="absolute bottom-0 h-[20px]"
-                  style={{ left: w.left, width: w.width }}
-                >
-                  <div className="relative h-full">
-                    <div className="absolute left-0 right-0 top-[10px] border-t border-slate-500/60 dark:border-white/60" />
-                    <div className="absolute left-0 top-[6px] h-[8px] border-l border-slate-500/60 dark:border-white/60" />
-                    <div className="absolute right-0 top-[6px] h-[8px] border-r border-slate-500/60 dark:border-white/60" />
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "absolute left-1/2 -translate-x-1/2 top-[-1px] text-xs shrink-0",
-                        w.key === "EO"
-                          ? "bg-blue-500 text-white border-blue-700 dark:bg-blue-600 dark:border-blue-300"
-                          : w.key === "HP"
-                            ? "bg-orange-500 text-white border-orange-700 dark:bg-orange-600 dark:border-orange-300"
-                            : "bg-gray-500 text-white border-gray-700 dark:bg-gray-600 dark:border-gray-300"
-                      )}
-                    >
-                      {w.key}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="flex-shrink-0 w-20 h-full" />
-        </div>
-
-        {/* Header orari */}
-        <div className="flex items-stretch mb-2 px-4 h-[44px]">
-          <div
-            className="flex-shrink-0 p-1 flex items-center justify-center h-full print:hidden"
-            style={{ width: TIMELINE_SKELETON_CLEANER_COL }}
-          >
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled
-              title="In arrivo"
-              className={cn(
-                "w-full h-full border-2",
-                "border-red-600 dark:border-red-500",
-                "text-red-700 dark:text-red-200"
-              )}
-            >
-              <UserMinus className="w-5 h-5" />
-            </Button>
-          </div>
-          <div
-            className="flex-1 h-full grid"
-            style={{
-              gridTemplateColumns: `repeat(${TIMELINE_SKELETON_SLOTS.length}, 1fr)`,
-            }}
-          >
-            {TIMELINE_SKELETON_SLOTS.map((slot, idx) => (
-              <div
-                key={slot}
-                className="h-full flex items-center justify-center text-center text-xs font-semibold text-foreground border-r border-border px-1"
-              >
-                {slot}
-              </div>
-            ))}
-          </div>
-          <div className="flex-shrink-0 w-20 h-full text-center text-xs font-semibold text-foreground border-l border-border px-1 flex items-center justify-center">
-            Ore lavorate
-          </div>
-        </div>
-
-        {/* Righe placeholder (nessun cleaner reale) */}
-        <div className="flex-1 overflow-auto px-4 pb-4 pt-1">
-          {[1, 2, 3].map((row) => (
-            <div key={row} className="flex mb-0.5">
-              <div
-                className="flex-shrink-0 p-1 flex items-center border-2 border-custom-blue bg-custom-blue/10"
-                style={{ width: TIMELINE_SKELETON_CLEANER_COL }}
-              >
-                <div className="w-full flex items-center gap-2 min-w-0 px-0.5">
-                  <div className="flex-shrink-0 w-3 h-3 rounded-full bg-muted animate-pulse" />
-                  <div className="h-3.5 flex-1 rounded bg-muted/70 animate-pulse min-w-0" />
-                </div>
-              </div>
-              <div className="relative min-h-[45px] flex-1 border-l border-border bg-background">
-                <div
-                  className="absolute inset-0 pointer-events-none grid"
-                  style={{
-                    gridTemplateColumns: `repeat(${TIMELINE_SKELETON_SLOTS.length}, 1fr)`,
-                  }}
-                >
-                  {TIMELINE_SKELETON_SLOTS.map((slot, idx) => (
-                    <div
-                      key={`${row}-${slot}`}
-                      title={slot}
-                      className={cn(
-                        "border-r border-border",
-                        idx % 2 === 0
-                          ? "bg-blue-50/30 dark:bg-blue-950/10"
-                          : "bg-sky-100/30 dark:bg-sky-900/10"
-                      )}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="flex-shrink-0 w-20 min-h-[45px] border-l border-border flex items-center justify-center text-xs text-muted-foreground">
-                —
-              </div>
-            </div>
-          ))}
-          <p className="text-center text-xs text-muted-foreground pt-3 pb-1">
-            Contenuto timeline in arrivo
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+/** Task timeline → TaskType per ricerca / drag */
+function timelineRowToTaskType(t: any, fallbackPriority: TaskType["priority"]): TaskType {
+  const cleaning = Number(t.cleaning_time) || 0;
+  const hours = Math.floor(cleaning / 60);
+  const mins = cleaning % 60;
+  const pr = String(t.priority || "").toLowerCase();
+  let priorityUi: TaskType["priority"] = fallbackPriority;
+  if (pr === "early_out" || pr === "early-out") priorityUi = "early-out";
+  else if (pr === "high_priority" || pr === "high") priorityUi = "high";
+  else if (pr === "low_priority" || pr === "low") priorityUi = "low";
+  return {
+    id: String(t.task_id),
+    name: String(t.logistic_code ?? t.task_id),
+    type: String(t.customer_name || ""),
+    duration: `${hours}.${String(mins).padStart(2, "0")}`,
+    priority: priorityUi,
+    assignedTo: null,
+    status: "pending",
+    scheduledTime: t.start_time ?? null,
+    address: t.address != null ? String(t.address) : undefined,
+    premium: Boolean(t.premium),
+    straordinaria: Boolean(t.straordinaria),
+    locked: Boolean(t.locked),
+    locked_reason: t.locked_reason != null ? String(t.locked_reason) : undefined,
+    customer_name: t.customer_name != null ? String(t.customer_name) : undefined,
+    customer_reference: t.customer_reference != null ? String(t.customer_reference) : undefined,
+    alias: t.alias != null ? String(t.alias) : undefined,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 type AdamFingerprint = {
@@ -411,15 +260,49 @@ type AdamFingerprint = {
 
 export default function GenerateLogisticsAssignments() {
   const { toast } = useToast();
-  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const saved = localStorage.getItem("selected_work_date");
+    if (saved) {
+      try {
+        const [y, m, d] = saved.split("-").map(Number);
+        return new Date(y, m - 1, d);
+      } catch {
+        /* fallthrough */
+      }
+    }
+    return new Date();
+  });
   const [searchTask, setSearchTask] = useState("");
   /** Solo sul pulsante refresh (come generate-assignments), nessun overlay pagina */
   const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
   const [logisticsSummary, setLogisticsSummary] = useState<LogisticsSummaryState | null>(null);
   const [logisticsTaskLists, setLogisticsTaskLists] = useState<LogisticsTaskLists>(EMPTY_LOGISTICS_TASK_LISTS);
+  const [logisticsDrivers, setLogisticsDrivers] = useState<
+    Array<{ id: number; name?: string; lastname?: string; role?: string; premium?: boolean; start_time?: string | null }>
+  >([]);
+  const [logisticsDriversAssignments, setLogisticsDriversAssignments] = useState<
+    Array<{ driver: { id: number; name?: string; lastname?: string; role?: string; premium?: boolean; start_time?: string | null }; tasks: any[] }>
+  >([]);
+  const [isLoadingDragDrop, setIsLoadingDragDrop] = useState(false);
+  /** Estrazione / refresh da ADAM al cambio data (come checkAndAutoLoadSavedAssignments + extractData su HK) */
+  const [isExtractingLogistics, setIsExtractingLogistics] = useState(false);
+  const [extractionStep, setExtractionStep] = useState("Inizializzazione...");
+  /** Allinea titolo e riga "Step x/2" al loader housekeeping */
+  const [logisticsLoaderKind, setLogisticsLoaderKind] = useState<
+    "extract" | "load-tasks" | "general"
+  >("general");
+  const lastValidDragIndexRef = useRef<number | null>(null);
+  const isDraggingRef = useRef(false);
+  const dragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const adamBaselineRef = useRef<AdamFingerprint | null>(null);
   const [hasAdamUpdates, setHasAdamUpdates] = useState(false);
+
+  const isTimelineReadOnly = isDateInPast(selectedDate);
+
+  useEffect(() => {
+    localStorage.setItem("selected_work_date", format(selectedDate, "yyyy-MM-dd"));
+  }, [selectedDate]);
 
   const fetchAdamLogisticsFingerprint = useCallback(async (workDate: string): Promise<AdamFingerprint | null> => {
     try {
@@ -509,9 +392,173 @@ export default function GenerateLogisticsAssignments() {
     }
   }, [toast]);
 
+  const loadLogisticsTimelineState = useCallback(async (date: Date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    try {
+      const [selRes, tlRes] = await Promise.all([
+        fetch(`/api/selected-logistics-drivers?date=${dateStr}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+        }),
+        fetch(`/api/logistics-timeline?date=${dateStr}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+        }),
+      ]);
+      const sel = selRes.ok ? await selRes.json() : { drivers: [] };
+      const tl = tlRes.ok ? await tlRes.json() : { drivers_assignments: [] };
+      const selDrivers = sel.drivers || [];
+      const fromTl = tl.drivers_assignments || [];
+      const selectedIds = new Set(selDrivers.map((d: { id: number }) => d.id));
+
+      const mergedSelected = selDrivers.map((d: { id: number; name?: string; lastname?: string }) => {
+        const hit = fromTl.find((x: { driver?: { id: number } }) => x.driver?.id === d.id);
+        return hit ? { ...hit, driver: { ...hit.driver, ...d } } : { driver: d, tasks: [] };
+      });
+
+      const orphanRows = fromTl.filter(
+        (x: { driver?: { id: number }; tasks?: unknown[] }) =>
+          x.driver?.id != null &&
+          !selectedIds.has(x.driver.id) &&
+          (x.tasks?.length || 0) > 0
+      );
+
+      const assignments = [
+        ...mergedSelected,
+        ...orphanRows.map((row: { driver: { id: number }; tasks: unknown[] }) => ({
+          ...row,
+          driver: { ...row.driver, isRemoved: true as const },
+        })),
+      ];
+
+      setLogisticsDrivers(assignments.map((row: { driver: (typeof selDrivers)[number] & { isRemoved?: boolean } }) => row.driver));
+      setLogisticsDriversAssignments(assignments);
+    } catch (e) {
+      console.error("loadLogisticsTimelineState", e);
+      setLogisticsDrivers([]);
+      setLogisticsDriversAssignments([]);
+    }
+  }, []);
+
+  const reloadLogisticsPage = useCallback(async () => {
+    await loadLogisticsContainers(selectedDate);
+    await loadLogisticsTimelineState(selectedDate);
+  }, [selectedDate, loadLogisticsContainers, loadLogisticsTimelineState]);
+
+  /**
+   * Allineato a generate-assignments: data passata → solo PG; data oggi/futura → se la timeline ha già task
+   * per quella data si ricarica senza script; altrimenti extract driver + create_containers logistics (ADAM).
+   */
   useEffect(() => {
-    void loadLogisticsContainers(selectedDate);
-  }, [selectedDate, loadLogisticsContainers]);
+    let cancelled = false;
+    const date = selectedDate;
+    const dateStr = format(date, "yyyy-MM-dd");
+
+    const run = async () => {
+      if (isDateInPast(date)) {
+        await loadLogisticsContainers(date);
+        await loadLogisticsTimelineState(date);
+        return;
+      }
+
+      setIsExtractingLogistics(true);
+      setLogisticsLoaderKind("general");
+      setExtractionStep("Caricamento dati...");
+
+      try {
+        const tlRes = await fetch(`/api/logistics-timeline?date=${encodeURIComponent(dateStr)}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+        });
+
+        if (cancelled) return;
+
+        const timeline = tlRes.ok ? await tlRes.json() : {};
+        const hasTimelineWork = (timeline.drivers_assignments || []).some(
+          (da: { tasks?: unknown[] }) => Array.isArray(da.tasks) && da.tasks.length > 0
+        );
+        const metadataOk = timeline.metadata?.date === dateStr;
+
+        if (hasTimelineWork && metadataOk) {
+          setLogisticsLoaderKind("load-tasks");
+          setExtractionStep("Caricamento task nei contenitori...");
+          await loadLogisticsContainers(date);
+          await loadLogisticsTimelineState(date);
+          setExtractionStep("Dati caricati!");
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          return;
+        }
+
+        setLogisticsLoaderKind("extract");
+        setExtractionStep("Estrazione dati dal database...");
+        const exRes = await fetch("/api/extract-logistics-drivers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: dateStr }),
+        });
+        const exJson = await exRes.json().catch(() => ({}));
+        if (!exJson?.success) {
+          console.warn("extract-logistics-drivers:", exJson?.message || exRes.status);
+        }
+
+        if (cancelled) return;
+
+        const refreshRes = await fetch("/api/logistics-containers/refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: dateStr, modified_by: getCurrentUsername() }),
+        });
+        if (!refreshRes.ok) {
+          const j = await refreshRes.json().catch(() => ({}));
+          throw new Error((j as { error?: string }).error || "Refresh containers fallito");
+        }
+
+        if (cancelled) return;
+
+        const fp = await fetchAdamLogisticsFingerprint(dateStr);
+        if (fp) {
+          adamBaselineRef.current = fp;
+          setHasAdamUpdates(false);
+        }
+
+        setLogisticsLoaderKind("load-tasks");
+        setExtractionStep("Caricamento task nei contenitori...");
+        await loadLogisticsContainers(date);
+        await loadLogisticsTimelineState(date);
+        setExtractionStep("Task caricati!");
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } catch (e: unknown) {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : "Errore sconosciuto";
+        setExtractionStep("Errore durante l'estrazione. Caricamento task esistenti...");
+        setLogisticsLoaderKind("load-tasks");
+        toast({
+          variant: "destructive",
+          title: "Caricamento logistica",
+          description: msg,
+        });
+        await loadLogisticsContainers(date);
+        await loadLogisticsTimelineState(date);
+      } finally {
+        if (!cancelled) {
+          setIsExtractingLogistics(false);
+          setExtractionStep("Inizializzazione...");
+          setLogisticsLoaderKind("general");
+        }
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedDate,
+    loadLogisticsContainers,
+    loadLogisticsTimelineState,
+    fetchAdamLogisticsFingerprint,
+    toast,
+  ]);
 
   /** Refresh pesante da ADAM (script create_containers logistics) + reload — come pulsante su generate-assignments */
   const refreshLogisticsContainersFromAdam = useCallback(async () => {
@@ -539,7 +586,7 @@ export default function GenerateLogisticsAssignments() {
         title: "Containers aggiornati",
         description: "I dati dei task sono stati aggiornati da ADAM",
       });
-      await loadLogisticsContainers(selectedDate);
+      await reloadLogisticsPage();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Errore sconosciuto";
       toast({
@@ -550,7 +597,7 @@ export default function GenerateLogisticsAssignments() {
     } finally {
       setIsRefreshingContainers(false);
     }
-  }, [selectedDate, toast, fetchAdamLogisticsFingerprint, loadLogisticsContainers]);
+  }, [selectedDate, toast, fetchAdamLogisticsFingerprint, reloadLogisticsPage]);
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) setSelectedDate(date);
@@ -583,6 +630,236 @@ export default function GenerateLogisticsAssignments() {
     () => highlightedIdsForSearch(lowPriorityTasks, searchTask),
     [lowPriorityTasks, searchTask]
   );
+
+  const allTasksWithAssignments = useMemo(() => {
+    const timelineTasks: TaskType[] = [];
+    for (const row of logisticsDriversAssignments) {
+      for (const t of row.tasks || []) {
+        timelineTasks.push(timelineRowToTaskType(t, "low"));
+      }
+    }
+    return [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks, ...timelineTasks];
+  }, [earlyOutTasks, highPriorityTasks, lowPriorityTasks, logisticsDriversAssignments]);
+
+  const parseDriverId = (droppableId: string | undefined | null) => {
+    if (!droppableId?.startsWith("timeline-")) return null;
+    const n = Number(droppableId.slice("timeline-".length));
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const parseContainerKey = (
+    droppableId: string | undefined | null
+  ): "early_out" | "high_priority" | "low_priority" | null => {
+    if (!droppableId) return null;
+    if (droppableId === "early-out") return "early_out";
+    if (droppableId === "high") return "high_priority";
+    if (droppableId === "low") return "low_priority";
+    return null;
+  };
+
+  const saveLogisticsAssignment = async (
+    taskId: string,
+    driverId: number,
+    logisticCode: string | undefined,
+    insertAt?: number
+  ) => {
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const res = await fetch("/api/save-logistics-timeline-assignment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        taskId,
+        driverId,
+        logisticCode,
+        date: dateStr,
+        insertAt,
+        modified_by: user.username || "unknown",
+      }),
+    });
+    if (!res.ok) {
+      if (res.status === 423) throw new Error("Task bloccata");
+      throw new Error("Assegnazione fallita");
+    }
+  };
+
+  const removeLogisticsTimelineAssignment = async (taskId: string, logisticCode?: string) => {
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    const res = await fetch("/api/remove-logistics-timeline-assignment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId, logisticCode, date: dateStr }),
+    });
+    if (!res.ok) throw new Error("Rimozione fallita");
+  };
+
+  const reorderLogisticsTimeline = async (
+    taskId: string,
+    logisticCode: string | undefined,
+    driverId: number,
+    fromIndex: number,
+    toIndex: number
+  ) => {
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const res = await fetch("/api/reorder-logistics-timeline", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date: dateStr,
+        driverId,
+        taskId,
+        logisticCode,
+        fromIndex,
+        toIndex,
+        modified_by: user.username || "unknown",
+      }),
+    });
+    if (!res.ok) throw new Error("Riordino fallito");
+  };
+
+  const onDragUpdate = (update: { destination?: { droppableId: string; index: number } | null }) => {
+    const { destination } = update;
+    if (!destination) {
+      lastValidDragIndexRef.current = null;
+      return;
+    }
+    if (parseDriverId(destination.droppableId) !== null) {
+      lastValidDragIndexRef.current = destination.index;
+    } else {
+      lastValidDragIndexRef.current = null;
+    }
+  };
+
+  const onDragEnd = async (result: DropResult) => {
+    const dropIndexSnapshot = lastValidDragIndexRef.current;
+    lastValidDragIndexRef.current = null;
+    const { destination, source, draggableId } = result;
+    if (!destination) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) {
+      return;
+    }
+
+    const toContainer = parseContainerKey(destination.droppableId);
+    const toDriverId = parseDriverId(destination.droppableId);
+    const fromContainer = parseContainerKey(source.droppableId);
+    const fromDriverId = parseDriverId(source.droppableId);
+
+    const taskId = draggableId.includes("-cleaner-") ? draggableId.split("-cleaner-")[0] : draggableId;
+    const task = allTasksWithAssignments.find((t) => String(t.id) === String(taskId));
+    const logisticCode = task?.name;
+
+    if (isTimelineReadOnly) {
+      toast({ title: "Sola lettura", description: "Data nel passato", variant: "destructive" });
+      return;
+    }
+
+    if (task && (task as TaskType & { locked?: boolean }).locked && fromDriverId === null) {
+      toast({ title: "Task bloccata", variant: "destructive" });
+      return;
+    }
+
+    setIsLoadingDragDrop(true);
+    isDraggingRef.current = true;
+    if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+    dragTimeoutRef.current = setTimeout(() => {
+      isDraggingRef.current = false;
+      setIsLoadingDragDrop(false);
+    }, 10000);
+
+    try {
+      if (fromContainer != null && toDriverId !== null && fromDriverId === null) {
+        const idx = dropIndexSnapshot !== null ? dropIndexSnapshot : destination.index;
+        await saveLogisticsAssignment(taskId, toDriverId, logisticCode, idx);
+        await reloadLogisticsPage();
+        toast({ title: "Task assegnata", variant: "success" });
+        return;
+      }
+
+      if (fromDriverId !== null && toDriverId !== null && fromDriverId === toDriverId) {
+        await reorderLogisticsTimeline(taskId, logisticCode, fromDriverId, source.index, destination.index);
+        await reloadLogisticsPage();
+        toast({ title: "Riordinata", variant: "success" });
+        return;
+      }
+
+      if (fromDriverId !== null && toDriverId !== null && fromDriverId !== toDriverId) {
+        const idx = dropIndexSnapshot !== null ? dropIndexSnapshot : destination.index;
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        const res = await fetch("/api/move-task-between-drivers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            taskId,
+            logisticCode,
+            sourceDriverId: fromDriverId,
+            destDriverId: toDriverId,
+            destIndex: idx,
+            date: format(selectedDate, "yyyy-MM-dd"),
+            modified_by: user.username || "unknown",
+          }),
+        });
+        if (!res.ok) throw new Error("Spostamento fallito");
+        await reloadLogisticsPage();
+        toast({ title: "Task spostata", variant: "success" });
+        return;
+      }
+
+      if (fromDriverId !== null && toContainer != null && toDriverId === null) {
+        await removeLogisticsTimelineAssignment(taskId, logisticCode);
+        await reloadLogisticsPage();
+        toast({ title: "Task rimossa dalla timeline", variant: "success" });
+        return;
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Errore";
+      toast({ title: "Errore", description: msg, variant: "destructive" });
+    } finally {
+      isDraggingRef.current = false;
+      if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+      setIsLoadingDragDrop(false);
+    }
+  };
+
+  if (isExtractingLogistics) {
+    return (
+      <div className="bg-background text-foreground min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="flex justify-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
+          </div>
+          <h2 className="text-2xl font-bold text-foreground">
+            {logisticsLoaderKind === "extract"
+              ? "Estrazione Dati in Corso"
+              : logisticsLoaderKind === "load-tasks"
+                ? "Caricamento Task"
+                : "Caricamento Dati"}
+          </h2>
+          <p className="text-muted-foreground">{extractionStep}</p>
+          <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+            {logisticsLoaderKind === "extract" && (
+              <>
+                <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+                <span>Step 1/2: Estrazione driver dal database</span>
+              </>
+            )}
+            {logisticsLoaderKind === "load-tasks" && (
+              <>
+                <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+                <span>Step 2/2: Caricamento nei contenitori</span>
+              </>
+            )}
+            {logisticsLoaderKind === "general" && (
+              <>
+                <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+                <span>Caricamento generale...</span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background text-foreground min-h-screen">
@@ -692,7 +969,7 @@ export default function GenerateLogisticsAssignments() {
           </div>
         </div>
 
-        <DragDropContext onDragEnd={() => {}} onDragUpdate={() => {}}>
+        <DragDropContext onDragEnd={onDragEnd} onDragUpdate={onDragUpdate}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 w-full">
             <PriorityColumn
               title="EARLY OUT"
@@ -700,7 +977,7 @@ export default function GenerateLogisticsAssignments() {
               tasks={earlyOutTasks}
               droppableId="early-out"
               icon="clock"
-              isDragDisabled
+              isDragDisabled={isTimelineReadOnly}
               disableToolbar
               flushDropZone
               operationsScope="logistics"
@@ -712,7 +989,7 @@ export default function GenerateLogisticsAssignments() {
               tasks={highPriorityTasks}
               droppableId="high"
               icon="alert-circle"
-              isDragDisabled
+              isDragDisabled={isTimelineReadOnly}
               disableToolbar
               flushDropZone
               operationsScope="logistics"
@@ -724,21 +1001,28 @@ export default function GenerateLogisticsAssignments() {
               tasks={lowPriorityTasks}
               droppableId="low"
               icon="arrow-down"
-              isDragDisabled
+              isDragDisabled={isTimelineReadOnly}
               disableToolbar
               flushDropZone
               operationsScope="logistics"
               highlightedTaskIds={highlightedLowPriority}
             />
           </div>
-        </DragDropContext>
 
-        <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-2">
-            <TimelineSkeleton />
-          </div>
+          <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="xl:col-span-2">
+              <LogisticsTimelineView
+                workDate={format(selectedDate, "yyyy-MM-dd")}
+                drivers={logisticsDrivers}
+                driversAssignments={logisticsDriversAssignments}
+                searchTask={searchTask}
+                isReadOnly={isTimelineReadOnly}
+                isLoadingOverlay={isLoadingDragDrop}
+                onRefresh={reloadLogisticsPage}
+              />
+            </div>
 
-          <div className="space-y-6">
+            <div className="space-y-6">
             <div className="min-h-[200px] rounded-lg border-2 border-border bg-card shadow-sm flex items-center justify-center text-muted-foreground text-sm">
               Mappa (in arrivo)
             </div>
@@ -805,8 +1089,9 @@ export default function GenerateLogisticsAssignments() {
                 </div>
               </div>
             </div>
+            </div>
           </div>
-        </div>
+        </DragDropContext>
       </div>
     </div>
   );

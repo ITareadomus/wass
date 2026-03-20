@@ -19,6 +19,7 @@ interface Cleaner {
   id: number;
   name: string;
   lastname: string;
+  alias?: string | null;
   role: string;
   active: boolean;
   ranking: number;
@@ -40,7 +41,26 @@ interface TaskStats {
   straordinarie: number;
 }
 
+function convocationKindFromSearch(): "cleaners" | "drivers" {
+  if (typeof window === "undefined") return "cleaners";
+  return new URLSearchParams(window.location.search).get("kind") === "drivers" ? "drivers" : "cleaners";
+}
+
+function useConvocationKind(): "cleaners" | "drivers" {
+  const [kind, setKind] = useState<"cleaners" | "drivers">(convocationKindFromSearch);
+  useEffect(() => {
+    const sync = () => setKind(convocationKindFromSearch());
+    sync();
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, []);
+  return kind;
+}
+
 export default function Convocazioni() {
+  const convKind = useConvocationKind();
+  const isDrivers = convKind === "drivers";
+
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [taskStats, setTaskStats] = useState<TaskStats>({ total: 0, premium: 0, standard: 0, straordinarie: 0 });
   const [selectedCleaners, setSelectedCleaners] = useState<Set<number>>(new Set());
@@ -80,134 +100,118 @@ export default function Convocazioni() {
     const loadCleaners = async () => {
       try {
         setIsLoading(true);
-        setLoadingMessage("Estrazione cleaners dal database...");
+        setLoadingMessage(
+          isDrivers ? "Estrazione driver dal database..." : "Estrazione cleaners dal database..."
+        );
 
-        // Salva la data selezionata in localStorage
         const dateStr = format(selectedDate, "yyyy-MM-dd");
-        localStorage.setItem('selected_work_date', dateStr);
+        localStorage.setItem("selected_work_date", dateStr);
 
-        // Esegui extract_cleaners_optimized.py
-        const extractResponse = await fetch('/api/extract-cleaners-optimized', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: dateStr })
+        const extractUrl = isDrivers ? "/api/extract-logistics-drivers" : "/api/extract-cleaners-optimized";
+        const extractResponse = await fetch(extractUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: dateStr }),
         });
 
         if (!extractResponse.ok) {
-          throw new Error('Errore durante l\'estrazione dei cleaners');
+          throw new Error(isDrivers ? "Errore durante l'estrazione dei driver" : "Errore durante l'estrazione dei cleaners");
         }
 
         const extractResult = await extractResponse.json();
-        console.log("Estrazione cleaners completata:", extractResult);
+        console.log("Estrazione completata:", extractResult);
 
-        setLoadingMessage("Caricamento cleaners...");
+        setLoadingMessage(isDrivers ? "Caricamento driver..." : "Caricamento cleaners...");
 
-        // Carica cleaners da API (PostgreSQL)
-        const cleanersResponse = await fetch(`/api/cleaners?date=${dateStr}`, {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        const rosterUrl = isDrivers
+          ? `/api/logistics-drivers?date=${dateStr}`
+          : `/api/cleaners?date=${dateStr}`;
+        const rosterResponse = await fetch(rosterUrl, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
         });
-        if (!cleanersResponse.ok) {
-          throw new Error('Impossibile caricare i cleaners');
+        if (!rosterResponse.ok) {
+          throw new Error(isDrivers ? "Impossibile caricare i driver" : "Impossibile caricare i cleaners");
         }
 
-        const cleanersData = await cleanersResponse.json();
-        let dateCleaners = cleanersData.cleaners || [];
+        const rosterData = await rosterResponse.json();
+        let dateCleaners = (isDrivers ? rosterData.drivers : rosterData.cleaners) || [];
 
-        console.log(`📅 Cleaners totali per ${dateStr} (PostgreSQL):`, dateCleaners.length);
-
-        // Carica selected_cleaners da API per gestire la persistenza delle selezioni
-        const selectedResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        const selectedUrl = isDrivers
+          ? `/api/selected-logistics-drivers?date=${dateStr}`
+          : `/api/selected-cleaners?date=${dateStr}`;
+        const selectedResponse = await fetch(selectedUrl, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
         });
         let alreadySelectedIds = new Set<number>();
-        let preselectedIds = new Set<number>(); // IDs da mantenere selezionati nell'UI
+        let preselectedIds = new Set<number>();
 
         if (selectedResponse.ok) {
           const selectedData = await selectedResponse.json();
-          // Verifica che la data in selected_cleaners corrisponda
           const selectedDateFromFile = selectedData.metadata?.date;
-          console.log(`🔍 Data in selected_cleaners API: ${selectedDateFromFile}, data richiesta: ${dateStr}`);
-
-          // Filtra solo se la data corrisponde
           if (selectedDateFromFile === dateStr) {
-            const selectedCleanerIds = selectedData.cleaners?.map((c: any) => c.id) || [];
-            alreadySelectedIds = new Set(selectedCleanerIds);
-            preselectedIds = new Set(selectedCleanerIds); // Mantieni la selezione visiva
-            console.log(`✅ Cleaners già selezionati per ${dateStr}:`, Array.from(alreadySelectedIds));
-          } else {
-            console.log(`⚠️ Data non corrispondente (API: ${selectedDateFromFile}, richiesta: ${dateStr}), mostro TUTTI i cleaners`);
+            const selectedIds = isDrivers
+              ? selectedData.drivers?.map((c: any) => c.id) || []
+              : selectedData.cleaners?.map((c: any) => c.id) || [];
+            alreadySelectedIds = new Set(selectedIds);
+            preselectedIds = new Set(selectedIds);
           }
-        } else {
-          console.log(`ℹ️ selected_cleaners API vuoto, mostro TUTTI i cleaners`);
         }
 
-        // NUOVO: Carica anche cleaners dalla timeline (DB) per pre-selezionarli
-        const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`);
+        const timelineUrl = isDrivers ? `/api/logistics-timeline?date=${dateStr}` : `/api/timeline?date=${dateStr}`;
+        const timelineResponse = await fetch(timelineUrl);
         if (timelineResponse.ok) {
           try {
             const timelineData = await timelineResponse.json();
             const timelineDateFromFile = timelineData.metadata?.date;
-
-            // Solo se la data corrisponde
-            if (timelineDateFromFile === dateStr && timelineData.cleaners_assignments) {
-              for (const cleanerEntry of timelineData.cleaners_assignments) {
-                if (cleanerEntry.cleaner?.id) {
-                  const cleanerId = cleanerEntry.cleaner.id;
-                  // Pre-seleziona visivamente (NON aggiungere ad alreadySelectedIds per renderlo visibile)
-                  preselectedIds.add(cleanerId);
-                  console.log(`✅ Cleaner ${cleanerId} trovato nella timeline - pre-selezionato visivamente`);
+            if (timelineDateFromFile === dateStr) {
+              if (isDrivers && timelineData.drivers_assignments) {
+                for (const row of timelineData.drivers_assignments) {
+                  if (row.driver?.id) preselectedIds.add(row.driver.id);
+                }
+              }
+              if (!isDrivers && timelineData.cleaners_assignments) {
+                for (const row of timelineData.cleaners_assignments) {
+                  if (row.cleaner?.id) preselectedIds.add(row.cleaner.id);
                 }
               }
             }
           } catch (e) {
-            console.warn('⚠️ Errore parsing timeline:', e);
+            console.warn("⚠️ Errore parsing timeline:", e);
           }
         }
 
-        // Mostra TUTTI i cleaners attivi (NON filtrare quelli già selezionati)
         const availableCleaners = dateCleaners.filter((c: any) => c.active === true);
-
-        console.log(`📊 Risultato filtro cleaners:`);
-        console.log(`   - Totali per ${dateStr}: ${dateCleaners.length}`);
-        console.log(`   - Già in selected_cleaners: ${alreadySelectedIds.size}`);
-        console.log(`   - Pre-selezionati dalla timeline: ${preselectedIds.size}`);
-        console.log(`   - Disponibili da mostrare: ${availableCleaners.length}`);
-
-        // Ordina per counter_hours (decrescente - più ore prima)
         availableCleaners.sort((a: any, b: any) => b.counter_hours - a.counter_hours);
 
         setCleaners(availableCleaners);
         setFilteredCleaners(availableCleaners);
 
-        // Unisci TUTTI i cleaners pre-selezionati (da selected_cleaners API E dalla timeline)
         const allPreselectedIds = new Set([...alreadySelectedIds, ...preselectedIds]);
         setSelectedCleaners(allPreselectedIds);
 
-        console.log(`✅ Cleaners mostrati: ${availableCleaners.length}, pre-selezionati totali: ${allPreselectedIds.size}`);
-
-        console.log(`✅ Cleaners mostrati: ${availableCleaners.length}, pre-selezionati: ${preselectedIds.size}`);
-
-        // Carica statistiche task
         setLoadingMessage("Caricamento statistiche task...");
-        await loadTaskStats(dateStr);
+        await loadTaskStats(dateStr, isDrivers);
 
         setIsLoading(false);
         setLoadingMessage("Caricamento completato!");
       } catch (error) {
-        console.error("Errore nel caricamento dei cleaners:", error);
-        setLoadingMessage("Errore nel caricamento dei cleaners");
+        console.error("Errore nel caricamento convocazioni:", error);
+        setLoadingMessage(isDrivers ? "Errore nel caricamento dei driver" : "Errore nel caricamento dei cleaners");
         setIsLoading(false);
       }
     };
 
-    loadCleaners();
-  }, [selectedDate]);
+    void loadCleaners();
+  }, [selectedDate, convKind]);
 
-  const loadTaskStats = async (dateStr: string) => {
+  const loadTaskStats = async (dateStr: string, driversMode: boolean) => {
     try {
-      const res = await fetch(`/api/containers?date=${encodeURIComponent(dateStr)}`);
+      const statsUrl = driversMode
+        ? `/api/logistics-containers?date=${encodeURIComponent(dateStr)}`
+        : `/api/containers?date=${encodeURIComponent(dateStr)}`;
+      const res = await fetch(statsUrl);
       if (!res.ok) throw new Error('Errore durante il caricamento dei containers');
       const data = await res.json();
       const c = data.containers || {};
@@ -316,11 +320,12 @@ export default function Convocazioni() {
   };
 
   const handleSaveSelection = async () => {
+    const label = isDrivers ? "driver" : "cleaner";
     if (selectedCleaners.size === 0) {
       toast({
         variant: "destructive",
-        title: "⚠️ Nessun cleaner selezionato",
-        description: "Seleziona almeno un cleaner prima di salvare"
+        title: `⚠️ Nessun ${label} selezionato`,
+        description: `Seleziona almeno un ${label} prima di salvare`,
       });
       return;
     }
@@ -328,62 +333,88 @@ export default function Convocazioni() {
     try {
       setIsSaving(true);
       const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-      // Carica cleaners dalla timeline (DB) per includerli nel salvataggio
-      const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`);
-      let timelineCleaners: Cleaner[] = [];
-      if (timelineResponse.ok) {
-        try {
-          const timelineData = await timelineResponse.json();
-          if (timelineData.metadata?.date === dateStr && timelineData.cleaners_assignments) {
-            timelineCleaners = timelineData.cleaners_assignments
-              .map((ca: any) => ca.cleaner)
-              .filter((c: any) => c && selectedCleaners.has(c.id));
+      if (isDrivers) {
+        const timelineResponse = await fetch(`/api/logistics-timeline?date=${dateStr}`);
+        let timelineDrivers: Cleaner[] = [];
+        if (timelineResponse.ok) {
+          try {
+            const timelineData = await timelineResponse.json();
+            if (timelineData.metadata?.date === dateStr && timelineData.drivers_assignments) {
+              timelineDrivers = timelineData.drivers_assignments
+                .map((ca: any) => ca.driver)
+                .filter((c: any) => c && selectedCleaners.has(c.id));
+            }
+          } catch (e) {
+            console.warn("⚠️ Errore caricamento timeline logistics:", e);
           }
-        } catch (e) {
-          console.warn('⚠️ Errore caricamento timeline cleaners:', e);
         }
+        const fromUI = filteredCleaners.filter((c) => selectedCleaners.has(c.id));
+        const tlIds = new Set(timelineDrivers.map((c) => c.id));
+        const uniqueFromUI = fromUI.filter((c) => !tlIds.has(c.id));
+        const selectedData = [...timelineDrivers, ...uniqueFromUI];
+        const response = await fetch("/api/save-selected-logistics-drivers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            drivers: selectedData,
+            total_selected: selectedData.length,
+            date: dateStr,
+            action_type: "replace",
+            modified_by: user.username || "unknown",
+          }),
+        });
+        if (!response.ok) throw new Error("Errore nel salvataggio dei driver");
+        toast({
+          variant: "success",
+          title: `${selectedData.length} driver salvati con successo!`,
+          description: `Salvati per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
+        });
+      } else {
+        const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`);
+        let timelineCleaners: Cleaner[] = [];
+        if (timelineResponse.ok) {
+          try {
+            const timelineData = await timelineResponse.json();
+            if (timelineData.metadata?.date === dateStr && timelineData.cleaners_assignments) {
+              timelineCleaners = timelineData.cleaners_assignments
+                .map((ca: any) => ca.cleaner)
+                .filter((c: any) => c && selectedCleaners.has(c.id));
+            }
+          } catch (e) {
+            console.warn("⚠️ Errore caricamento timeline cleaners:", e);
+          }
+        }
+        const cleanersFromUI = filteredCleaners.filter((c) => selectedCleaners.has(c.id));
+        const timelineCleanerIds = new Set(timelineCleaners.map((c) => c.id));
+        const uniqueCleanersFromUI = cleanersFromUI.filter((c) => !timelineCleanerIds.has(c.id));
+        const selectedCleanersData = [...timelineCleaners, ...uniqueCleanersFromUI];
+        const response = await fetch("/api/save-selected-cleaners", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cleaners: selectedCleanersData,
+            total_selected: selectedCleanersData.length,
+            date: dateStr,
+            action_type: "replace",
+          }),
+        });
+        if (!response.ok) throw new Error("Errore nel salvataggio dei cleaners");
+        toast({
+          variant: "success",
+          title: `${selectedCleanersData.length} cleaner salvati con successo!`,
+          description: `I cleaners sono stati salvati per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
+        });
       }
-
-      // Combina cleaners dall'UI con quelli dalla timeline (evita duplicati)
-      // IMPORTANTE: usa l'oggetto completo del cleaner da cleaners/filteredCleaners
-      const cleanersFromUI = filteredCleaners.filter(c => selectedCleaners.has(c.id));
-      const timelineCleanerIds = new Set(timelineCleaners.map(c => c.id));
-      const uniqueCleanersFromUI = cleanersFromUI.filter(c => !timelineCleanerIds.has(c.id));
-      const selectedCleanersData = [...timelineCleaners, ...uniqueCleanersFromUI];
-
-      const dataToSave = {
-        cleaners: selectedCleanersData,
-        total_selected: selectedCleanersData.length,
-        date: dateStr,
-        action_type: 'replace'
-      };
-
-      const response = await fetch('/api/save-selected-cleaners', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(dataToSave),
-      });
-
-      if (!response.ok) {
-        throw new Error('Errore nel salvataggio dei cleaners');
-      }
-
-      const result = await response.json();
-      console.log("Cleaners salvati con successo:", result);
-      toast({
-        variant: "success",
-        title: `${selectedCleanersData.length} cleaner salvati con successo!`,
-        description: `I cleaners sono stati salvati per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`
-      });
     } catch (error) {
       console.error("Errore nel salvataggio:", error);
       toast({
         variant: "destructive",
         title: "❌ Errore nel salvataggio",
-        description: "Si è verificato un errore nel salvataggio dei cleaners selezionati"
+        description: isDrivers
+          ? "Si è verificato un errore nel salvataggio dei driver selezionati"
+          : "Si è verificato un errore nel salvataggio dei cleaners selezionati",
       });
     } finally {
       setIsSaving(false);
@@ -391,11 +422,12 @@ export default function Convocazioni() {
   };
 
   const handleAddCleaners = async () => {
+    const label = isDrivers ? "driver" : "cleaner";
     if (selectedCleaners.size === 0) {
       toast({
         variant: "destructive",
-        title: "⚠️ Nessun cleaner selezionato",
-        description: "Seleziona almeno un cleaner prima di aggiungere"
+        title: `⚠️ Nessun ${label} selezionato`,
+        description: `Seleziona almeno un ${label} prima di aggiungere`,
       });
       return;
     }
@@ -403,85 +435,130 @@ export default function Convocazioni() {
     try {
       setIsSaving(true);
       const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-      // Carica cleaners dalla timeline (DB) per includerli
-      const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`);
-      let timelineCleaners: Cleaner[] = [];
-      if (timelineResponse.ok) {
-        try {
-          const timelineData = await timelineResponse.json();
-          if (timelineData.metadata?.date === dateStr && timelineData.cleaners_assignments) {
-            timelineCleaners = timelineData.cleaners_assignments
-              .map((ca: any) => ca.cleaner)
-              .filter((c: any) => c && selectedCleaners.has(c.id));
+      if (isDrivers) {
+        const timelineResponse = await fetch(`/api/logistics-timeline?date=${dateStr}`);
+        let timelineDrivers: Cleaner[] = [];
+        if (timelineResponse.ok) {
+          try {
+            const timelineData = await timelineResponse.json();
+            if (timelineData.metadata?.date === dateStr && timelineData.drivers_assignments) {
+              timelineDrivers = timelineData.drivers_assignments
+                .map((ca: any) => ca.driver)
+                .filter((c: any) => c && selectedCleaners.has(c.id));
+            }
+          } catch (e) {
+            console.warn("⚠️ Errore caricamento timeline logistics:", e);
           }
-        } catch (e) {
-          console.warn('⚠️ Errore caricamento timeline cleaners:', e);
         }
-      }
-
-      // Carica la selezione attuale da API
-      const currentResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-      });
-      const currentData = await currentResponse.json();
-      const currentCleaners = currentData.cleaners || [];
-
-      // Combina cleaners dall'UI con quelli dalla timeline
-      // IMPORTANTE: usa l'oggetto completo del cleaner da filteredCleaners
-      const cleanersFromUI = filteredCleaners.filter(c => selectedCleaners.has(c.id));
-      const timelineCleanerIds = new Set(timelineCleaners.map(c => c.id));
-      const uniqueCleanersFromUI = cleanersFromUI.filter(c => !timelineCleanerIds.has(c.id));
-      const allSelectedCleaners = [...timelineCleaners, ...uniqueCleanersFromUI];
-
-      // Unisci con cleaners esistenti (evita duplicati)
-      const existingIds = new Set(currentCleaners.map((c: any) => c.id));
-      const newCleaners = allSelectedCleaners.filter(c => !existingIds.has(c.id));
-      const mergedCleaners = [...currentCleaners, ...newCleaners];
-
-      const dataToSave = {
-        cleaners: mergedCleaners,
-        total_selected: mergedCleaners.length,
-        date: dateStr,
-        action_type: 'add'
-      };
-
-      const response = await fetch('/api/save-selected-cleaners', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dataToSave)
-      });
-
-      if (!response.ok) {
-        throw new Error('Errore nel salvataggio');
-      }
-
-      if (newCleaners.length === 0) {
-        toast({
-          variant: "success",
-          title: "Nessun nuovo cleaner aggiunto",
-          description: `Tutti i cleaners selezionati sono già presenti per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
-          duration: 4000
+        const currentResponse = await fetch(`/api/selected-logistics-drivers?date=${dateStr}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
         });
+        const currentData = await currentResponse.json();
+        const currentDrivers = currentData.drivers || [];
+        const fromUI = filteredCleaners.filter((c) => selectedCleaners.has(c.id));
+        const tlIds = new Set(timelineDrivers.map((c) => c.id));
+        const uniqueFromUI = fromUI.filter((c) => !tlIds.has(c.id));
+        const allSelected = [...timelineDrivers, ...uniqueFromUI];
+        const existingIds = new Set(currentDrivers.map((c: any) => c.id));
+        const newOnes = allSelected.filter((c) => !existingIds.has(c.id));
+        const merged = [...currentDrivers, ...newOnes];
+        const response = await fetch("/api/save-selected-logistics-drivers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            drivers: merged,
+            total_selected: merged.length,
+            date: dateStr,
+            action_type: "add",
+            modified_by: user.username || "unknown",
+          }),
+        });
+        if (!response.ok) throw new Error("Errore nel salvataggio");
+        if (newOnes.length === 0) {
+          toast({
+            variant: "success",
+            title: "Nessun nuovo driver aggiunto",
+            description: `Tutti i driver selezionati sono già presenti per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
+            duration: 4000,
+          });
+        } else {
+          toast({
+            variant: "success",
+            title: `${newOnes.length} driver aggiunti correttamente!`,
+            description: `Totale driver: ${merged.length} per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
+            duration: 3000,
+          });
+        }
+        sessionStorage.setItem("preserveAssignments", "true");
+        setLocation("/generate-logistics-assignments");
       } else {
-        toast({
-          variant: "success",
-          title: `${newCleaners.length} cleaner aggiunti correttamente!`,
-          description: `Totale cleaners: ${mergedCleaners.length} per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
-          duration: 3000
+        const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`);
+        let timelineCleaners: Cleaner[] = [];
+        if (timelineResponse.ok) {
+          try {
+            const timelineData = await timelineResponse.json();
+            if (timelineData.metadata?.date === dateStr && timelineData.cleaners_assignments) {
+              timelineCleaners = timelineData.cleaners_assignments
+                .map((ca: any) => ca.cleaner)
+                .filter((c: any) => c && selectedCleaners.has(c.id));
+            }
+          } catch (e) {
+            console.warn("⚠️ Errore caricamento timeline cleaners:", e);
+          }
+        }
+        const currentResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
         });
+        const currentData = await currentResponse.json();
+        const currentCleaners = currentData.cleaners || [];
+        const cleanersFromUI = filteredCleaners.filter((c) => selectedCleaners.has(c.id));
+        const timelineCleanerIds = new Set(timelineCleaners.map((c) => c.id));
+        const uniqueCleanersFromUI = cleanersFromUI.filter((c) => !timelineCleanerIds.has(c.id));
+        const allSelectedCleaners = [...timelineCleaners, ...uniqueCleanersFromUI];
+        const existingIds = new Set(currentCleaners.map((c: any) => c.id));
+        const newCleaners = allSelectedCleaners.filter((c) => !existingIds.has(c.id));
+        const mergedCleaners = [...currentCleaners, ...newCleaners];
+        const response = await fetch("/api/save-selected-cleaners", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cleaners: mergedCleaners,
+            total_selected: mergedCleaners.length,
+            date: dateStr,
+            action_type: "add",
+          }),
+        });
+        if (!response.ok) throw new Error("Errore nel salvataggio");
+        if (newCleaners.length === 0) {
+          toast({
+            variant: "success",
+            title: "Nessun nuovo cleaner aggiunto",
+            description: `Tutti i cleaners selezionati sono già presenti per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
+            duration: 4000,
+          });
+        } else {
+          toast({
+            variant: "success",
+            title: `${newCleaners.length} cleaner aggiunti correttamente!`,
+            description: `Totale cleaners: ${mergedCleaners.length} per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
+            duration: 3000,
+          });
+        }
+        sessionStorage.setItem("preserveAssignments", "true");
+        setLocation("/generate-assignments");
       }
-
-      // Torna alla pagina principale SENZA resettare la timeline
-      sessionStorage.setItem('preserveAssignments', 'true');
-      setLocation('/generate-assignments');
     } catch (error) {
-      console.error('Errore nell\'aggiunta cleaners:', error);
+      console.error("Errore nell'aggiunta:", error);
       toast({
         variant: "destructive",
         title: "❌ Errore nell'aggiunta",
-        description: "Si è verificato un errore durante l\'aggiunta dei cleaners"
+        description: isDrivers
+          ? "Si è verificato un errore durante l'aggiunta dei driver"
+          : "Si è verificato un errore durante l'aggiunta dei cleaners",
       });
     } finally {
       setIsSaving(false);
@@ -509,9 +586,9 @@ export default function Convocazioni() {
           {/* Header con titolo e selettore data */}
           <div className="flex justify-between items-center flex-wrap gap-4">
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+              <h1 className="text-3xl font-bold text-foreground flex items-center gap-2 flex-wrap">
                 <Users className="w-8 h-8 text-custom-blue" />
-                CONVOCAZIONI del
+                {isDrivers ? "CONVOCAZIONI DRIVER del" : "CONVOCAZIONI del"}
               </h1>
               <Popover>
                 <PopoverTrigger asChild>
@@ -546,7 +623,9 @@ export default function Convocazioni() {
           <div className="bg-custom-blue-light rounded-xl border-2 border-custom-blue shadow-lg p-6">
             <div className="flex items-center gap-4 w-full">
               <div className="flex items-center gap-4 shrink-0">
-                <div className="text-lg font-semibold text-foreground">CLEANERS SELEZIONATI</div>
+                <div className="text-lg font-semibold text-foreground">
+                  {isDrivers ? "DRIVERS SELEZIONATI" : "CLEANERS SELEZIONATI"}
+                </div>
                 <div className="text-lg font-bold">
                   <span className="text-primary">{selectedCleaners.size}</span>
                   <span className="text-muted-foreground mx-1">/</span>
@@ -564,7 +643,8 @@ export default function Convocazioni() {
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 )}
               >
-                Cleaners non convocati da due giorni o più: <span className="font-bold text-yellow-500 dark:text-yellow-400">{notConvocatiDaDueGiorniCount}</span>
+                {isDrivers ? "Driver" : "Cleaners"} non convocati da due giorni o più:{" "}
+                <span className="font-bold text-yellow-500 dark:text-yellow-400">{notConvocatiDaDueGiorniCount}</span>
                 {showOnlyNotConvocatiDaDueGiorni && " (clicca per mostrare tutti)"}
               </button>
             </div>
@@ -578,7 +658,7 @@ export default function Convocazioni() {
             <div className="mb-4 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-custom-blue" />
               <Input
-                placeholder="Cerca cleaner per nome..."
+                placeholder={isDrivers ? "Cerca driver per nome..." : "Cerca cleaner per nome..."}
                 value={searchCleaner}
                 onChange={(e) => setSearchCleaner(e.target.value)}
                 className="pl-10 border-2 border-custom-blue"
@@ -637,25 +717,59 @@ export default function Convocazioni() {
                               Non disponibile
                             </span>
                           )}
-                          {isFormatore && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
-                              Formatore
-                            </span>
-                          )}
-                          {canDoStraordinaria && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
-                              Straordinario
-                            </span>
-                          )}
-                          {isPremium && !canDoStraordinaria && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
-                              Premium
-                            </span>
-                          )}
-                          {!isPremium && !isFormatore && !canDoStraordinaria && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
-                              Standard
-                            </span>
+                          {isDrivers ? (
+                            <>
+                              {cleaner.role === "Formatore" && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-200 border-orange-300 dark:border-orange-700">
+                                  Formatore
+                                </span>
+                              )}
+                              {cleaner.role === "Straordinario" && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 border-red-300 dark:border-red-700">
+                                  Straordinario
+                                </span>
+                              )}
+                              {cleaner.role === "Premium" && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
+                                  Premium
+                                </span>
+                              )}
+                              {cleaner.role === "Standard" && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-200 border-green-300 dark:border-green-700">
+                                  Standard
+                                </span>
+                              )}
+                              {!["Formatore", "Straordinario", "Premium", "Standard"].includes(
+                                String(cleaner.role || "")
+                              ) && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-500/30 text-sky-900 dark:bg-sky-500/40 dark:text-sky-100 border-sky-600 dark:border-sky-400">
+                                  Driver
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {isFormatore && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
+                                  Formatore
+                                </span>
+                              )}
+                              {canDoStraordinaria && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
+                                  Straordinario
+                                </span>
+                              )}
+                              {isPremium && !canDoStraordinaria && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
+                                  Premium
+                                </span>
+                              )}
+                              {!isPremium && !isFormatore && !canDoStraordinaria && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
+                                  Standard
+                                </span>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -776,9 +890,11 @@ export default function Convocazioni() {
           <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog({ open, cleanerId: null })}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Cleaner Non Disponibile</DialogTitle>
+                <DialogTitle>{isDrivers ? "Driver non disponibile" : "Cleaner Non Disponibile"}</DialogTitle>
                 <DialogDescription>
-                  Questo cleaner risulta non disponibile. Sei sicuro di volerlo selezionare?
+                  {isDrivers
+                    ? "Questo driver risulta non disponibile. Sei sicuro di volerlo selezionare?"
+                    : "Questo cleaner risulta non disponibile. Sei sicuro di volerlo selezionare?"}
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
@@ -802,7 +918,7 @@ export default function Convocazioni() {
             <Button
               onClick={async () => {
                 await handleSaveSelection();
-                setLocation('/generate-assignments');
+                setLocation(isDrivers ? "/generate-logistics-assignments" : "/generate-assignments");
               }}
               size="lg"
               disabled={selectedCleaners.size === 0 || isSaving}
@@ -862,8 +978,10 @@ export default function Convocazioni() {
             </div>
           </div>
 
-          {/* Statistiche Cleaners */}
-          <h4 className="text-xs font-semibold text-muted-foreground mb-2">Cleaners</h4>
+          {/* Statistiche roster */}
+          <h4 className="text-xs font-semibold text-muted-foreground mb-2">
+            {isDrivers ? "Driver" : "Cleaners"}
+          </h4>
           <div className="grid grid-cols-2 gap-2 flex-1">
             {/* Disponibili */}
             <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-2 flex flex-col items-center justify-center border-2 border-blue-300 dark:border-blue-700">
@@ -947,6 +1065,8 @@ export default function Convocazioni() {
               </span>
             </div>
 
+            {!isDrivers && (
+              <>
             {/* Premium */}
             <div className="bg-yellow-100 dark:bg-yellow-950/50 rounded-lg p-2 flex flex-col items-center justify-center border-2 border-yellow-300 dark:border-yellow-700">
               <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
@@ -1110,6 +1230,8 @@ export default function Convocazioni() {
                 {filteredCleaners.filter(c => c.role === "Straordinario").length}/{filteredCleaners.length}
               </span>
             </div>
+              </>
+            )}
           </div>
         </Card>
       </div>

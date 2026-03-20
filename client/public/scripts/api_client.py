@@ -248,6 +248,15 @@ class ApiClient:
             "snapshotReason": "extract_cleaners_optimized"
         }
         return self._post("/api/cleaners", payload)
+
+    def save_logistics_drivers(self, date: str, drivers: List[Dict]) -> Dict:
+        """Salva roster autisti (lg_drivers) su PostgreSQL via API."""
+        payload = {
+            "date": date,
+            "drivers": drivers,
+            "snapshotReason": "extract_logistics_drivers",
+        }
+        return self._post("/api/logistics-drivers", payload)
     
     # ==================== HELPER METHODS ====================
     
