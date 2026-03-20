@@ -8,6 +8,8 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext, us
 const DEBUG = false;
 const dlog = (...args: any[]) => DEBUG && console.log(...args);
 import { ThemeToggle } from "@/components/theme-toggle";
+import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
+import { WassSiteHeader } from "@/components/wass-site-header";
 import { CalendarIcon, Users, RefreshCw, Settings, HelpCircle, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useLocation, Link } from 'wouter';
@@ -1981,11 +1983,23 @@ export default function GenerateAssignments() {
 
   return (
     <div className="bg-background text-foreground min-h-screen">
-      <div className="w-full px-4 py-6">
-        <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl flex items-center gap-2 font-bold text-foreground">
-              WASS HOUSEKEEPING del
+      <WassSiteHeader
+        right={
+          <>
+            <Link href={`/unconfirmed-tasks?date=${format(selectedDate, "yyyy-MM-dd")}`}>
+              <Button variant="outline" size="icon" className="rounded-full" title="Task Non Confermate" data-testid="link-unconfirmed-tasks">
+                <HelpCircle className="h-5 w-5" />
+              </Button>
+            </Link>
+            <ThemeToggle />
+          </>
+        }
+      />
+      <div className="w-full px-4 pt-3 pb-6">
+        <div className="mx-auto mb-6 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 flex-wrap items-center gap-4">
+            <h1 className="flex items-center gap-2 text-[25px] font-bold text-foreground">
+              HOUSEKEEPING del
             </h1>
             <Popover>
               <PopoverTrigger asChild>
@@ -2011,14 +2025,7 @@ export default function GenerateAssignments() {
               </PopoverContent>
             </Popover>
           </div>
-          <div className="flex items-center gap-3">
-            <Link href={`/unconfirmed-tasks?date=${format(selectedDate, "yyyy-MM-dd")}`}>
-              <Button variant="outline" size="icon" className="rounded-full" title="Task Non Confermate" data-testid="link-unconfirmed-tasks">
-                <HelpCircle className="h-5 w-5" />
-              </Button>
-            </Link>
-            <ThemeToggle />
-          </div>
+          <HousekeepingLogisticsSwitch active="housekeeping" />
         </div>
 
         <MultiSelectContext.Provider value={multiSelectContextValue}>

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { DragDropContext, type DropResult } from "react-beautiful-dnd";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
+import { WassSiteHeader } from "@/components/wass-site-header";
 import { useToast } from "@/hooks/use-toast";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import LogisticsTimelineView from "@/components/timeline/logistics-timeline-view";
@@ -12,11 +14,11 @@ import {
   Search,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -303,6 +305,12 @@ export default function GenerateLogisticsAssignments() {
   useEffect(() => {
     localStorage.setItem("selected_work_date", format(selectedDate, "yyyy-MM-dd"));
   }, [selectedDate]);
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      setSelectedDate(date);
+    }
+  };
 
   const fetchAdamLogisticsFingerprint = useCallback(async (workDate: string): Promise<AdamFingerprint | null> => {
     try {
@@ -599,10 +607,6 @@ export default function GenerateLogisticsAssignments() {
     }
   }, [selectedDate, toast, fetchAdamLogisticsFingerprint, reloadLogisticsPage]);
 
-  const handleDateSelect = (date: Date | undefined) => {
-    if (date) setSelectedDate(date);
-  };
-
   const s = logisticsSummary;
 
   const earlyOutTasks = useMemo(
@@ -863,46 +867,9 @@ export default function GenerateLogisticsAssignments() {
 
   return (
     <div className="bg-background text-foreground min-h-screen">
-      <div className="w-full px-4 py-6">
-        <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl flex items-center gap-2 font-bold text-foreground">
-              WASS LOGISTICS del
-            </h1>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "justify-start text-left font-normal",
-                    !selectedDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDate ? (
-                    format(selectedDate, "dd/MM/yyyy", { locale: it })
-                  ) : (
-                    <span>Seleziona data</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                className="w-auto p-0"
-                align="start"
-                onOpenAutoFocus={(e) => e.preventDefault()}
-              >
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={handleDateSelect}
-                  defaultMonth={selectedDate}
-                  initialFocus
-                  locale={it}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div className="flex items-center gap-3">
+      <WassSiteHeader
+        right={
+          <>
             <Link href={`/unconfirmed-tasks?date=${format(selectedDate, "yyyy-MM-dd")}`}>
               <Button
                 variant="outline"
@@ -915,57 +882,93 @@ export default function GenerateLogisticsAssignments() {
               </Button>
             </Link>
             <ThemeToggle />
+          </>
+        }
+      />
+      <div className="w-full px-4 pt-3 pb-6">
+        <div className="mx-auto mb-6 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 flex-wrap items-center gap-4">
+            <h1 className="flex items-center gap-2 text-3xl font-bold text-foreground">
+              LOGISTICS del
+            </h1>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "justify-start text-left font-normal",
+                    !selectedDate && "text-muted-foreground"
+                  )}
+                  data-testid="button-logistics-work-date"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: it }) : <span>Seleziona data</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={handleDateSelect}
+                  initialFocus
+                  locale={it}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
+          <HousekeepingLogisticsSwitch active="logistics" />
         </div>
 
-        <div className="mb-4 flex items-center gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-custom-blue" />
-            <Input
-              placeholder="Cerca task..."
-              value={searchTask}
-              onChange={(e) => setSearchTask(e.target.value)}
-              className="border-2 border-custom-blue pl-10"
-              data-testid="input-search-task-logistics"
-            />
-          </div>
-          <div className="flex items-center flex-shrink-0 bg-custom-blue rounded-md overflow-hidden border-2 border-custom-blue">
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={isRefreshingContainers}
-              title="Aggiorna containers da ADAM"
-              onClick={() => void refreshLogisticsContainersFromAdam()}
-              className="flex items-center rounded-none text-black dark:text-white hover:bg-custom-blue/80 px-3"
-              data-testid="button-logistics-refresh-adam"
-            >
-              {isRefreshingContainers ? (
-                <span className="relative inline-flex">
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                </span>
-              ) : (
-                <span className="relative inline-flex">
-                  <RefreshCw className="w-4 h-4" />
-                  {hasAdamUpdates && (
-                    <span
-                      className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-red-500"
-                      title="Aggiornamenti disponibili da ADAM"
-                    />
-                  )}
-                </span>
-              )}
-            </Button>
-            <div className="w-px h-6 bg-black/20 dark:bg-white/20" />
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled
-              title="In arrivo"
-              className="flex items-center gap-2 rounded-none text-black dark:text-white hover:bg-custom-blue/80 px-3"
-            >
-              <CalendarIcon className="w-4 h-4" />
-              Assegna
-            </Button>
+        <div className="mx-auto mb-4 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="relative min-w-[200px] flex-1">
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-custom-blue" />
+              <Input
+                placeholder="Cerca task..."
+                value={searchTask}
+                onChange={(e) => setSearchTask(e.target.value)}
+                className="border-2 border-custom-blue pl-10"
+                data-testid="input-search-task-logistics"
+              />
+            </div>
+            <div className="flex shrink-0 items-center overflow-hidden rounded-md border-2 border-custom-blue bg-custom-blue">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={isRefreshingContainers}
+                title="Aggiorna containers da ADAM"
+                onClick={() => void refreshLogisticsContainersFromAdam()}
+                className="flex items-center rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
+                data-testid="button-logistics-refresh-adam"
+              >
+                {isRefreshingContainers ? (
+                  <span className="relative inline-flex">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  </span>
+                ) : (
+                  <span className="relative inline-flex">
+                    <RefreshCw className="h-4 w-4" />
+                    {hasAdamUpdates && (
+                      <span
+                        className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-red-500"
+                        title="Aggiornamenti disponibili da ADAM"
+                      />
+                    )}
+                  </span>
+                )}
+              </Button>
+              <div className="h-6 w-px bg-black/20 dark:bg-white/20" />
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled
+                title="In arrivo"
+                className="flex items-center gap-2 rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
+              >
+                <CalendarIcon className="h-4 w-4" />
+                Assegna
+              </Button>
+            </div>
           </div>
         </div>
 
