@@ -187,6 +187,31 @@ function containerTasks(container: any): any[] {
   return [];
 }
 
+/** Evita SyntaxError su `response.json()` quando il body è HTML (es. SPA fallback / porta sbagliata). */
+async function parseFetchJsonOrFallback<T>(res: Response, fallback: T): Promise<T> {
+  const raw = await res.text();
+  if (!res.ok) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+async function parseFetchJsonStrictWhenOk(res: Response, notOkMessage: string): Promise<unknown> {
+  const raw = await res.text();
+  if (!res.ok) throw new Error(notOkMessage);
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error(
+      raw.trimStart().startsWith("<")
+        ? "Risposta HTML al posto di JSON: apri l'app con npm run dev (Express + Vite sulla stessa porta, es. 5000), non solo il dev server Vite su un'altra porta."
+        : "Risposta non valida dal server (non JSON)."
+    );
+  }
+}
+
 function parseLogisticsSummary(data: any): LogisticsSummaryState {
   const eo = containerTasks(data?.containers?.early_out);
   const hp = containerTasks(data?.containers?.high_priority);
@@ -384,10 +409,10 @@ export default function GenerateLogisticsAssignments() {
         cache: "no-store",
         headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
       });
-      if (!getRes.ok) {
-        throw new Error("Impossibile caricare i containers logistics");
-      }
-      const data = await getRes.json();
+      const data = await parseFetchJsonStrictWhenOk(
+        getRes,
+        "Impossibile caricare i containers logistics"
+      );
       setLogisticsSummary(parseLogisticsSummary(data));
       setLogisticsTaskLists(parseLogisticsTaskLists(data));
     } catch (e: unknown) {
@@ -413,8 +438,8 @@ export default function GenerateLogisticsAssignments() {
           headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
         }),
       ]);
-      const sel = selRes.ok ? await selRes.json() : { drivers: [] };
-      const tl = tlRes.ok ? await tlRes.json() : { drivers_assignments: [] };
+      const sel = await parseFetchJsonOrFallback(selRes, { drivers: [] as unknown[] });
+      const tl = await parseFetchJsonOrFallback(tlRes, { drivers_assignments: [] as unknown[] });
       const selDrivers = sel.drivers || [];
       const fromTl = tl.drivers_assignments || [];
       const selectedIds = new Set(selDrivers.map((d: { id: number }) => d.id));
@@ -481,7 +506,7 @@ export default function GenerateLogisticsAssignments() {
 
         if (cancelled) return;
 
-        const timeline = tlRes.ok ? await tlRes.json() : {};
+        const timeline = await parseFetchJsonOrFallback(tlRes, {} as Record<string, unknown>);
         const hasTimelineWork = (timeline.drivers_assignments || []).some(
           (da: { tasks?: unknown[] }) => Array.isArray(da.tasks) && da.tasks.length > 0
         );
