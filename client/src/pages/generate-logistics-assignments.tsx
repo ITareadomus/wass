@@ -888,7 +888,7 @@ export default function GenerateLogisticsAssignments() {
       <div className="w-full px-4 pt-3 pb-6">
         <div className="mx-auto mb-6 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-4">
           <div className="flex min-w-0 flex-wrap items-center gap-4">
-            <h1 className="flex items-center gap-2 text-3xl font-bold text-foreground">
+            <h1 className="flex items-center gap-2 text-[25px] font-bold text-foreground">
               LOGISTICS del
             </h1>
             <Popover>
@@ -896,7 +896,7 @@ export default function GenerateLogisticsAssignments() {
                 <Button
                   variant="outline"
                   className={cn(
-                    "justify-start text-left font-normal",
+                    "justify-start border-2 border-custom-blue text-left text-[13px] font-normal [background-clip:unset] [-webkit-background-clip:unset]",
                     !selectedDate && "text-muted-foreground"
                   )}
                   data-testid="button-logistics-work-date"

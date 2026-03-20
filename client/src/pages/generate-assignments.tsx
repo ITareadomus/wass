@@ -2006,7 +2006,7 @@ export default function GenerateAssignments() {
                 <Button
                   variant="outline"
                   className={cn(
-                    "justify-start text-left font-normal",
+                    "justify-start border-2 border-custom-blue text-left text-[13px] font-normal [background-clip:unset] [-webkit-background-clip:unset]",
                     !selectedDate && "text-muted-foreground"
                   )}
                 >
