@@ -47,6 +47,8 @@ interface TimelineViewProps {
   tasks: Task[];
   hasUnsavedChanges?: boolean; // Stato delle modifiche non salvate dal parent
   onTaskMoved?: () => void; // Callback quando una task viene spostata
+  /** Dopo reset assegnazioni: ripristina stato pulsanti Assegna EO → HP → LP nel parent */
+  onWaveAssignStateReset?: () => void;
   isReadOnly?: boolean; // Modalità read-only: disabilita tutte le modifiche
   isLoadingDragDrop?: boolean; // Mostra loading overlay durante drag&drop
   lastValidDragIndex?: number | null; // Indice valido durante il drag (da container verso timeline)
@@ -77,6 +79,7 @@ export default function TimelineView({
   tasks,
   hasUnsavedChanges = false,
   onTaskMoved,
+  onWaveAssignStateReset,
   isReadOnly = false,
   isLoadingDragDrop = false,
   lastValidDragIndex = null,
@@ -1395,6 +1398,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
         throw new Error('Errore durante il reset');
       }
 
+      onWaveAssignStateReset?.();
+
       // Svuota subito la timeline in UI, così l'utente vede l'effetto
       setTimelineData(null);
       setLastSavedFilename(null);
@@ -1802,7 +1807,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             <div>
               <h2 className="text-xl font-bold text-foreground flex items-center">
                 <CalendarIcon className="w-5 h-5 mr-2 text-custom-blue" />
-                Timeline Assegnazioni - {cleaners.length} Cleaners
+                Timeline Housekeeping - {cleaners.length} Cleaners
               </h2>
             </div>
             <div className="flex gap-3 print:hidden">
@@ -1926,30 +1931,35 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               className="flex-shrink-0 p-1 flex items-center justify-center h-full print:hidden"
               style={{ width: `${cleanerColumnWidth}px` }}
             >
-              {!isReadOnly && (
-                <Button
-                  onClick={() => setShowClearAllSelectedCleanersDialog(true)}
-                  variant="ghost"
-                  size="sm"
-                  disabled={cleaners.length === 0 || hasTasksInTimeline || clearAllSelectedCleanersMutation.isPending}
-                  className={cn(
-                    "w-full h-full border-2",
-                    "border-red-600 dark:border-red-500",
-                    "text-red-700 dark:text-red-200",
-                    "hover:bg-red-50 dark:hover:bg-red-950/30"
-                  )}
-                  aria-label="Rimuovi tutti i cleaners convocati"
-                  title={
-                    cleaners.length === 0
+              <Button
+                onClick={() => setShowClearAllSelectedCleanersDialog(true)}
+                variant="ghost"
+                size="sm"
+                disabled={
+                  isReadOnly ||
+                  cleaners.length === 0 ||
+                  hasTasksInTimeline ||
+                  clearAllSelectedCleanersMutation.isPending
+                }
+                className={cn(
+                  "w-full h-full border-2",
+                  "border-red-600 dark:border-red-500",
+                  "text-red-700 dark:text-red-200",
+                  "hover:bg-red-50 dark:hover:bg-red-950/30"
+                )}
+                aria-label="Rimuovi tutti i cleaners convocati"
+                title={
+                  isReadOnly
+                    ? "Non disponibile in modalità storico (data passata)"
+                    : cleaners.length === 0
                       ? "Nessun cleaner convocato da rimuovere"
                       : hasTasksInTimeline
                         ? "Disabilitato: ci sono task nella timeline"
                         : `Rimuovi tutti i convocati (${cleaners.length})`
-                  }
-                >
-                  <UserMinus className="w-5 h-5" />
-                </Button>
-              )}
+                }
+              >
+                <UserMinus className="w-5 h-5" />
+              </Button>
             </div>
             <div
               ref={timelineRowRef}
@@ -1977,7 +1987,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 <div className="text-center p-6">
                   <Users className="mx-auto h-12 w-12 text-yellow-600 dark:text-yellow-400 mb-3" />
                   <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
-                    Nessun cleaner selezionato
+                    Nessun cleaner convocato
                   </h3>
                   <p className="text-yellow-700 dark:text-yellow-300">
                     Vai alla pagina Convocazioni per selezionare i cleaner da convocare
@@ -2526,7 +2536,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
       {/* Alias Edit Dialog */}
       <Dialog open={aliasDialog.open} onOpenChange={(open) => !open && setAliasDialog({ open: false, cleanerId: null, cleanerName: '' })}>
-        <DialogContent className="sm:max-md">
+        <DialogContent className="sm:max-md" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="w-5 h-5 text-custom-blue" />
@@ -2546,7 +2556,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 onChange={(e) => setEditingAlias(e.target.value)}
                 placeholder="Inserisci alias"
                 className="w-full"
-                autoFocus
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     handleSaveAlias();
@@ -2590,7 +2599,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
       {/* Start Time Edit Dialog */}
       <Dialog open={startTimeEditDialog.open} onOpenChange={(open) => !open && setStartTimeEditDialog({ open: false, cleanerId: null, cleanerName: '' })}>
-        <DialogContent className="sm:max-md">
+        <DialogContent className="sm:max-md" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="w-5 h-5 text-custom-blue" />
@@ -2611,7 +2620,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 onChange={(e) => setEditingStartTime(e.target.value)}
                 placeholder="Inserisci orario (HH:mm)"
                 className="w-full"
-                autoFocus
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     handleSaveStartTime();
@@ -2907,6 +2915,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             // DARK: stesso background del dialog Dettagli Task (quello di default di shadcn: bg-background)
             "dark:bg-background",
           )}
+          onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">

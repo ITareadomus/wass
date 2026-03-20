@@ -119,6 +119,14 @@ export function ThemeToggle() {
 
   const currentUser = getCurrentUser();
 
+  const getHomePath = (): string => {
+    if (typeof window !== "undefined" && (location === "/convocazioni" || location.startsWith("/convocazioni?"))) {
+      const kind = new URLSearchParams(window.location.search).get("kind");
+      if (kind === "drivers") return "/generate-logistics-assignments";
+    }
+    return "/generate-assignments";
+  };
+
   return (
     <div className="flex items-center gap-2">
       <Button
@@ -133,10 +141,10 @@ export function ThemeToggle() {
           <Moon className="h-5 w-5" />
         )}
       </Button>
-      {location !== "/" && location !== "/generate-assignments" && location !== "/login" && (
-        <Button 
-          onClick={() => setLocation("/generate-assignments")} 
-          variant="outline" 
+      {location !== "/" && location !== "/generate-assignments" && location !== "/generate-logistics-assignments" && location !== "/login" && (
+        <Button
+          onClick={() => setLocation(getHomePath())}
+          variant="outline"
           size="icon"
           className="rounded-full"
           title="Torna alla Home"

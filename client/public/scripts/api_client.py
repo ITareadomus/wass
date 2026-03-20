@@ -175,7 +175,16 @@ class ApiClient:
             "containers": containers_data
         }
         return self._post("/api/containers", payload)
-    
+
+    def get_logistics_containers(self, date: str) -> Dict:
+        """Carica logistics containers (enable_route_drivers) da PostgreSQL."""
+        return self._get("/api/logistics-containers", {"date": date})
+
+    def save_logistics_containers(self, date: str, containers_data: Dict) -> Dict:
+        """Salva logistics containers su PostgreSQL (tabella daily_logistics_containers)."""
+        payload = {"date": date, "containers": containers_data}
+        return self._post("/api/logistics-containers", payload)
+
     # ==================== CLEANERS ====================
     
     def get_cleaners(self, date: str) -> List[Dict]:
@@ -239,6 +248,15 @@ class ApiClient:
             "snapshotReason": "extract_cleaners_optimized"
         }
         return self._post("/api/cleaners", payload)
+
+    def save_logistics_drivers(self, date: str, drivers: List[Dict]) -> Dict:
+        """Salva roster autisti (lg_drivers) su PostgreSQL via API."""
+        payload = {
+            "date": date,
+            "drivers": drivers,
+            "snapshotReason": "extract_logistics_drivers",
+        }
+        return self._post("/api/logistics-drivers", payload)
     
     # ==================== HELPER METHODS ====================
     

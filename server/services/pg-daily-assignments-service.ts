@@ -101,6 +101,48 @@ export interface PgDailyAssignmentRow {
   updated_at?: Date;
 }
 
+/** Flat row for daily_logistics_assignments_* (mirror of PgDailyAssignmentRow, driver_*) */
+export interface PgLogisticsAssignmentRow {
+  work_date: string;
+  driver_id: number;
+  driver_name?: string | null;
+  driver_lastname?: string | null;
+  driver_role?: string | null;
+  driver_premium?: boolean | null;
+  driver_start_time?: string | null;
+  task_id: number;
+  logistic_code: number;
+  client_id?: number | null;
+  premium: boolean;
+  address: string;
+  lat?: number | null;
+  lng?: number | null;
+  cleaning_time: number;
+  base_cleaning_time?: number | null;
+  checkin_date?: string | null;
+  checkout_date?: string | null;
+  checkin_time?: string | null;
+  checkout_time?: string | null;
+  pax_in?: number | null;
+  pax_out?: number | null;
+  small_equipment?: boolean | null;
+  operation_id?: number | null;
+  confirmed_operation?: boolean | null;
+  straordinaria?: boolean | null;
+  type_apt?: string | null;
+  alias?: string | null;
+  customer_name?: string | null;
+  customer_reference?: string | number | null;
+  reasons: string[];
+  priority?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  followup?: boolean | null;
+  sequence: number;
+  travel_time: number;
+  manually_moved?: boolean;
+}
+
 export class PgDailyAssignmentsService {
 
   /**
@@ -187,6 +229,193 @@ export class PgDailyAssignmentsService {
       console.log('✅ PG: Tabella daily_task_locks verificata');
     } catch (error) {
       console.warn('⚠️ PG: Errore (ignorabile) nella creazione daily_task_locks:', error);
+    }
+  }
+
+  /**
+   * Logistics: lg_selected_drivers*, daily_logistics_assignments_* (timeline separata da HK)
+   */
+  async ensureLogisticsWorkspaceTables(): Promise<void> {
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS lg_selected_drivers (
+          id SERIAL PRIMARY KEY,
+          work_date DATE NOT NULL UNIQUE,
+          drivers INTEGER[] NOT NULL DEFAULT '{}',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await query(`CREATE INDEX IF NOT EXISTS idx_lg_selected_drivers_work_date ON lg_selected_drivers(work_date)`);
+      await query(`
+        CREATE TABLE IF NOT EXISTS lg_selected_drivers_revisions (
+          id SERIAL PRIMARY KEY,
+          selected_drivers_id INTEGER NOT NULL REFERENCES lg_selected_drivers(id) ON DELETE CASCADE,
+          work_date DATE NOT NULL,
+          revision_number INTEGER NOT NULL,
+          drivers_before INTEGER[] NOT NULL DEFAULT '{}',
+          drivers_after INTEGER[] NOT NULL DEFAULT '{}',
+          action_type VARCHAR(30) NOT NULL,
+          action_payload JSONB,
+          performed_by VARCHAR(100),
+          created_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE (selected_drivers_id, revision_number)
+        )
+      `);
+      await query(`
+        CREATE INDEX IF NOT EXISTS idx_lg_sel_drivers_rev_work_date ON lg_selected_drivers_revisions(work_date)
+      `);
+
+      await query(`
+        CREATE TABLE IF NOT EXISTS daily_logistics_assignments_revisions (
+          id SERIAL PRIMARY KEY,
+          work_date DATE NOT NULL,
+          revision INTEGER NOT NULL,
+          task_count INTEGER DEFAULT 0,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          created_by VARCHAR(100) DEFAULT 'system',
+          modification_type VARCHAR(100),
+          UNIQUE(work_date, revision)
+        )
+      `);
+      await query(`
+        CREATE INDEX IF NOT EXISTS idx_logistics_assignments_revisions_work_date
+        ON daily_logistics_assignments_revisions(work_date, revision DESC)
+      `);
+      await query(`ALTER TABLE daily_logistics_assignments_revisions ADD COLUMN IF NOT EXISTS edited_fields TEXT[] DEFAULT '{}'`);
+      await query(`ALTER TABLE daily_logistics_assignments_revisions ADD COLUMN IF NOT EXISTS old_values TEXT[] DEFAULT '{}'`);
+      await query(`ALTER TABLE daily_logistics_assignments_revisions ADD COLUMN IF NOT EXISTS new_values TEXT[] DEFAULT '{}'`);
+
+      await query(`
+        CREATE TABLE IF NOT EXISTS daily_logistics_assignments_current (
+          id BIGSERIAL PRIMARY KEY,
+          work_date DATE NOT NULL,
+          driver_id INTEGER NOT NULL,
+          driver_name VARCHAR(255),
+          driver_lastname VARCHAR(255),
+          driver_role VARCHAR(100),
+          driver_premium BOOLEAN DEFAULT FALSE,
+          driver_start_time VARCHAR(10) DEFAULT '10:00',
+          task_id INTEGER NOT NULL,
+          logistic_code INTEGER NOT NULL,
+          client_id INTEGER,
+          premium BOOLEAN NOT NULL DEFAULT FALSE,
+          address TEXT NOT NULL DEFAULT '',
+          lat NUMERIC(9, 6),
+          lng NUMERIC(9, 6),
+          cleaning_time INTEGER NOT NULL DEFAULT 0,
+          base_cleaning_time INTEGER,
+          checkin_date DATE,
+          checkout_date DATE,
+          checkin_time VARCHAR(10),
+          checkout_time VARCHAR(10),
+          pax_in INTEGER,
+          pax_out INTEGER,
+          small_equipment BOOLEAN,
+          operation_id INTEGER,
+          confirmed_operation BOOLEAN,
+          straordinaria BOOLEAN,
+          type_apt VARCHAR(100),
+          alias VARCHAR(255),
+          customer_name VARCHAR(255),
+          customer_reference TEXT,
+          reasons TEXT[] NOT NULL DEFAULT '{}',
+          manually_moved BOOLEAN NOT NULL DEFAULT FALSE,
+          priority VARCHAR(50),
+          start_time VARCHAR(10),
+          end_time VARCHAR(10),
+          followup BOOLEAN,
+          sequence INTEGER NOT NULL DEFAULT 0,
+          travel_time INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await query(`CREATE INDEX IF NOT EXISTS idx_logistics_assignments_current_work_date ON daily_logistics_assignments_current(work_date)`);
+      await query(`CREATE INDEX IF NOT EXISTS idx_logistics_assignments_current_driver_date ON daily_logistics_assignments_current(driver_id, work_date)`);
+      await query(`CREATE INDEX IF NOT EXISTS idx_logistics_assignments_current_task ON daily_logistics_assignments_current(task_id)`);
+
+      await query(`
+        CREATE TABLE IF NOT EXISTS daily_logistics_assignments_history (
+          id SERIAL PRIMARY KEY,
+          work_date DATE NOT NULL,
+          revision INTEGER NOT NULL,
+          driver_id INTEGER NOT NULL,
+          driver_name VARCHAR(255),
+          driver_lastname VARCHAR(255),
+          driver_role VARCHAR(100),
+          driver_premium BOOLEAN DEFAULT FALSE,
+          driver_start_time VARCHAR(10) DEFAULT '10:00',
+          task_id INTEGER NOT NULL,
+          logistic_code INTEGER NOT NULL,
+          client_id INTEGER,
+          premium BOOLEAN NOT NULL DEFAULT FALSE,
+          address TEXT NOT NULL DEFAULT '',
+          lat NUMERIC(9, 6),
+          lng NUMERIC(9, 6),
+          cleaning_time INTEGER NOT NULL DEFAULT 0,
+          base_cleaning_time INTEGER,
+          checkin_date DATE,
+          checkout_date DATE,
+          checkin_time VARCHAR(10),
+          checkout_time VARCHAR(10),
+          pax_in INTEGER,
+          pax_out INTEGER,
+          small_equipment BOOLEAN,
+          operation_id INTEGER,
+          confirmed_operation BOOLEAN,
+          straordinaria BOOLEAN,
+          type_apt VARCHAR(100),
+          alias VARCHAR(255),
+          customer_name VARCHAR(255),
+          customer_reference TEXT,
+          reasons TEXT[] NOT NULL DEFAULT '{}',
+          manually_moved BOOLEAN NOT NULL DEFAULT FALSE,
+          priority VARCHAR(50),
+          start_time VARCHAR(10),
+          end_time VARCHAR(10),
+          followup BOOLEAN,
+          sequence INTEGER NOT NULL DEFAULT 0,
+          travel_time INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          created_by VARCHAR(100) DEFAULT 'system'
+        )
+      `);
+      await query(`
+        CREATE INDEX IF NOT EXISTS idx_logistics_assignments_history_work_rev
+        ON daily_logistics_assignments_history(work_date, revision DESC)
+      `);
+
+      await query(`
+        CREATE TABLE IF NOT EXISTS lg_drivers (
+          id SERIAL PRIMARY KEY,
+          driver_id INTEGER NOT NULL,
+          work_date DATE NOT NULL,
+          name VARCHAR(255) NOT NULL,
+          lastname VARCHAR(255) NOT NULL,
+          role VARCHAR(50) DEFAULT 'Driver',
+          active BOOLEAN DEFAULT true,
+          ranking INTEGER DEFAULT 0,
+          counter_hours DECIMAL(6,2) DEFAULT 0,
+          counter_days INTEGER DEFAULT 0,
+          available BOOLEAN DEFAULT true,
+          contract_type VARCHAR(50),
+          preferred_customers INTEGER[] DEFAULT '{}',
+          telegram_id BIGINT,
+          start_time VARCHAR(10) DEFAULT '10:00',
+          can_do_straordinaria BOOLEAN DEFAULT false,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW(),
+          UNIQUE(driver_id, work_date)
+        )
+      `);
+      await query(`CREATE INDEX IF NOT EXISTS idx_lg_drivers_work_date ON lg_drivers(work_date)`);
+      await query(`CREATE INDEX IF NOT EXISTS idx_lg_drivers_driver_id ON lg_drivers(driver_id)`);
+      await query(`CREATE INDEX IF NOT EXISTS idx_lg_drivers_active ON lg_drivers(active)`);
+
+      console.log('✅ PG: Tabelle logistics workspace verificate');
+    } catch (error) {
+      console.warn('⚠️ PG: ensureLogisticsWorkspaceTables:', error);
     }
   }
 
@@ -890,6 +1119,45 @@ export class PgDailyAssignmentsService {
     }
   }
 
+  /** Ultimo invio timeline logistica su ADAM (se presente). */
+  async getLastLogisticsTransferToAdamTimestamp(workDate: string): Promise<Date | null> {
+    try {
+      const result = await query(
+        `
+        SELECT created_at
+        FROM daily_logistics_assignments_revisions
+        WHERE work_date = $1 AND modification_type = 'transfer_to_adam'
+        ORDER BY revision DESC
+        LIMIT 1
+      `,
+        [workDate]
+      );
+      return result.rows[0]?.created_at || null;
+    } catch (error) {
+      console.error('❌ PG: getLastLogisticsTransferToAdamTimestamp:', error);
+      return null;
+    }
+  }
+
+  /** Driver con almeno una task nella timeline logistica corrente per la data. */
+  async loadLogisticsCurrentDriverIds(workDate: string): Promise<Set<number>> {
+    try {
+      const result = await query(
+        `SELECT DISTINCT driver_id FROM daily_logistics_assignments_current WHERE work_date = $1`,
+        [workDate]
+      );
+      const s = new Set<number>();
+      for (const row of result.rows) {
+        const id = Number((row as any).driver_id);
+        if (Number.isFinite(id)) s.add(id);
+      }
+      return s;
+    } catch (error) {
+      console.error('❌ PG: loadLogisticsCurrentDriverIds:', error);
+      return new Set();
+    }
+  }
+
   /**
    * Count how many transfer_to_adam revisions exist for a work_date.
    * Used to detect "second or later transfer" for cleanup phase (clear unassigned tasks on ADAM).
@@ -905,6 +1173,341 @@ export class PgDailyAssignmentsService {
     } catch (error) {
       console.error('❌ PG History: Errore nel conteggio trasferimenti ADAM:', error);
       return 0;
+    }
+  }
+
+  // ==================== LOGISTICS TIMELINE (daily_logistics_assignments_*) ====================
+
+  private logisticsTimelineToRows(workDate: string, timeline: any): PgLogisticsAssignmentRow[] {
+    const rows: PgLogisticsAssignmentRow[] = [];
+    if (!timeline?.drivers_assignments || !Array.isArray(timeline.drivers_assignments)) {
+      return rows;
+    }
+    for (const assignment of timeline.drivers_assignments) {
+      const driver = assignment.driver;
+      if (!driver?.id) continue;
+      const tasks = assignment.tasks || [];
+      for (const task of tasks) {
+        if (!task.task_id) continue;
+        rows.push({
+          work_date: workDate,
+          driver_id: Number(driver.id),
+          driver_name: driver.name || null,
+          driver_lastname: driver.lastname || null,
+          driver_role: driver.role || null,
+          driver_premium: driver.premium != null ? Boolean(driver.premium) : null,
+          driver_start_time: driver.start_time ?? '10:00',
+          task_id: Number(task.task_id),
+          logistic_code: Number(task.logistic_code || 0),
+          client_id: task.client_id ? Number(task.client_id) : null,
+          premium: Boolean(task.premium),
+          address: String(task.address || ''),
+          lat: task.lat ? parseFloat(String(task.lat)) : null,
+          lng: task.lng ? parseFloat(String(task.lng)) : null,
+          cleaning_time: Number(task.cleaning_time || 0),
+          base_cleaning_time: task.base_cleaning_time != null ? Number(task.base_cleaning_time) : Number(task.cleaning_time || 0),
+          checkin_date: normalizeDateToYmd(task.checkin_date),
+          checkout_date: normalizeDateToYmd(task.checkout_date),
+          checkin_time: task.checkin_time || null,
+          checkout_time: task.checkout_time || null,
+          pax_in: task.pax_in != null ? Number(task.pax_in) : null,
+          pax_out: task.pax_out != null ? Number(task.pax_out) : null,
+          small_equipment: task.small_equipment != null ? Boolean(task.small_equipment) : null,
+          operation_id: task.operation_id != null ? Number(task.operation_id) : null,
+          confirmed_operation: task.confirmed_operation != null ? Boolean(task.confirmed_operation) : null,
+          straordinaria: task.straordinaria != null ? Boolean(task.straordinaria) : null,
+          type_apt: task.type_apt || null,
+          alias: task.alias || null,
+          customer_name: task.customer_name || null,
+          customer_reference: task.customer_reference ? String(task.customer_reference) : null,
+          reasons: Array.isArray(task.reasons) ? task.reasons : [],
+          priority: task.priority || null,
+          start_time: task.start_time || null,
+          end_time: task.end_time || null,
+          followup: task.followup != null ? Boolean(task.followup) : null,
+          sequence: Number(task.sequence || 0),
+          travel_time: Number(task.travel_time || 0),
+          manually_moved: Boolean(task.manually_moved),
+        });
+      }
+    }
+    return rows;
+  }
+
+  async saveLogisticsTimeline(workDate: string, timeline: any): Promise<number> {
+    const client = await pool.connect();
+    try {
+      const rows = this.logisticsTimelineToRows(workDate, timeline);
+      await client.query('BEGIN');
+      await client.query('DELETE FROM daily_logistics_assignments_current WHERE work_date = $1', [workDate]);
+      if (rows.length === 0) {
+        await client.query('COMMIT');
+        return 0;
+      }
+      for (const row of rows) {
+        await client.query(`
+          INSERT INTO daily_logistics_assignments_current (
+            work_date, driver_id, driver_name, driver_lastname, driver_role, driver_premium, driver_start_time,
+            task_id, logistic_code, client_id,
+            premium, address, lat, lng, cleaning_time, base_cleaning_time,
+            checkin_date, checkout_date, checkin_time, checkout_time,
+            pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
+            type_apt, alias, customer_name, customer_reference, reasons, manually_moved, priority,
+            start_time, end_time, followup, sequence, travel_time
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7,
+            $8, $9, $10,
+            $11, $12, $13, $14, $15, $16,
+            $17, $18, $19, $20,
+            $21, $22, $23, $24, $25, $26,
+            $27, $28, $29, $30, $31, $32, $33,
+            $34, $35, $36, $37, $38
+          )
+        `, [
+          row.work_date,
+          row.driver_id,
+          row.driver_name,
+          row.driver_lastname,
+          row.driver_role,
+          row.driver_premium,
+          row.driver_start_time,
+          row.task_id,
+          row.logistic_code,
+          row.client_id,
+          row.premium,
+          row.address,
+          row.lat,
+          row.lng,
+          row.cleaning_time,
+          row.base_cleaning_time,
+          row.checkin_date,
+          row.checkout_date,
+          row.checkin_time ? row.checkin_time.substring(0, 5) : null,
+          row.checkout_time ? row.checkout_time.substring(0, 5) : null,
+          row.pax_in,
+          row.pax_out,
+          row.small_equipment,
+          row.operation_id,
+          row.confirmed_operation,
+          row.straordinaria,
+          row.type_apt,
+          row.alias,
+          row.customer_name,
+          row.customer_reference,
+          row.reasons,
+          row.manually_moved === true,
+          row.priority,
+          row.start_time,
+          row.end_time,
+          row.followup,
+          row.sequence,
+          row.travel_time,
+        ]);
+      }
+      await client.query('COMMIT');
+      return rows.length;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG Logistics: saveLogisticsTimeline', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getLogisticsAssignments(workDate: string): Promise<PgLogisticsAssignmentRow[]> {
+    try {
+      const result = await query(
+        'SELECT * FROM daily_logistics_assignments_current WHERE work_date = $1 ORDER BY driver_id, sequence',
+        [workDate]
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('❌ PG Logistics: getLogisticsAssignments', error);
+      return [];
+    }
+  }
+
+  async loadLogisticsTimeline(workDate: string): Promise<any | null> {
+    try {
+      const rows = await this.getLogisticsAssignments(workDate);
+      if (rows.length === 0) {
+        return null;
+      }
+      const driverMap = new Map<number, { driver: any; tasks: any[] }>();
+      for (const row of rows) {
+        if (!driverMap.has(row.driver_id)) {
+          const driver: any = { id: row.driver_id };
+          if (row.driver_name) driver.name = row.driver_name;
+          if (row.driver_lastname) driver.lastname = row.driver_lastname;
+          if (row.driver_role) driver.role = row.driver_role;
+          if (row.driver_premium !== null) driver.premium = row.driver_premium;
+          driver.start_time = row.driver_start_time ?? '10:00';
+          driverMap.set(row.driver_id, { driver, tasks: [] });
+        }
+        const task: any = {
+          task_id: row.task_id,
+          logistic_code: row.logistic_code,
+        };
+        if (row.client_id) task.client_id = row.client_id;
+        if (row.premium !== null) task.premium = row.premium;
+        if (row.address) task.address = row.address;
+        if (row.lat !== null) task.lat = parseFloat(String(row.lat));
+        if (row.lng !== null) task.lng = parseFloat(String(row.lng));
+        const baseTime =
+          row.base_cleaning_time != null ? row.base_cleaning_time : row.cleaning_time;
+        task.base_cleaning_time = baseTime;
+        task.cleaning_time = row.cleaning_time;
+        task.checkin_date = normalizeDateToYmd(row.checkin_date) ?? undefined;
+        task.checkout_date = normalizeDateToYmd(row.checkout_date) ?? undefined;
+        if (row.checkin_time) task.checkin_time = row.checkin_time.substring(0, 5);
+        if (row.checkout_time) task.checkout_time = row.checkout_time.substring(0, 5);
+        if (row.pax_in !== null) task.pax_in = row.pax_in;
+        if (row.pax_out !== null) task.pax_out = row.pax_out;
+        if (row.small_equipment !== null) task.small_equipment = row.small_equipment;
+        if (row.operation_id !== null) task.operation_id = row.operation_id;
+        if (row.confirmed_operation !== null) task.confirmed_operation = row.confirmed_operation;
+        if (row.straordinaria !== null) task.straordinaria = row.straordinaria;
+        if (row.type_apt) task.type_apt = row.type_apt;
+        if (row.alias) task.alias = row.alias;
+        if (row.customer_name) task.customer_name = row.customer_name;
+        if (row.customer_reference) task.customer_reference = row.customer_reference;
+        if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
+        task.manually_moved = row.manually_moved === true;
+        if (row.priority) task.priority = row.priority;
+        if (row.start_time) task.start_time = row.start_time;
+        if (row.end_time) task.end_time = row.end_time;
+        if (row.followup !== null) task.followup = row.followup;
+        if (row.sequence !== null) task.sequence = row.sequence;
+        if (row.travel_time !== null) task.travel_time = row.travel_time;
+        driverMap.get(row.driver_id)!.tasks.push(task);
+      }
+      const drivers_assignments = Array.from(driverMap.values()).map((da) => ({
+        ...da,
+        tasks: da.tasks.sort((a, b) => (a.sequence || 0) - (b.sequence || 0)),
+      }));
+      const totalTasks = drivers_assignments.reduce((sum, da) => sum + da.tasks.length, 0);
+      return {
+        drivers_assignments,
+        metadata: {
+          date: workDate,
+          last_updated: new Date().toISOString(),
+          source: 'postgresql_logistics',
+        },
+        meta: {
+          total_drivers: drivers_assignments.length,
+          used_drivers: drivers_assignments.filter((d) => d.tasks.length > 0).length,
+          assigned_tasks: totalTasks,
+        },
+      };
+    } catch (error) {
+      console.error('❌ PG Logistics: loadLogisticsTimeline', error);
+      return null;
+    }
+  }
+
+  async saveLogisticsTimelineToHistory(
+    workDate: string,
+    timeline: any,
+    createdBy: string = 'system',
+    modificationType: string = 'manual',
+    editedFields: string[] = [],
+    oldValues: string[] = [],
+    newValues: string[] = []
+  ): Promise<number> {
+    const client = await pool.connect();
+    try {
+      const rows = this.logisticsTimelineToRows(workDate, timeline);
+      await client.query('BEGIN');
+      await client.query(
+        'SELECT 1 FROM daily_logistics_assignments_revisions WHERE work_date = $1 FOR UPDATE',
+        [workDate]
+      );
+      const revResult = await client.query(
+        'SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_logistics_assignments_revisions WHERE work_date = $1',
+        [workDate]
+      );
+      const revision = parseInt(revResult.rows[0]?.next_revision || '1');
+      await client.query(
+        `
+        INSERT INTO daily_logistics_assignments_revisions (work_date, revision, task_count, created_by, modification_type, edited_fields, old_values, new_values)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `,
+        [workDate, revision, rows.length, createdBy, modificationType, editedFields, oldValues, newValues]
+      );
+      for (const row of rows) {
+        await client.query(
+          `
+          INSERT INTO daily_logistics_assignments_history (
+            work_date, revision, driver_id, driver_name, driver_lastname, driver_role, driver_premium, driver_start_time,
+            task_id, logistic_code, client_id,
+            premium, address, lat, lng, cleaning_time, base_cleaning_time,
+            checkin_date, checkout_date, checkin_time, checkout_time,
+            pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
+            type_apt, alias, customer_name, customer_reference, reasons, manually_moved, priority,
+            start_time, end_time, followup, sequence, travel_time, created_by
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8,
+            $9, $10, $11,
+            $12, $13, $14, $15, $16, $17,
+            $18, $19, $20, $21,
+            $22, $23, $24, $25, $26, $27,
+            $28, $29, $30, $31, $32, $33, $34,
+            $35, $36, $37, $38, $39, $40
+          )
+        `,
+          [
+            row.work_date,
+            revision,
+            row.driver_id,
+            row.driver_name,
+            row.driver_lastname,
+            row.driver_role,
+            row.driver_premium,
+            row.driver_start_time,
+            row.task_id,
+            row.logistic_code,
+            row.client_id,
+            row.premium,
+            row.address,
+            row.lat,
+            row.lng,
+            row.cleaning_time,
+            row.base_cleaning_time,
+            row.checkin_date,
+            row.checkout_date,
+            row.checkin_time,
+            row.checkout_time,
+            row.pax_in,
+            row.pax_out,
+            row.small_equipment,
+            row.operation_id,
+            row.confirmed_operation,
+            row.straordinaria,
+            row.type_apt,
+            row.alias,
+            row.customer_name,
+            row.customer_reference,
+            row.reasons,
+            row.manually_moved === true,
+            row.priority,
+            row.start_time,
+            row.end_time,
+            row.followup,
+            row.sequence,
+            row.travel_time,
+            createdBy,
+          ]
+        );
+      }
+      await client.query('COMMIT');
+      return revision;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG Logistics: saveLogisticsTimelineToHistory', error);
+      throw error;
+    } finally {
+      client.release();
     }
   }
 
@@ -1063,6 +1666,135 @@ export class PgDailyAssignmentsService {
       };
     } catch (error) {
       console.error('❌ PG: Errore nel caricamento containers:', error);
+      return null;
+    }
+  }
+
+  // ==================== LOGISTICS CONTAINERS (daily_logistics_*) ====================
+
+  async loadLogisticsContainers(workDate: string): Promise<any | null> {
+    try {
+      const result = await query(
+        'SELECT * FROM daily_logistics_containers WHERE work_date = $1 ORDER BY priority, task_id',
+        [workDate]
+      );
+
+      if (result.rows.length === 0) {
+        console.log(`📖 PG: Nessun logistics container trovato per ${workDate}`);
+        return null;
+      }
+
+      const locksMap = await this.getLocksMap(workDate);
+
+      const tasksByPriority: { [key: string]: any[] } = {
+        early_out: [],
+        high_priority: [],
+        low_priority: []
+      };
+
+      const priorityMap: { [key: string]: string } = {
+        'early_out': 'early_out',
+        'high': 'high_priority',
+        'high_priority': 'high_priority',
+        'low': 'low_priority',
+        'low_priority': 'low_priority'
+      };
+
+      for (const row of result.rows) {
+        const task: any = {
+          task_id: row.task_id,
+          logistic_code: row.logistic_code,
+          priority: row.priority
+        };
+        if (row.client_id) task.client_id = row.client_id;
+        if (row.premium !== null) task.premium = row.premium;
+        if (row.address) task.address = row.address;
+        if (row.lat !== null) task.lat = String(row.lat);
+        if (row.lng !== null) task.lng = String(row.lng);
+        if (row.cleaning_time) task.cleaning_time = row.cleaning_time;
+        task.checkin_date = normalizeDateToYmd(row.checkin_date) ?? undefined;
+        task.checkout_date = normalizeDateToYmd(row.checkout_date) ?? undefined;
+        if (row.checkin_time) task.checkin_time = row.checkin_time.substring(0, 5);
+        if (row.checkout_time) task.checkout_time = row.checkout_time.substring(0, 5);
+        if (row.pax_in !== null) task.pax_in = row.pax_in;
+        if (row.pax_out !== null) task.pax_out = row.pax_out;
+        if (row.small_equipment !== null) task.small_equipment = row.small_equipment;
+        if (row.operation_id !== null) task.operation_id = row.operation_id;
+        if (row.confirmed_operation !== null) task.confirmed_operation = row.confirmed_operation;
+        if (row.straordinaria !== null) task.straordinaria = row.straordinaria;
+        if (row.type_apt) task.type_apt = row.type_apt;
+        if (row.alias) task.alias = row.alias;
+        if (row.customer_name) task.customer_name = row.customer_name;
+        if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
+        if (row.customer_reference) task.customer_reference = row.customer_reference;
+
+        const lockInfo = locksMap.get(row.task_id);
+        if (lockInfo) {
+          task.locked = lockInfo.locked;
+          task.locked_reason = lockInfo.lockedReason;
+          task.locked_by = lockInfo.lockedBy;
+        } else {
+          task.locked = row.locked || false;
+          task.locked_reason = row.locked_reason || undefined;
+        }
+
+        const dbPriority = row.priority || 'low';
+        const frontendPriority = priorityMap[dbPriority] || 'low_priority';
+        tasksByPriority[frontendPriority].push(task);
+      }
+
+      const allTasks = [...tasksByPriority.early_out, ...tasksByPriority.high_priority, ...tasksByPriority.low_priority];
+      const tasksNeedingRef = allTasks.filter(t => t.client_id === 3 && !t.customer_reference);
+      if (tasksNeedingRef.length > 0) {
+        try {
+          const mysql = await import('mysql2/promise');
+          const adamConnection = await mysql.createConnection({
+            host: process.env.DB_HOST,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_NAME
+          });
+          const logisticCodes = tasksNeedingRef.map(t => t.logistic_code);
+          const [rows] = await adamConnection.execute(
+            `SELECT logistic_code, customer_structure_reference 
+             FROM app_structures 
+             WHERE logistic_code IN (${logisticCodes.map(() => '?').join(',')})`,
+            logisticCodes
+          );
+          const refMap = new Map<number, string>();
+          for (const row of rows as any[]) {
+            if (row.customer_structure_reference) {
+              refMap.set(row.logistic_code, row.customer_structure_reference);
+            }
+          }
+          for (const task of tasksNeedingRef) {
+            const ref = refMap.get(task.logistic_code);
+            if (ref) task.customer_reference = ref;
+          }
+          await adamConnection.end();
+        } catch (adamError) {
+          console.error('⚠️ PG: Errore customer_reference ADAM (logistics):', adamError);
+        }
+      }
+
+      const containers = {
+        early_out: { tasks: tasksByPriority.early_out, count: tasksByPriority.early_out.length },
+        high_priority: { tasks: tasksByPriority.high_priority, count: tasksByPriority.high_priority.length },
+        low_priority: { tasks: tasksByPriority.low_priority, count: tasksByPriority.low_priority.length }
+      };
+      const totalTasks = containers.early_out.count + containers.high_priority.count + containers.low_priority.count;
+      console.log(`✅ PG: Logistics containers caricati per ${workDate} (${totalTasks} task)`);
+      return {
+        containers,
+        summary: {
+          total_tasks: totalTasks,
+          early_out: containers.early_out.count,
+          high_priority: containers.high_priority.count,
+          low_priority: containers.low_priority.count
+        }
+      };
+    } catch (error) {
+      console.error('❌ PG: Errore nel caricamento logistics containers:', error);
       return null;
     }
   }
@@ -1323,6 +2055,185 @@ export class PgDailyAssignmentsService {
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('❌ PG: Errore nel salvataggio containers:', error);
+      return false;
+    } finally {
+      client.release();
+    }
+  }
+
+  async saveLogisticsContainers(workDate: string, containersData: any): Promise<boolean> {
+    const client = await pool.connect();
+    const autoDuplicateLockedBy = 'system:auto_duplicate_adam_logistics';
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM daily_logistics_containers WHERE work_date = $1', [workDate]);
+
+      const containers = containersData?.containers || {};
+      let totalInserted = 0;
+      const autoDuplicateLockReason = 'task doppio (bloccato automaticamente)';
+
+      const priorityConfigs = [
+        { dbName: 'early_out', keys: ['early_out'] },
+        { dbName: 'high_priority', keys: ['high_priority', 'high'] },
+        { dbName: 'low_priority', keys: ['low_priority', 'low'] }
+      ];
+
+      for (const config of priorityConfigs) {
+        let tasks: any[] = [];
+        for (const key of config.keys) {
+          const containerData = containers[key];
+          if (containerData) {
+            tasks = Array.isArray(containerData) ? containerData : (containerData.tasks || []);
+            break;
+          }
+        }
+
+        for (const task of tasks) {
+          if (!task.task_id) continue;
+
+          await client.query(`
+            INSERT INTO daily_logistics_containers (
+              work_date, priority,
+              task_id, logistic_code, client_id, premium, address, lat, lng,
+              cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
+              pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
+              straordinaria, type_apt, alias, customer_name, reasons, customer_reference,
+              locked, locked_reason
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6, $7, $8, $9,
+              $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
+              $20, $21, $22, $23, $24, $25, $26, $27
+            )
+          `, [
+            workDate,
+            config.dbName,
+            task.task_id,
+            task.logistic_code || 0,
+            task.client_id || null,
+            task.premium || false,
+            task.address || null,
+            task.lat || null,
+            task.lng || null,
+            task.cleaning_time || 0,
+            normalizeDateToYmd(task.checkin_date),
+            normalizeDateToYmd(task.checkout_date),
+            task.checkin_time || null,
+            task.checkout_time || null,
+            task.pax_in ?? null,
+            task.pax_out ?? null,
+            task.small_equipment || false,
+            task.operation_id ?? null,
+            task.confirmed_operation || false,
+            task.straordinaria || false,
+            task.type_apt || null,
+            task.alias || null,
+            task.customer_name || null,
+            task.reasons || [],
+            task.customer_reference || null,
+            task.locked || false,
+            task.locked_reason || null
+          ]);
+          totalInserted++;
+        }
+      }
+
+      const lockDupesUpdate = await client.query(`
+        WITH ranked AS (
+          SELECT work_date, logistic_code, task_id,
+            ROW_NUMBER() OVER (
+              PARTITION BY work_date, logistic_code
+              ORDER BY
+                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+                task_id DESC
+            ) AS rn
+          FROM daily_logistics_containers
+          WHERE work_date = $1 AND logistic_code IS NOT NULL AND logistic_code <> 0
+        ),
+        to_lock AS (SELECT work_date, task_id FROM ranked WHERE rn > 1)
+        UPDATE daily_logistics_containers dc
+        SET locked = TRUE, locked_reason = $2
+        FROM to_lock tl
+        WHERE dc.work_date = tl.work_date AND dc.task_id = tl.task_id
+          AND COALESCE(dc.locked, FALSE) = FALSE
+      `, [workDate, autoDuplicateLockReason]);
+
+      const lockDupesUpsert = await client.query(`
+        WITH ranked AS (
+          SELECT work_date, logistic_code, task_id,
+            ROW_NUMBER() OVER (
+              PARTITION BY work_date, logistic_code
+              ORDER BY
+                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+                task_id DESC
+            ) AS rn
+          FROM daily_logistics_containers
+          WHERE work_date = $1 AND logistic_code IS NOT NULL AND logistic_code <> 0
+        ),
+        to_lock AS (SELECT work_date, task_id FROM ranked WHERE rn > 1)
+        INSERT INTO daily_task_locks (work_date, task_id, locked, locked_reason, locked_by)
+        SELECT work_date, task_id, TRUE, $2, $3 FROM to_lock
+        ON CONFLICT (work_date, task_id) DO UPDATE SET
+          locked = TRUE,
+          locked_reason = CASE
+            WHEN daily_task_locks.locked_reason IS NULL OR daily_task_locks.locked_reason = ''
+              THEN EXCLUDED.locked_reason
+            ELSE daily_task_locks.locked_reason END,
+          locked_by = COALESCE(daily_task_locks.locked_by, EXCLUDED.locked_by),
+          updated_at = NOW()
+      `, [workDate, autoDuplicateLockReason, autoDuplicateLockedBy]);
+
+      await client.query(`
+        WITH ranked AS (
+          SELECT work_date, logistic_code, task_id,
+            ROW_NUMBER() OVER (
+              PARTITION BY work_date, logistic_code
+              ORDER BY
+                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+                task_id DESC
+            ) AS rn
+          FROM daily_logistics_containers
+          WHERE work_date = $1 AND logistic_code IS NOT NULL AND logistic_code <> 0
+        ),
+        winners AS (SELECT work_date, task_id FROM ranked WHERE rn = 1)
+        UPDATE daily_logistics_containers dc
+        SET locked = FALSE, locked_reason = NULL
+        FROM winners w
+        WHERE dc.work_date = w.work_date AND dc.task_id = w.task_id
+          AND dc.locked = TRUE AND dc.locked_reason = $2
+      `, [workDate, autoDuplicateLockReason]);
+
+      await client.query(`
+        WITH ranked AS (
+          SELECT work_date, logistic_code, task_id,
+            ROW_NUMBER() OVER (
+              PARTITION BY work_date, logistic_code
+              ORDER BY
+                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+                task_id DESC
+            ) AS rn
+          FROM daily_logistics_containers
+          WHERE work_date = $1 AND logistic_code IS NOT NULL AND logistic_code <> 0
+        ),
+        winners AS (SELECT work_date, task_id FROM ranked WHERE rn = 1)
+        UPDATE daily_task_locks l
+        SET locked = FALSE, locked_reason = NULL, locked_by = $3, updated_at = NOW()
+        FROM winners w
+        WHERE l.work_date = w.work_date AND l.task_id = w.task_id
+          AND l.locked = TRUE AND l.locked_reason = $2 AND l.locked_by = $3
+      `, [workDate, autoDuplicateLockReason, autoDuplicateLockedBy]);
+
+      if ((lockDupesUpdate.rowCount || 0) > 0 || (lockDupesUpsert.rowCount || 0) > 0) {
+        console.log(
+          `🔒 PG: Auto-lock duplicati logistics ${workDate} -> rows=${lockDupesUpdate.rowCount || 0}, locks=${lockDupesUpsert.rowCount || 0}`
+        );
+      }
+
+      await client.query('COMMIT');
+      console.log(`✅ PG: Logistics containers salvati per ${workDate} (${totalInserted} task)`);
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG: Errore nel salvataggio logistics containers:', error);
       return false;
     } finally {
       client.release();
@@ -1814,6 +2725,230 @@ export class PgDailyAssignmentsService {
     }
   }
 
+  // ==================== LOGISTICS CONTAINERS HISTORY ====================
+
+  async saveLogisticsContainersToHistory(
+    workDate: string,
+    createdBy: string = 'system',
+    modificationType: string = 'manual'
+  ): Promise<number> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        'SELECT 1 FROM daily_logistics_containers_revisions WHERE work_date = $1 FOR UPDATE',
+        [workDate]
+      );
+      const revResult = await client.query(
+        'SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_logistics_containers_revisions WHERE work_date = $1',
+        [workDate]
+      );
+      const revision = parseInt(revResult.rows[0]?.next_revision || '1');
+      const currentContainers = await client.query(
+        'SELECT * FROM daily_logistics_containers WHERE work_date = $1',
+        [workDate]
+      );
+      console.log(`📜 PG Logistics History: revisione ${revision}, ${currentContainers.rows.length} task per ${workDate}...`);
+      await client.query(`
+        INSERT INTO daily_logistics_containers_revisions (work_date, revision, task_count, created_by, modification_type)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [workDate, revision, currentContainers.rows.length, createdBy, modificationType]);
+
+      for (const row of currentContainers.rows) {
+        await client.query(`
+          INSERT INTO daily_logistics_containers_history (
+            work_date, revision, priority,
+            task_id, logistic_code, client_id, premium, address, lat, lng,
+            cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
+            pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
+            straordinaria, type_apt, alias, customer_name, reasons, customer_reference, created_by,
+            locked, locked_reason
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+            $21, $22, $23, $24, $25, $26, $27, $28, $29
+          )
+        `, [
+          workDate,
+          revision,
+          row.priority,
+          row.task_id,
+          row.logistic_code,
+          row.client_id,
+          row.premium,
+          row.address,
+          row.lat,
+          row.lng,
+          row.cleaning_time,
+          row.checkin_date,
+          row.checkout_date,
+          row.checkin_time,
+          row.checkout_time,
+          row.pax_in,
+          row.pax_out,
+          row.small_equipment,
+          row.operation_id,
+          row.confirmed_operation,
+          row.straordinaria,
+          row.type_apt,
+          row.alias,
+          row.customer_name,
+          row.reasons || [],
+          row.customer_reference ?? null,
+          createdBy,
+          row.locked || false,
+          row.locked_reason || null
+        ]);
+      }
+      await client.query('COMMIT');
+      console.log(`✅ PG Logistics History: revisione ${revision} salvata`);
+      return revision;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG Logistics History: errore salvataggio:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getLogisticsContainersRevisions(workDate: string): Promise<any[]> {
+    try {
+      const result = await query(
+        `SELECT revision, task_count, created_at, created_by, modification_type
+         FROM daily_logistics_containers_revisions
+         WHERE work_date = $1 ORDER BY revision DESC`,
+        [workDate]
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('❌ PG Logistics History: errore revisioni:', error);
+      return [];
+    }
+  }
+
+  async getLogisticsContainersAtRevision(workDate: string, revision: number): Promise<any | null> {
+    try {
+      const result = await query(
+        'SELECT * FROM daily_logistics_containers_history WHERE work_date = $1 AND revision = $2 ORDER BY priority, task_id',
+        [workDate, revision]
+      );
+      if (result.rows.length === 0) return null;
+      const containers: { [key: string]: any[] } = { early_out: [], high: [], low: [] };
+      for (const row of result.rows) {
+        const task: any = {
+          task_id: row.task_id,
+          logistic_code: row.logistic_code,
+          priority: row.priority,
+          client_id: row.client_id,
+          premium: row.premium,
+          address: row.address,
+          lat: row.lat,
+          lng: row.lng,
+          cleaning_time: row.cleaning_time,
+          checkin_date: row.checkin_date,
+          checkout_date: row.checkout_date,
+          checkin_time: row.checkin_time,
+          checkout_time: row.checkout_time,
+          pax_in: row.pax_in,
+          pax_out: row.pax_out,
+          small_equipment: row.small_equipment,
+          operation_id: row.operation_id,
+          confirmed_operation: row.confirmed_operation,
+          straordinaria: row.straordinaria,
+          type_apt: row.type_apt,
+          alias: row.alias,
+          customer_name: row.customer_name,
+          reasons: row.reasons || [],
+          locked: row.locked || false,
+          locked_reason: row.locked_reason || null
+        };
+        if (row.customer_reference) task.customer_reference = row.customer_reference;
+        const priority = row.priority || 'low';
+        if (!containers[priority]) containers[priority] = [];
+        containers[priority].push(task);
+      }
+      return { containers };
+    } catch (error) {
+      console.error('❌ PG Logistics History: errore caricamento revisione:', error);
+      return null;
+    }
+  }
+
+  async restoreLogisticsContainersFromRevision(
+    workDate: string,
+    revision: number,
+    createdBy: string = 'system'
+  ): Promise<boolean> {
+    const client = await pool.connect();
+    try {
+      await this.saveLogisticsContainersToHistory(workDate, createdBy, 'pre_restore');
+      await client.query('BEGIN');
+      const historyResult = await client.query(
+        'SELECT * FROM daily_logistics_containers_history WHERE work_date = $1 AND revision = $2',
+        [workDate, revision]
+      );
+      if (historyResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return false;
+      }
+      await client.query('DELETE FROM daily_logistics_containers WHERE work_date = $1', [workDate]);
+      for (const row of historyResult.rows) {
+        await client.query(`
+          INSERT INTO daily_logistics_containers (
+            work_date, priority,
+            task_id, logistic_code, client_id, premium, address, lat, lng,
+            cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
+            pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
+            straordinaria, type_apt, alias, customer_name, reasons, customer_reference,
+            locked, locked_reason
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9,
+            $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
+            $20, $21, $22, $23, $24, $25, $26, $27
+          )
+        `, [
+          workDate,
+          row.priority,
+          row.task_id,
+          row.logistic_code,
+          row.client_id,
+          row.premium,
+          row.address,
+          row.lat,
+          row.lng,
+          row.cleaning_time,
+          row.checkin_date,
+          row.checkout_date,
+          row.checkin_time,
+          row.checkout_time,
+          row.pax_in,
+          row.pax_out,
+          row.small_equipment,
+          row.operation_id,
+          row.confirmed_operation,
+          row.straordinaria,
+          row.type_apt,
+          row.alias,
+          row.customer_name,
+          row.reasons || [],
+          row.customer_reference ?? null,
+          row.locked || false,
+          row.locked_reason || null
+        ]);
+      }
+      await client.query('COMMIT');
+      console.log(`✅ PG Logistics: ripristinati ${historyResult.rows.length} task da revisione ${revision}`);
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG Logistics: errore ripristino:', error);
+      return false;
+    } finally {
+      client.release();
+    }
+  }
+
   // ==================== SELECTED CLEANERS ====================
 
   /**
@@ -2014,6 +3149,156 @@ export class PgDailyAssignmentsService {
     }
   }
 
+  // ==================== LOGISTICS SELECTED DRIVERS (lg_selected_drivers) ====================
+
+  async loadSelectedLogisticsDrivers(workDate: string): Promise<number[] | null> {
+    try {
+      const result = await query(
+        'SELECT drivers FROM lg_selected_drivers WHERE work_date = $1',
+        [workDate]
+      );
+      if (result.rows.length > 0 && result.rows[0].drivers) {
+        return result.rows[0].drivers;
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ PG: loadSelectedLogisticsDrivers', error);
+      return null;
+    }
+  }
+
+  async saveSelectedLogisticsDrivers(
+    workDate: string,
+    driverIds: number[],
+    actionType: string = 'replace',
+    actionPayload: any = null,
+    performedBy: string = 'system'
+  ): Promise<boolean> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const currentResult = await client.query(
+        'SELECT id, drivers FROM lg_selected_drivers WHERE work_date = $1',
+        [workDate]
+      );
+      const driversBefore: number[] = currentResult.rows[0]?.drivers || [];
+      let selectedDriversId = currentResult.rows[0]?.id;
+      if (selectedDriversId) {
+        await client.query(
+          `UPDATE lg_selected_drivers SET drivers = $2::integer[], updated_at = NOW() WHERE id = $1`,
+          [selectedDriversId, driverIds]
+        );
+      } else {
+        const insertResult = await client.query(
+          `INSERT INTO lg_selected_drivers (work_date, drivers, updated_at) VALUES ($1, $2::integer[], NOW()) RETURNING id`,
+          [workDate, driverIds]
+        );
+        selectedDriversId = insertResult.rows[0].id;
+      }
+      const beforeSorted = [...driversBefore].sort((a, b) => a - b);
+      const afterSorted = [...driverIds].sort((a, b) => a - b);
+      const hasChanged = JSON.stringify(beforeSorted) !== JSON.stringify(afterSorted);
+      if (hasChanged && actionType !== 'INIT') {
+        const revResult = await client.query(
+          `SELECT COALESCE(MAX(revision_number), 0) + 1 as next_rev FROM lg_selected_drivers_revisions WHERE selected_drivers_id = $1`,
+          [selectedDriversId]
+        );
+        const revisionNumber = revResult.rows[0].next_rev;
+        await client.query(
+          `INSERT INTO lg_selected_drivers_revisions
+           (selected_drivers_id, work_date, revision_number, drivers_before, drivers_after, action_type, action_payload, performed_by)
+           VALUES ($1, $2, $3, $4::integer[], $5::integer[], $6, $7, $8)`,
+          [
+            selectedDriversId,
+            workDate,
+            revisionNumber,
+            driversBefore,
+            driverIds,
+            actionType,
+            actionPayload ? JSON.stringify(actionPayload) : null,
+            performedBy,
+          ]
+        );
+      }
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG: saveSelectedLogisticsDrivers', error);
+      return false;
+    } finally {
+      client.release();
+    }
+  }
+
+  async rollbackSelectedLogisticsDrivers(
+    workDate: string,
+    toRevisionNumber: number,
+    performedBy: string = 'system'
+  ): Promise<boolean> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const revResult = await client.query(
+        `SELECT drivers_before, selected_drivers_id FROM lg_selected_drivers_revisions
+         WHERE work_date = $1 AND revision_number = $2`,
+        [workDate, toRevisionNumber]
+      );
+      if (revResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return false;
+      }
+      const driversToRestore = revResult.rows[0].drivers_before;
+      const selectedDriversId = revResult.rows[0].selected_drivers_id;
+      const currentResult = await client.query('SELECT drivers FROM lg_selected_drivers WHERE work_date = $1', [workDate]);
+      const driversBefore = currentResult.rows[0]?.drivers || [];
+      await client.query(`UPDATE lg_selected_drivers SET drivers = $1::integer[], updated_at = NOW() WHERE work_date = $2`, [
+        driversToRestore,
+        workDate,
+      ]);
+      const nextRevResult = await client.query(
+        `SELECT COALESCE(MAX(revision_number), 0) + 1 as next_rev FROM lg_selected_drivers_revisions WHERE selected_drivers_id = $1`,
+        [selectedDriversId]
+      );
+      await client.query(
+        `INSERT INTO lg_selected_drivers_revisions
+         (selected_drivers_id, work_date, revision_number, drivers_before, drivers_after, action_type, action_payload, performed_by)
+         VALUES ($1, $2, $3, $4::integer[], $5::integer[], 'ROLLBACK', $6, $7)`,
+        [
+          selectedDriversId,
+          workDate,
+          nextRevResult.rows[0].next_rev,
+          driversBefore,
+          driversToRestore,
+          JSON.stringify({ rolled_back_to_revision: toRevisionNumber }),
+          performedBy,
+        ]
+      );
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG: rollbackSelectedLogisticsDrivers', error);
+      return false;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getSelectedLogisticsDriversRevisions(workDate: string): Promise<any[]> {
+    try {
+      const result = await query(
+        `SELECT revision_number, drivers_before, drivers_after, action_type, action_payload, performed_by, created_at
+         FROM lg_selected_drivers_revisions WHERE work_date = $1 ORDER BY revision_number DESC`,
+        [workDate]
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('❌ PG: getSelectedLogisticsDriversRevisions', error);
+      return [];
+    }
+  }
+
   // ==================== CLEANERS (ANAGRAFICA) ====================
 
   /**
@@ -2094,6 +3379,138 @@ export class PgDailyAssignmentsService {
     } catch (error) {
       console.error('❌ PG: Errore nel caricamento cleaners per IDs:', error);
       return [];
+    }
+  }
+
+  // ==================== LOGISTICS DRIVERS ROSTER (lg_drivers, ADAM user_role_id = 9) ====================
+
+  async loadLgDriversForDate(workDate: string): Promise<any[] | null> {
+    try {
+      const result = await query(
+        `
+        SELECT
+          d.driver_id as id, d.name, d.lastname, d.role, d.active, d.ranking,
+          d.counter_hours, d.counter_days, d.available, d.contract_type,
+          d.preferred_customers, d.telegram_id, d.start_time,
+          ca.alias
+        FROM lg_drivers d
+        LEFT JOIN cleaner_aliases ca ON ca.cleaner_id = d.driver_id
+        WHERE d.work_date = $1 AND d.active = true
+        ORDER BY d.counter_hours DESC
+      `,
+        [workDate]
+      );
+      if (result.rows.length > 0) {
+        console.log(`✅ PG: ${result.rows.length} logistics drivers caricati per ${workDate}`);
+        return result.rows;
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ PG: Errore nel caricamento lg_drivers:', error);
+      return null;
+    }
+  }
+
+  async loadLgDriversByIds(driverIds: number[], workDate: string): Promise<any[]> {
+    if (!driverIds || driverIds.length === 0) return [];
+    try {
+      const result = await query(
+        `
+        SELECT
+          d.driver_id as id, d.name, d.lastname, d.role, d.active, d.ranking,
+          d.counter_hours, d.counter_days, d.available, d.contract_type,
+          d.preferred_customers, d.telegram_id, d.start_time,
+          ca.alias
+        FROM lg_drivers d
+        LEFT JOIN cleaner_aliases ca ON ca.cleaner_id = d.driver_id
+        WHERE d.driver_id = ANY($1) AND d.work_date = $2
+      `,
+        [driverIds, workDate]
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('❌ PG: Errore nel caricamento lg_drivers per IDs:', error);
+      return [];
+    }
+  }
+
+  async saveLgDriversForDate(workDate: string, drivers: any[], snapshotReason?: string): Promise<boolean> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const permanentAliases = await client.query(`
+        SELECT cleaner_id, alias, name, lastname FROM cleaner_aliases
+      `);
+      const aliasMap = new Map(permanentAliases.rows.map((r: any) => [r.cleaner_id, r.alias]));
+
+      await client.query('DELETE FROM lg_drivers WHERE work_date = $1', [workDate]);
+      for (const d of drivers) {
+        if (d.alias && !aliasMap.has(d.id)) {
+          await client.query(
+            `
+            INSERT INTO cleaner_aliases (cleaner_id, alias, name, lastname, updated_at)
+            VALUES ($1, $2, $3, $4, NOW())
+            ON CONFLICT (cleaner_id) DO UPDATE SET alias = $2, updated_at = NOW()
+          `,
+            [d.id, d.alias, d.name, d.lastname]
+          );
+        }
+
+        await client.query(
+          `
+          INSERT INTO lg_drivers
+          (driver_id, work_date, name, lastname, role, active, ranking,
+           counter_hours, counter_days, available, contract_type,
+           preferred_customers, telegram_id, start_time,
+           created_at, updated_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
+        `,
+          [
+            d.id,
+            workDate,
+            d.name || '',
+            d.lastname || '',
+            d.role || 'Driver',
+            d.active !== false,
+            d.ranking || 0,
+            d.counter_hours || 0,
+            d.counter_days || 0,
+            d.available !== false,
+            d.contract_type || null,
+            d.preferred_customers || [],
+            d.telegram_id || null,
+            d.start_time ?? '10:00',
+          ]
+        );
+      }
+      await client.query('COMMIT');
+      console.log(`✅ PG: ${drivers.length} lg_drivers salvati per ${workDate}${snapshotReason ? ` (${snapshotReason})` : ''}`);
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ PG: Errore nel salvataggio lg_drivers:', error);
+      return false;
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateLgDriverField(driverId: number, workDate: string, field: string, value: any): Promise<boolean> {
+    const allowedFields = ['start_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days'];
+    if (!allowedFields.includes(field)) {
+      console.error(`❌ PG: Campo lg_drivers non consentito: ${field}`);
+      return false;
+    }
+    try {
+      await query(
+        `UPDATE lg_drivers SET ${field} = $1, updated_at = NOW() WHERE driver_id = $2 AND work_date = $3`,
+        [value, driverId, workDate]
+      );
+      console.log(`✅ PG: lg_drivers ${driverId} (${workDate}): ${field} = ${value}`);
+      return true;
+    } catch (error) {
+      console.error(`❌ PG: Errore update lg_drivers ${driverId}:`, error);
+      return false;
     }
   }
 
@@ -2184,10 +3601,16 @@ export class PgDailyAssignmentsService {
       // Alias: only update cleaner_aliases (cleaners.alias no longer used)
       if (field === 'alias') {
         if (value) {
-          const cleanerData = await query(
+          let cleanerData = await query(
             'SELECT name, lastname FROM cleaners WHERE cleaner_id = $1 AND work_date = $2',
             [cleanerId, workDate]
           );
+          if (!cleanerData.rows[0]) {
+            cleanerData = await query(
+              'SELECT name, lastname FROM lg_drivers WHERE driver_id = $1 AND work_date = $2',
+              [cleanerId, workDate]
+            );
+          }
           const name = cleanerData.rows[0]?.name || null;
           const lastname = cleanerData.rows[0]?.lastname || null;
           await query(`

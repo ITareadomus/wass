@@ -29,6 +29,12 @@ interface PriorityColumnProps {
   isDragDisabled?: boolean;
   containerMultiSelectState?: ContainerMultiSelectState;
   highlightedTaskIds?: Set<string>;
+  /** Disabilita toolbar Multiselect + Assegna (es. pagina logistics senza timeline) */
+  disableToolbar?: boolean;
+  /** Zona drop senza padding interno (evita l'effetto "riquadro" dentro la colonna). */
+  flushDropZone?: boolean;
+  /** Passato a TaskCard per caricare i nomi operazione (enable_wass vs enable_route_drivers). */
+  operationsScope?: "housekeeping" | "logistics";
 }
 
 export default function PriorityColumn({
@@ -42,6 +48,9 @@ export default function PriorityColumn({
   isDragDisabled = false,
   containerMultiSelectState,
   highlightedTaskIds = new Set(),
+  disableToolbar = false,
+  flushDropZone = false,
+  operationsScope = "housekeeping",
 }: PriorityColumnProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isDateInPast, setIsDateInPast] = useState(false);
@@ -264,7 +273,7 @@ export default function PriorityColumn({
             variant={isMultiSelectMode ? "default" : "outline"}
             size="sm"
             onClick={toggleMode}
-            disabled={tasks.length === 0 || isDateInPast}
+            disabled={tasks.length === 0 || isDateInPast || disableToolbar}
             className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
             title={isMultiSelectMode ? "Disattiva selezione multipla" : "Attiva selezione multipla"}
             data-testid="button-toggle-multiselect"
@@ -276,7 +285,14 @@ export default function PriorityColumn({
             variant="outline"
             size="sm"
             onClick={handleAssign}
-            disabled={!assignAction || assignButtonDisabled || tasks.length === 0 || isDateInPast || isAssigning}
+            disabled={
+              !assignAction ||
+              assignButtonDisabled ||
+              tasks.length === 0 ||
+              isDateInPast ||
+              isAssigning ||
+              disableToolbar
+            }
             className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
             title="Assegna"
             data-testid="button-assign-priority"
@@ -292,7 +308,8 @@ export default function PriorityColumn({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`
-              flex flex-wrap gap-2 min-h-[120px] transition-colors duration-200 content-start p-2
+              flex flex-wrap gap-2 min-h-[120px] transition-colors duration-200 content-start border-0
+              ${flushDropZone ? "p-0" : "p-2"}
               ${snapshot.isDraggingOver ? "drop-zone-active" : ""}
             `}
             data-testid={`priority-column-${droppableId}`}
@@ -317,6 +334,7 @@ export default function PriorityColumn({
                   isReadOnly={isDateInPast}
                   multiSelectContext={multiSelectCtx}
                   isHighlighted={isHighlighted}
+                  operationsScope={operationsScope}
                 />
               );
             })}

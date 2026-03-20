@@ -8,6 +8,8 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext, us
 const DEBUG = false;
 const dlog = (...args: any[]) => DEBUG && console.log(...args);
 import { ThemeToggle } from "@/components/theme-toggle";
+import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
+import { WassSiteHeader } from "@/components/wass-site-header";
 import { CalendarIcon, Users, RefreshCw, Settings, HelpCircle, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useLocation, Link } from 'wouter';
@@ -1935,43 +1937,6 @@ export default function GenerateAssignments() {
     return { hasEoOnTimeline, hasHpOnTimeline, hasLpOnTimeline };
   }, [allTasksWithAssignments]);
 
-  // Mostra loader durante l'estrazione
-  if (isExtracting || isLoadingTasks || isLoading) {
-    return (
-      <div className="bg-background text-foreground min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="flex justify-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
-          </div>
-          <h2 className="text-2xl font-bold text-foreground">
-            {isExtracting ? "Estrazione Dati in Corso" : isLoadingTasks ? "Caricamento Task" : "Caricamento Dati"}
-          </h2>
-          <p className="text-muted-foreground">{extractionStep}</p>
-          <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
-            {isExtracting && (
-              <>
-                <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
-                <span>Step 1/2: Estrazione dal database</span>
-              </>
-            )}
-            {isLoadingTasks && (
-              <>
-                <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
-                <span>Step 2/2: Caricamento nei contenitori</span>
-              </>
-            )}
-            {isLoading && (
-              <>
-                <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
-                <span>Caricamento generale...</span>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Definisci la funzione handleDateSelect qui, se non è già definita
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
@@ -1981,46 +1946,90 @@ export default function GenerateAssignments() {
 
   return (
     <div className="bg-background text-foreground min-h-screen">
-      <div className="w-full px-4 py-6">
-        <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl flex items-center gap-2 font-bold text-foreground">
-              GENERA ASSEGNAZIONI del
-            </h1>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "justify-start text-left font-normal",
-                    !selectedDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: it }) : <span>Seleziona data</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={handleDateSelect}
-                  initialFocus
-                  locale={it}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div className="flex items-center gap-3">
+      <WassSiteHeader
+        right={
+          <>
             <Link href={`/unconfirmed-tasks?date=${format(selectedDate, "yyyy-MM-dd")}`}>
               <Button variant="outline" size="icon" className="rounded-full" title="Task Non Confermate" data-testid="link-unconfirmed-tasks">
                 <HelpCircle className="h-5 w-5" />
               </Button>
             </Link>
             <ThemeToggle />
+          </>
+        }
+      />
+      <div className="w-full px-4 pt-3 pb-6">
+        {!(isExtracting || isLoadingTasks || isLoading) && (
+          <div className="mx-auto mb-6 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-4">
+            <div className="flex min-w-0 flex-wrap items-center gap-4">
+              <h1 className="flex items-center gap-2 text-[25px] font-bold text-foreground">
+                HOUSEKEEPING del
+              </h1>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "justify-start border-2 border-custom-blue text-left text-[13px] font-normal [background-clip:unset] [-webkit-background-clip:unset]",
+                      !selectedDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: it }) : <span>Seleziona data</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDateSelect}
+                    initialFocus
+                    locale={it}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <HousekeepingLogisticsSwitch active="housekeeping" />
           </div>
-        </div>
+        )}
 
+        {isExtracting || isLoadingTasks || isLoading ? (
+          <div className="mx-auto flex w-full max-w-[1920px] items-center justify-center p-12">
+            <div className="space-y-4 text-center">
+              <div className="flex justify-center">
+                <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
+              </div>
+              <h2 className="text-xl font-bold text-foreground">
+                {isExtracting
+                  ? "Estrazione Dati in Corso"
+                  : isLoadingTasks
+                    ? "Caricamento Task"
+                    : "Caricamento Dati"}
+              </h2>
+              <p className="text-muted-foreground">{extractionStep}</p>
+              <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+                {isExtracting && (
+                  <>
+                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
+                    <span>Step 1/2: Estrazione dal database</span>
+                  </>
+                )}
+                {isLoadingTasks && (
+                  <>
+                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
+                    <span>Step 2/2: Caricamento nei contenitori</span>
+                  </>
+                )}
+                {isLoading && !isExtracting && !isLoadingTasks && (
+                  <>
+                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
+                    <span>Caricamento generale...</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
         <MultiSelectContext.Provider value={multiSelectContextValue}>
           <DragDropContext
             onDragEnd={onDragEnd}
@@ -2246,6 +2255,11 @@ export default function GenerateAssignments() {
                   tasks={allTasksWithAssignments}
                   hasUnsavedChanges={hasUnsavedChanges}
                   onTaskMoved={handleTaskMoved}
+                  onWaveAssignStateReset={() => {
+                    setHasRunAssignEo(false);
+                    setHasRunAssignHp(false);
+                    setHasRunAssignLp(false);
+                  }}
                   isReadOnly={isTimelineReadOnly}
                   isLoadingDragDrop={isLoadingDragDrop}
                   lastValidDragIndex={lastValidDragIndex}
@@ -2332,6 +2346,7 @@ export default function GenerateAssignments() {
           )}
         </DragDropContext>
         </MultiSelectContext.Provider>
+        )}
       </div>
     </div>
   );
