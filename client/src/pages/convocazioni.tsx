@@ -565,20 +565,6 @@ export default function Convocazioni() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="bg-background text-foreground min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="flex justify-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
-          </div>
-          <h2 className="text-2xl font-bold text-foreground">Caricamento Convocazioni</h2>
-          <p className="text-muted-foreground">{loadingMessage}</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-background text-foreground min-h-screen">
       <div className="p-4 w-full">
@@ -619,39 +605,56 @@ export default function Convocazioni() {
             </div>
           </div>
 
-          {/* Barra Contatore */}
-          <div className="bg-custom-blue-light rounded-xl border-2 border-custom-blue shadow-lg p-6">
-            <div className="flex items-center gap-4 w-full">
-              <div className="flex items-center gap-4 shrink-0">
-                <div className="text-lg font-semibold text-foreground">
-                  {isDrivers ? "DRIVERS SELEZIONATI" : "CLEANERS SELEZIONATI"}
+          {isLoading ? (
+            <div className="flex items-center justify-center p-12">
+              <div className="space-y-4 text-center">
+                <div className="flex justify-center">
+                  <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
                 </div>
-                <div className="text-lg font-bold">
-                  <span className="text-primary">{selectedCleaners.size}</span>
-                  <span className="text-muted-foreground mx-1">/</span>
-                  <span className="text-foreground">{filteredCleaners.length}</span> {/* Utilizza filteredCleaners per il conteggio totale */}
+                <h2 className="text-xl font-bold text-foreground">Caricamento Convocazioni</h2>
+                <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
+                  <span>{loadingMessage}</span>
                 </div>
               </div>
-              <div className="flex-1 min-w-0" aria-hidden />
-              <button
-                type="button"
-                onClick={() => setShowOnlyNotConvocatiDaDueGiorni((prev) => !prev)}
-                className={cn(
-                  "text-sm shrink-0 text-right rounded px-2 py-1 -mx-2 -my-1 transition-colors",
-                  showOnlyNotConvocatiDaDueGiorni
-                    ? "text-yellow-600 dark:text-yellow-400 bg-amber-500/20 underline"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                )}
-              >
-                {isDrivers ? "Driver" : "Cleaners"} non convocati da due giorni o più:{" "}
-                <span className="font-bold text-yellow-500 dark:text-yellow-400">{notConvocatiDaDueGiorniCount}</span>
-                {showOnlyNotConvocatiDaDueGiorni && " (clicca per mostrare tutti)"}
-              </button>
             </div>
-          </div>
+          ) : (
+            /* Barra Contatore */
+            <div className="bg-custom-blue-light rounded-xl border-2 border-custom-blue shadow-lg p-6">
+              <div className="flex items-center gap-4 w-full">
+                <div className="flex items-center gap-4 shrink-0">
+                  <div className="text-lg font-semibold text-foreground">
+                    {isDrivers ? "DRIVERS SELEZIONATI" : "CLEANERS SELEZIONATI"}
+                  </div>
+                  <div className="text-lg font-bold">
+                    <span className="text-primary">{selectedCleaners.size}</span>
+                    <span className="text-muted-foreground mx-1">/</span>
+                    <span className="text-foreground">{filteredCleaners.length}</span>{" "}
+                    {/* Utilizza filteredCleaners per il conteggio totale */}
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0" aria-hidden />
+                <button
+                  type="button"
+                  onClick={() => setShowOnlyNotConvocatiDaDueGiorni((prev) => !prev)}
+                  className={cn(
+                    "text-sm shrink-0 text-right rounded px-2 py-1 -mx-2 -my-1 transition-colors",
+                    showOnlyNotConvocatiDaDueGiorni
+                      ? "text-yellow-600 dark:text-yellow-400 bg-amber-500/20 underline"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                >
+                  {isDrivers ? "Driver" : "Cleaners"} non convocati da due giorni o più:{" "}
+                  <span className="font-bold text-yellow-500 dark:text-yellow-400">{notConvocatiDaDueGiorniCount}</span>
+                  {showOnlyNotConvocatiDaDueGiorni && " (clicca per mostrare tutti)"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Grid con lista cleaners e statistiche affiancate */}
+        {!isLoading && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
           {/* Lista Cleaners - 2/3 dello spazio */}
           <Card className="p-6 lg:col-span-2 flex flex-col overflow-hidden border-2 border-custom-blue bg-custom-blue-light dark:bg-custom-blue">
@@ -1235,6 +1238,7 @@ export default function Convocazioni() {
           </div>
         </Card>
       </div>
+        )}
     </div>
   </div>
   );

@@ -92,6 +92,24 @@ worked_dates = {}
 for r in date_rows:
     worked_dates.setdefault(r["user_id"], set()).add(r["d"])
 
+# 3b) Collaboratore-only: giorno conta se c'è riga in app_housekeeping_report_collaboration (join report)
+try:
+    cur.execute(
+        """
+        SELECT c.user_id, DATE(COALESCE(c.updated_at, r.updated_at)) AS d
+        FROM app_housekeeping_report_collaboration c
+        INNER JOIN app_housekeeping_report r ON r.id = c.housekeeping_report_id
+        WHERE COALESCE(c.updated_at, r.updated_at) >= %s AND COALESCE(c.updated_at, r.updated_at) < %s
+          AND (r.deleted IS NULL OR r.deleted = 0)
+        GROUP BY c.user_id, DATE(COALESCE(c.updated_at, r.updated_at))
+        """,
+        (start_window, target_date),
+    )
+    for r in cur.fetchall():
+        worked_dates.setdefault(r["user_id"], set()).add(r["d"])
+except mysql.connector.Error as e:
+    print(f"⚠️ app_housekeeping_report_collaboration (giorni lavorati): {e}")
+
 def streak_ending_at(uid, last_day):
     """Conta i giorni consecutivi lavorati fino a last_day (incluso), andando indietro."""
     s = worked_dates.get(uid, set())

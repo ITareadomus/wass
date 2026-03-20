@@ -21,6 +21,7 @@ import TaskCard from "@/components/drag-drop/task-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { getCleanerHexColor } from "@/lib/cleaner-colors";
 import type { TaskType as Task } from "@shared/schema";
 import {
   AlertDialog,
@@ -1087,6 +1088,12 @@ export default function LogisticsTimelineView({
                       }
                     >
                       <div className="w-full flex items-center gap-2">
+                        {!driver.isRemoved && (
+                          <div
+                            className="flex-shrink-0 w-3 h-3 rounded-full"
+                            style={{ backgroundColor: getCleanerHexColor(driver.id) }}
+                          />
+                        )}
                         <div className="break-words font-bold text-[13px] flex-1">
                           {driversAliases[driver.id]?.alias ||
                             driver.alias ||

@@ -850,46 +850,6 @@ export default function GenerateLogisticsAssignments() {
     }
   };
 
-  if (isExtractingLogistics) {
-    return (
-      <div className="bg-background text-foreground min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="flex justify-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
-          </div>
-          <h2 className="text-2xl font-bold text-foreground">
-            {logisticsLoaderKind === "extract"
-              ? "Estrazione Dati in Corso"
-              : logisticsLoaderKind === "load-tasks"
-                ? "Caricamento Task"
-                : "Caricamento Dati"}
-          </h2>
-          <p className="text-muted-foreground">{extractionStep}</p>
-          <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
-            {logisticsLoaderKind === "extract" && (
-              <>
-                <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
-                <span>Step 1/2: Estrazione driver dal database</span>
-              </>
-            )}
-            {logisticsLoaderKind === "load-tasks" && (
-              <>
-                <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
-                <span>Step 2/2: Caricamento nei contenitori</span>
-              </>
-            )}
-            {logisticsLoaderKind === "general" && (
-              <>
-                <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
-                <span>Caricamento generale...</span>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-background text-foreground min-h-screen">
       <WassSiteHeader
@@ -911,39 +871,79 @@ export default function GenerateLogisticsAssignments() {
         }
       />
       <div className="w-full px-4 pt-3 pb-6">
-        <div className="mx-auto mb-6 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-4">
-          <div className="flex min-w-0 flex-wrap items-center gap-4">
-            <h1 className="flex items-center gap-2 text-[25px] font-bold text-foreground">
-              LOGISTICS del
-            </h1>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "justify-start border-2 border-custom-blue text-left text-[13px] font-normal [background-clip:unset] [-webkit-background-clip:unset]",
-                    !selectedDate && "text-muted-foreground"
-                  )}
-                  data-testid="button-logistics-work-date"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: it }) : <span>Seleziona data</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={handleDateSelect}
-                  initialFocus
-                  locale={it}
-                />
-              </PopoverContent>
-            </Popover>
+        {!isExtractingLogistics && (
+          <div className="mx-auto mb-6 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-4">
+            <div className="flex min-w-0 flex-wrap items-center gap-4">
+              <h1 className="flex items-center gap-2 text-[25px] font-bold text-foreground">
+                LOGISTICS del
+              </h1>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "justify-start border-2 border-custom-blue text-left text-[13px] font-normal [background-clip:unset] [-webkit-background-clip:unset]",
+                      !selectedDate && "text-muted-foreground"
+                    )}
+                    data-testid="button-logistics-work-date"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: it }) : <span>Seleziona data</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDateSelect}
+                    initialFocus
+                    locale={it}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <HousekeepingLogisticsSwitch active="logistics" />
           </div>
-          <HousekeepingLogisticsSwitch active="logistics" />
-        </div>
+        )}
 
+        {isExtractingLogistics ? (
+          <div className="mx-auto flex w-full max-w-[1920px] items-center justify-center p-12">
+            <div className="space-y-4 text-center">
+              <div className="flex justify-center">
+                <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
+              </div>
+              <h2 className="text-xl font-bold text-foreground">
+                {logisticsLoaderKind === "extract"
+                  ? "Estrazione Dati in Corso"
+                  : logisticsLoaderKind === "load-tasks"
+                    ? "Caricamento Task"
+                    : "Caricamento Dati"}
+              </h2>
+              <p className="text-muted-foreground">{extractionStep}</p>
+              <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+                {logisticsLoaderKind === "extract" && (
+                  <>
+                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
+                    <span>Step 1/2: Estrazione driver dal database</span>
+                  </>
+                )}
+                {logisticsLoaderKind === "load-tasks" && (
+                  <>
+                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
+                    <span>Step 2/2: Caricamento nei contenitori</span>
+                  </>
+                )}
+                {logisticsLoaderKind === "general" && (
+                  <>
+                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
+                    <span>Caricamento generale...</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+        <>
         <div className="mx-auto mb-4 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="relative min-w-[200px] flex-1">
@@ -1120,6 +1120,8 @@ export default function GenerateLogisticsAssignments() {
             </div>
           </div>
         </DragDropContext>
+        </>
+        )}
       </div>
     </div>
   );

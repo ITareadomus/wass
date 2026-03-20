@@ -1174,6 +1174,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (dateStr) lastWorkedByCleanerId.set(id, dateStr);
             }
 
+            const rcm = await import("./services/adam-report-collaboration-mysql");
+            await rcm.mergeLastWorkedFromHousekeepingCollaborations(
+              adamConnection,
+              lastWorkedByCleanerId
+            );
+            await rcm.mergeLastWorkedFromReportCollaboration(adamConnection, lastWorkedByCleanerId);
+
             if (lastTransfer) {
               const [titRows]: any = await adamConnection.execute(
                 `SELECT DISTINCT cleaned_by_us FROM app_housekeeping
@@ -1204,6 +1211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const id = Number(r?.user_id);
               if (Number.isFinite(id)) hasReportIds.add(id);
             }
+            await rcm.addCollaboratorUserIdsWithReportOnDate(adamConnection, workDate, hasReportIds);
           } finally {
             await adamConnection.end();
           }
@@ -1303,6 +1311,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (dateStr) lastWorkedByCleanerId.set(id, dateStr);
           }
 
+          const rcm = await import("./services/adam-report-collaboration-mysql");
+          await rcm.mergeLastWorkedFromHousekeepingCollaborations(
+            adamConnection,
+            lastWorkedByCleanerId
+          );
+          await rcm.mergeLastWorkedFromReportCollaboration(adamConnection, lastWorkedByCleanerId);
+
           // Dopo invio ADAM: "in programma" = titolari + collaboratori da app_housekeeping
           if (lastTransfer) {
             const [titRows]: any = await adamConnection.execute(
@@ -1335,6 +1350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const id = Number(r?.user_id);
             if (Number.isFinite(id)) hasReportIds.add(id);
           }
+          await rcm.addCollaboratorUserIdsWithReportOnDate(adamConnection, workDate, hasReportIds);
         } finally {
           await adamConnection.end();
         }

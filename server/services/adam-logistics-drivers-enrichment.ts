@@ -1,6 +1,11 @@
 import { addDays, format, parseISO, startOfWeek, subDays } from "date-fns";
 import * as mysql from "mysql2/promise";
 import { databaseConfig } from "../../config/database";
+import {
+  addCollaboratorUserIdsWithReportOnDate,
+  mergeLastWorkedFromReportCollaboration,
+  mergeWorkedDaysFromReportCollaboration,
+} from "./adam-report-collaboration-mysql";
 
 function toYyyyMmDd(v: unknown): string {
   if (v == null) return "";
@@ -112,6 +117,8 @@ async function loadMysqlDriverStatsOnConnection(
     workedByUser.get(id)!.add(ds);
   }
 
+  await mergeWorkedDaysFromReportCollaboration(conn, startWindowStr, workDate, workedByUser);
+
   for (const uid of userIds) {
     const counter_hours = weeklyHours.get(uid) ?? 0;
     let counter_days = 0;
@@ -185,6 +192,8 @@ export async function enrichLogisticsDriversFromAdam(workDate: string, drivers: 
         if (Number.isFinite(id) && dateStr) lastWorkedByUserId.set(id, dateStr);
       }
 
+      await mergeLastWorkedFromReportCollaboration(adamConnection, lastWorkedByUserId);
+
       const [reportRows]: any = await adamConnection.execute(
         `SELECT user_id FROM app_housekeeping_report WHERE DATE(updated_at) = ?`,
         [workDate]
@@ -193,6 +202,8 @@ export async function enrichLogisticsDriversFromAdam(workDate: string, drivers: 
         const id = Number(r?.user_id);
         if (Number.isFinite(id)) hasReportIds.add(id);
       }
+
+      await addCollaboratorUserIdsWithReportOnDate(adamConnection, workDate, hasReportIds);
 
       mysqlStats = await loadMysqlDriverStatsOnConnection(adamConnection, workDate, userIds);
     } finally {

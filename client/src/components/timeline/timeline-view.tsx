@@ -47,6 +47,8 @@ interface TimelineViewProps {
   tasks: Task[];
   hasUnsavedChanges?: boolean; // Stato delle modifiche non salvate dal parent
   onTaskMoved?: () => void; // Callback quando una task viene spostata
+  /** Dopo reset assegnazioni: ripristina stato pulsanti Assegna EO → HP → LP nel parent */
+  onWaveAssignStateReset?: () => void;
   isReadOnly?: boolean; // Modalità read-only: disabilita tutte le modifiche
   isLoadingDragDrop?: boolean; // Mostra loading overlay durante drag&drop
   lastValidDragIndex?: number | null; // Indice valido durante il drag (da container verso timeline)
@@ -77,6 +79,7 @@ export default function TimelineView({
   tasks,
   hasUnsavedChanges = false,
   onTaskMoved,
+  onWaveAssignStateReset,
   isReadOnly = false,
   isLoadingDragDrop = false,
   lastValidDragIndex = null,
@@ -1394,6 +1397,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       if (!response.ok) {
         throw new Error('Errore durante il reset');
       }
+
+      onWaveAssignStateReset?.();
 
       // Svuota subito la timeline in UI, così l'utente vede l'effetto
       setTimelineData(null);
