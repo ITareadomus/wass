@@ -35,6 +35,7 @@ export const lgSelectedDrivers = pgTable("lg_selected_drivers", {
   id: serial("id").primaryKey(),
   workDate: date("work_date").notNull().unique(),
   drivers: integer("drivers").array().notNull().default(sql`'{}'`),
+  vehicleAssignments: jsonb("vehicle_assignments").notNull().default(sql`'{}'::jsonb`),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
@@ -46,6 +47,8 @@ export const lgSelectedDriversRevisions = pgTable("lg_selected_drivers_revisions
   revisionNumber: integer("revision_number").notNull(),
   driversBefore: integer("drivers_before").array().notNull().default(sql`'{}'`),
   driversAfter: integer("drivers_after").array().notNull().default(sql`'{}'`),
+  vehicleAssignmentsBefore: jsonb("vehicle_assignments_before").notNull().default(sql`'{}'::jsonb`),
+  vehicleAssignmentsAfter: jsonb("vehicle_assignments_after").notNull().default(sql`'{}'::jsonb`),
   actionType: varchar("action_type", { length: 30 }).notNull(),
   actionPayload: jsonb("action_payload"),
   performedBy: varchar("performed_by", { length: 100 }),

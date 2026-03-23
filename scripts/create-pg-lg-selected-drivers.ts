@@ -18,9 +18,14 @@ async function main() {
         id SERIAL PRIMARY KEY,
         work_date DATE NOT NULL UNIQUE,
         drivers INTEGER[] NOT NULL DEFAULT '{}',
+        vehicle_assignments JSONB NOT NULL DEFAULT '{}'::jsonb,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+    `);
+    await client.query(`
+      ALTER TABLE lg_selected_drivers
+      ADD COLUMN IF NOT EXISTS vehicle_assignments JSONB NOT NULL DEFAULT '{}'::jsonb;
     `);
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_lg_selected_drivers_work_date ON lg_selected_drivers(work_date);
@@ -33,12 +38,22 @@ async function main() {
         revision_number INTEGER NOT NULL,
         drivers_before INTEGER[] NOT NULL DEFAULT '{}',
         drivers_after INTEGER[] NOT NULL DEFAULT '{}',
+        vehicle_assignments_before JSONB NOT NULL DEFAULT '{}'::jsonb,
+        vehicle_assignments_after JSONB NOT NULL DEFAULT '{}'::jsonb,
         action_type VARCHAR(30) NOT NULL,
         action_payload JSONB,
         performed_by VARCHAR(100),
         created_at TIMESTAMP DEFAULT NOW(),
         UNIQUE (selected_drivers_id, revision_number)
       );
+    `);
+    await client.query(`
+      ALTER TABLE lg_selected_drivers_revisions
+      ADD COLUMN IF NOT EXISTS vehicle_assignments_before JSONB NOT NULL DEFAULT '{}'::jsonb;
+    `);
+    await client.query(`
+      ALTER TABLE lg_selected_drivers_revisions
+      ADD COLUMN IF NOT EXISTS vehicle_assignments_after JSONB NOT NULL DEFAULT '{}'::jsonb;
     `);
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_lg_sel_drivers_rev_work_date

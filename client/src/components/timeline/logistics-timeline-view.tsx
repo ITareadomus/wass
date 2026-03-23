@@ -10,6 +10,7 @@ import {
   CheckCircle,
   Pencil,
   Save,
+  Bike,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -1602,7 +1603,7 @@ export default function LogisticsTimelineView({
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <DialogHeader>
-            <DialogTitle className="flex flex-wrap items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 w-full">
               <span className="flex items-center gap-2 flex-wrap">
                 Dettagli Driver #{selectedDriverForDetails?.id}
                 {selectedDriverForDetails &&
@@ -1628,6 +1629,25 @@ export default function LogisticsTimelineView({
                     </span>
                   ))}
               </span>
+              {(() => {
+                const vehicleName = String(
+                  selectedDriverForDetails?.assigned_vehicle_name ??
+                    selectedDriverForDetails?.vehicle_name ??
+                    ""
+                ).trim();
+                if (!vehicleName) return null;
+                const isScooterVehicle = /^piaggio\b/i.test(vehicleName);
+                return (
+                  <span className="ml-auto inline-flex items-center gap-1.5 bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border border-sky-300 dark:border-sky-700 rounded-lg px-2 py-1 text-xs font-semibold">
+                    {isScooterVehicle ? (
+                      <Bike className="h-3.5 w-3.5" />
+                    ) : (
+                      <Truck className="h-3.5 w-3.5" />
+                    )}
+                    <span>{vehicleName}</span>
+                  </span>
+                );
+              })()}
             </DialogTitle>
           </DialogHeader>
 

@@ -242,9 +242,14 @@ export class PgDailyAssignmentsService {
           id SERIAL PRIMARY KEY,
           work_date DATE NOT NULL UNIQUE,
           drivers INTEGER[] NOT NULL DEFAULT '{}',
+          vehicle_assignments JSONB NOT NULL DEFAULT '{}'::jsonb,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
+      `);
+      await query(`
+        ALTER TABLE lg_selected_drivers
+        ADD COLUMN IF NOT EXISTS vehicle_assignments JSONB NOT NULL DEFAULT '{}'::jsonb
       `);
       await query(`CREATE INDEX IF NOT EXISTS idx_lg_selected_drivers_work_date ON lg_selected_drivers(work_date)`);
       await query(`
@@ -255,12 +260,22 @@ export class PgDailyAssignmentsService {
           revision_number INTEGER NOT NULL,
           drivers_before INTEGER[] NOT NULL DEFAULT '{}',
           drivers_after INTEGER[] NOT NULL DEFAULT '{}',
+          vehicle_assignments_before JSONB NOT NULL DEFAULT '{}'::jsonb,
+          vehicle_assignments_after JSONB NOT NULL DEFAULT '{}'::jsonb,
           action_type VARCHAR(30) NOT NULL,
           action_payload JSONB,
           performed_by VARCHAR(100),
           created_at TIMESTAMP DEFAULT NOW(),
           UNIQUE (selected_drivers_id, revision_number)
         )
+      `);
+      await query(`
+        ALTER TABLE lg_selected_drivers_revisions
+        ADD COLUMN IF NOT EXISTS vehicle_assignments_before JSONB NOT NULL DEFAULT '{}'::jsonb
+      `);
+      await query(`
+        ALTER TABLE lg_selected_drivers_revisions
+        ADD COLUMN IF NOT EXISTS vehicle_assignments_after JSONB NOT NULL DEFAULT '{}'::jsonb
       `);
       await query(`
         CREATE INDEX IF NOT EXISTS idx_lg_sel_drivers_rev_work_date ON lg_selected_drivers_revisions(work_date)
@@ -3172,32 +3187,45 @@ export class PgDailyAssignmentsService {
     driverIds: number[],
     actionType: string = 'replace',
     actionPayload: any = null,
-    performedBy: string = 'system'
+    performedBy: string = 'system',
+    vehicleAssignments: Record<string, any> = {}
   ): Promise<boolean> {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       const currentResult = await client.query(
-        'SELECT id, drivers FROM lg_selected_drivers WHERE work_date = $1',
+        'SELECT id, drivers, vehicle_assignments FROM lg_selected_drivers WHERE work_date = $1',
         [workDate]
       );
       const driversBefore: number[] = currentResult.rows[0]?.drivers || [];
+      const vehicleAssignmentsBefore: Record<string, any> =
+        currentResult.rows[0]?.vehicle_assignments &&
+        typeof currentResult.rows[0].vehicle_assignments === 'object'
+          ? currentResult.rows[0].vehicle_assignments
+          : {};
       let selectedDriversId = currentResult.rows[0]?.id;
       if (selectedDriversId) {
         await client.query(
-          `UPDATE lg_selected_drivers SET drivers = $2::integer[], updated_at = NOW() WHERE id = $1`,
-          [selectedDriversId, driverIds]
+          `UPDATE lg_selected_drivers
+           SET drivers = $2::integer[], vehicle_assignments = $3::jsonb, updated_at = NOW()
+           WHERE id = $1`,
+          [selectedDriversId, driverIds, JSON.stringify(vehicleAssignments || {})]
         );
       } else {
         const insertResult = await client.query(
-          `INSERT INTO lg_selected_drivers (work_date, drivers, updated_at) VALUES ($1, $2::integer[], NOW()) RETURNING id`,
-          [workDate, driverIds]
+          `INSERT INTO lg_selected_drivers (work_date, drivers, vehicle_assignments, updated_at)
+           VALUES ($1, $2::integer[], $3::jsonb, NOW())
+           RETURNING id`,
+          [workDate, driverIds, JSON.stringify(vehicleAssignments || {})]
         );
         selectedDriversId = insertResult.rows[0].id;
       }
       const beforeSorted = [...driversBefore].sort((a, b) => a - b);
       const afterSorted = [...driverIds].sort((a, b) => a - b);
-      const hasChanged = JSON.stringify(beforeSorted) !== JSON.stringify(afterSorted);
+      const hasDriversChanged = JSON.stringify(beforeSorted) !== JSON.stringify(afterSorted);
+      const hasVehicleAssignmentsChanged =
+        JSON.stringify(vehicleAssignmentsBefore || {}) !== JSON.stringify(vehicleAssignments || {});
+      const hasChanged = hasDriversChanged || hasVehicleAssignmentsChanged;
       if (hasChanged && actionType !== 'INIT') {
         const revResult = await client.query(
           `SELECT COALESCE(MAX(revision_number), 0) + 1 as next_rev FROM lg_selected_drivers_revisions WHERE selected_drivers_id = $1`,
@@ -3206,14 +3234,21 @@ export class PgDailyAssignmentsService {
         const revisionNumber = revResult.rows[0].next_rev;
         await client.query(
           `INSERT INTO lg_selected_drivers_revisions
-           (selected_drivers_id, work_date, revision_number, drivers_before, drivers_after, action_type, action_payload, performed_by)
-           VALUES ($1, $2, $3, $4::integer[], $5::integer[], $6, $7, $8)`,
+           (
+             selected_drivers_id, work_date, revision_number,
+             drivers_before, drivers_after,
+             vehicle_assignments_before, vehicle_assignments_after,
+             action_type, action_payload, performed_by
+           )
+           VALUES ($1, $2, $3, $4::integer[], $5::integer[], $6::jsonb, $7::jsonb, $8, $9, $10)`,
           [
             selectedDriversId,
             workDate,
             revisionNumber,
             driversBefore,
             driverIds,
+            JSON.stringify(vehicleAssignmentsBefore || {}),
+            JSON.stringify(vehicleAssignments || {}),
             actionType,
             actionPayload ? JSON.stringify(actionPayload) : null,
             performedBy,
@@ -3231,6 +3266,23 @@ export class PgDailyAssignmentsService {
     }
   }
 
+  async loadSelectedLogisticsDriverVehicleAssignments(workDate: string): Promise<Record<string, any>> {
+    try {
+      const result = await query(
+        'SELECT vehicle_assignments FROM lg_selected_drivers WHERE work_date = $1',
+        [workDate]
+      );
+      const raw = result.rows[0]?.vehicle_assignments;
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        return raw;
+      }
+      return {};
+    } catch (error) {
+      console.error('❌ PG: loadSelectedLogisticsDriverVehicleAssignments', error);
+      return {};
+    }
+  }
+
   async rollbackSelectedLogisticsDrivers(
     workDate: string,
     toRevisionNumber: number,
@@ -3240,7 +3292,7 @@ export class PgDailyAssignmentsService {
     try {
       await client.query('BEGIN');
       const revResult = await client.query(
-        `SELECT drivers_before, selected_drivers_id FROM lg_selected_drivers_revisions
+        `SELECT drivers_before, vehicle_assignments_before, selected_drivers_id FROM lg_selected_drivers_revisions
          WHERE work_date = $1 AND revision_number = $2`,
         [workDate, toRevisionNumber]
       );
@@ -3249,27 +3301,41 @@ export class PgDailyAssignmentsService {
         return false;
       }
       const driversToRestore = revResult.rows[0].drivers_before;
+      const vehicleAssignmentsToRestore = revResult.rows[0].vehicle_assignments_before || {};
       const selectedDriversId = revResult.rows[0].selected_drivers_id;
-      const currentResult = await client.query('SELECT drivers FROM lg_selected_drivers WHERE work_date = $1', [workDate]);
+      const currentResult = await client.query(
+        'SELECT drivers, vehicle_assignments FROM lg_selected_drivers WHERE work_date = $1',
+        [workDate]
+      );
       const driversBefore = currentResult.rows[0]?.drivers || [];
-      await client.query(`UPDATE lg_selected_drivers SET drivers = $1::integer[], updated_at = NOW() WHERE work_date = $2`, [
-        driversToRestore,
-        workDate,
-      ]);
+      const vehicleAssignmentsBefore = currentResult.rows[0]?.vehicle_assignments || {};
+      await client.query(
+        `UPDATE lg_selected_drivers
+         SET drivers = $1::integer[], vehicle_assignments = $2::jsonb, updated_at = NOW()
+         WHERE work_date = $3`,
+        [driversToRestore, JSON.stringify(vehicleAssignmentsToRestore || {}), workDate]
+      );
       const nextRevResult = await client.query(
         `SELECT COALESCE(MAX(revision_number), 0) + 1 as next_rev FROM lg_selected_drivers_revisions WHERE selected_drivers_id = $1`,
         [selectedDriversId]
       );
       await client.query(
         `INSERT INTO lg_selected_drivers_revisions
-         (selected_drivers_id, work_date, revision_number, drivers_before, drivers_after, action_type, action_payload, performed_by)
-         VALUES ($1, $2, $3, $4::integer[], $5::integer[], 'ROLLBACK', $6, $7)`,
+         (
+           selected_drivers_id, work_date, revision_number,
+           drivers_before, drivers_after,
+           vehicle_assignments_before, vehicle_assignments_after,
+           action_type, action_payload, performed_by
+         )
+         VALUES ($1, $2, $3, $4::integer[], $5::integer[], $6::jsonb, $7::jsonb, 'ROLLBACK', $8, $9)`,
         [
           selectedDriversId,
           workDate,
           nextRevResult.rows[0].next_rev,
           driversBefore,
           driversToRestore,
+          JSON.stringify(vehicleAssignmentsBefore || {}),
+          JSON.stringify(vehicleAssignmentsToRestore || {}),
           JSON.stringify({ rolled_back_to_revision: toRevisionNumber }),
           performedBy,
         ]
@@ -3288,7 +3354,7 @@ export class PgDailyAssignmentsService {
   async getSelectedLogisticsDriversRevisions(workDate: string): Promise<any[]> {
     try {
       const result = await query(
-        `SELECT revision_number, drivers_before, drivers_after, action_type, action_payload, performed_by, created_at
+        `SELECT revision_number, drivers_before, drivers_after, vehicle_assignments_before, vehicle_assignments_after, action_type, action_payload, performed_by, created_at
          FROM lg_selected_drivers_revisions WHERE work_date = $1 ORDER BY revision_number DESC`,
         [workDate]
       );

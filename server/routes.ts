@@ -1886,10 +1886,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
             role: row.role || "Driver",
             premium: row.role === "Premium",
             start_time: st,
+            assigned_vehicle_id:
+              typeof d === "object" && d ? d.assigned_vehicle_id ?? null : null,
+            assigned_vehicle_name:
+              typeof d === "object" && d ? d.assigned_vehicle_name ?? null : null,
+            assigned_vehicle_pms_code:
+              typeof d === "object" && d ? d.assigned_vehicle_pms_code ?? null : null,
           };
         }
         return typeof d === "number"
-          ? { id: d, name: "Driver", lastname: String(d), role: "Driver", premium: false, start_time: st }
+          ? {
+              id: d,
+              name: "Driver",
+              lastname: String(d),
+              role: "Driver",
+              premium: false,
+              start_time: st,
+              assigned_vehicle_id: null,
+              assigned_vehicle_name: null,
+              assigned_vehicle_pms_code: null,
+            }
           : {
               id: d.id,
               name: d.name || "Driver",
@@ -1897,6 +1913,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               role: d.role || "Driver",
               premium: Boolean(d.premium),
               start_time: st,
+              assigned_vehicle_id: d.assigned_vehicle_id ?? null,
+              assigned_vehicle_name: d.assigned_vehicle_name ?? null,
+              assigned_vehicle_pms_code: d.assigned_vehicle_pms_code ?? null,
             };
       });
       const ok = await workspaceFiles.saveSelectedLogisticsDrivers(
