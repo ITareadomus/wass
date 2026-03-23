@@ -132,7 +132,8 @@ export function CleanerSelectorDialog({
             if (cleaner.role === "Formatore") return 1;
             if (cleaner.role === "Straordinario") return 2;
             if (cleaner.role === "Premium") return 3;
-            return 4;
+            if (cleaner.role === "Ufficio") return 4;
+            return 5;
           };
 
           const priorityA = getPriority(a);
@@ -297,6 +298,11 @@ export function CleanerSelectorDialog({
                                 Premium
                               </span>
                             )}
+                            {cleaner.role === "Ufficio" && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
+                                Ufficio
+                              </span>
+                            )}
                           </div>
                         </label>
                       );
@@ -372,6 +378,11 @@ export function CleanerSelectorDialog({
                             {cleaner.role === "Premium" && (
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
                                 Premium
+                              </span>
+                            )}
+                            {cleaner.role === "Ufficio" && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
+                                Ufficio
                               </span>
                             )}
                           </div>

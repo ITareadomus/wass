@@ -1960,9 +1960,9 @@ export default function GenerateAssignments() {
       />
       <div className="w-full px-4 pt-3 pb-6">
         {!(isExtracting || isLoadingTasks || isLoading) && (
-          <div className="mx-auto mb-6 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-4">
+          <div className="mx-auto mb-3 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-4">
-              <h1 className="flex items-center gap-2 text-[25px] font-bold text-foreground">
+              <h1 className="flex items-center gap-2 text-[25px] leading-[44px] font-bold text-foreground">
                 HOUSEKEEPING del
               </h1>
               <Popover>
@@ -2208,7 +2208,7 @@ export default function GenerateAssignments() {
               const highlightedLowPriority = getHighlightedTaskIds(lowPriorityTasks);
 
               return (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 w-full">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 w-full">
                   <PriorityColumn
                     title="EARLY OUT"
                     priority="early-out"
@@ -2246,7 +2246,7 @@ export default function GenerateAssignments() {
               );
             })()}
 
-          <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="mt-0 grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="xl:col-span-2">
               {/* Timeline View */}
               <div data-print-timeline>
@@ -2269,7 +2269,7 @@ export default function GenerateAssignments() {
               </div>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-4">
               <MapSection tasks={allTasksWithAssignments} />
 
               {/* Pannello Statistiche Task */}
