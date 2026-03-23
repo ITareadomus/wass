@@ -22,6 +22,8 @@ export interface TaskForPhase2 {
   typeApt: string; // A, B, C
   priority: string;
   cleaningTime: number;
+  operationId?: number | null;
+  isOfficeTask?: boolean;
 }
 
 export interface GroupCandidate {
@@ -43,13 +45,26 @@ export interface ApartmentTypes {
   premium_apt: string[];
   straordinario_apt: string[];
   formatore_apt: string[];
+  ufficio_apt: string[];
+}
+
+export interface CleanerTaskRulesConfig {
+  standard_apt?: boolean;
+  premium_apt?: boolean;
+  straordinario_apt?: boolean;
+  ufficio_apt?: boolean;
+}
+
+export interface TaskTypesByCleanerConfig {
+  [roleKey: string]: CleanerTaskRulesConfig;
 }
 
 export const DEFAULT_APARTMENT_TYPES: ApartmentTypes = {
   standard_apt: ['A', 'B', 'C', 'D', 'E', 'F', 'X'],
   premium_apt: ['A', 'B', 'C', 'D', 'E', 'F', 'X'],
   straordinario_apt: ['A', 'B', 'C', 'D', 'E', 'F', 'X'],
-  formatore_apt: ['B', 'C']
+  formatore_apt: ['B', 'C'],
+  ufficio_apt: ['A', 'B', 'C', 'D', 'E', 'F', 'X']
 };
 
 export interface FairnessParams {
@@ -93,6 +108,8 @@ export interface Phase2Params {
   loadWeight: number;
   preferenceBonus: number;
   apartmentTypes: ApartmentTypes;
+  officeOperationIds?: number[];
+  taskTypesByCleaner?: TaskTypesByCleanerConfig | null;
   formatoreRules?: FormatoreRules | null;  // se assente, nessuna restrizione extra per formatori
   dynamicMaxTasks?: number;  // base max from totalTasks/numCleaners, bonus +1 per-cleaner if avgTravel ≤ 10min
   fairness: FairnessParams;  // minutes-based fairness parameters
@@ -214,9 +231,27 @@ function normalizeCleanerRole(role: string): string {
   const normalized = role.toLowerCase().trim();
   if (normalized.includes('standard')) return 'standard_cleaner';
   if (normalized.includes('premium')) return 'premium_cleaner';
+  if (normalized.includes('ufficio')) return 'ufficio_cleaner';
   if (normalized.includes('straord')) return 'straordinario_cleaner';
   if (normalized.includes('formatore')) return 'formatore_cleaner';
   return 'standard_cleaner';
+}
+
+function resolveOperationId(task: TaskForPhase2): number | null {
+  if (typeof task.operationId === 'number' && Number.isFinite(task.operationId)) {
+    return task.operationId;
+  }
+  return null;
+}
+
+function isOfficeTask(task: TaskForPhase2, officeOperationIds: Set<number>): boolean {
+  if (task.isOfficeTask === true) return true;
+  const operationId = resolveOperationId(task);
+  return operationId != null && officeOperationIds.has(operationId);
+}
+
+function isRealStraordinariaTask(task: TaskForPhase2, officeOperationIds: Set<number>): boolean {
+  return Boolean(task.straordinaria) && !isOfficeTask(task, officeOperationIds);
 }
 
 function canCleanerHandleApartment(
@@ -243,6 +278,9 @@ function canCleanerHandleApartment(
     case 'formatore_cleaner':
       allowedApts = apartmentTypes.formatore_apt || [];
       break;
+    case 'ufficio_cleaner':
+      allowedApts = apartmentTypes.ufficio_apt || [];
+      break;
     default:
       return true;
   }
@@ -253,14 +291,41 @@ function canCleanerHandleApartment(
 export function isCleanerCompatible(
   cleaner: CleanerInput,
   task: TaskForPhase2,
-  apartmentTypes: ApartmentTypes = DEFAULT_APARTMENT_TYPES
+  apartmentTypes: ApartmentTypes = DEFAULT_APARTMENT_TYPES,
+  officeOperationIds: Set<number> = new Set<number>(),
+  taskTypesByCleaner: TaskTypesByCleanerConfig | null = null
 ): { compatible: boolean; reason?: string } {
   const normalizedRole = normalizeCleanerRole(cleaner.role);
+  const officeTask = isOfficeTask(task, officeOperationIds);
+  const roleRules = taskTypesByCleaner?.[normalizedRole];
+
+  if (officeTask) {
+    if (roleRules?.ufficio_apt === true) return { compatible: true };
+    return { compatible: false, reason: 'OFFICE_TASK_NOT_ALLOWED_BY_SETTINGS' };
+  }
+
+  // For cleaner role Ufficio, non-office compatibility is fully driven by app_settings checkboxes.
+  if (normalizedRole === 'ufficio_cleaner' && taskTypesByCleaner) {
+    if (isRealStraordinariaTask(task, officeOperationIds)) {
+      return roleRules?.straordinario_apt
+        ? { compatible: true }
+        : { compatible: false, reason: 'UFFICIO_CLEANER_STRAORDINARIO_DISABLED' };
+    }
+    if (task.premium) {
+      return roleRules?.premium_apt
+        ? { compatible: true }
+        : { compatible: false, reason: 'UFFICIO_CLEANER_PREMIUM_DISABLED' };
+    }
+    return roleRules?.standard_apt
+      ? { compatible: true }
+      : { compatible: false, reason: 'UFFICIO_CLEANER_STANDARD_DISABLED' };
+  }
+
   if (task.premium && normalizedRole !== 'premium_cleaner') {
     return { compatible: false, reason: 'ROLE_MISMATCH_PREMIUM_REQUIRED' };
   }
   
-  if (task.straordinaria && normalizedRole !== 'straordinario_cleaner') {
+  if (isRealStraordinariaTask(task, officeOperationIds) && normalizedRole !== 'straordinario_cleaner') {
     return { compatible: false, reason: 'CANNOT_DO_STRAORDINARIA' };
   }
   
@@ -274,12 +339,14 @@ export function isCleanerCompatible(
 export function isCleanerCompatibleWithGroup(
   cleaner: CleanerInput,
   tasks: TaskForPhase2[],
-  apartmentTypes: ApartmentTypes = DEFAULT_APARTMENT_TYPES
+  apartmentTypes: ApartmentTypes = DEFAULT_APARTMENT_TYPES,
+  officeOperationIds: Set<number> = new Set<number>(),
+  taskTypesByCleaner: TaskTypesByCleanerConfig | null = null
 ): { compatible: boolean; reasons: string[] } {
   const reasons: string[] = [];
   
   for (const task of tasks) {
-    const result = isCleanerCompatible(cleaner, task, apartmentTypes);
+    const result = isCleanerCompatible(cleaner, task, apartmentTypes, officeOperationIds, taskTypesByCleaner);
     if (!result.compatible) {
       reasons.push(`task_${task.taskId}:${result.reason}`);
     }
@@ -377,7 +444,9 @@ export function scoreCleanerForGroup(
 export function findMostExpensiveTask(
   tasks: TaskForPhase2[],
   cleaners: CleanerInput[],
-  apartmentTypes: ApartmentTypes = DEFAULT_APARTMENT_TYPES
+  apartmentTypes: ApartmentTypes = DEFAULT_APARTMENT_TYPES,
+  officeOperationIds: Set<number> = new Set<number>(),
+  taskTypesByCleaner: TaskTypesByCleanerConfig | null = null
 ): { task: TaskForPhase2; reason: string } | null {
   if (tasks.length <= 1) return null;
   
@@ -390,7 +459,7 @@ export function findMostExpensiveTask(
     let compatibleCount = 0;
     
     for (const cleaner of cleaners) {
-      const result = isCleanerCompatibleWithGroup(cleaner, remaining, apartmentTypes);
+      const result = isCleanerCompatibleWithGroup(cleaner, remaining, apartmentTypes, officeOperationIds, taskTypesByCleaner);
       if (result.compatible) compatibleCount++;
     }
     
@@ -400,7 +469,7 @@ export function findMostExpensiveTask(
     
     let incompatCount = 0;
     for (const cleaner of cleaners) {
-      const result = isCleanerCompatible(cleaner, task, apartmentTypes);
+      const result = isCleanerCompatible(cleaner, task, apartmentTypes, officeOperationIds, taskTypesByCleaner);
       if (!result.compatible) incompatCount++;
     }
     
@@ -443,6 +512,7 @@ export function runPhase2Algorithm(
   const cleanerTravelMin = new Map<number, number>();   // Total travel minutes assigned
   
   const initialLoad = params.initialLoadByCleanerMin ?? new Map<number, number>();
+  const officeOperationIds = new Set<number>(params.officeOperationIds ?? []);
   const initialPositions = params.initialLastPositionByCleaner ?? new Map<number, { lat: number; lng: number }>();
   const initialFixedStats = params.initialFixedStatsByCleaner ?? new Map<number, CleanerFixedStats>();
   
@@ -491,7 +561,13 @@ export function runPhase2Algorithm(
   tasksMap.forEach((task, taskId) => {
     let compatibleCount = 0;
     for (const cleaner of cleaners) {
-      const result = isCleanerCompatible(cleaner, task, params.apartmentTypes);
+      const result = isCleanerCompatible(
+        cleaner,
+        task,
+        params.apartmentTypes,
+        officeOperationIds,
+        params.taskTypesByCleaner ?? null
+      );
       if (result.compatible) compatibleCount++;
     }
     taskScarcity.set(taskId, compatibleCount);
@@ -531,7 +607,7 @@ export function runPhase2Algorithm(
   
   const otTaskIds = new Set<number>();
   tasksMap.forEach((task, taskId) => {
-    if (task.straordinaria) otTaskIds.add(taskId);
+    if (task.straordinaria && !isOfficeTask(task, officeOperationIds)) otTaskIds.add(taskId);
   });
   const assignedOtTaskIds = new Set<number>();
   
@@ -555,18 +631,19 @@ export function runPhase2Algorithm(
       const incompatibleReasons: { cleanerId: number; reasons: string[] }[] = [];
       
       // Check if current group contains straordinaria and its duration
-      const groupHasStraordinaria = tasks.some(t => t.straordinaria);
-      const groupStraordinariaDuration = tasks.filter(t => t.straordinaria).reduce((sum, t) => sum + t.cleaningTime, 0);
+      const groupStraordinariaTasks = tasks.filter(t => t.straordinaria && !isOfficeTask(t, officeOperationIds));
+      const groupHasStraordinaria = groupStraordinariaTasks.length > 0;
+      const groupStraordinariaDuration = groupStraordinariaTasks.reduce((sum, t) => sum + t.cleaningTime, 0);
       const groupTotalCleaningTime = tasks.reduce((sum, t) => sum + t.cleaningTime, 0);
-      const groupStraordinariaCount = tasks.filter(t => t.straordinaria).length;
+      const groupStraordinariaCount = groupStraordinariaTasks.length;
       
       // Pre-check: valida gruppi con straordinaria
       // Regole: OT lunga (≥6h) → solo 1 task, OT corta (<6h) → max 2 task (OT + 1 extra ≤2h)
       // IMPORTANTE: un gruppo può avere al massimo 1 OT
       // Invece di reject, droppa task fino a forma valida
       if (groupHasStraordinaria && tasks.length > 1) {
-        const otTasks = tasks.filter(t => t.straordinaria);
-        const nonOtTasks = tasks.filter(t => !t.straordinaria);
+        const otTasks = groupStraordinariaTasks;
+        const nonOtTasks = tasks.filter(t => !t.straordinaria || isOfficeTask(t, officeOperationIds));
         
         // Se ci sono multipli OT, tieni solo il primo e droppa gli altri
         if (otTasks.length > 1) {
@@ -659,7 +736,7 @@ export function runPhase2Algorithm(
           continue; // Riprova con gruppo ridotto
         } else {
           // OT corta + 1 task extra: verifica che extra sia ≤2h
-          const extraTask = tasks.find(t => !t.straordinaria);
+          const extraTask = tasks.find(t => !t.straordinaria || isOfficeTask(t, officeOperationIds));
           if (extraTask && extraTask.cleaningTime > STRAORDINARIA_EXTRA_TASK_MAX_MIN) {
             // Extra troppo lungo: droppa l'extra, tieni solo l'OT
             const idx = currentTaskIds.indexOf(extraTask.taskId);
@@ -772,7 +849,13 @@ export function runPhase2Algorithm(
           // OK: Cleaner has 1 task <= 2h and new straordinaria is < 6h - allowed
         }
         
-        const result = isCleanerCompatibleWithGroup(cleaner, tasks, params.apartmentTypes);
+        const result = isCleanerCompatibleWithGroup(
+          cleaner,
+          tasks,
+          params.apartmentTypes,
+          officeOperationIds,
+          params.taskTypesByCleaner ?? null
+        );
         if (result.compatible) {
           compatibleCleaners.push(cleaner);
         } else {
@@ -830,7 +913,9 @@ export function runPhase2Algorithm(
           const existingStraDuration = cleanerStraordinariaDuration.get(assignedCleaner.cleanerId) || 0;
           cleanerStraordinariaDuration.set(assignedCleaner.cleanerId, existingStraDuration + groupStraordinariaDuration);
           // Marca le OT task come assegnate per rilasciare riserva cleaner straordinari
-          tasks.filter(t => t.straordinaria).forEach(t => assignedOtTaskIds.add(t.taskId));
+          tasks
+            .filter(t => t.straordinaria && !isOfficeTask(t, officeOperationIds))
+            .forEach(t => assignedOtTaskIds.add(t.taskId));
         }
         const existingCleaningTime = cleanerTotalCleaningTime.get(assignedCleaner.cleanerId) || 0;
         cleanerTotalCleaningTime.set(assignedCleaner.cleanerId, existingCleaningTime + groupTotalCleaningTime);
@@ -867,7 +952,13 @@ export function runPhase2Algorithm(
         });
         
         if (currentTaskIds.length > 1) {
-          const dropResult = findMostExpensiveTask(tasks, cleaners, params.apartmentTypes);
+          const dropResult = findMostExpensiveTask(
+            tasks,
+            cleaners,
+            params.apartmentTypes,
+            officeOperationIds,
+            params.taskTypesByCleaner ?? null
+          );
           if (dropResult) {
             const droppedId = dropResult.task.taskId;
             const droppedIdx = currentTaskIds.indexOf(droppedId);
@@ -906,7 +997,12 @@ export function runPhase2Algorithm(
           // SOLO se questo è un gruppo OT singolo (solo l'OT task) che fallisce,
           // marca l'OT come "processata" per rilasciare la riserva
           // Se è un gruppo OT+altri task, altri gruppi candidati potrebbero avere successo
-          if (groupHasStraordinaria && tasks.length === 1 && tasks[0].straordinaria) {
+          if (
+            groupHasStraordinaria &&
+            tasks.length === 1 &&
+            tasks[0].straordinaria &&
+            !isOfficeTask(tasks[0], officeOperationIds)
+          ) {
             assignedOtTaskIds.add(tasks[0].taskId);
           }
           break;

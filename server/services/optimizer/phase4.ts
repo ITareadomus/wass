@@ -7,7 +7,7 @@ import {
   Phase3TimelineConstraints
 } from './phase3';
 import { PriorityWindows, priorityPenalty, Priority } from './priorityWindows';
-import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, FairnessParams, DEFAULT_FAIRNESS_PARAMS, MinutesBasedTargets, FormatoreRules } from './phase2';
+import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, FairnessParams, DEFAULT_FAIRNESS_PARAMS, MinutesBasedTargets, FormatoreRules, TaskTypesByCleanerConfig } from './phase2';
 import { TravelPolicy, getWaveLevelConstraints } from './travelPolicy';
 import { runPhase4RepairBatch } from './phase4OrTools';
 
@@ -28,6 +28,8 @@ export interface Phase4Params {
   maxCleanersToTryPerTask: number;     // Max cleaners da provare per task (performance cap)
   // Compatibilità appartamento (role-based)
   apartmentTypes: ApartmentTypes;
+  officeOperationIds?: number[];
+  taskTypesByCleaner?: TaskTypesByCleanerConfig | null;
   /** Regole formatori da app_settings (priorità + tipi task ammessi). Se assente, nessuna restrizione extra. */
   formatoreRules?: FormatoreRules | null;
   // Dynamic max tasks per cleaner (calcolato da totalTasks/numCleaners)
@@ -165,9 +167,23 @@ function normalizeCleanerRole(role: string): string {
   const normalized = role.toLowerCase().trim();
   if (normalized.includes('standard')) return 'standard_cleaner';
   if (normalized.includes('premium')) return 'premium_cleaner';
+  if (normalized.includes('ufficio')) return 'ufficio_cleaner';
   if (normalized.includes('straord')) return 'straordinario_cleaner';
   if (normalized.includes('formatore')) return 'formatore_cleaner';
   return 'standard_cleaner';
+}
+
+function resolveOperationId(task: TaskForScheduling): number | null {
+  if (typeof task.operationId === 'number' && Number.isFinite(task.operationId)) {
+    return task.operationId;
+  }
+  return null;
+}
+
+function isOfficeTask(task: TaskForScheduling, officeOperationIds: Set<number>): boolean {
+  if (task.isOfficeTask === true) return true;
+  const operationId = resolveOperationId(task);
+  return operationId != null && officeOperationIds.has(operationId);
 }
 
 function canCleanerHandleApartment(
@@ -194,6 +210,9 @@ function canCleanerHandleApartment(
     case 'formatore_cleaner':
       allowedApts = apartmentTypes.formatore_apt || [];
       break;
+    case 'ufficio_cleaner':
+      allowedApts = apartmentTypes.ufficio_apt || [];
+      break;
     default:
       return true;
   }
@@ -219,14 +238,41 @@ function checkHardConstraints(
   task: TaskForScheduling,
   tasksMap: Map<number, TaskForScheduling>,
   apartmentTypes: ApartmentTypes = DEFAULT_APARTMENT_TYPES,
+  officeOperationIds: Set<number> = new Set<number>(),
+  taskTypesByCleaner: TaskTypesByCleanerConfig | null = null,
   formatoreRules?: FormatoreRules | null
 ): HardConstraintResult {
   const cleanerRole = schedule.role || 'Standard';
   const normalizedRole = normalizeCleanerRole(cleanerRole);
+  const officeTask = isOfficeTask(task, officeOperationIds);
+  const roleRules = taskTypesByCleaner?.[normalizedRole];
   const fixedCount = schedule.fixedTaskCount ?? 0;
   const totalExistingCount = fixedCount + (schedule.tasks?.length ?? 0);
   const fixedHasAnyOT = schedule.fixedHasAnyOT === true;
   const fixedHasLongOT = schedule.fixedHasLongOT === true;
+
+  if (officeTask) {
+    return roleRules?.ufficio_apt === true
+      ? { compatible: true }
+      : { compatible: false, reason: 'OFFICE_TASK_NOT_ALLOWED_BY_SETTINGS' };
+  }
+
+  // For cleaner role Ufficio, non-office compatibility is fully driven by app_settings checkboxes.
+  if (normalizedRole === 'ufficio_cleaner' && taskTypesByCleaner) {
+    if (task.straordinaria) {
+      return roleRules?.straordinario_apt
+        ? { compatible: true }
+        : { compatible: false, reason: 'UFFICIO_CLEANER_STRAORDINARIO_DISABLED' };
+    }
+    if (task.premium) {
+      return roleRules?.premium_apt
+        ? { compatible: true }
+        : { compatible: false, reason: 'UFFICIO_CLEANER_PREMIUM_DISABLED' };
+    }
+    return roleRules?.standard_apt
+      ? { compatible: true }
+      : { compatible: false, reason: 'UFFICIO_CLEANER_STANDARD_DISABLED' };
+  }
   
   // 0. Verifica premium: task premium richiede cleaner Premium
   if (task.premium && normalizedRole !== 'premium_cleaner') {
@@ -458,7 +504,15 @@ function tryInsertTask(
   // VINCOLI HARD: compatibilità cleaner-task, regole OT
   // Questi vincoli NON possono essere rilassati
   // =====================================================
-  const hardCheck = checkHardConstraints(schedule, task, tasksMap, params.apartmentTypes, params.formatoreRules);
+  const hardCheck = checkHardConstraints(
+    schedule,
+    task,
+    tasksMap,
+    params.apartmentTypes,
+    new Set<number>(params.officeOperationIds ?? []),
+    params.taskTypesByCleaner ?? null,
+    params.formatoreRules
+  );
   if (!hardCheck.compatible) {
     return {
       cleanerId: schedule.cleanerId,
@@ -792,7 +846,15 @@ function trySwapForTask(
         ...schedule,
         tasks: tasksWithoutRemoved
       };
-      const hardCheck = checkHardConstraints(tempSchedule, task, tasksMap, params.apartmentTypes, params.formatoreRules);
+      const hardCheck = checkHardConstraints(
+        tempSchedule,
+        task,
+        tasksMap,
+        params.apartmentTypes,
+        new Set<number>(params.officeOperationIds ?? []),
+        params.taskTypesByCleaner ?? null,
+        params.formatoreRules
+      );
       if (!hardCheck.compatible) {
         continue;
       }

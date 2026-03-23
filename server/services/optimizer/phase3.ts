@@ -41,6 +41,8 @@ export interface TaskForScheduling {
   straordinaria?: boolean;
   premium?: boolean;
   typeApt?: string;
+  operationId?: number | null;
+  isOfficeTask?: boolean;
 }
 
 export interface CleanerForScheduling {

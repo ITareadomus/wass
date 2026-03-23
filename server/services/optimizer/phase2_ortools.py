@@ -29,6 +29,8 @@ def normalize_role(role):
         return "standard_cleaner"
     if "premium" in r:
         return "premium_cleaner"
+    if "ufficio" in r:
+        return "ufficio_cleaner"
     if "straord" in r:
         return "straordinario_cleaner"
     if "formatore" in r:
@@ -48,16 +50,43 @@ def can_handle_apt(role_key, type_apt, apartment_types):
         allowed = apartment_types.get("straordinario_apt") or []
     elif role_key == "formatore_cleaner":
         allowed = apartment_types.get("formatore_apt") or []
+    elif role_key == "ufficio_cleaner":
+        allowed = apartment_types.get("ufficio_apt") or []
     else:
         return True
     return apt in [a.upper() for a in allowed]
 
 
-def task_cleaner_compatible(cleaner, task, apartment_types):
+def is_office_task(task, office_operation_ids):
+    if task.get("isOfficeTask") is True:
+        return True
+    op_id = task.get("operationId")
+    try:
+        return op_id is not None and int(op_id) in office_operation_ids
+    except Exception:
+        return False
+
+
+def is_real_straordinaria(task, office_operation_ids):
+    return bool(task.get("straordinaria")) and not is_office_task(task, office_operation_ids)
+
+
+def task_cleaner_compatible(cleaner, task, apartment_types, office_operation_ids, task_types_by_cleaner):
     role_key = normalize_role(cleaner.get("role"))
+    role_rules = task_types_by_cleaner.get(role_key) or {}
+    office_task = is_office_task(task, office_operation_ids)
+    if office_task:
+        return bool(role_rules.get("ufficio_apt", False))
+
+    if role_key == "ufficio_cleaner":
+        if is_real_straordinaria(task, office_operation_ids):
+            return bool(role_rules.get("straordinario_apt", False))
+        if task.get("premium"):
+            return bool(role_rules.get("premium_apt", False))
+        return bool(role_rules.get("standard_apt", False))
     if task.get("premium") and role_key != "premium_cleaner":
         return False
-    if task.get("straordinaria") and role_key != "straordinario_cleaner":
+    if is_real_straordinaria(task, office_operation_ids) and role_key != "straordinario_cleaner":
         return False
     if not can_handle_apt(role_key, task.get("typeApt"), apartment_types):
         return False
@@ -78,8 +107,10 @@ def normalize_task_priority(priority):
     return s if s else None
 
 
-def task_formatore_compatible(task, formatore_rules, apartment_types):
+def task_formatore_compatible(task, formatore_rules, apartment_types, office_operation_ids):
     """True iff task is allowed for a formatore by app_settings (priority + task type + typeApt)."""
+    if is_office_task(task, office_operation_ids):
+        return True
     if not formatore_rules:
         return True
     allowed_priorities = formatore_rules.get("allowedPriorities") or []
@@ -101,9 +132,9 @@ def task_formatore_compatible(task, formatore_rules, apartment_types):
             return False
     if task.get("premium") and not formatore_rules.get("premiumApt", False):
         return False
-    if task.get("straordinaria") and not formatore_rules.get("straordinarioApt", False):
+    if is_real_straordinaria(task, office_operation_ids) and not formatore_rules.get("straordinarioApt", False):
         return False
-    if not task.get("premium") and not task.get("straordinaria") and not formatore_rules.get("standardApt", True):
+    if not task.get("premium") and not is_real_straordinaria(task, office_operation_ids) and not formatore_rules.get("standardApt", True):
         return False
     if not can_handle_apt("formatore_cleaner", task.get("typeApt"), apartment_types):
         return False
@@ -121,7 +152,14 @@ def main():
     tasks_list = data.get("tasks") or []
     cleaners = data.get("cleaners") or []
     apartment_types = data.get("apartmentTypes") or {}
+    office_operation_ids = set()
+    for op_id in (data.get("officeOperationIds") or []):
+        try:
+            office_operation_ids.add(int(op_id))
+        except Exception:
+            pass
     formatore_rules = data.get("formatoreRules")
+    task_types_by_cleaner = data.get("taskTypesByCleaner") or {}
     fairness = data.get("fairness") or {}
     w_t = float(fairness.get("wT", 1.0))
     targets = data.get("targets") or {}
@@ -175,9 +213,9 @@ def main():
         group_work.append(int(work_min * SCALE))
         group_travel.append(travel_min)
         group_ntasks.append(len(task_ids))
-        has_ot = g.get("hasStraordinaria", False)
-        long_ot = g.get("isLongStraordinaria", False)
-        ot_dur = sum((t.get("cleaningTime") or 60) for t in tasks if t.get("straordinaria"))
+        has_ot = any(is_real_straordinaria(t, office_operation_ids) for t in tasks)
+        ot_dur = sum((t.get("cleaningTime") or 60) for t in tasks if is_real_straordinaria(t, office_operation_ids))
+        long_ot = ot_dur >= long_ot_min
         group_has_ot.append(has_ot)
         group_long_ot.append(long_ot)
         group_ot_duration.append(ot_dur)
@@ -230,10 +268,10 @@ def main():
             # For formatori, also enforce formatore_rules (priority + task type).
             compat = True
             for task in tasks:
-                if not task_cleaner_compatible(cleaner, task, apartment_types):
+                if not task_cleaner_compatible(cleaner, task, apartment_types, office_operation_ids, task_types_by_cleaner):
                     compat = False
                     break
-                if cleaner_is_formatore[c_idx] and not task_formatore_compatible(task, formatore_rules, apartment_types):
+                if cleaner_is_formatore[c_idx] and not task_formatore_compatible(task, formatore_rules, apartment_types, office_operation_ids):
                     compat = False
                     break
             if not compat:
@@ -280,7 +318,7 @@ def main():
         tasks = [tasks_by_id[tid] for tid in task_ids if tasks_by_id.get(tid)]
         ok = True
         for task in tasks:
-            if not task_formatore_compatible(task, formatore_rules, apartment_types):
+            if not task_formatore_compatible(task, formatore_rules, apartment_types, office_operation_ids):
                 ok = False
                 break
         group_is_formatore_compatible.append(ok)

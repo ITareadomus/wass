@@ -236,6 +236,21 @@ const displayClickableInputClass =
     {} as Record<number, string>
   ) || { 1: "FERMATA", 2: "PARTENZA", 3: "PULIZIA STRAORDINARIA", 4: "RIPASSO" };
 
+  const normalizeOperationName = (name: string | null | undefined) =>
+    (name || "").toLowerCase().trim();
+
+  const getOperationNameFromTask = (taskObj: any) => {
+    const opId = taskObj?.operation_id;
+    if (opId == null) return "";
+    return operationNames[opId] || "";
+  };
+
+  const isOfficeOtherOperation = (taskObj: any) =>
+    normalizeOperationName(getOperationNameFromTask(taskObj)) === "pulizia uffici/altro";
+
+  const isOfficeStraordinariaOperation = (taskObj: any) =>
+    normalizeOperationName(getOperationNameFromTask(taskObj)) === "pulizia uffici straordinaria";
+
   const [isMapFiltered, setIsMapFiltered] = useState(false);
   
   // Estrai locked e locked_reason dal task per dependency stabili
@@ -740,7 +755,7 @@ const displayClickableInputClass =
 
   // Determina il tipo della CARD dai flag dell'oggetto *task* (non quelli della navigazione nel modale)
   const cardIsPremium = Boolean(task.premium);
-  const cardIsStraordinaria = Boolean(task.straordinaria);
+  const cardIsStraordinaria = Boolean(task.straordinaria) || isOfficeStraordinariaOperation(task);
 
   // Il modale invece usa displayTask (vedi più sotto)
 
@@ -1721,14 +1736,20 @@ const displayClickableInputClass =
                   variant="outline"
                   className={cn(
                     "text-xs shrink-0 px-2 py-0.5 rounded border font-medium",
-                    Boolean(displayTask.straordinaria)
-                      ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
-                      : Boolean(displayTask.premium)
-                        ? "bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
-                        : "bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400"
+                    isOfficeOtherOperation(displayTask) || isOfficeStraordinariaOperation(displayTask)
+                      ? "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700"
+                      : Boolean(displayTask.straordinaria)
+                        ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
+                        : Boolean(displayTask.premium)
+                          ? "bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
+                          : "bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400"
                   )}
                 >
-                  {getTaskTypeStyle(Boolean(displayTask.straordinaria), Boolean(displayTask.premium)).label}
+                  {isOfficeStraordinariaOperation(displayTask)
+                    ? "PULIZIA UFFICI STRAORDINARIA"
+                    : isOfficeOtherOperation(displayTask)
+                      ? "PULIZIA UFFICI"
+                      : getTaskTypeStyle(Boolean(displayTask.straordinaria), Boolean(displayTask.premium)).label}
                 </Badge>
                 {(displayTask as any).priority && (
                   <Badge
