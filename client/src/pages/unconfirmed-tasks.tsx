@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
 import { useLocation } from "wouter";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -310,59 +309,58 @@ export default function UnconfirmedTasks() {
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="container mx-auto px-4 py-6">
+      <main className="w-full min-h-[calc(100vh-72px)] px-4 py-6">
         <div className="flex flex-col gap-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => changeDate(-1)}
-                data-testid="button-prev-date"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex items-center gap-2 px-4 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
-                    data-testid="workdate-picker-trigger"
-                  >
-                    <CalendarIcon className="h-4 w-4" />
-                    <span className="font-medium">
-                      {format(parseISO(selectedDate), "EEEE d MMMM yyyy", { locale: it })}
-                    </span>
-                  </button>
-                </PopoverTrigger>
+          {!isLoading && (
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => changeDate(-1)}
+                  data-testid="button-prev-date"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 px-4 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
+                      data-testid="workdate-picker-trigger"
+                    >
+                      <CalendarIcon className="h-4 w-4" />
+                      <span className="font-medium">
+                        {format(parseISO(selectedDate), "EEEE d MMMM yyyy", { locale: it })}
+                      </span>
+                    </button>
+                  </PopoverTrigger>
 
-                <PopoverContent className="w-auto p-2" align="start">
-                <Calendar
-                  mode="single"
-                  selected={parseISO(selectedDate)}
-                  onSelect={(d) => {
-                    if (!d) return;
-                    setSelectedDate(format(d, "yyyy-MM-dd"));
-                    setDatePickerOpen(false);
-                  }}
-                  initialFocus
-                  locale={it}
-                />
-                </PopoverContent>
-              </Popover>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => changeDate(1)}
-                data-testid="button-next-date"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+                  <PopoverContent className="w-auto p-2" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={parseISO(selectedDate)}
+                    onSelect={(d) => {
+                      if (!d) return;
+                      setSelectedDate(format(d, "yyyy-MM-dd"));
+                      setDatePickerOpen(false);
+                    }}
+                    initialFocus
+                    locale={it}
+                  />
+                  </PopoverContent>
+                </Popover>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => changeDate(1)}
+                  data-testid="button-next-date"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <ThemeToggle />
-            </div>
-          </div>
+          )}
 
           {isRefreshError ? (
             <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">

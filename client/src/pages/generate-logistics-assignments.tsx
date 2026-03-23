@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { DragDropContext, type DropResult } from "react-beautiful-dnd";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
-import { WassSiteHeader } from "@/components/wass-site-header";
 import { useToast } from "@/hooks/use-toast";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import LogisticsTimelineView from "@/components/timeline/logistics-timeline-view";
@@ -10,13 +8,11 @@ import type { TaskType } from "@shared/schema";
 import {
   CalendarIcon,
   RefreshCw,
-  HelpCircle,
   Search,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Link } from "wouter";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -852,24 +848,6 @@ export default function GenerateLogisticsAssignments() {
 
   return (
     <div className="bg-background text-foreground min-h-screen">
-      <WassSiteHeader
-        right={
-          <>
-            <Link href={`/unconfirmed-tasks?date=${format(selectedDate, "yyyy-MM-dd")}`}>
-              <Button
-                variant="outline"
-                size="icon"
-                className="rounded-full"
-                title="Task Non Confermate"
-                data-testid="link-unconfirmed-tasks-logistics"
-              >
-                <HelpCircle className="h-5 w-5" />
-              </Button>
-            </Link>
-            <ThemeToggle />
-          </>
-        }
-      />
       <div className="w-full px-4 pt-3 pb-6">
         {!isExtractingLogistics && (
           <div className="mx-auto mb-6 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-4">

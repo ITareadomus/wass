@@ -23,7 +23,12 @@ interface Account {
   role: string;
 }
 
-export function ThemeToggle() {
+interface ThemeToggleProps {
+  showHomeButton?: boolean;
+  showAccountMenu?: boolean;
+}
+
+export function ThemeToggle({ showHomeButton = true, showAccountMenu = true }: ThemeToggleProps) {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const [isDark, setIsDark] = useState(false);
@@ -141,7 +146,7 @@ export function ThemeToggle() {
           <Moon className="h-5 w-5" />
         )}
       </Button>
-      {location !== "/" && location !== "/generate-assignments" && location !== "/generate-logistics-assignments" && location !== "/login" && (
+      {showHomeButton && location !== "/" && location !== "/generate-assignments" && location !== "/generate-logistics-assignments" && location !== "/login" && (
         <Button
           onClick={() => setLocation(getHomePath())}
           variant="outline"
@@ -152,7 +157,7 @@ export function ThemeToggle() {
           <Home className="h-5 w-5" />
         </Button>
       )}
-      {user && (
+      {showAccountMenu && user && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full h-9 w-9 p-0">

@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Trash2, Plus, Eye, EyeOff, Save, X, Home } from "lucide-react";
 import {
   Select,
@@ -310,9 +309,6 @@ export default function Settings() {
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Settings</h1>
-          <div className="flex gap-2 items-center">
-            <ThemeToggle />
-          </div>
         </div>
 
         {/* Task Types Settings - Removed */}
