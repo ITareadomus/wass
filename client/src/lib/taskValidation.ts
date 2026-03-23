@@ -6,6 +6,7 @@ interface CleanerTaskRules {
   standard_apt: boolean;
   premium_apt: boolean;
   straordinario_apt: boolean;
+  ufficio_apt?: boolean;
 }
 
 interface TaskTypesByCleaner {
@@ -15,7 +16,9 @@ interface TaskTypesByCleaner {
 interface ApartmentTypesConfig {
   standard_apt?: string[];
   premium_apt?: string[];
+  straordinario_apt?: string[];
   formatore_apt?: string[];
+  ufficio_apt?: string[];
 }
 
 interface PriorityTypesConfig {
@@ -35,6 +38,36 @@ interface SettingsSchema {
 let cachedRules: TaskTypesByCleaner | null = null;
 let cachedApartmentTypes: ApartmentTypesConfig | null = null;
 let cachedPriorityTypes: PriorityTypesConfig | null = null;
+let cachedOfficeOperationIds: Set<number> | null = null;
+
+const OFFICE_OPERATION_NAMES = new Set([
+  "pulizia uffici",
+  "pulizia uffici/altro",
+  "pulizia uffici straordinaria",
+]);
+
+async function loadOfficeOperationIds(): Promise<void> {
+  if (cachedOfficeOperationIds) return;
+  cachedOfficeOperationIds = new Set<number>();
+  try {
+    const response = await fetch("/api/operations", {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
+    });
+    if (!response.ok) return;
+    const data = await response.json();
+    const operations = Array.isArray(data?.active_operations) ? data.active_operations : [];
+    for (const operation of operations) {
+      const id = Number(operation?.id);
+      const normalizedName = String(operation?.name ?? "").toLowerCase().trim();
+      if (Number.isFinite(id) && OFFICE_OPERATION_NAMES.has(normalizedName)) {
+        cachedOfficeOperationIds.add(id);
+      }
+    }
+  } catch {
+    // Best effort: if this fails, office detection still works from task operation name.
+  }
+}
 
 export async function loadValidationRules(): Promise<TaskTypesByCleaner> {
   if (cachedRules) return cachedRules;
@@ -57,6 +90,7 @@ export async function loadValidationRules(): Promise<TaskTypesByCleaner> {
     cachedRules = settings.task_types ?? {};
     cachedApartmentTypes = settings.apartment_types ?? null;
     cachedPriorityTypes = settings.priority_types ?? null;
+    await loadOfficeOperationIds();
 
     return cachedRules;
   } catch (error) {
@@ -68,11 +102,15 @@ export async function loadValidationRules(): Promise<TaskTypesByCleaner> {
 }
 
 function normalizeCleanerRole(role: string): string {
+  if (!role) return 'standard_cleaner';
   const normalized = role.toLowerCase().trim();
 
   if (normalized.includes('standard')) return 'standard_cleaner';
   if (normalized.includes('premium')) return 'premium_cleaner';
-  if (normalized.includes('straord')) return 'straordinaria_cleaner';
+  if (normalized.includes('ufficio')) return 'ufficio_cleaner';
+  if (normalized.includes('straord')) return 'straordinario_cleaner';
+  if (normalized.includes('straordinario')) return 'straordinario_cleaner';
+  if (normalized.includes('straordinaria')) return 'straordinario_cleaner';
   if (normalized.includes('formatore')) return 'formatore_cleaner';
 
   // If none of the specific roles match, return the normalized role itself.
@@ -80,11 +118,35 @@ function normalizeCleanerRole(role: string): string {
   return normalized;
 }
 
-function determineTaskType(task: any): string | null {
+function isOfficeTask(task: any): boolean {
+  if (typeof task !== "object" || task === null) return false;
+
+  const operationIdRaw = task.operation_id ?? task.operationId;
+  const operationId = operationIdRaw != null ? Number(operationIdRaw) : NaN;
+  if (Number.isFinite(operationId) && cachedOfficeOperationIds?.has(operationId)) {
+    return true;
+  }
+
+  const operationName = String(
+    task.operation_name ??
+      task.operationName ??
+      task.operation_label ??
+      ""
+  )
+    .toLowerCase()
+    .trim();
+  return OFFICE_OPERATION_NAMES.has(operationName);
+}
+
+type TaskTypeKey = keyof CleanerTaskRules;
+
+function determineTaskType(task: any): TaskTypeKey | null {
   // Ensure task is an object and not null before accessing properties
   if (typeof task !== 'object' || task === null) {
     return null;
   }
+
+  if (isOfficeTask(task)) return 'ufficio_apt';
 
   const isPremium = Boolean(task.premium);
   const isStraordinaria = Boolean(task.straordinaria);
@@ -132,20 +194,26 @@ export function canCleanerHandleTaskSync(
   // If no rules are provided, assume any task can be handled.
   if (!rules) return true;
 
+  const roleKey = normalizeCleanerRole(cleanerRole);
+  const officeTask = isOfficeTask(task);
+
   const taskType = determineTaskType(task);
   // If the task type cannot be determined, assume it can be handled.
   if (!taskType) return true;
-
-  const roleKey = normalizeCleanerRole(cleanerRole);
 
   // Get the specific rules for the cleaner's role.
   const roleRules = rules[roleKey];
   // If there are no specific rules for this role, assume it can handle the task.
   if (!roleRules) return true;
 
+  // Office tasks are controlled by the dedicated checkbox per role (task_types.<role>.ufficio_apt).
+  if (officeTask) {
+    return roleRules.ufficio_apt === true;
+  }
+
   // Straordinario tasks: only cleaners with role "Straordinario" can handle them
-  if (taskType === "straordinario_apt") {
-    return roleKey === 'straordinaria_cleaner';
+  if (taskType === "straordinario_apt" && roleKey !== 'ufficio_cleaner') {
+    return roleKey === 'straordinario_cleaner';
   }
 
   // Check if the cleaner's role is allowed to handle this specific task type based on task_types rules.

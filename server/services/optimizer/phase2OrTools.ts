@@ -93,6 +93,8 @@ function buildPayload(
     clientId: t.clientId,
     premium: t.premium,
     straordinaria: t.straordinaria,
+    operationId: t.operationId ?? null,
+    isOfficeTask: t.isOfficeTask === true,
     typeApt: t.typeApt,
     priority: t.priority,
     cleaningTime: t.cleaningTime
@@ -137,6 +139,8 @@ function buildPayload(
     tasks: tasksPayload,
     cleaners: cleanersPayload,
     apartmentTypes: params.apartmentTypes ?? DEFAULT_APARTMENT_TYPES,
+    officeOperationIds: params.officeOperationIds ?? [],
+    taskTypesByCleaner: params.taskTypesByCleaner ?? null,
     formatoreRules: formatoreRules ? {
       allowedPriorities: formatoreRules.allowedPriorities,
       standardApt: formatoreRules.standardApt,

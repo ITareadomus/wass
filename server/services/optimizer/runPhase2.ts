@@ -1,4 +1,6 @@
 import pool from '../../../shared/pg-db';
+import * as mysql from 'mysql2/promise';
+import { databaseConfig } from '../../../config/database';
 import { 
   Phase2Params, 
   DEFAULT_PHASE2_PARAMS,
@@ -8,7 +10,8 @@ import {
   Phase2Event,
   ApartmentTypes,
   DEFAULT_APARTMENT_TYPES,
-  FormatoreRules
+  FormatoreRules,
+  TaskTypesByCleanerConfig,
 } from './phase2';
 import { runPhase2WithOrTools } from './phase2OrTools';
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, loadLockedCleanerIds } from './db';
@@ -25,7 +28,8 @@ async function loadApartmentTypes(): Promise<ApartmentTypes> {
         standard_apt: apt.standard_apt || DEFAULT_APARTMENT_TYPES.standard_apt,
         premium_apt: apt.premium_apt || DEFAULT_APARTMENT_TYPES.premium_apt,
         straordinario_apt: apt.straordinario_apt || DEFAULT_APARTMENT_TYPES.straordinario_apt,
-        formatore_apt: apt.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt
+        formatore_apt: apt.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt,
+        ufficio_apt: apt.ufficio_apt || DEFAULT_APARTMENT_TYPES.ufficio_apt
       };
     }
     const legacy = await pool.query(`SELECT value FROM app_settings WHERE key = 'apartment_types'`);
@@ -35,13 +39,60 @@ async function loadApartmentTypes(): Promise<ApartmentTypes> {
         standard_apt: v.standard_apt || DEFAULT_APARTMENT_TYPES.standard_apt,
         premium_apt: v.premium_apt || DEFAULT_APARTMENT_TYPES.premium_apt,
         straordinario_apt: v.straordinario_apt || DEFAULT_APARTMENT_TYPES.straordinario_apt,
-        formatore_apt: v.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt
+        formatore_apt: v.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt,
+        ufficio_apt: v.ufficio_apt || DEFAULT_APARTMENT_TYPES.ufficio_apt
       };
     }
   } catch (e) {
     console.error('Failed to load apartment_types from app_settings, using defaults', e);
   }
   return DEFAULT_APARTMENT_TYPES;
+}
+
+async function loadOfficeOperationIds(): Promise<number[]> {
+  let connection: mysql.Connection | null = null;
+  try {
+    connection = await mysql.createConnection({
+      host: databaseConfig.mysql.host,
+      port: databaseConfig.mysql.port,
+      user: databaseConfig.mysql.user,
+      password: databaseConfig.mysql.password,
+      database: databaseConfig.mysql.database,
+    });
+
+    const [rows]: any = await connection.execute(
+      `SELECT o.id, l.name
+       FROM app_structure_operation o
+       INNER JOIN app_structure_operation_langs l
+         ON l.structure_operation_id = o.id AND l.id_lang = 1
+       WHERE o.active = 1 AND o.enable_wass = 1
+       ORDER BY o.id`
+    );
+
+    const officeNames = new Set([
+      'pulizia uffici',
+      'pulizia uffici/altro',
+      'pulizia uffici straordinaria',
+    ]);
+
+    const ids = (Array.isArray(rows) ? rows : [])
+      .filter((r: any) => officeNames.has(String(r?.name ?? '').toLowerCase().trim()))
+      .map((r: any) => Number(r?.id))
+      .filter((id: number) => Number.isFinite(id));
+
+    return Array.from(new Set(ids));
+  } catch (e) {
+    console.warn('[Phase2] Unable to load office operation IDs, fallback to none:', e);
+    return [];
+  } finally {
+    if (connection) {
+      try {
+        await connection.end();
+      } catch {
+        // ignore
+      }
+    }
+  }
 }
 
 async function loadFormatoreRules(): Promise<FormatoreRules | null> {
@@ -68,6 +119,21 @@ async function loadFormatoreRules(): Promise<FormatoreRules | null> {
     };
   } catch (e) {
     console.error('Failed to load formatore rules from app_settings:', e);
+    return null;
+  }
+}
+
+async function loadTaskTypesByCleaner(): Promise<TaskTypesByCleanerConfig | null> {
+  try {
+    const result = await pool.query(`
+      SELECT value FROM app_settings WHERE key = 'app_settings'
+    `);
+    const value = result.rows[0]?.value;
+    const taskTypes = value?.task_types;
+    if (!taskTypes || typeof taskTypes !== 'object') return null;
+    return taskTypes as TaskTypesByCleanerConfig;
+  } catch (e) {
+    console.error('Failed to load task_types from app_settings:', e);
     return null;
   }
 }
@@ -140,7 +206,7 @@ async function loadCleanersForDate(workDate: string): Promise<CleanerInput[]> {
   }));
 }
 
-async function loadTasksForPhase2(workDate: string): Promise<Map<number, TaskForPhase2>> {
+async function loadTasksForPhase2(workDate: string, officeOperationIds: Set<number>): Promise<Map<number, TaskForPhase2>> {
   const result = await pool.query(`
     SELECT 
       task_id as "taskId",
@@ -150,6 +216,7 @@ async function loadTasksForPhase2(workDate: string): Promise<Map<number, TaskFor
       client_id as "clientId",
       premium,
       straordinaria,
+      operation_id as "operationId",
       type_apt as "typeApt",
       priority,
       cleaning_time as "cleaningTime"
@@ -170,6 +237,8 @@ async function loadTasksForPhase2(workDate: string): Promise<Map<number, TaskFor
       clientId: row.clientId,
       premium: row.premium || false,
       straordinaria: row.straordinaria || false,
+      operationId: row.operationId != null ? Number(row.operationId) : null,
+      isOfficeTask: row.operationId != null ? officeOperationIds.has(Number(row.operationId)) : false,
       typeApt: row.typeApt || 'C',
       priority: row.priority || 'low',
       cleaningTime: row.cleaningTime || 60
@@ -323,7 +392,13 @@ export async function runPhase2(
   }
 
   try {
-    const [apartmentTypes, formatoreRules] = await Promise.all([loadApartmentTypes(), loadFormatoreRules()]);
+    const [apartmentTypes, formatoreRules, officeOperationIds, taskTypesByCleaner] = await Promise.all([
+      loadApartmentTypes(),
+      loadFormatoreRules(),
+      loadOfficeOperationIds(),
+      loadTaskTypesByCleaner(),
+    ]);
+    const officeOperationSet = new Set<number>(officeOperationIds);
     let initialLastPositionByCleaner: Map<number, { lat: number; lng: number }> | undefined;
     if (timelineContext?.anchorPointsByCleaner) {
       initialLastPositionByCleaner = new Map();
@@ -338,6 +413,8 @@ export async function runPhase2(
       ...DEFAULT_PHASE2_PARAMS, 
       ...params,
       apartmentTypes,
+      officeOperationIds: params.officeOperationIds ?? officeOperationIds,
+      taskTypesByCleaner: params.taskTypesByCleaner ?? taskTypesByCleaner,
       formatoreRules: formatoreRules ?? DEFAULT_FORMATORE_RULES,
       initialLoadByCleanerMin: timelineContext?.initialLoadByCleanerMin,
       initialLastPositionByCleaner,
@@ -353,7 +430,7 @@ export async function runPhase2(
       loadSelectedCleanerIds(workDate),
       loadCleanersForDate(workDate),
       loadLockedCleanerIds(workDate),
-      loadTasksForPhase2(workDate),
+      loadTasksForPhase2(workDate, officeOperationSet),
       loadPhase1Groups(runId)
     ]);
 

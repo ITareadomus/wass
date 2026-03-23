@@ -1,4 +1,6 @@
 import pool from '../../../shared/pg-db';
+import * as mysql from 'mysql2/promise';
+import { databaseConfig } from '../../../config/database';
 import { 
   runPhase4Algorithm, 
   Phase4Params, 
@@ -9,7 +11,7 @@ import {
 import { TaskForScheduling, Phase3TimelineConstraints } from './phase3';
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, getLatestRunForDate, loadLockedCleanerIds } from './db';
 import { loadPriorityStartWindows, mapPriorityType, priorityToDbFormat } from './priorityWindows';
-import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, calculateMinutesBasedTargets, TaskForPhase2, DEFAULT_FAIRNESS_PARAMS, FormatoreRules } from './phase2';
+import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, calculateMinutesBasedTargets, TaskForPhase2, DEFAULT_FAIRNESS_PARAMS, FormatoreRules, TaskTypesByCleanerConfig } from './phase2';
 import { TimelineContext } from './timelineContext';
 
 async function loadApartmentTypes(): Promise<ApartmentTypes> {
@@ -23,7 +25,8 @@ async function loadApartmentTypes(): Promise<ApartmentTypes> {
         standard_apt: apt.standard_apt || DEFAULT_APARTMENT_TYPES.standard_apt,
         premium_apt: apt.premium_apt || DEFAULT_APARTMENT_TYPES.premium_apt,
         straordinario_apt: apt.straordinario_apt || DEFAULT_APARTMENT_TYPES.straordinario_apt,
-        formatore_apt: apt.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt
+        formatore_apt: apt.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt,
+        ufficio_apt: apt.ufficio_apt || DEFAULT_APARTMENT_TYPES.ufficio_apt
       };
     }
     const legacy = await pool.query(`SELECT value FROM app_settings WHERE key = 'apartment_types'`);
@@ -33,13 +36,60 @@ async function loadApartmentTypes(): Promise<ApartmentTypes> {
         standard_apt: v.standard_apt || DEFAULT_APARTMENT_TYPES.standard_apt,
         premium_apt: v.premium_apt || DEFAULT_APARTMENT_TYPES.premium_apt,
         straordinario_apt: v.straordinario_apt || DEFAULT_APARTMENT_TYPES.straordinario_apt,
-        formatore_apt: v.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt
+        formatore_apt: v.formatore_apt || DEFAULT_APARTMENT_TYPES.formatore_apt,
+        ufficio_apt: v.ufficio_apt || DEFAULT_APARTMENT_TYPES.ufficio_apt
       };
     }
   } catch (e) {
     console.error('Failed to load apartment_types from app_settings, using defaults', e);
   }
   return DEFAULT_APARTMENT_TYPES;
+}
+
+async function loadOfficeOperationIds(): Promise<number[]> {
+  let connection: mysql.Connection | null = null;
+  try {
+    connection = await mysql.createConnection({
+      host: databaseConfig.mysql.host,
+      port: databaseConfig.mysql.port,
+      user: databaseConfig.mysql.user,
+      password: databaseConfig.mysql.password,
+      database: databaseConfig.mysql.database,
+    });
+
+    const [rows]: any = await connection.execute(
+      `SELECT o.id, l.name
+       FROM app_structure_operation o
+       INNER JOIN app_structure_operation_langs l
+         ON l.structure_operation_id = o.id AND l.id_lang = 1
+       WHERE o.active = 1 AND o.enable_wass = 1
+       ORDER BY o.id`
+    );
+
+    const officeNames = new Set([
+      'pulizia uffici',
+      'pulizia uffici/altro',
+      'pulizia uffici straordinaria',
+    ]);
+
+    const ids = (Array.isArray(rows) ? rows : [])
+      .filter((r: any) => officeNames.has(String(r?.name ?? '').toLowerCase().trim()))
+      .map((r: any) => Number(r?.id))
+      .filter((id: number) => Number.isFinite(id));
+
+    return Array.from(new Set(ids));
+  } catch (e) {
+    console.warn('[Phase4] Unable to load office operation IDs, fallback to none:', e);
+    return [];
+  } finally {
+    if (connection) {
+      try {
+        await connection.end();
+      } catch {
+        // ignore
+      }
+    }
+  }
 }
 
 async function loadFormatoreRules(): Promise<FormatoreRules | null> {
@@ -66,6 +116,21 @@ async function loadFormatoreRules(): Promise<FormatoreRules | null> {
     };
   } catch (e) {
     console.error('Failed to load formatore rules from app_settings:', e);
+    return null;
+  }
+}
+
+async function loadTaskTypesByCleaner(): Promise<TaskTypesByCleanerConfig | null> {
+  try {
+    const result = await pool.query(`
+      SELECT value FROM app_settings WHERE key = 'app_settings'
+    `);
+    const value = result.rows[0]?.value;
+    const taskTypes = value?.task_types;
+    if (!taskTypes || typeof taskTypes !== 'object') return null;
+    return taskTypes as TaskTypesByCleanerConfig;
+  } catch (e) {
+    console.error('Failed to load task_types from app_settings:', e);
     return null;
   }
 }
@@ -329,7 +394,7 @@ async function loadUnassignedTasks(runId: string, workDate: string): Promise<{ t
   }));
 }
 
-async function loadTasksForScheduling(workDate: string): Promise<Map<number, TaskForScheduling>> {
+async function loadTasksForScheduling(workDate: string, officeOperationIds: Set<number>): Promise<Map<number, TaskForScheduling>> {
   const result = await pool.query(`
     SELECT 
       task_id,
@@ -343,7 +408,8 @@ async function loadTasksForScheduling(workDate: string): Promise<Map<number, Tas
       priority,
       straordinaria,
       COALESCE(premium, false) as premium,
-      COALESCE(type_apt, 'C') as type_apt
+      COALESCE(type_apt, 'C') as type_apt,
+      operation_id as operation_id
     FROM daily_containers
     WHERE work_date = $1
       AND lat IS NOT NULL 
@@ -368,7 +434,9 @@ async function loadTasksForScheduling(workDate: string): Promise<Map<number, Tas
       priorityType: mapPriorityType(row.priority),
       straordinaria: row.straordinaria === true,
       premium: row.premium === true,
-      typeApt: row.type_apt
+      typeApt: row.type_apt,
+      operationId: row.operation_id != null ? Number(row.operation_id) : null,
+      isOfficeTask: row.operation_id != null ? officeOperationIds.has(Number(row.operation_id)) : false
     });
   }
   return map;
@@ -586,18 +654,26 @@ export async function runPhase4(
   }
 
   try {
-    const [apartmentTypes, formatoreRules] = await Promise.all([loadApartmentTypes(), loadFormatoreRules()]);
+    const [apartmentTypes, formatoreRules, officeOperationIds, taskTypesByCleaner] = await Promise.all([
+      loadApartmentTypes(),
+      loadFormatoreRules(),
+      loadOfficeOperationIds(),
+      loadTaskTypesByCleaner(),
+    ]);
+    const officeOperationSet = new Set<number>(officeOperationIds);
     const fullParams: Phase4Params = { 
       ...DEFAULT_PHASE4_PARAMS, 
       ...params,
       apartmentTypes,
+      officeOperationIds: params.officeOperationIds ?? officeOperationIds,
+      taskTypesByCleaner: params.taskTypesByCleaner ?? taskTypesByCleaner,
       formatoreRules: formatoreRules ?? DEFAULT_FORMATORE_RULES
     };
 
     const [schedules, unassignedTasks, tasksMap, priorityWindows, lockedCleanerIds] = await Promise.all([
       loadPhase3Schedules(resolvedRunId, resolvedWorkDate),
       loadUnassignedTasks(resolvedRunId, resolvedWorkDate),
-      loadTasksForScheduling(resolvedWorkDate),
+      loadTasksForScheduling(resolvedWorkDate, officeOperationSet),
       loadPriorityStartWindows(resolvedRunId),
       loadLockedCleanerIds(resolvedWorkDate)
     ]);
@@ -700,7 +776,9 @@ export async function runPhase4(
       straordinaria: t.straordinaria ?? false,
       typeApt: t.typeApt ?? '',
       priority: t.priorityType ?? 'LP',  // Use priorityType from TaskForScheduling
-      cleaningTime: t.cleaningTimeMinutes ?? 60
+      cleaningTime: t.cleaningTimeMinutes ?? 60,
+      operationId: t.operationId ?? null,
+      isOfficeTask: t.isOfficeTask === true
     }));
     const targets = calculateMinutesBasedTargets(tasksForTargets, eligibleSchedulesCount, fullParams.fairness);
     

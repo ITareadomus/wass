@@ -69,7 +69,7 @@ function GlobalHeader() {
               </Button>
             </Link>
           ) : null}
-          <ThemeToggle showHomeButton={false} />
+          <ThemeToggle showHomeButton={false} gapClassName="gap-3" />
         </>
       }
     />
@@ -79,7 +79,7 @@ function GlobalHeader() {
 function LoginHeader() {
   return (
     <WassSiteHeader
-      right={<ThemeToggle showHomeButton={false} showAccountMenu={false} />}
+      right={<ThemeToggle showHomeButton={false} showAccountMenu={false} gapClassName="gap-3" />}
     />
   );
 }

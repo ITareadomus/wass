@@ -26,9 +26,10 @@ interface Account {
 interface ThemeToggleProps {
   showHomeButton?: boolean;
   showAccountMenu?: boolean;
+  gapClassName?: string;
 }
 
-export function ThemeToggle({ showHomeButton = true, showAccountMenu = true }: ThemeToggleProps) {
+export function ThemeToggle({ showHomeButton = true, showAccountMenu = true, gapClassName = "gap-3" }: ThemeToggleProps) {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const [isDark, setIsDark] = useState(false);
@@ -133,7 +134,7 @@ export function ThemeToggle({ showHomeButton = true, showAccountMenu = true }: T
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={`flex items-center ${gapClassName}`}>
       <Button
         variant="outline"
         size="icon"
