@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Link } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -14,6 +14,75 @@ import SystemSettings from "@/pages/system-settings";
 import ClientSettings from "@/pages/client-settings";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
+import { WassSiteHeader } from "@/components/wass-site-header";
+import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { HelpCircle, Home } from "lucide-react";
+
+function GlobalHeader() {
+  const [location] = useLocation();
+  const selectedDate =
+    typeof window !== "undefined" ? localStorage.getItem("selected_work_date") : null;
+  const unconfirmedHref = selectedDate
+    ? `/unconfirmed-tasks?date=${selectedDate}`
+    : "/unconfirmed-tasks";
+  const isConvocazioniPage =
+    location === "/convocazioni" || location.startsWith("/convocazioni?");
+  const isUnconfirmedTasksPage =
+    location === "/unconfirmed-tasks" || location.startsWith("/unconfirmed-tasks?");
+  const showHomeButton =
+    isConvocazioniPage || location === "/settings" || location === "/account-settings";
+  const showUnconfirmedButton = !showHomeButton && !isUnconfirmedTasksPage;
+  const homeHref =
+    isConvocazioniPage &&
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("kind") === "drivers"
+      ? "/generate-logistics-assignments"
+      : "/generate-assignments";
+
+  return (
+    <WassSiteHeader
+      right={
+        <>
+          {showHomeButton ? (
+            <Link href={homeHref}>
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-full"
+                title="Torna alla Home"
+                data-testid="link-home-global"
+              >
+                <Home className="h-5 w-5" />
+              </Button>
+            </Link>
+          ) : showUnconfirmedButton ? (
+            <Link href={unconfirmedHref}>
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-full"
+                title="Task Non Confermate"
+                data-testid="link-unconfirmed-tasks-global"
+              >
+                <HelpCircle className="h-5 w-5" />
+              </Button>
+            </Link>
+          ) : null}
+          <ThemeToggle showHomeButton={false} />
+        </>
+      }
+    />
+  );
+}
+
+function LoginHeader() {
+  return (
+    <WassSiteHeader
+      right={<ThemeToggle showHomeButton={false} showAccountMenu={false} />}
+    />
+  );
+}
 
 function ProtectedRoute({ component: Component }: { component: () => JSX.Element }) {
   const [, setLocation] = useLocation();
@@ -30,13 +99,25 @@ function ProtectedRoute({ component: Component }: { component: () => JSX.Element
     return null;
   }
 
-  return <Component />;
+  return (
+    <>
+      <GlobalHeader />
+      <Component />
+    </>
+  );
 }
 
 function Router() {
   return (
     <Switch>
-      <Route path="/login" component={Login} />
+      <Route path="/login">
+        {() => (
+          <>
+            <LoginHeader />
+            <Login />
+          </>
+        )}
+      </Route>
       <Route path="/">
         {() => <ProtectedRoute component={HomeGate} />}
       </Route>

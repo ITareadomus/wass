@@ -11,7 +11,6 @@ import { format, differenceInCalendarDays } from "date-fns";
 import { it } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from 'wouter';
 
@@ -598,40 +597,39 @@ export default function Convocazioni() {
       <div className="p-4 w-full">
         <div className="mb-6 space-y-4">
           {/* Header con titolo e selettore data */}
-          <div className="flex justify-between items-center flex-wrap gap-4">
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold text-foreground flex items-center gap-2 flex-wrap">
-                <Users className="w-8 h-8 text-custom-blue" />
-                {isDrivers ? "CONVOCAZIONI DRIVER del" : "CONVOCAZIONI del"}
-              </h1>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "justify-start text-left font-normal",
-                      !selectedDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: it }) : <span>Seleziona data</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={(date) => date && setSelectedDate(date)}
-                    initialFocus
-                    locale={it}
-                  />
-                </PopoverContent>
-              </Popover>
+          {!isLoading && (
+            <div className="flex justify-between items-center flex-wrap gap-4">
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-foreground flex items-center gap-2 flex-wrap">
+                  <Users className="w-8 h-8 text-custom-blue" />
+                  {isDrivers ? "CONVOCAZIONI DRIVER del" : "CONVOCAZIONI del"}
+                </h1>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        !selectedDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: it }) : <span>Seleziona data</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={(date) => date && setSelectedDate(date)}
+                      initialFocus
+                      locale={it}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <ThemeToggle />
-            </div>
-          </div>
+          )}
 
           {isLoading ? (
             <div className="flex items-center justify-center p-12">
