@@ -980,8 +980,10 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           if (cleaner.role === "Straordinario") return 2;
           // 3. Premium (solo se NON straordinario)
           if (cleaner.role === "Premium") return 3;
-          // 4. Standard / qualsiasi altro
-          return 4;
+          // 4. Ufficio
+          if (cleaner.role === "Ufficio") return 4;
+          // 5. Standard / qualsiasi altro
+          return 5;
         };
 
         const priorityA = getPriority(a);
@@ -2106,6 +2108,11 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                 F
                               </div>
                             )}
+                            {!isRemoved && cleaner.role === "Ufficio" && (
+                              <div className="bg-sky-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                                U
+                              </div>
+                            )}
                           </>
                         )}
                       </div>
@@ -2778,6 +2785,11 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           Premium
                         </span>
                       )}
+                      {cleaner.role === "Ufficio" && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
+                          Ufficio
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
@@ -2938,6 +2950,10 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                         ) : selectedCleaner.role === "Premium" ? (
                           <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-600/30 text-gray-900 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-700 dark:border-yellow-400">
                             Premium
+                          </span>
+                        ) : selectedCleaner.role === "Ufficio" ? (
+                          <span className="px-2 py-0.5 rounded border font-medium text-sm bg-sky-600/30 text-gray-900 dark:bg-sky-500/40 dark:text-sky-200 border-sky-700 dark:border-sky-400">
+                            Ufficio
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-600/30 text-gray-900 dark:bg-green-500/40 dark:text-green-200 border-green-700 dark:border-green-400">

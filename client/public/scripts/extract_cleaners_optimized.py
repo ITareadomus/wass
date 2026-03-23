@@ -50,12 +50,12 @@ week_end_excl = week_start + timedelta(days=7)  # [week_start, week_end_excl)
 conn = mysql.connector.connect(**db_config)
 cur = conn.cursor(dictionary=True)
 
-# 1) Lista cleaners (7=Standard, 13=Formatore, 15=Premium, 20=Straordinario)
+# 1) Lista cleaners (7=Standard, 13=Formatore, 15=Premium, 17=Cleaner Ufficio, 20=Straordinario)
 # NOTA: Leggiamo tw_start da ADAM per usarlo come default se non c'è custom PostgreSQL
 cur.execute("""
     SELECT id, name, lastname, user_role_id, active, contract_type_id, telegram_id, tw_start
     FROM app_users 
-    WHERE user_role_id IN (7, 13, 15, 20) AND active = 1;
+    WHERE user_role_id IN (7, 13, 15, 17, 20) AND active = 1;
 """)
 cleaners = cur.fetchall()
 
@@ -222,6 +222,8 @@ for u in cleaners:
         role = "Straordinario"
     elif role_id == 15:
         role = "Premium"
+    elif role_id == 17:
+        role = "Ufficio"
     elif role_id == 13:
         role = "Formatore"
     else:

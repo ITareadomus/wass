@@ -182,7 +182,35 @@ export default function Convocazioni() {
         }
 
         const availableCleaners = dateCleaners.filter((c: any) => c.active === true);
-        availableCleaners.sort((a: any, b: any) => b.counter_hours - a.counter_hours);
+        availableCleaners.sort((a: any, b: any) => {
+          // Mantieni lo stesso ordinamento del dialog "Aggiungi cleaner":
+          // Formatore -> Straordinario -> Premium -> Ufficio -> Standard/altro
+          const getPriority = (cleaner: any) => {
+            if (cleaner.role === "Formatore") return 1;
+            if (cleaner.role === "Straordinario") return 2;
+            if (cleaner.role === "Premium") return 3;
+            if (cleaner.role === "Ufficio") return 4;
+            return 5;
+          };
+
+          const priorityA = getPriority(a);
+          const priorityB = getPriority(b);
+          if (priorityA !== priorityB) {
+            return priorityA - priorityB;
+          }
+
+          const hoursA = Number(
+            a.weekly_hours !== undefined && a.weekly_hours !== null
+              ? a.weekly_hours
+              : a.counter_hours ?? 0
+          );
+          const hoursB = Number(
+            b.weekly_hours !== undefined && b.weekly_hours !== null
+              ? b.weekly_hours
+              : b.counter_hours ?? 0
+          );
+          return hoursB - hoursA;
+        });
 
         setCleaners(availableCleaners);
         setFilteredCleaners(availableCleaners);
@@ -760,12 +788,17 @@ export default function Convocazioni() {
                                   Straordinario
                                 </span>
                               )}
+                              {cleaner.role === "Ufficio" && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-500/30 text-sky-800 dark:bg-sky-500/40 dark:text-sky-200 border-sky-600 dark:border-sky-400">
+                                  Ufficio
+                                </span>
+                              )}
                               {isPremium && !canDoStraordinaria && (
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
                                   Premium
                                 </span>
                               )}
-                              {!isPremium && !isFormatore && !canDoStraordinaria && (
+                              {!isPremium && !isFormatore && !canDoStraordinaria && cleaner.role !== "Ufficio" && (
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
                                   Standard
                                 </span>
