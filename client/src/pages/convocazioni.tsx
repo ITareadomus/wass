@@ -6,13 +6,19 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Users, CalendarIcon, ArrowLeft, Save, UserPlus, Search, RefreshCw, AlertTriangle } from "lucide-react";
+import { Users, CalendarIcon, ArrowLeft, Save, UserPlus, Search, RefreshCw, AlertTriangle, Truck, Bike } from "lucide-react";
 import { format, differenceInCalendarDays } from "date-fns";
 import { it } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from 'wouter';
+
+interface LogisticsVehicleOption {
+  id: number;
+  name: string;
+  pms_code: string | null;
+}
 
 interface Cleaner {
   id: number;
@@ -31,6 +37,10 @@ interface Cleaner {
   telegram_id: number | null;
   start_time: string | null;
   show_plus_one?: boolean;
+  assigned_vehicle_id?: number | null;
+  assigned_vehicle_name?: string | null;
+  assigned_vehicle_pms_code?: string | null;
+  assigned_vehicle_task_id?: number | null;
 }
 
 interface TaskStats {
@@ -136,6 +146,21 @@ export default function Convocazioni() {
         const rosterData = await rosterResponse.json();
         let dateCleaners = (isDrivers ? rosterData.drivers : rosterData.cleaners) || [];
 
+        if (isDrivers) {
+          const vRes = await fetch(`/api/logistics-vehicles?date=${dateStr}`, {
+            cache: "no-store",
+            headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+          });
+          if (vRes.ok) {
+            const vj = await vRes.json();
+            setLogisticsVehicles(Array.isArray(vj.vehicles) ? vj.vehicles : []);
+          } else {
+            setLogisticsVehicles([]);
+          }
+        } else {
+          setLogisticsVehicles([]);
+        }
+
         const selectedUrl = isDrivers
           ? `/api/selected-logistics-drivers?date=${dateStr}`
           : `/api/selected-cleaners?date=${dateStr}`;
@@ -145,6 +170,7 @@ export default function Convocazioni() {
         });
         let alreadySelectedIds = new Set<number>();
         let preselectedIds = new Set<number>();
+        const preselectedVehicleByDriver: Record<number, string> = {};
 
         if (selectedResponse.ok) {
           const selectedData = await selectedResponse.json();
@@ -155,6 +181,16 @@ export default function Convocazioni() {
               : selectedData.cleaners?.map((c: any) => c.id) || [];
             alreadySelectedIds = new Set(selectedIds);
             preselectedIds = new Set(selectedIds);
+            if (isDrivers) {
+              for (const d of selectedData.drivers || []) {
+                if (d?.id != null && d?.assigned_vehicle_id != null) {
+                  const sid = Number(d.assigned_vehicle_id);
+                  if (Number.isFinite(sid)) {
+                    preselectedVehicleByDriver[Number(d.id)] = String(sid);
+                  }
+                }
+              }
+            }
           }
         }
 
@@ -217,6 +253,7 @@ export default function Convocazioni() {
 
         const allPreselectedIds = new Set([...alreadySelectedIds, ...preselectedIds]);
         setSelectedCleaners(allPreselectedIds);
+        setSelectedVehicleByDriver(preselectedVehicleByDriver);
 
         setLoadingMessage("Caricamento statistiche task...");
         await loadTaskStats(dateStr, isDrivers);
@@ -288,6 +325,45 @@ export default function Convocazioni() {
     });
   }, [filteredCleaners, showOnlyNotConvocatiDaDueGiorni]);
 
+  const [selectedVehicleByDriver, setSelectedVehicleByDriver] = useState<Record<number, string>>({});
+  const [logisticsVehicles, setLogisticsVehicles] = useState<LogisticsVehicleOption[]>([]);
+
+  const availableVehicles = logisticsVehicles;
+  const availableVehicleById = useMemo(() => {
+    const map = new Map<number, LogisticsVehicleOption>();
+    for (const v of availableVehicles) map.set(v.id, v);
+    return map;
+  }, [availableVehicles]);
+  const vehiclePmsCodeById = useMemo(() => {
+    const map: Record<number, string | null> = {};
+    for (const v of availableVehicles) {
+      map[v.id] = v.pms_code && String(v.pms_code).trim() ? String(v.pms_code).trim() : null;
+    }
+    return map;
+  }, [availableVehicles]);
+
+  const driversRoster = useMemo(() => filteredCleaners, [filteredCleaners]);
+
+  const visibleRoster = useMemo(() => cleanersToShow, [cleanersToShow]);
+
+  const selectedDrivers = useMemo(
+    () => (isDrivers ? driversRoster.filter((c) => selectedCleaners.has(c.id)) : []),
+    [driversRoster, selectedCleaners, isDrivers]
+  );
+  const assignedVehicleIds = useMemo(() => {
+    const used = new Set<number>();
+    for (const rawId of Object.values(selectedVehicleByDriver)) {
+      const id = Number(rawId);
+      if (Number.isFinite(id)) used.add(id);
+    }
+    return used;
+  }, [selectedVehicleByDriver]);
+
+  const selectedDriverNames = useMemo(() => {
+    if (!isDrivers) return [];
+    return selectedDrivers.map((c) => `${c.name} ${c.lastname}`.trim());
+  }, [selectedDrivers, isDrivers]);
+
   const toggleCleanerSelection = (cleanerId: number, isAvailable: boolean) => {
     // Se il cleaner è già selezionato, lo deseleziona
     if (selectedCleaners.has(cleanerId)) {
@@ -295,6 +371,11 @@ export default function Convocazioni() {
         const newSet = new Set(prev);
         newSet.delete(cleanerId);
         return newSet;
+      });
+      setSelectedVehicleByDriver((prev) => {
+        const next = { ...prev };
+        delete next[cleanerId];
+        return next;
       });
       // (+1) istantaneo: nascondi quando deselezioni
       setCleaners(prev => prev.map(c => c.id === cleanerId ? { ...c, show_plus_one: false } : c));
@@ -332,6 +413,11 @@ export default function Convocazioni() {
         newSet.delete(id);
         return newSet;
       });
+      setSelectedVehicleByDriver((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
       setCleaners(prev => prev.map(c => c.id === id ? { ...c, show_plus_one: false } : c));
       setFilteredCleaners(prev => prev.map(c => c.id === id ? { ...c, show_plus_one: false } : c));
     } else {
@@ -346,7 +432,7 @@ export default function Convocazioni() {
     setConfirmDialog({ open: false, cleanerId: null });
   };
 
-  const handleSaveSelection = async () => {
+  const handleSaveSelection = async (): Promise<boolean> => {
     const label = isDrivers ? "driver" : "cleaner";
     if (selectedCleaners.size === 0) {
       toast({
@@ -354,7 +440,7 @@ export default function Convocazioni() {
         title: `⚠️ Nessun ${label} selezionato`,
         description: `Seleziona almeno un ${label} prima di salvare`,
       });
-      return;
+      return false;
     }
 
     try {
@@ -380,7 +466,17 @@ export default function Convocazioni() {
         const fromUI = filteredCleaners.filter((c) => selectedCleaners.has(c.id));
         const tlIds = new Set(timelineDrivers.map((c) => c.id));
         const uniqueFromUI = fromUI.filter((c) => !tlIds.has(c.id));
-        const selectedData = [...timelineDrivers, ...uniqueFromUI];
+        const selectedData = [...timelineDrivers, ...uniqueFromUI].map((d: any) => {
+          const assignedVehicleIdRaw = selectedVehicleByDriver[d.id];
+          const assignedVehicleId = assignedVehicleIdRaw ? Number(assignedVehicleIdRaw) : null;
+          const assignedVehicle = assignedVehicleId ? availableVehicleById.get(assignedVehicleId) : undefined;
+          return {
+            ...d,
+            assigned_vehicle_id: assignedVehicleId,
+            assigned_vehicle_name: assignedVehicle?.name ?? null,
+            assigned_vehicle_pms_code: assignedVehicle?.pms_code ?? null,
+          };
+        });
         const response = await fetch("/api/save-selected-logistics-drivers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -393,10 +489,27 @@ export default function Convocazioni() {
           }),
         });
         if (!response.ok) throw new Error("Errore nel salvataggio dei driver");
+        const transferResponse = await fetch("/api/sync-logistics-driver-vehicles-to-adam", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date: dateStr,
+            username: user.username || "unknown",
+          }),
+        });
+        if (!transferResponse.ok) {
+          throw new Error("Errore nella sincronizzazione driver-veicolo su ADAM");
+        }
+        const transferResult = await transferResponse.json();
+        if (!transferResult?.success) {
+          throw new Error(
+            transferResult?.message || "Sincronizzazione driver-veicolo su ADAM non riuscita"
+          );
+        }
         toast({
           variant: "success",
-          title: `${selectedData.length} driver salvati con successo!`,
-          description: `Salvati per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
+          title: `${selectedData.length} driver salvati con successo`,
+          description: `Salvati su PG e sincronizzati su ADAM per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
         });
       } else {
         const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`);
@@ -434,15 +547,17 @@ export default function Convocazioni() {
           description: `I cleaners sono stati salvati per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
         });
       }
+      return true;
     } catch (error) {
       console.error("Errore nel salvataggio:", error);
       toast({
         variant: "destructive",
         title: "❌ Errore nel salvataggio",
         description: isDrivers
-          ? "Si è verificato un errore nel salvataggio dei driver selezionati"
+          ? "Si è verificato un errore nel salvataggio/sincronizzazione driver"
           : "Si è verificato un errore nel salvataggio dei cleaners selezionati",
       });
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -488,7 +603,17 @@ export default function Convocazioni() {
         const fromUI = filteredCleaners.filter((c) => selectedCleaners.has(c.id));
         const tlIds = new Set(timelineDrivers.map((c) => c.id));
         const uniqueFromUI = fromUI.filter((c) => !tlIds.has(c.id));
-        const allSelected = [...timelineDrivers, ...uniqueFromUI];
+        const allSelected = [...timelineDrivers, ...uniqueFromUI].map((d: any) => {
+          const assignedVehicleIdRaw = selectedVehicleByDriver[d.id];
+          const assignedVehicleId = assignedVehicleIdRaw ? Number(assignedVehicleIdRaw) : null;
+          const assignedVehicle = assignedVehicleId ? availableVehicleById.get(assignedVehicleId) : undefined;
+          return {
+            ...d,
+            assigned_vehicle_id: assignedVehicleId,
+            assigned_vehicle_name: assignedVehicle?.name ?? null,
+            assigned_vehicle_pms_code: assignedVehicle?.pms_code ?? null,
+          };
+        });
         const existingIds = new Set(currentDrivers.map((c: any) => c.id));
         const newOnes = allSelected.filter((c) => !existingIds.has(c.id));
         const merged = [...currentDrivers, ...newOnes];
@@ -653,10 +778,9 @@ export default function Convocazioni() {
                     {isDrivers ? "DRIVERS SELEZIONATI" : "CLEANERS SELEZIONATI"}
                   </div>
                   <div className="text-lg font-bold">
-                    <span className="text-primary">{selectedCleaners.size}</span>
+                    <span className="text-primary">{isDrivers ? selectedDrivers.length : selectedCleaners.size}</span>
                     <span className="text-muted-foreground mx-1">/</span>
-                    <span className="text-foreground">{filteredCleaners.length}</span>{" "}
-                    {/* Utilizza filteredCleaners per il conteggio totale */}
+                    <span className="text-foreground">{driversRoster.length}</span>
                   </div>
                 </div>
                 <div className="flex-1 min-w-0" aria-hidden />
@@ -696,7 +820,7 @@ export default function Convocazioni() {
             </div>
 
             <div className="space-y-3 flex-1 overflow-y-auto pr-2">
-              {cleanersToShow
+              {visibleRoster
                 .filter((cleaner) =>
                   `${cleaner.name} ${cleaner.lastname}`
                     .toUpperCase()
@@ -707,6 +831,15 @@ export default function Convocazioni() {
                   const isPremium = cleaner.role === "Premium";
                   const isFormatore = cleaner.role === "Formatore";
                   const canDoStraordinaria = cleaner.role === "Straordinario";
+                  const selectedVehicleIdRaw = selectedVehicleByDriver[cleaner.id];
+                  const selectedVehicleId = selectedVehicleIdRaw ? Number(selectedVehicleIdRaw) : null;
+                  const selectedVehicleName = selectedVehicleId
+                    ? (availableVehicleById.get(selectedVehicleId)?.name ?? "").toString().trim()
+                    : "";
+                  const isScooterVehicle = /^piaggio\b/i.test(selectedVehicleName);
+                  const selectedVehiclePlate = selectedVehicleId
+                    ? vehiclePmsCodeById[selectedVehicleId] ?? null
+                    : null;
                   const lastWorked = cleaner.last_worked_date
                     ? (() => {
                         const s = String(cleaner.last_worked_date).trim();
@@ -773,6 +906,16 @@ export default function Convocazioni() {
                               ) && (
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-500/30 text-sky-900 dark:bg-sky-500/40 dark:text-sky-100 border-sky-600 dark:border-sky-400">
                                   Driver
+                                </span>
+                              )}
+                              {selectedVehiclePlate && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
+                                  {isScooterVehicle ? (
+                                    <Bike className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <Truck className="h-3.5 w-3.5" />
+                                  )}
+                                  <span>{selectedVehiclePlate}</span>
                                 </span>
                               )}
                             </>
@@ -951,8 +1094,10 @@ export default function Convocazioni() {
           <div className="flex justify-center mt-4 pt-4 border-t">
             <Button
               onClick={async () => {
-                await handleSaveSelection();
-                setLocation(isDrivers ? "/generate-logistics-assignments" : "/generate-assignments");
+                const ok = await handleSaveSelection();
+                if (ok) {
+                  setLocation(isDrivers ? "/generate-logistics-assignments" : "/generate-assignments");
+                }
               }}
               size="lg"
               disabled={selectedCleaners.size === 0 || isSaving}
@@ -1016,9 +1161,9 @@ export default function Convocazioni() {
           <h4 className="text-xs font-semibold text-muted-foreground mb-2">
             {isDrivers ? "Driver" : "Cleaners"}
           </h4>
-          <div className="grid grid-cols-2 gap-2 flex-1">
+          <div className="grid grid-cols-2 gap-2">
             {/* Disponibili */}
-            <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-2 flex flex-col items-center justify-center border-2 border-blue-300 dark:border-blue-700">
+            <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-2 h-[117px] flex flex-col items-center justify-center border-2 border-blue-300 dark:border-blue-700">
               <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
                 <circle
                   cx="50"
@@ -1049,17 +1194,17 @@ export default function Convocazioni() {
                   dominantBaseline="middle"
                   className="text-lg font-bold fill-blue-600 dark:fill-blue-400"
                 >
-                  {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.available !== false).length / filteredCleaners.length) * 100) : 0}%
+                {driversRoster.length > 0 ? Math.round((driversRoster.filter(c => c.available !== false).length / driversRoster.length) * 100) : 0}%
                 </text>
               </svg>
               <span className="text-[10px] font-semibold text-blue-800 dark:text-blue-200 text-center">Disponibili</span>
               <span className="text-[9px] text-blue-800 dark:text-blue-200">
-                {filteredCleaners.filter(c => c.available !== false).length}/{filteredCleaners.length}
+                {driversRoster.filter(c => c.available !== false).length}/{driversRoster.length}
               </span>
             </div>
 
             {/* Non Disponibili */}
-            <div className="bg-gray-100 dark:bg-gray-950/50 rounded-lg p-2 flex flex-col items-center justify-center border-2 border-gray-300 dark:border-gray-700">
+            <div className="bg-gray-100 dark:bg-gray-950/50 rounded-lg p-2 h-[117px] flex flex-col items-center justify-center border-2 border-gray-300 dark:border-gray-700">
               <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
                 <circle
                   cx="50"
@@ -1077,7 +1222,7 @@ export default function Convocazioni() {
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="8"
-                  strokeDasharray={`${filteredCleaners.length > 0 ? (filteredCleaners.filter(c => c.available === false).length / filteredCleaners.length) * 251.2 : 0} 251.2`}
+                  strokeDasharray={`${driversRoster.length > 0 ? (driversRoster.filter(c => c.available === false).length / driversRoster.length) * 251.2 : 0} 251.2`}
                   strokeDashoffset="0"
                   transform="rotate(-90 50 50)"
                   className="text-gray-500 dark:text-gray-600 transition-all duration-500"
@@ -1090,12 +1235,12 @@ export default function Convocazioni() {
                   dominantBaseline="middle"
                   className="text-lg font-bold fill-gray-600 dark:fill-gray-400"
                 >
-                  {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.available === false).length / filteredCleaners.length) * 100) : 0}%
+                  {driversRoster.length > 0 ? Math.round((driversRoster.filter(c => c.available === false).length / driversRoster.length) * 100) : 0}%
                 </text>
               </svg>
               <span className="text-[10px] font-semibold text-gray-800 dark:text-gray-200 text-center">Non Disponibili</span>
               <span className="text-[9px] text-gray-800 dark:text-gray-200">
-                {filteredCleaners.filter(c => c.available === false).length}/{filteredCleaners.length}
+                {driversRoster.filter(c => c.available === false).length}/{driversRoster.length}
               </span>
             </div>
 
@@ -1267,6 +1412,55 @@ export default function Convocazioni() {
               </>
             )}
           </div>
+
+          {isDrivers && (
+            <div className="mt-4 pt-3 border-t border-border flex-1 min-h-0">
+              <h4 className="text-xs font-semibold text-muted-foreground mb-2">Veicoli</h4>
+              <div className="bg-slate-100 dark:bg-slate-950/50 rounded-lg p-3 border-2 border-slate-300 dark:border-slate-700 h-[calc(100%-12px)] mb-[12px] overflow-y-auto">
+                {selectedDriverNames.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Nessun driver selezionato.
+                  </p>
+                ) : (
+                  <div className="space-y-1">
+                    {selectedDrivers.map((driver) => (
+                      <div key={driver.id} className="flex items-center gap-2">
+                        <div className="text-xs font-medium text-slate-800 dark:text-slate-200 flex-1">
+                          {`${driver.name} ${driver.lastname}`.trim()}
+                        </div>
+                        {(() => {
+                          const currentVehicleId = Number(selectedVehicleByDriver[driver.id] ?? "");
+                          const selectableVehicles = availableVehicles.filter((vehicle) => {
+                            if (vehicle.id === currentVehicleId) return true;
+                            return !assignedVehicleIds.has(vehicle.id);
+                          });
+                          return (
+                        <select
+                          value={selectedVehicleByDriver[driver.id] ?? ""}
+                          onChange={(e) =>
+                            setSelectedVehicleByDriver((prev) => ({
+                              ...prev,
+                              [driver.id]: e.target.value,
+                            }))
+                          }
+                          className="h-7 text-xs rounded border border-slate-300 dark:border-slate-700 bg-background px-2 min-w-[120px]"
+                        >
+                          <option value="">Seleziona veicolo</option>
+                          {selectableVehicles.map((vehicle) => (
+                            <option key={vehicle.id} value={vehicle.id}>
+                              {vehicle.name}
+                            </option>
+                          ))}
+                        </select>
+                          );
+                        })()}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </Card>
       </div>
         )}

@@ -52,6 +52,8 @@ cur.execute(
 )
 users = cur.fetchall()
 
+# I veicoli non sono più righe lg_drivers: lista da GET /api/logistics-vehicles (structure_id ADAM).
+
 cur.execute(
     """SELECT user_id,
            ROUND(SUM(
@@ -247,9 +249,15 @@ for u in users:
         }
     )
 
+LEGACY_VEHICLE_ID_OFFSET = 900_000_000
 adam_ids = {d["id"] for d in drivers_data}
 preserved = 0
 for did, row in existing_pg.items():
+    # Non reimportare pseudo-veicoli o altre righe legacy non più usate.
+    if did >= LEGACY_VEHICLE_ID_OFFSET:
+        continue
+    if str(row.get("role") or "").strip().lower() == "vehicle":
+        continue
     if did not in adam_ids:
         cid = did
         counter_hours = weekly_hours.get(cid, float(row.get("counter_hours") or 0))

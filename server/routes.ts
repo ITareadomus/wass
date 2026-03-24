@@ -1430,7 +1430,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/cleaners-aliases - Carica alias cleaners da cleaner_aliases (permanente)
+  // GET /api/cleaners-aliases - Carica alias cleaners da aliases (permanente)
   app.get("/api/cleaners-aliases", async (req, res) => {
     try {
       const dateParam = req.query.date as string;
@@ -1440,7 +1440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       
-      // Load from permanent cleaner_aliases table (date-independent)
+      // Load from permanent aliases table (date-independent)
       const aliasMap = await pgDailyAssignmentsService.getAllCleanerAliases();
 
       // Convert Map to object format for API response
@@ -1455,10 +1455,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      console.log(`✅ Alias caricati da cleaner_aliases: ${Object.keys(aliases).length}`);
+      console.log(`✅ Alias caricati da aliases: ${Object.keys(aliases).length}`);
       res.json({
         aliases,
-        metadata: { date: workDate, source: 'cleaner_aliases', last_updated: getRomeTimestamp() }
+        metadata: { date: workDate, source: 'aliases', last_updated: getRomeTimestamp() }
       });
     } catch (error: any) {
       console.error("Errore nel load degli alias:", error);
@@ -1822,6 +1822,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  /** Catalogo veicoli ADAM (structure_kind_id = 6) — non più in lg_drivers. */
+  app.get("/api/logistics-vehicles", async (req, res) => {
+    let connection: any = null;
+    try {
+      const workDate = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const { loadLogisticsVehiclesCatalog } = await import("./services/adam-logistics-vehicle-service");
+      connection = await mysql.createConnection({
+        host: databaseConfig.mysql.host,
+        port: databaseConfig.mysql.port,
+        user: databaseConfig.mysql.user,
+        password: databaseConfig.mysql.password,
+        database: databaseConfig.mysql.database,
+      });
+      const vehicles = await loadLogisticsVehiclesCatalog(connection);
+      res.json({
+        vehicles,
+        total: vehicles.length,
+        metadata: { date: workDate, source: "adam_mysql" },
+      });
+    } catch (error: any) {
+      console.error("GET /api/logistics-vehicles:", error);
+      res.status(500).json({ success: false, error: error.message });
+    } finally {
+      if (connection) {
+        try {
+          await connection.end();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  });
+
   app.post("/api/logistics-drivers", async (req, res) => {
     try {
       const { date, drivers, snapshotReason } = req.body;
@@ -1869,15 +1902,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentUsername = req.body.modified_by || req.body.created_by || getCurrentUsername(req);
       const driverIds = selectedDrivers.map((d: any) => (typeof d === "number" ? d : d.id));
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const {
+        normalizeVehicleStructureId,
+        resolveVehicleStructureIdsToTaskIds,
+      } = await import("./services/adam-logistics-vehicle-service");
       const fullRows = await pgDailyAssignmentsService.loadLgDriversByIds(driverIds, workDate);
       const rowById = new Map<number, any>(fullRows.map((r: any) => [Number(r.id), r]));
-      const enriched = selectedDrivers.map((d: any) => {
+      const baseEnriched = selectedDrivers.map((d: any) => {
         const id = typeof d === "number" ? d : d.id;
         const row = rowById.get(id);
         const st =
           typeof d === "object" && d && d.start_time != null
             ? d.start_time
             : row?.start_time || "10:00";
+        const rawVid =
+          typeof d === "object" && d && d.assigned_vehicle_id != null && d.assigned_vehicle_id !== ""
+            ? Number(d.assigned_vehicle_id)
+            : null;
+        const structureId = normalizeVehicleStructureId(rawVid);
         if (row) {
           return {
             id,
@@ -1886,10 +1928,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             role: row.role || "Driver",
             premium: row.role === "Premium",
             start_time: st,
+            assigned_vehicle_id: structureId,
+            assigned_vehicle_name:
+              typeof d === "object" && d ? d.assigned_vehicle_name ?? null : null,
+            assigned_vehicle_pms_code:
+              typeof d === "object" && d ? d.assigned_vehicle_pms_code ?? null : null,
           };
         }
         return typeof d === "number"
-          ? { id: d, name: "Driver", lastname: String(d), role: "Driver", premium: false, start_time: st }
+          ? {
+              id: d,
+              name: "Driver",
+              lastname: String(d),
+              role: "Driver",
+              premium: false,
+              start_time: st,
+              assigned_vehicle_id: structureId,
+              assigned_vehicle_name: null,
+              assigned_vehicle_pms_code: null,
+            }
           : {
               id: d.id,
               name: d.name || "Driver",
@@ -1897,8 +1954,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
               role: d.role || "Driver",
               premium: Boolean(d.premium),
               start_time: st,
+              assigned_vehicle_id: structureId,
+              assigned_vehicle_name: d.assigned_vehicle_name ?? null,
+              assigned_vehicle_pms_code: d.assigned_vehicle_pms_code ?? null,
             };
       });
+
+      const toResolve = [
+        ...new Set(
+          baseEnriched
+            .map((e: any) => e.assigned_vehicle_id)
+            .filter((sid: any) => sid != null && Number.isFinite(Number(sid)))
+        ),
+      ] as number[];
+
+      let vehicleWarnings: string[] = [];
+      let taskMap = new Map<number, number>();
+      if (toResolve.length > 0) {
+        let conn: any = null;
+        try {
+          conn = await mysql.createConnection({
+            host: databaseConfig.mysql.host,
+            port: databaseConfig.mysql.port,
+            user: databaseConfig.mysql.user,
+            password: databaseConfig.mysql.password,
+            database: databaseConfig.mysql.database,
+          });
+          const r = await resolveVehicleStructureIdsToTaskIds(conn, workDate, toResolve);
+          taskMap = r.map;
+          vehicleWarnings = r.warnings;
+        } catch (dbErr: any) {
+          vehicleWarnings.push(
+            `MySQL veicoli: ${dbErr?.message || dbErr} — vehicle_task_id non risolto`
+          );
+        } finally {
+          if (conn) {
+            try {
+              await conn.end();
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+      }
+
+      const enriched = baseEnriched.map((e: any) => ({
+        ...e,
+        assigned_vehicle_task_id:
+          e.assigned_vehicle_id != null ? taskMap.get(Number(e.assigned_vehicle_id)) ?? null : null,
+      }));
+
       const ok = await workspaceFiles.saveSelectedLogisticsDrivers(
         workDate,
         { drivers: enriched, total_selected: enriched.length, metadata: { date: workDate } },
@@ -1909,10 +2014,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!ok) {
         return res.status(500).json({ success: false, error: "save failed" });
       }
-      res.json({ success: true, count: driverIds.length });
+      res.json({
+        success: true,
+        count: driverIds.length,
+        vehicle_warnings: vehicleWarnings,
+      });
     } catch (error: any) {
       console.error("POST /api/save-selected-logistics-drivers:", error);
       res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  /**
+   * Sync ADAM SOLO driver-veicolo (senza timeline): aggiorna cleaned_by_us sui task veicolo del giorno.
+   * Da usare dalla pagina convocazioni subito dopo il save PG.
+   */
+  app.post("/api/sync-logistics-driver-vehicles-to-adam", async (req, res) => {
+    let connection: any = null;
+    try {
+      const { date, username: reqUsername } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const username = reqUsername || getCurrentUsername(req);
+
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const vehicleAssignments =
+        await pgDailyAssignmentsService.loadSelectedLogisticsDriverVehicleAssignments(workDate);
+
+      const hasVehicleBindings = Object.values(vehicleAssignments || {}).some((a: any) => {
+        const v = a?.vehicle_id;
+        return v != null && v !== "" && Number.isFinite(Number(v));
+      });
+      if (!hasVehicleBindings) {
+        return res.json({
+          success: false,
+          message: "Nessuna associazione driver-veicolo da sincronizzare",
+        });
+      }
+
+      const {
+        normalizeVehicleStructureId,
+        resolveVehicleStructureIdsToTaskIds,
+        listVehicleHousekeepingTaskIdsForDate,
+      } = await import("./services/adam-logistics-vehicle-service");
+
+      const taskToDriver = new Map<number, number>();
+      const pendingStructureResolve: { structureId: number; driverId: number }[] = [];
+
+      for (const [driverIdStr, a] of Object.entries(vehicleAssignments || {})) {
+        const driverId = Number(driverIdStr);
+        if (!Number.isFinite(driverId) || !a || typeof a !== "object") continue;
+        const sid = normalizeVehicleStructureId(
+          a.vehicle_id != null ? Number(a.vehicle_id) : null
+        );
+        if (!sid) continue;
+
+        const tid: number | null =
+          a.vehicle_task_id != null && Number.isFinite(Number(a.vehicle_task_id))
+            ? Number(a.vehicle_task_id)
+            : null;
+        if (tid != null) {
+          taskToDriver.set(tid, driverId);
+        } else {
+          pendingStructureResolve.push({ structureId: sid, driverId });
+        }
+      }
+
+      connection = await mysql.createConnection({
+        host: databaseConfig.mysql.host,
+        port: databaseConfig.mysql.port,
+        user: databaseConfig.mysql.user,
+        password: databaseConfig.mysql.password,
+        database: databaseConfig.mysql.database,
+      });
+
+      if (pendingStructureResolve.length > 0) {
+        const uniqueSids = [...new Set(pendingStructureResolve.map((p) => p.structureId))];
+        const { map, warnings } = await resolveVehicleStructureIdsToTaskIds(
+          connection,
+          workDate,
+          uniqueSids
+        );
+        for (const { structureId, driverId } of pendingStructureResolve) {
+          const tid = map.get(structureId);
+          if (tid != null) taskToDriver.set(tid, driverId);
+        }
+        if (warnings.length) {
+          console.warn("sync-logistics-driver-vehicles-to-adam warnings:", warnings);
+        }
+      }
+
+      const { pgUsersService } = await import("./services/pg-users-service");
+      const userRecord = await pgUsersService.getUserByUsername(username);
+      const adamUpdatedBy = userRecord?.adam_id ? `E${userRecord.adam_id}` : username;
+
+      const allVehicleTaskIds = await listVehicleHousekeepingTaskIdsForDate(connection, workDate);
+      const nowRome = format(new Date(), "yyyy-MM-dd HH:mm:ss");
+      let updated = 0;
+      let errors = 0;
+      for (const taskId of allVehicleTaskIds) {
+        const cleanedBy = taskToDriver.get(taskId) ?? null;
+        const assignedAtUs = cleanedBy != null ? nowRome : null;
+        const assignedAtMilliseconds = cleanedBy != null ? Date.now() : null;
+        try {
+          await connection.execute(
+            `UPDATE app_housekeeping
+             SET
+               cleaned_by_us = ?,
+               sequence = NULL,
+               updated_by = ?,
+               updated_at = ?,
+               assigned_at_us = ?,
+               assigned_at_milliseconds = ?,
+               collaboration = 0,
+               collaboration_by = NULL,
+               collaboration_at = NULL,
+               collaboration_bypass = 0,
+               helpwork = 0,
+               helpwork_by = 0,
+               helpwork_at = NULL,
+               startwork = 0,
+               startwork_at = NULL,
+               startreport = 0,
+               startreport_at = NULL,
+               extratimes = ''
+             WHERE id = ?`,
+            [
+              cleanedBy,
+              adamUpdatedBy,
+              nowRome,
+              assignedAtUs,
+              assignedAtMilliseconds,
+              taskId,
+            ]
+          );
+          updated++;
+        } catch (e) {
+          errors++;
+          console.error(`sync-logistics-driver-vehicles-to-adam task ${taskId}:`, e);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Sync driver-veicolo completata su ${allVehicleTaskIds.length} task veicolo`,
+        vehicle_task_count: allVehicleTaskIds.length,
+        adam_updates_attempted: updated,
+        adam_update_errors: errors,
+        synced_by: username,
+      });
+    } catch (error: any) {
+      console.error("POST /api/sync-logistics-driver-vehicles-to-adam:", error);
+      res.status(500).json({ success: false, message: error.message });
+    } finally {
+      if (connection) {
+        try {
+          await connection.end();
+        } catch {
+          /* ignore */
+        }
+      }
     }
   });
 
@@ -2255,8 +2515,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   /**
-   * Registra una revisione `transfer_to_adam` sulla timeline logistica (storico PG).
-   * Allineato al pulsante housekeeping; push MySQL ADAM dedicato può essere esteso qui.
+   * Registra una revisione `transfer_to_adam` della timeline logistica su PG (senza sync ADAM).
    */
   app.post("/api/transfer-logistics-to-adam", async (req, res) => {
     try {
@@ -2264,9 +2523,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       const username = reqUsername || getCurrentUsername(req);
 
-      const timelineData = await workspaceFiles.loadLogisticsTimeline(workDate);
-      const hasAssignments = timelineData?.drivers_assignments?.some(
-        (da: any) => Array.isArray(da.tasks) && da.tasks.length > 0
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const timelineData =
+        (await workspaceFiles.loadLogisticsTimeline(workDate)) ?? {
+          metadata: { date: workDate, last_updated: getRomeTimestamp() },
+          drivers_assignments: [],
+          meta: { total_drivers: 0, used_drivers: 0, assigned_tasks: 0 },
+        };
+      const hasAssignments = timelineData?.drivers_assignments?.some((da: any) =>
+        Array.isArray(da.tasks) && da.tasks.length > 0
       );
       if (!hasAssignments) {
         return res.json({
@@ -2274,8 +2539,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "Nessuna task assegnata nella timeline logistica",
         });
       }
-
-      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       await pgDailyAssignmentsService.saveLogisticsTimelineToHistory(
         workDate,
         timelineData,
@@ -2285,8 +2548,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         [],
         []
       );
-
-      console.log(`✅ Logistics transfer_to_adam revision: ${workDate} by ${username}`);
 
       res.json({
         success: true,
@@ -4144,7 +4405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Recupera alias per i collaboratori
       const { query } = await import("../shared/pg-db");
       const aliasesResult = await query(
-        `SELECT cleaner_id, alias FROM cleaner_aliases WHERE cleaner_id = ANY($1)`,
+        `SELECT cleaner_id, alias FROM aliases WHERE cleaner_id = ANY($1)`,
         [collaboration.cleanerIds]
       );
       
@@ -7514,7 +7775,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     }
   });
 
-  // Endpoint per migrare gli alias da JSON a cleaner_aliases (tabella permanente)
+  // Endpoint per migrare gli alias da JSON a aliases (tabella permanente)
   app.post("/api/migrate-aliases", async (req, res) => {
     try {
       const aliasesPath = path.join(process.cwd(), "client/public/data/cleaners/cleaners_aliases.json");
@@ -7530,11 +7791,11 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       const aliases = aliasesData.aliases || {};
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       
-      // Use new bulk import function to cleaner_aliases table
+      // Use new bulk import function to aliases table
       const migrated = await pgDailyAssignmentsService.importAliasesFromJson(aliases);
 
-      console.log(`✅ Migrati ${migrated} alias da JSON a cleaner_aliases`);
-      res.json({ success: true, message: `Migrati ${migrated} alias a cleaner_aliases`, migrated });
+      console.log(`✅ Migrati ${migrated} alias da JSON a aliases`);
+      res.json({ success: true, message: `Migrati ${migrated} alias a aliases`, migrated });
     } catch (error: any) {
       console.error("Errore nella migrazione degli alias:", error);
       res.status(500).json({ success: false, error: error.message });

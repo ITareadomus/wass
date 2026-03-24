@@ -14,10 +14,10 @@ async function createLogisticsContainersTables() {
   const { default: pool } = await import('../shared/pg-db');
   const client = await pool.connect();
   try {
-    console.log('📝 Creating daily_logistics_containers tables...');
+    console.log('📝 Creating lg_containers tables...');
 
     await client.query(`
-      CREATE TABLE IF NOT EXISTS daily_logistics_containers (
+      CREATE TABLE IF NOT EXISTS lg_containers (
         id SERIAL PRIMARY KEY,
         work_date DATE NOT NULL,
         priority VARCHAR(20) NOT NULL,
@@ -53,17 +53,17 @@ async function createLogisticsContainersTables() {
     `);
 
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_logistics_containers_work_date_priority
-      ON daily_logistics_containers(work_date, priority);
+      CREATE INDEX IF NOT EXISTS idx_lg_containers_work_date_priority
+      ON lg_containers(work_date, priority);
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_logistics_containers_task_id
-      ON daily_logistics_containers(task_id);
+      CREATE INDEX IF NOT EXISTS idx_lg_containers_task_id
+      ON lg_containers(task_id);
     `);
 
-    console.log('📝 Creating daily_logistics_containers_revisions...');
+    console.log('📝 Creating lg_containers_revision...');
     await client.query(`
-      CREATE TABLE IF NOT EXISTS daily_logistics_containers_revisions (
+      CREATE TABLE IF NOT EXISTS lg_containers_revision (
         id SERIAL PRIMARY KEY,
         work_date DATE NOT NULL,
         revision INTEGER NOT NULL,
@@ -75,13 +75,13 @@ async function createLogisticsContainersTables() {
       );
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_logistics_containers_revisions_work_date
-      ON daily_logistics_containers_revisions(work_date, revision DESC);
+      CREATE INDEX IF NOT EXISTS idx_lg_containers_revision_work_date
+      ON lg_containers_revision(work_date, revision DESC);
     `);
 
-    console.log('📝 Creating daily_logistics_containers_history...');
+    console.log('📝 Creating lg_containers_history...');
     await client.query(`
-      CREATE TABLE IF NOT EXISTS daily_logistics_containers_history (
+      CREATE TABLE IF NOT EXISTS lg_containers_history (
         id SERIAL PRIMARY KEY,
         work_date DATE NOT NULL,
         revision INTEGER NOT NULL,
@@ -116,12 +116,12 @@ async function createLogisticsContainersTables() {
       );
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_logistics_containers_history_work_rev
-      ON daily_logistics_containers_history(work_date, revision DESC);
+      CREATE INDEX IF NOT EXISTS idx_lg_containers_history_work_rev
+      ON lg_containers_history(work_date, revision DESC);
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_logistics_containers_history_task_id
-      ON daily_logistics_containers_history(task_id);
+      CREATE INDEX IF NOT EXISTS idx_lg_containers_history_task_id
+      ON lg_containers_history(task_id);
     `);
 
     console.log('✅ Logistics containers tables created successfully');

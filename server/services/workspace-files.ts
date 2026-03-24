@@ -277,7 +277,7 @@ export async function saveContainers(workDate: string, data: any, createdBy: str
   }
 }
 
-/** WASS Logistics: containers in daily_logistics_containers (separate from housekeeping) */
+/** WASS Logistics: containers in lg_containers (separate from housekeeping) */
 export async function loadLogisticsContainers(workDate: string): Promise<any | null> {
   try {
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
@@ -576,11 +576,13 @@ export async function loadSelectedLogisticsDrivers(workDate: string): Promise<an
   try {
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
     const ids = await pgDailyAssignmentsService.loadSelectedLogisticsDrivers(workDate);
+    const vehicleAssignments = await pgDailyAssignmentsService.loadSelectedLogisticsDriverVehicleAssignments(workDate);
     if (ids && ids.length > 0) {
       const rows = await pgDailyAssignmentsService.loadLgDriversByIds(ids, workDate);
       const byId = new Map<number, any>(rows.map((r: any) => [Number(r.id), r]));
       const driversData = ids.map((id) => {
         const row = byId.get(id);
+        const assignment = vehicleAssignments?.[String(id)] || null;
         if (row) {
           return {
             id,
@@ -595,6 +597,10 @@ export async function loadSelectedLogisticsDrivers(workDate: string): Promise<an
             counter_days: row.counter_days ?? 0,
             contract_type: row.contract_type ?? null,
             alias: row.alias ?? undefined,
+            assigned_vehicle_id: assignment?.vehicle_id ?? null,
+            assigned_vehicle_name: assignment?.vehicle_name ?? null,
+            assigned_vehicle_pms_code: assignment?.vehicle_pms_code ?? null,
+            assigned_vehicle_task_id: assignment?.vehicle_task_id ?? null,
           };
         }
         return {
@@ -609,6 +615,10 @@ export async function loadSelectedLogisticsDrivers(workDate: string): Promise<an
           counter_hours: 0,
           counter_days: 0,
           contract_type: null,
+          assigned_vehicle_id: assignment?.vehicle_id ?? null,
+          assigned_vehicle_name: assignment?.vehicle_name ?? null,
+          assigned_vehicle_pms_code: assignment?.vehicle_pms_code ?? null,
+          assigned_vehicle_task_id: assignment?.vehicle_task_id ?? null,
         };
       });
       return {
@@ -642,13 +652,34 @@ export async function saveSelectedLogisticsDrivers(
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
     const arr = data.drivers || [];
     const driverIds = arr.map((d: any) => (typeof d === 'number' ? d : d.id)).filter((id: any) => id != null);
+    const vehicleAssignments: Record<string, any> = {};
+    for (const d of arr) {
+      if (!d || typeof d !== 'object' || d.id == null) continue;
+      const driverId = String(d.id);
+      const vehicleIdRaw = d.assigned_vehicle_id;
+      if (vehicleIdRaw == null || vehicleIdRaw === '') continue;
+      const vehicleId = Number(vehicleIdRaw);
+      if (!Number.isFinite(vehicleId)) continue;
+      const taskIdRaw = d.assigned_vehicle_task_id;
+      const vehicleTaskId =
+        taskIdRaw != null && taskIdRaw !== '' && Number.isFinite(Number(taskIdRaw))
+          ? Number(taskIdRaw)
+          : null;
+      vehicleAssignments[driverId] = {
+        vehicle_id: vehicleId,
+        vehicle_name: d.assigned_vehicle_name ?? null,
+        vehicle_pms_code: d.assigned_vehicle_pms_code ?? null,
+        vehicle_task_id: vehicleTaskId,
+      };
+    }
     const actionType = skipRevision ? 'INIT' : modificationType.toUpperCase();
     return await pgDailyAssignmentsService.saveSelectedLogisticsDrivers(
       workDate,
       driverIds,
       actionType,
       data.actionPayload || null,
-      createdBy
+      createdBy,
+      vehicleAssignments
     );
   } catch (err) {
     console.error(`❌ saveSelectedLogisticsDrivers:`, err);
