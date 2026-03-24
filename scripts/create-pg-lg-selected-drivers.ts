@@ -31,7 +31,7 @@ async function main() {
       CREATE INDEX IF NOT EXISTS idx_lg_selected_drivers_work_date ON lg_selected_drivers(work_date);
     `);
     await client.query(`
-      CREATE TABLE IF NOT EXISTS lg_selected_drivers_revisions (
+      CREATE TABLE IF NOT EXISTS lg_selected_drivers_revision (
         id SERIAL PRIMARY KEY,
         selected_drivers_id INTEGER NOT NULL REFERENCES lg_selected_drivers(id) ON DELETE CASCADE,
         work_date DATE NOT NULL,
@@ -48,18 +48,18 @@ async function main() {
       );
     `);
     await client.query(`
-      ALTER TABLE lg_selected_drivers_revisions
+      ALTER TABLE lg_selected_drivers_revision
       ADD COLUMN IF NOT EXISTS vehicle_assignments_before JSONB NOT NULL DEFAULT '{}'::jsonb;
     `);
     await client.query(`
-      ALTER TABLE lg_selected_drivers_revisions
+      ALTER TABLE lg_selected_drivers_revision
       ADD COLUMN IF NOT EXISTS vehicle_assignments_after JSONB NOT NULL DEFAULT '{}'::jsonb;
     `);
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_lg_sel_drivers_rev_work_date
-      ON lg_selected_drivers_revisions(work_date);
+      ON lg_selected_drivers_revision(work_date);
     `);
-    console.log('✅ lg_selected_drivers + lg_selected_drivers_revisions OK');
+    console.log('✅ lg_selected_drivers + lg_selected_drivers_revision OK');
   } catch (e) {
     console.error(e);
     process.exitCode = 1;

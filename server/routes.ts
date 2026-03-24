@@ -1430,7 +1430,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/cleaners-aliases - Carica alias cleaners da cleaner_aliases (permanente)
+  // GET /api/cleaners-aliases - Carica alias cleaners da aliases (permanente)
   app.get("/api/cleaners-aliases", async (req, res) => {
     try {
       const dateParam = req.query.date as string;
@@ -1440,7 +1440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       
-      // Load from permanent cleaner_aliases table (date-independent)
+      // Load from permanent aliases table (date-independent)
       const aliasMap = await pgDailyAssignmentsService.getAllCleanerAliases();
 
       // Convert Map to object format for API response
@@ -1455,10 +1455,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      console.log(`✅ Alias caricati da cleaner_aliases: ${Object.keys(aliases).length}`);
+      console.log(`✅ Alias caricati da aliases: ${Object.keys(aliases).length}`);
       res.json({
         aliases,
-        metadata: { date: workDate, source: 'cleaner_aliases', last_updated: getRomeTimestamp() }
+        metadata: { date: workDate, source: 'aliases', last_updated: getRomeTimestamp() }
       });
     } catch (error: any) {
       console.error("Errore nel load degli alias:", error);
@@ -4405,7 +4405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Recupera alias per i collaboratori
       const { query } = await import("../shared/pg-db");
       const aliasesResult = await query(
-        `SELECT cleaner_id, alias FROM cleaner_aliases WHERE cleaner_id = ANY($1)`,
+        `SELECT cleaner_id, alias FROM aliases WHERE cleaner_id = ANY($1)`,
         [collaboration.cleanerIds]
       );
       
@@ -7775,7 +7775,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     }
   });
 
-  // Endpoint per migrare gli alias da JSON a cleaner_aliases (tabella permanente)
+  // Endpoint per migrare gli alias da JSON a aliases (tabella permanente)
   app.post("/api/migrate-aliases", async (req, res) => {
     try {
       const aliasesPath = path.join(process.cwd(), "client/public/data/cleaners/cleaners_aliases.json");
@@ -7791,11 +7791,11 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       const aliases = aliasesData.aliases || {};
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       
-      // Use new bulk import function to cleaner_aliases table
+      // Use new bulk import function to aliases table
       const migrated = await pgDailyAssignmentsService.importAliasesFromJson(aliases);
 
-      console.log(`✅ Migrati ${migrated} alias da JSON a cleaner_aliases`);
-      res.json({ success: true, message: `Migrati ${migrated} alias a cleaner_aliases`, migrated });
+      console.log(`✅ Migrati ${migrated} alias da JSON a aliases`);
+      res.json({ success: true, message: `Migrati ${migrated} alias a aliases`, migrated });
     } catch (error: any) {
       console.error("Errore nella migrazione degli alias:", error);
       res.status(500).json({ success: false, error: error.message });

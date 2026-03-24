@@ -25,7 +25,7 @@ Preferred communication style: Simple, everyday language.
 ## Data Storage
 - **Primary Database**: PostgreSQL (DigitalOcean) as the single source of truth.
 - **ORM**: Drizzle ORM for type-safe operations and migrations.
-- **Schema Design**: Flat tables for `daily_assignments_current`, `daily_assignments_history`, `daily_containers`, `daily_selected_cleaners`, `cleaners`, `cleaner_aliases`, `app_settings`, and `users`.
+- **Schema Design**: Flat tables for `daily_assignments_current`, `daily_assignments_history`, `daily_containers`, `daily_selected_cleaners`, `cleaners`, `aliases`, `app_settings`, and `users`.
 - **Data Validation**: Zod schemas for runtime type checking.
 - **Revision Tracking**: Comprehensive history tables for assignments, containers, and selected cleaners, including detailed action types for changes.
 - **Cleaner Start Time**: Date-scoped `start_time` for cleaners stored in PostgreSQL, with a hierarchy of custom > ADAM > default (10:00).

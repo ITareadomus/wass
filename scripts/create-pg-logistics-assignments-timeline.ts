@@ -17,9 +17,9 @@ async function createLogisticsAssignmentsTimelineTables() {
   const { default: pool } = await import('../shared/pg-db');
   const client = await pool.connect();
   try {
-    console.log('📝 Creating daily_logistics_assignments_revisions...');
+    console.log('📝 Creating lg_timeline_revision...');
     await client.query(`
-      CREATE TABLE IF NOT EXISTS daily_logistics_assignments_revisions (
+      CREATE TABLE IF NOT EXISTS lg_timeline_revision (
         id SERIAL PRIMARY KEY,
         work_date DATE NOT NULL,
         revision INTEGER NOT NULL,
@@ -34,13 +34,13 @@ async function createLogisticsAssignmentsTimelineTables() {
       );
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_logistics_assignments_revisions_work_date
-      ON daily_logistics_assignments_revisions(work_date, revision DESC);
+      CREATE INDEX IF NOT EXISTS idx_lg_timeline_revision_work_date
+      ON lg_timeline_revision(work_date, revision DESC);
     `);
 
-    console.log('📝 Creating daily_logistics_assignments_current...');
+    console.log('📝 Creating lg_timeline...');
     await client.query(`
-      CREATE TABLE IF NOT EXISTS daily_logistics_assignments_current (
+      CREATE TABLE IF NOT EXISTS lg_timeline (
         id BIGSERIAL PRIMARY KEY,
         work_date DATE NOT NULL,
         driver_id INTEGER NOT NULL,
@@ -85,21 +85,21 @@ async function createLogisticsAssignmentsTimelineTables() {
       );
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_logistics_assignments_current_work_date
-      ON daily_logistics_assignments_current(work_date);
+      CREATE INDEX IF NOT EXISTS idx_lg_timeline_work_date
+      ON lg_timeline(work_date);
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_logistics_assignments_current_driver_date
-      ON daily_logistics_assignments_current(driver_id, work_date);
+      CREATE INDEX IF NOT EXISTS idx_lg_timeline_driver_date
+      ON lg_timeline(driver_id, work_date);
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_logistics_assignments_current_task
-      ON daily_logistics_assignments_current(task_id);
+      CREATE INDEX IF NOT EXISTS idx_lg_timeline_task
+      ON lg_timeline(task_id);
     `);
 
-    console.log('📝 Creating daily_logistics_assignments_history...');
+    console.log('📝 Creating lg_timeline_history...');
     await client.query(`
-      CREATE TABLE IF NOT EXISTS daily_logistics_assignments_history (
+      CREATE TABLE IF NOT EXISTS lg_timeline_history (
         id SERIAL PRIMARY KEY,
         work_date DATE NOT NULL,
         revision INTEGER NOT NULL,
@@ -145,8 +145,8 @@ async function createLogisticsAssignmentsTimelineTables() {
       );
     `);
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_logistics_assignments_history_work_rev
-      ON daily_logistics_assignments_history(work_date, revision DESC);
+      CREATE INDEX IF NOT EXISTS idx_lg_timeline_history_work_rev
+      ON lg_timeline_history(work_date, revision DESC);
     `);
 
     console.log('✅ Logistics assignments timeline tables created successfully');

@@ -277,7 +277,7 @@ export async function saveContainers(workDate: string, data: any, createdBy: str
   }
 }
 
-/** WASS Logistics: containers in daily_logistics_containers (separate from housekeeping) */
+/** WASS Logistics: containers in lg_containers (separate from housekeeping) */
 export async function loadLogisticsContainers(workDate: string): Promise<any | null> {
   try {
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
