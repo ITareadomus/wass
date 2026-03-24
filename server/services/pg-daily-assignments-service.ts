@@ -3462,6 +3462,7 @@ export class PgDailyAssignmentsService {
         FROM lg_drivers d
         LEFT JOIN cleaner_aliases ca ON ca.cleaner_id = d.driver_id
         WHERE d.work_date = $1 AND d.active = true
+          AND (d.role IS NULL OR LOWER(TRIM(d.role)) <> 'vehicle')
         ORDER BY d.counter_hours DESC
       `,
         [workDate]
@@ -3490,6 +3491,7 @@ export class PgDailyAssignmentsService {
         FROM lg_drivers d
         LEFT JOIN cleaner_aliases ca ON ca.cleaner_id = d.driver_id
         WHERE d.driver_id = ANY($1) AND d.work_date = $2
+          AND (d.role IS NULL OR LOWER(TRIM(d.role)) <> 'vehicle')
       `,
         [driverIds, workDate]
       );

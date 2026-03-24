@@ -1238,36 +1238,6 @@ export default function LogisticsTimelineView({
                     📜 Sei in modalità storico
                   </Button>
                 )}
-                <Button
-                  type="button"
-                  onClick={() => setShowAdamTransferDialog(true)}
-                  size="sm"
-                  variant="outline"
-                  className="h-full px-3 border-2 border-custom-blue shrink-0"
-                  disabled={isReadOnly || !hasTasksInTimeline || isTransferringToAdam}
-                  title={
-                    isReadOnly
-                      ? "Non puoi trasferire in modalità storico"
-                      : !hasTasksInTimeline
-                        ? "Nessuna task assegnata nella timeline"
-                        : "Registra le assegnazioni logistica (revisione trasferimento)"
-                  }
-                  data-testid="button-transfer-adam-logistics"
-                >
-                  {isTransferringToAdam ? (
-                    <RefreshCw className="mr-1 h-4 w-4 animate-spin" />
-                  ) : (
-                    <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                      />
-                    </svg>
-                  )}
-                  {isTransferringToAdam ? "Trasferimento…" : "Trasferisci su ADAM"}
-                </Button>
               </div>
             </div>
             {lastAdamTransfer && (
@@ -1638,7 +1608,7 @@ export default function LogisticsTimelineView({
                 if (!vehicleName) return null;
                 const isScooterVehicle = /^piaggio\b/i.test(vehicleName);
                 return (
-                  <span className="ml-auto inline-flex items-center gap-1.5 bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border border-sky-300 dark:border-sky-700 rounded-lg px-2 py-1 text-xs font-semibold">
+                  <span className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded border text-sm font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
                     {isScooterVehicle ? (
                       <Bike className="h-3.5 w-3.5" />
                     ) : (

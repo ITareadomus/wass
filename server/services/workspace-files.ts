@@ -600,6 +600,7 @@ export async function loadSelectedLogisticsDrivers(workDate: string): Promise<an
             assigned_vehicle_id: assignment?.vehicle_id ?? null,
             assigned_vehicle_name: assignment?.vehicle_name ?? null,
             assigned_vehicle_pms_code: assignment?.vehicle_pms_code ?? null,
+            assigned_vehicle_task_id: assignment?.vehicle_task_id ?? null,
           };
         }
         return {
@@ -617,6 +618,7 @@ export async function loadSelectedLogisticsDrivers(workDate: string): Promise<an
           assigned_vehicle_id: assignment?.vehicle_id ?? null,
           assigned_vehicle_name: assignment?.vehicle_name ?? null,
           assigned_vehicle_pms_code: assignment?.vehicle_pms_code ?? null,
+          assigned_vehicle_task_id: assignment?.vehicle_task_id ?? null,
         };
       });
       return {
@@ -658,10 +660,16 @@ export async function saveSelectedLogisticsDrivers(
       if (vehicleIdRaw == null || vehicleIdRaw === '') continue;
       const vehicleId = Number(vehicleIdRaw);
       if (!Number.isFinite(vehicleId)) continue;
+      const taskIdRaw = d.assigned_vehicle_task_id;
+      const vehicleTaskId =
+        taskIdRaw != null && taskIdRaw !== '' && Number.isFinite(Number(taskIdRaw))
+          ? Number(taskIdRaw)
+          : null;
       vehicleAssignments[driverId] = {
         vehicle_id: vehicleId,
         vehicle_name: d.assigned_vehicle_name ?? null,
         vehicle_pms_code: d.assigned_vehicle_pms_code ?? null,
+        vehicle_task_id: vehicleTaskId,
       };
     }
     const actionType = skipRevision ? 'INIT' : modificationType.toUpperCase();

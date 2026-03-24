@@ -52,34 +52,7 @@ cur.execute(
 )
 users = cur.fetchall()
 
-# I veicoli ADAM da includere nelle convocazioni logistics.
-# NB: usiamo un offset alto per evitare collisioni di ID con app_users.
-VEHICLE_ID_OFFSET = 900_000_000
-vehicles = []
-try:
-    cur.execute(
-        """
-        SELECT *
-        FROM app_structures
-        WHERE structure_kind_id = 6
-          AND active = 1
-        """
-    )
-    vehicles = cur.fetchall()
-except mysql.connector.Error:
-    # Alcuni ambienti espongono la tabella al singolare.
-    try:
-        cur.execute(
-            """
-            SELECT *
-            FROM app_structure
-            WHERE structure_kind_id = 6
-              AND active = 1
-            """
-        )
-        vehicles = cur.fetchall()
-    except mysql.connector.Error as e:
-        print(f"⚠️ Lettura veicoli da app_structure/app_structures fallita: {e}")
+# I veicoli non sono più righe lg_drivers: lista da GET /api/logistics-vehicles (structure_id ADAM).
 
 cur.execute(
     """SELECT user_id,
@@ -276,55 +249,15 @@ for u in users:
         }
     )
 
-for v in vehicles:
-    sid = v.get("id")
-    if sid is None:
-        continue
-    try:
-        sid_num = int(sid)
-    except (TypeError, ValueError):
-        continue
-
-    # Nome veicolo per la sezione "Veicoli" (dropdown/lista).
-    vehicle_name = (
-        v.get("name")
-        or v.get("alias")
-        or v.get("title")
-        or v.get("vehicle_name")
-        or f"Veicolo {sid_num}"
-    )
-    # Targa da app_structures per il badge sul div del driver.
-    vehicle_plate = (
-        v.get("pms_code")
-        or v.get("plate")
-        or v.get("targa")
-        or v.get("customer_structure_reference")
-        or v.get("logistic_code")
-        or ""
-    )
-
-    drivers_data.append(
-        {
-            "id": VEHICLE_ID_OFFSET + sid_num,
-            "name": str(vehicle_name),
-            # Salviamo la targa su lastname per mantenerla nel payload lg_drivers.
-            "lastname": str(vehicle_plate),
-            "role": "Vehicle",
-            "active": True,
-            "ranking": 0,
-            "counter_hours": 0.0,
-            "counter_days": 0,
-            "available": True,
-            "contract_type": None,
-            "preferred_customers": [],
-            "telegram_id": None,
-            "start_time": "10:00",
-        }
-    )
-
+LEGACY_VEHICLE_ID_OFFSET = 900_000_000
 adam_ids = {d["id"] for d in drivers_data}
 preserved = 0
 for did, row in existing_pg.items():
+    # Non reimportare pseudo-veicoli o altre righe legacy non più usate.
+    if did >= LEGACY_VEHICLE_ID_OFFSET:
+        continue
+    if str(row.get("role") or "").strip().lower() == "vehicle":
+        continue
     if did not in adam_ids:
         cid = did
         counter_hours = weekly_hours.get(cid, float(row.get("counter_hours") or 0))

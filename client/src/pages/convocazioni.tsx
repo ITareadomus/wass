@@ -15,6 +15,12 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from 'wouter';
 
+interface LogisticsVehicleOption {
+  id: number;
+  name: string;
+  pms_code: string | null;
+}
+
 interface Cleaner {
   id: number;
   name: string;
@@ -35,6 +41,7 @@ interface Cleaner {
   assigned_vehicle_id?: number | null;
   assigned_vehicle_name?: string | null;
   assigned_vehicle_pms_code?: string | null;
+  assigned_vehicle_task_id?: number | null;
 }
 
 interface TaskStats {
@@ -140,6 +147,21 @@ export default function Convocazioni() {
         const rosterData = await rosterResponse.json();
         let dateCleaners = (isDrivers ? rosterData.drivers : rosterData.cleaners) || [];
 
+        if (isDrivers) {
+          const vRes = await fetch(`/api/logistics-vehicles?date=${dateStr}`, {
+            cache: "no-store",
+            headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+          });
+          if (vRes.ok) {
+            const vj = await vRes.json();
+            setLogisticsVehicles(Array.isArray(vj.vehicles) ? vj.vehicles : []);
+          } else {
+            setLogisticsVehicles([]);
+          }
+        } else {
+          setLogisticsVehicles([]);
+        }
+
         const selectedUrl = isDrivers
           ? `/api/selected-logistics-drivers?date=${dateStr}`
           : `/api/selected-cleaners?date=${dateStr}`;
@@ -163,7 +185,10 @@ export default function Convocazioni() {
             if (isDrivers) {
               for (const d of selectedData.drivers || []) {
                 if (d?.id != null && d?.assigned_vehicle_id != null) {
-                  preselectedVehicleByDriver[Number(d.id)] = String(d.assigned_vehicle_id);
+                  const sid = Number(d.assigned_vehicle_id);
+                  if (Number.isFinite(sid)) {
+                    preselectedVehicleByDriver[Number(d.id)] = String(sid);
+                  }
                 }
               }
             }
@@ -274,36 +299,25 @@ export default function Convocazioni() {
   }, [filteredCleaners, showOnlyNotConvocatiDaDueGiorni]);
 
   const [selectedVehicleByDriver, setSelectedVehicleByDriver] = useState<Record<number, string>>({});
+  const [logisticsVehicles, setLogisticsVehicles] = useState<LogisticsVehicleOption[]>([]);
 
-  const availableVehicles = useMemo(
-    () => (isDrivers ? filteredCleaners.filter((c) => c.role === "Vehicle") : []),
-    [filteredCleaners, isDrivers]
-  );
+  const availableVehicles = logisticsVehicles;
   const availableVehicleById = useMemo(() => {
-    const map = new Map<number, Cleaner>();
+    const map = new Map<number, LogisticsVehicleOption>();
     for (const v of availableVehicles) map.set(v.id, v);
     return map;
   }, [availableVehicles]);
   const vehiclePmsCodeById = useMemo(() => {
     const map: Record<number, string | null> = {};
     for (const v of availableVehicles) {
-      const pmsCode = (v as any).pms_code ?? v.assigned_vehicle_pms_code ?? null;
-      const fallbackPlate = (v.lastname ?? v.name ?? "").toString().trim();
-      const plate = pmsCode ? String(pmsCode).trim() : fallbackPlate;
-      map[v.id] = plate || null;
+      map[v.id] = v.pms_code && String(v.pms_code).trim() ? String(v.pms_code).trim() : null;
     }
     return map;
   }, [availableVehicles]);
 
-  const driversRoster = useMemo(
-    () => (isDrivers ? filteredCleaners.filter((c) => c.role !== "Vehicle") : filteredCleaners),
-    [filteredCleaners, isDrivers]
-  );
+  const driversRoster = useMemo(() => filteredCleaners, [filteredCleaners]);
 
-  const visibleRoster = useMemo(
-    () => (isDrivers ? cleanersToShow.filter((c) => c.role !== "Vehicle") : cleanersToShow),
-    [cleanersToShow, isDrivers]
-  );
+  const visibleRoster = useMemo(() => cleanersToShow, [cleanersToShow]);
 
   const selectedDrivers = useMemo(
     () => (isDrivers ? driversRoster.filter((c) => selectedCleaners.has(c.id)) : []),
@@ -391,7 +405,7 @@ export default function Convocazioni() {
     setConfirmDialog({ open: false, cleanerId: null });
   };
 
-  const handleSaveSelection = async () => {
+  const handleSaveSelection = async (): Promise<boolean> => {
     const label = isDrivers ? "driver" : "cleaner";
     if (selectedCleaners.size === 0) {
       toast({
@@ -399,7 +413,7 @@ export default function Convocazioni() {
         title: `⚠️ Nessun ${label} selezionato`,
         description: `Seleziona almeno un ${label} prima di salvare`,
       });
-      return;
+      return false;
     }
 
     try {
@@ -433,9 +447,7 @@ export default function Convocazioni() {
             ...d,
             assigned_vehicle_id: assignedVehicleId,
             assigned_vehicle_name: assignedVehicle?.name ?? null,
-            assigned_vehicle_pms_code: assignedVehicleId
-              ? (vehiclePmsCodeById[assignedVehicleId] ?? null)
-              : null,
+            assigned_vehicle_pms_code: assignedVehicle?.pms_code ?? null,
           };
         });
         const response = await fetch("/api/save-selected-logistics-drivers", {
@@ -450,10 +462,27 @@ export default function Convocazioni() {
           }),
         });
         if (!response.ok) throw new Error("Errore nel salvataggio dei driver");
+        const transferResponse = await fetch("/api/sync-logistics-driver-vehicles-to-adam", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date: dateStr,
+            username: user.username || "unknown",
+          }),
+        });
+        if (!transferResponse.ok) {
+          throw new Error("Errore nella sincronizzazione driver-veicolo su ADAM");
+        }
+        const transferResult = await transferResponse.json();
+        if (!transferResult?.success) {
+          throw new Error(
+            transferResult?.message || "Sincronizzazione driver-veicolo su ADAM non riuscita"
+          );
+        }
         toast({
           variant: "success",
-          title: `${selectedData.length} driver salvati con successo!`,
-          description: `Salvati per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
+          title: `${selectedData.length} driver salvati con successo`,
+          description: `Salvati su PG e sincronizzati su ADAM per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
         });
       } else {
         const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`);
@@ -491,15 +520,17 @@ export default function Convocazioni() {
           description: `I cleaners sono stati salvati per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
         });
       }
+      return true;
     } catch (error) {
       console.error("Errore nel salvataggio:", error);
       toast({
         variant: "destructive",
         title: "❌ Errore nel salvataggio",
         description: isDrivers
-          ? "Si è verificato un errore nel salvataggio dei driver selezionati"
+          ? "Si è verificato un errore nel salvataggio/sincronizzazione driver"
           : "Si è verificato un errore nel salvataggio dei cleaners selezionati",
       });
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -553,9 +584,7 @@ export default function Convocazioni() {
             ...d,
             assigned_vehicle_id: assignedVehicleId,
             assigned_vehicle_name: assignedVehicle?.name ?? null,
-            assigned_vehicle_pms_code: assignedVehicleId
-              ? (vehiclePmsCodeById[assignedVehicleId] ?? null)
-              : null,
+            assigned_vehicle_pms_code: assignedVehicle?.pms_code ?? null,
           };
         });
         const existingIds = new Set(currentDrivers.map((c: any) => c.id));
@@ -853,6 +882,16 @@ export default function Convocazioni() {
                                   Driver
                                 </span>
                               )}
+                              {selectedVehiclePlate && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
+                                  {isScooterVehicle ? (
+                                    <Bike className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <Truck className="h-3.5 w-3.5" />
+                                  )}
+                                  <span>{selectedVehiclePlate}</span>
+                                </span>
+                              )}
                             </>
                           ) : (
                             <>
@@ -929,16 +968,6 @@ export default function Convocazioni() {
                     </div>
                   </div>
                   <div className="flex items-center gap-6">
-                    {isDrivers && selectedVehiclePlate && (
-                      <div className="inline-flex items-center gap-1.5 bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border border-sky-300 dark:border-sky-700 rounded-lg px-2 py-1 text-xs font-semibold">
-                        {isScooterVehicle ? (
-                          <Bike className="h-3.5 w-3.5" />
-                        ) : (
-                          <Truck className="h-3.5 w-3.5" />
-                        )}
-                        <span>{selectedVehiclePlate}</span>
-                      </div>
-                    )}
                     <div className={`flex items-center gap-1 bg-background border-2 rounded-lg px-3 py-1 ${borderColor}`}>
                       <span className="text-xs font-semibold text-foreground mr-2">Start Time:</span>
                       <Button
@@ -1034,8 +1063,10 @@ export default function Convocazioni() {
           <div className="flex justify-center mt-4 pt-4 border-t">
             <Button
               onClick={async () => {
-                await handleSaveSelection();
-                setLocation(isDrivers ? "/generate-logistics-assignments" : "/generate-assignments");
+                const ok = await handleSaveSelection();
+                if (ok) {
+                  setLocation(isDrivers ? "/generate-logistics-assignments" : "/generate-assignments");
+                }
               }}
               size="lg"
               disabled={selectedCleaners.size === 0 || isSaving}
