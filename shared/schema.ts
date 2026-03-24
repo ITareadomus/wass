@@ -40,7 +40,7 @@ export const lgSelectedDrivers = pgTable("lg_selected_drivers", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
-export const lgSelectedDriversRevisions = pgTable("lg_selected_drivers_revisions", {
+export const lgSelectedDriversRevisions = pgTable("lg_selected_drivers_revision", {
   id: serial("id").primaryKey(),
   selectedDriversId: integer("selected_drivers_id").notNull(),
   workDate: date("work_date").notNull(),
@@ -55,9 +55,9 @@ export const lgSelectedDriversRevisions = pgTable("lg_selected_drivers_revisions
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// ==================== CLEANER_ALIASES ====================
+// ==================== ALIASES ====================
 // Tabella permanente per gli alias dei cleaners (indipendente dalla data)
-export const cleanerAliases = pgTable("cleaner_aliases", {
+export const cleanerAliases = pgTable("aliases", {
   cleanerId: integer("cleaner_id").primaryKey(),
   alias: varchar("alias", { length: 100 }).notNull(),
   name: varchar("name", { length: 255 }),

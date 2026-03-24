@@ -146,12 +146,12 @@ export interface PgLogisticsAssignmentRow {
 export class PgDailyAssignmentsService {
 
   /**
-   * Ensure cleaner_aliases and selected_cleaners_revisions tables exist
+   * Ensure aliases and selected_cleaners_revisions tables exist
    */
   async ensureCleanerAliasesAndRevisionsTables(): Promise<void> {
     try {
       await query(`
-        CREATE TABLE IF NOT EXISTS cleaner_aliases (
+        CREATE TABLE IF NOT EXISTS aliases (
           cleaner_id INTEGER PRIMARY KEY,
           alias VARCHAR(100) NOT NULL,
           name VARCHAR(255),
@@ -180,7 +180,7 @@ export class PgDailyAssignmentsService {
         ON selected_cleaners_revisions(work_date)
       `);
       await query(`DROP TABLE IF EXISTS cleaners_history CASCADE`);
-      console.log('✅ PG: Tabelle cleaner_aliases e selected_cleaners_revisions verificate');
+      console.log('✅ PG: Tabelle aliases e selected_cleaners_revisions verificate');
     } catch (error) {
       console.warn('⚠️ PG: Errore (ignorabile) nella migrazione:', error);
     }
@@ -253,7 +253,7 @@ export class PgDailyAssignmentsService {
       `);
       await query(`CREATE INDEX IF NOT EXISTS idx_lg_selected_drivers_work_date ON lg_selected_drivers(work_date)`);
       await query(`
-        CREATE TABLE IF NOT EXISTS lg_selected_drivers_revisions (
+        CREATE TABLE IF NOT EXISTS lg_selected_drivers_revision (
           id SERIAL PRIMARY KEY,
           selected_drivers_id INTEGER NOT NULL REFERENCES lg_selected_drivers(id) ON DELETE CASCADE,
           work_date DATE NOT NULL,
@@ -270,19 +270,19 @@ export class PgDailyAssignmentsService {
         )
       `);
       await query(`
-        ALTER TABLE lg_selected_drivers_revisions
+        ALTER TABLE lg_selected_drivers_revision
         ADD COLUMN IF NOT EXISTS vehicle_assignments_before JSONB NOT NULL DEFAULT '{}'::jsonb
       `);
       await query(`
-        ALTER TABLE lg_selected_drivers_revisions
+        ALTER TABLE lg_selected_drivers_revision
         ADD COLUMN IF NOT EXISTS vehicle_assignments_after JSONB NOT NULL DEFAULT '{}'::jsonb
       `);
       await query(`
-        CREATE INDEX IF NOT EXISTS idx_lg_sel_drivers_rev_work_date ON lg_selected_drivers_revisions(work_date)
+        CREATE INDEX IF NOT EXISTS idx_lg_sel_drivers_rev_work_date ON lg_selected_drivers_revision(work_date)
       `);
 
       await query(`
-        CREATE TABLE IF NOT EXISTS daily_logistics_assignments_revisions (
+        CREATE TABLE IF NOT EXISTS lg_timeline_revision (
           id SERIAL PRIMARY KEY,
           work_date DATE NOT NULL,
           revision INTEGER NOT NULL,
@@ -294,15 +294,15 @@ export class PgDailyAssignmentsService {
         )
       `);
       await query(`
-        CREATE INDEX IF NOT EXISTS idx_logistics_assignments_revisions_work_date
-        ON daily_logistics_assignments_revisions(work_date, revision DESC)
+        CREATE INDEX IF NOT EXISTS idx_lg_timeline_revision_work_date
+        ON lg_timeline_revision(work_date, revision DESC)
       `);
-      await query(`ALTER TABLE daily_logistics_assignments_revisions ADD COLUMN IF NOT EXISTS edited_fields TEXT[] DEFAULT '{}'`);
-      await query(`ALTER TABLE daily_logistics_assignments_revisions ADD COLUMN IF NOT EXISTS old_values TEXT[] DEFAULT '{}'`);
-      await query(`ALTER TABLE daily_logistics_assignments_revisions ADD COLUMN IF NOT EXISTS new_values TEXT[] DEFAULT '{}'`);
+      await query(`ALTER TABLE lg_timeline_revision ADD COLUMN IF NOT EXISTS edited_fields TEXT[] DEFAULT '{}'`);
+      await query(`ALTER TABLE lg_timeline_revision ADD COLUMN IF NOT EXISTS old_values TEXT[] DEFAULT '{}'`);
+      await query(`ALTER TABLE lg_timeline_revision ADD COLUMN IF NOT EXISTS new_values TEXT[] DEFAULT '{}'`);
 
       await query(`
-        CREATE TABLE IF NOT EXISTS daily_logistics_assignments_current (
+        CREATE TABLE IF NOT EXISTS lg_timeline (
           id BIGSERIAL PRIMARY KEY,
           work_date DATE NOT NULL,
           driver_id INTEGER NOT NULL,
@@ -346,12 +346,12 @@ export class PgDailyAssignmentsService {
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
-      await query(`CREATE INDEX IF NOT EXISTS idx_logistics_assignments_current_work_date ON daily_logistics_assignments_current(work_date)`);
-      await query(`CREATE INDEX IF NOT EXISTS idx_logistics_assignments_current_driver_date ON daily_logistics_assignments_current(driver_id, work_date)`);
-      await query(`CREATE INDEX IF NOT EXISTS idx_logistics_assignments_current_task ON daily_logistics_assignments_current(task_id)`);
+      await query(`CREATE INDEX IF NOT EXISTS idx_lg_timeline_work_date ON lg_timeline(work_date)`);
+      await query(`CREATE INDEX IF NOT EXISTS idx_lg_timeline_driver_date ON lg_timeline(driver_id, work_date)`);
+      await query(`CREATE INDEX IF NOT EXISTS idx_lg_timeline_task ON lg_timeline(task_id)`);
 
       await query(`
-        CREATE TABLE IF NOT EXISTS daily_logistics_assignments_history (
+        CREATE TABLE IF NOT EXISTS lg_timeline_history (
           id SERIAL PRIMARY KEY,
           work_date DATE NOT NULL,
           revision INTEGER NOT NULL,
@@ -397,8 +397,8 @@ export class PgDailyAssignmentsService {
         )
       `);
       await query(`
-        CREATE INDEX IF NOT EXISTS idx_logistics_assignments_history_work_rev
-        ON daily_logistics_assignments_history(work_date, revision DESC)
+        CREATE INDEX IF NOT EXISTS idx_lg_timeline_history_work_rev
+        ON lg_timeline_history(work_date, revision DESC)
       `);
 
       await query(`
@@ -1140,7 +1140,7 @@ export class PgDailyAssignmentsService {
       const result = await query(
         `
         SELECT created_at
-        FROM daily_logistics_assignments_revisions
+        FROM lg_timeline_revision
         WHERE work_date = $1 AND modification_type = 'transfer_to_adam'
         ORDER BY revision DESC
         LIMIT 1
@@ -1158,7 +1158,7 @@ export class PgDailyAssignmentsService {
   async loadLogisticsCurrentDriverIds(workDate: string): Promise<Set<number>> {
     try {
       const result = await query(
-        `SELECT DISTINCT driver_id FROM daily_logistics_assignments_current WHERE work_date = $1`,
+        `SELECT DISTINCT driver_id FROM lg_timeline WHERE work_date = $1`,
         [workDate]
       );
       const s = new Set<number>();
@@ -1254,14 +1254,14 @@ export class PgDailyAssignmentsService {
     try {
       const rows = this.logisticsTimelineToRows(workDate, timeline);
       await client.query('BEGIN');
-      await client.query('DELETE FROM daily_logistics_assignments_current WHERE work_date = $1', [workDate]);
+      await client.query('DELETE FROM lg_timeline WHERE work_date = $1', [workDate]);
       if (rows.length === 0) {
         await client.query('COMMIT');
         return 0;
       }
       for (const row of rows) {
         await client.query(`
-          INSERT INTO daily_logistics_assignments_current (
+          INSERT INTO lg_timeline (
             work_date, driver_id, driver_name, driver_lastname, driver_role, driver_premium, driver_start_time,
             task_id, logistic_code, client_id,
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
@@ -1333,7 +1333,7 @@ export class PgDailyAssignmentsService {
   async getLogisticsAssignments(workDate: string): Promise<PgLogisticsAssignmentRow[]> {
     try {
       const result = await query(
-        'SELECT * FROM daily_logistics_assignments_current WHERE work_date = $1 ORDER BY driver_id, sequence',
+        'SELECT * FROM lg_timeline WHERE work_date = $1 ORDER BY driver_id, sequence',
         [workDate]
       );
       return result.rows;
@@ -1435,17 +1435,17 @@ export class PgDailyAssignmentsService {
       const rows = this.logisticsTimelineToRows(workDate, timeline);
       await client.query('BEGIN');
       await client.query(
-        'SELECT 1 FROM daily_logistics_assignments_revisions WHERE work_date = $1 FOR UPDATE',
+        'SELECT 1 FROM lg_timeline_revision WHERE work_date = $1 FOR UPDATE',
         [workDate]
       );
       const revResult = await client.query(
-        'SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_logistics_assignments_revisions WHERE work_date = $1',
+        'SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM lg_timeline_revision WHERE work_date = $1',
         [workDate]
       );
       const revision = parseInt(revResult.rows[0]?.next_revision || '1');
       await client.query(
         `
-        INSERT INTO daily_logistics_assignments_revisions (work_date, revision, task_count, created_by, modification_type, edited_fields, old_values, new_values)
+        INSERT INTO lg_timeline_revision (work_date, revision, task_count, created_by, modification_type, edited_fields, old_values, new_values)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       `,
         [workDate, revision, rows.length, createdBy, modificationType, editedFields, oldValues, newValues]
@@ -1453,7 +1453,7 @@ export class PgDailyAssignmentsService {
       for (const row of rows) {
         await client.query(
           `
-          INSERT INTO daily_logistics_assignments_history (
+          INSERT INTO lg_timeline_history (
             work_date, revision, driver_id, driver_name, driver_lastname, driver_role, driver_premium, driver_start_time,
             task_id, logistic_code, client_id,
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
@@ -1685,12 +1685,12 @@ export class PgDailyAssignmentsService {
     }
   }
 
-  // ==================== LOGISTICS CONTAINERS (daily_logistics_*) ====================
+  // ==================== LOGISTICS CONTAINERS (lg_containers_*) ====================
 
   async loadLogisticsContainers(workDate: string): Promise<any | null> {
     try {
       const result = await query(
-        'SELECT * FROM daily_logistics_containers WHERE work_date = $1 ORDER BY priority, task_id',
+        'SELECT * FROM lg_containers WHERE work_date = $1 ORDER BY priority, task_id',
         [workDate]
       );
 
@@ -2081,7 +2081,7 @@ export class PgDailyAssignmentsService {
     const autoDuplicateLockedBy = 'system:auto_duplicate_adam_logistics';
     try {
       await client.query('BEGIN');
-      await client.query('DELETE FROM daily_logistics_containers WHERE work_date = $1', [workDate]);
+      await client.query('DELETE FROM lg_containers WHERE work_date = $1', [workDate]);
 
       const containers = containersData?.containers || {};
       let totalInserted = 0;
@@ -2107,7 +2107,7 @@ export class PgDailyAssignmentsService {
           if (!task.task_id) continue;
 
           await client.query(`
-            INSERT INTO daily_logistics_containers (
+            INSERT INTO lg_containers (
               work_date, priority,
               task_id, logistic_code, client_id, premium, address, lat, lng,
               cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
@@ -2161,11 +2161,11 @@ export class PgDailyAssignmentsService {
                 CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
                 task_id DESC
             ) AS rn
-          FROM daily_logistics_containers
+          FROM lg_containers
           WHERE work_date = $1 AND logistic_code IS NOT NULL AND logistic_code <> 0
         ),
         to_lock AS (SELECT work_date, task_id FROM ranked WHERE rn > 1)
-        UPDATE daily_logistics_containers dc
+        UPDATE lg_containers dc
         SET locked = TRUE, locked_reason = $2
         FROM to_lock tl
         WHERE dc.work_date = tl.work_date AND dc.task_id = tl.task_id
@@ -2181,7 +2181,7 @@ export class PgDailyAssignmentsService {
                 CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
                 task_id DESC
             ) AS rn
-          FROM daily_logistics_containers
+          FROM lg_containers
           WHERE work_date = $1 AND logistic_code IS NOT NULL AND logistic_code <> 0
         ),
         to_lock AS (SELECT work_date, task_id FROM ranked WHERE rn > 1)
@@ -2206,11 +2206,11 @@ export class PgDailyAssignmentsService {
                 CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
                 task_id DESC
             ) AS rn
-          FROM daily_logistics_containers
+          FROM lg_containers
           WHERE work_date = $1 AND logistic_code IS NOT NULL AND logistic_code <> 0
         ),
         winners AS (SELECT work_date, task_id FROM ranked WHERE rn = 1)
-        UPDATE daily_logistics_containers dc
+        UPDATE lg_containers dc
         SET locked = FALSE, locked_reason = NULL
         FROM winners w
         WHERE dc.work_date = w.work_date AND dc.task_id = w.task_id
@@ -2226,7 +2226,7 @@ export class PgDailyAssignmentsService {
                 CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
                 task_id DESC
             ) AS rn
-          FROM daily_logistics_containers
+          FROM lg_containers
           WHERE work_date = $1 AND logistic_code IS NOT NULL AND logistic_code <> 0
         ),
         winners AS (SELECT work_date, task_id FROM ranked WHERE rn = 1)
@@ -2751,27 +2751,27 @@ export class PgDailyAssignmentsService {
     try {
       await client.query('BEGIN');
       await client.query(
-        'SELECT 1 FROM daily_logistics_containers_revisions WHERE work_date = $1 FOR UPDATE',
+        'SELECT 1 FROM lg_containers_revision WHERE work_date = $1 FOR UPDATE',
         [workDate]
       );
       const revResult = await client.query(
-        'SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_logistics_containers_revisions WHERE work_date = $1',
+        'SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM lg_containers_revision WHERE work_date = $1',
         [workDate]
       );
       const revision = parseInt(revResult.rows[0]?.next_revision || '1');
       const currentContainers = await client.query(
-        'SELECT * FROM daily_logistics_containers WHERE work_date = $1',
+        'SELECT * FROM lg_containers WHERE work_date = $1',
         [workDate]
       );
       console.log(`📜 PG Logistics History: revisione ${revision}, ${currentContainers.rows.length} task per ${workDate}...`);
       await client.query(`
-        INSERT INTO daily_logistics_containers_revisions (work_date, revision, task_count, created_by, modification_type)
+        INSERT INTO lg_containers_revision (work_date, revision, task_count, created_by, modification_type)
         VALUES ($1, $2, $3, $4, $5)
       `, [workDate, revision, currentContainers.rows.length, createdBy, modificationType]);
 
       for (const row of currentContainers.rows) {
         await client.query(`
-          INSERT INTO daily_logistics_containers_history (
+          INSERT INTO lg_containers_history (
             work_date, revision, priority,
             task_id, logistic_code, client_id, premium, address, lat, lng,
             cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
@@ -2831,7 +2831,7 @@ export class PgDailyAssignmentsService {
     try {
       const result = await query(
         `SELECT revision, task_count, created_at, created_by, modification_type
-         FROM daily_logistics_containers_revisions
+         FROM lg_containers_revision
          WHERE work_date = $1 ORDER BY revision DESC`,
         [workDate]
       );
@@ -2845,7 +2845,7 @@ export class PgDailyAssignmentsService {
   async getLogisticsContainersAtRevision(workDate: string, revision: number): Promise<any | null> {
     try {
       const result = await query(
-        'SELECT * FROM daily_logistics_containers_history WHERE work_date = $1 AND revision = $2 ORDER BY priority, task_id',
+        'SELECT * FROM lg_containers_history WHERE work_date = $1 AND revision = $2 ORDER BY priority, task_id',
         [workDate, revision]
       );
       if (result.rows.length === 0) return null;
@@ -2900,17 +2900,17 @@ export class PgDailyAssignmentsService {
       await this.saveLogisticsContainersToHistory(workDate, createdBy, 'pre_restore');
       await client.query('BEGIN');
       const historyResult = await client.query(
-        'SELECT * FROM daily_logistics_containers_history WHERE work_date = $1 AND revision = $2',
+        'SELECT * FROM lg_containers_history WHERE work_date = $1 AND revision = $2',
         [workDate, revision]
       );
       if (historyResult.rows.length === 0) {
         await client.query('ROLLBACK');
         return false;
       }
-      await client.query('DELETE FROM daily_logistics_containers WHERE work_date = $1', [workDate]);
+      await client.query('DELETE FROM lg_containers WHERE work_date = $1', [workDate]);
       for (const row of historyResult.rows) {
         await client.query(`
-          INSERT INTO daily_logistics_containers (
+          INSERT INTO lg_containers (
             work_date, priority,
             task_id, logistic_code, client_id, premium, address, lat, lng,
             cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
@@ -3228,12 +3228,12 @@ export class PgDailyAssignmentsService {
       const hasChanged = hasDriversChanged || hasVehicleAssignmentsChanged;
       if (hasChanged && actionType !== 'INIT') {
         const revResult = await client.query(
-          `SELECT COALESCE(MAX(revision_number), 0) + 1 as next_rev FROM lg_selected_drivers_revisions WHERE selected_drivers_id = $1`,
+          `SELECT COALESCE(MAX(revision_number), 0) + 1 as next_rev FROM lg_selected_drivers_revision WHERE selected_drivers_id = $1`,
           [selectedDriversId]
         );
         const revisionNumber = revResult.rows[0].next_rev;
         await client.query(
-          `INSERT INTO lg_selected_drivers_revisions
+          `INSERT INTO lg_selected_drivers_revision
            (
              selected_drivers_id, work_date, revision_number,
              drivers_before, drivers_after,
@@ -3292,7 +3292,7 @@ export class PgDailyAssignmentsService {
     try {
       await client.query('BEGIN');
       const revResult = await client.query(
-        `SELECT drivers_before, vehicle_assignments_before, selected_drivers_id FROM lg_selected_drivers_revisions
+        `SELECT drivers_before, vehicle_assignments_before, selected_drivers_id FROM lg_selected_drivers_revision
          WHERE work_date = $1 AND revision_number = $2`,
         [workDate, toRevisionNumber]
       );
@@ -3316,11 +3316,11 @@ export class PgDailyAssignmentsService {
         [driversToRestore, JSON.stringify(vehicleAssignmentsToRestore || {}), workDate]
       );
       const nextRevResult = await client.query(
-        `SELECT COALESCE(MAX(revision_number), 0) + 1 as next_rev FROM lg_selected_drivers_revisions WHERE selected_drivers_id = $1`,
+        `SELECT COALESCE(MAX(revision_number), 0) + 1 as next_rev FROM lg_selected_drivers_revision WHERE selected_drivers_id = $1`,
         [selectedDriversId]
       );
       await client.query(
-        `INSERT INTO lg_selected_drivers_revisions
+        `INSERT INTO lg_selected_drivers_revision
          (
            selected_drivers_id, work_date, revision_number,
            drivers_before, drivers_after,
@@ -3355,7 +3355,7 @@ export class PgDailyAssignmentsService {
     try {
       const result = await query(
         `SELECT revision_number, drivers_before, drivers_after, vehicle_assignments_before, vehicle_assignments_after, action_type, action_payload, performed_by, created_at
-         FROM lg_selected_drivers_revisions WHERE work_date = $1 ORDER BY revision_number DESC`,
+         FROM lg_selected_drivers_revision WHERE work_date = $1 ORDER BY revision_number DESC`,
         [workDate]
       );
       return result.rows;
@@ -3369,7 +3369,7 @@ export class PgDailyAssignmentsService {
 
   /**
    * Load all cleaners for a work_date from PostgreSQL.
-   * Alias comes from cleaner_aliases only (cleaners.alias no longer used).
+   * Alias comes from aliases only (cleaners.alias no longer used).
    */
   async loadCleanersForDate(workDate: string): Promise<any[] | null> {
     try {
@@ -3380,7 +3380,7 @@ export class PgDailyAssignmentsService {
           c.preferred_customers, c.telegram_id, c.start_time,
           ca.alias
         FROM cleaners c
-        LEFT JOIN cleaner_aliases ca ON ca.cleaner_id = c.cleaner_id
+        LEFT JOIN aliases ca ON ca.cleaner_id = c.cleaner_id
         WHERE c.work_date = $1 AND c.active = true
         ORDER BY c.counter_hours DESC
       `, [workDate]);
@@ -3397,7 +3397,7 @@ export class PgDailyAssignmentsService {
   }
 
   /**
-   * Load a single cleaner by ID and date. Alias from cleaner_aliases only.
+   * Load a single cleaner by ID and date. Alias from aliases only.
    */
   async loadCleanerById(cleanerId: number, workDate: string): Promise<any | null> {
     try {
@@ -3408,7 +3408,7 @@ export class PgDailyAssignmentsService {
           c.preferred_customers, c.telegram_id, c.start_time,
           ca.alias
         FROM cleaners c
-        LEFT JOIN cleaner_aliases ca ON ca.cleaner_id = c.cleaner_id
+        LEFT JOIN aliases ca ON ca.cleaner_id = c.cleaner_id
         WHERE c.cleaner_id = $1 AND c.work_date = $2
       `, [cleanerId, workDate]);
 
@@ -3423,7 +3423,7 @@ export class PgDailyAssignmentsService {
   }
 
   /**
-   * Load multiple cleaners by IDs for a specific date. Alias from cleaner_aliases only.
+   * Load multiple cleaners by IDs for a specific date. Alias from aliases only.
    */
   async loadCleanersByIds(cleanerIds: number[], workDate: string): Promise<any[]> {
     if (!cleanerIds || cleanerIds.length === 0) return [];
@@ -3436,7 +3436,7 @@ export class PgDailyAssignmentsService {
           c.preferred_customers, c.telegram_id, c.start_time,
           ca.alias
         FROM cleaners c
-        LEFT JOIN cleaner_aliases ca ON ca.cleaner_id = c.cleaner_id
+        LEFT JOIN aliases ca ON ca.cleaner_id = c.cleaner_id
         WHERE c.cleaner_id = ANY($1) AND c.work_date = $2
       `, [cleanerIds, workDate]);
 
@@ -3460,7 +3460,7 @@ export class PgDailyAssignmentsService {
           d.preferred_customers, d.telegram_id, d.start_time,
           ca.alias
         FROM lg_drivers d
-        LEFT JOIN cleaner_aliases ca ON ca.cleaner_id = d.driver_id
+        LEFT JOIN aliases ca ON ca.cleaner_id = d.driver_id
         WHERE d.work_date = $1 AND d.active = true
           AND (d.role IS NULL OR LOWER(TRIM(d.role)) <> 'vehicle')
         ORDER BY d.counter_hours DESC
@@ -3489,7 +3489,7 @@ export class PgDailyAssignmentsService {
           d.preferred_customers, d.telegram_id, d.start_time,
           ca.alias
         FROM lg_drivers d
-        LEFT JOIN cleaner_aliases ca ON ca.cleaner_id = d.driver_id
+        LEFT JOIN aliases ca ON ca.cleaner_id = d.driver_id
         WHERE d.driver_id = ANY($1) AND d.work_date = $2
           AND (d.role IS NULL OR LOWER(TRIM(d.role)) <> 'vehicle')
       `,
@@ -3507,7 +3507,7 @@ export class PgDailyAssignmentsService {
     try {
       await client.query('BEGIN');
       const permanentAliases = await client.query(`
-        SELECT cleaner_id, alias, name, lastname FROM cleaner_aliases
+        SELECT cleaner_id, alias, name, lastname FROM aliases
       `);
       const aliasMap = new Map(permanentAliases.rows.map((r: any) => [r.cleaner_id, r.alias]));
 
@@ -3516,7 +3516,7 @@ export class PgDailyAssignmentsService {
         if (d.alias && !aliasMap.has(d.id)) {
           await client.query(
             `
-            INSERT INTO cleaner_aliases (cleaner_id, alias, name, lastname, updated_at)
+            INSERT INTO aliases (cleaner_id, alias, name, lastname, updated_at)
             VALUES ($1, $2, $3, $4, NOW())
             ON CONFLICT (cleaner_id) DO UPDATE SET alias = $2, updated_at = NOW()
           `,
@@ -3585,28 +3585,28 @@ export class PgDailyAssignmentsService {
   /**
    * Save/upsert cleaners for a work_date (bulk insert)
    * Replaces all cleaners for the date
-   * NOTE: Aliases are now stored in cleaner_aliases table (permanent, date-independent)
+   * NOTE: Aliases are now stored in aliases table (permanent, date-independent)
    */
   async saveCleanersForDate(workDate: string, cleaners: any[], snapshotReason?: string): Promise<boolean> {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      // Load permanent aliases from cleaner_aliases table
+      // Load permanent aliases from aliases table
       const permanentAliases = await client.query(`
-        SELECT cleaner_id, alias, name, lastname FROM cleaner_aliases
+        SELECT cleaner_id, alias, name, lastname FROM aliases
       `);
       const aliasMap = new Map(permanentAliases.rows.map((r: any) => [r.cleaner_id, r.alias]));
 
       // Delete existing cleaners for this date
       await client.query('DELETE FROM cleaners WHERE work_date = $1', [workDate]);
 
-      // Insert new cleaners; alias only in cleaner_aliases (cleaners.alias no longer used)
+      // Insert new cleaners; alias only in aliases (cleaners.alias no longer used)
       for (const cleaner of cleaners) {
-        // If cleaner has a new alias, save it to cleaner_aliases (permanent)
+        // If cleaner has a new alias, save it to aliases (permanent)
         if (cleaner.alias && !aliasMap.has(cleaner.id)) {
           await client.query(`
-            INSERT INTO cleaner_aliases (cleaner_id, alias, name, lastname, updated_at)
+            INSERT INTO aliases (cleaner_id, alias, name, lastname, updated_at)
             VALUES ($1, $2, $3, $4, NOW())
             ON CONFLICT (cleaner_id) DO UPDATE SET alias = $2, updated_at = NOW()
           `, [cleaner.id, cleaner.alias, cleaner.name, cleaner.lastname]);
@@ -3637,7 +3637,7 @@ export class PgDailyAssignmentsService {
         ]);
       }
 
-      // NON rimuovere da cleaner_aliases in base alla data: gli alias sono permanenti e
+      // NON rimuovere da aliases in base alla data: gli alias sono permanenti e
       // indipendenti dalla data. Cancellarli quando si salvano le convocazioni per una
       // nuova data (dove compaiono solo i convocati) cancellerebbe gli alias di tutti
       // i cleaner non convocati in quella data.
@@ -3656,7 +3656,7 @@ export class PgDailyAssignmentsService {
 
   /**
    * Update a single cleaner's field (e.g., start_time)
-   * NOTE: For alias updates, this also saves to cleaner_aliases table
+   * NOTE: For alias updates, this also saves to aliases table
    */
   async updateCleanerField(cleanerId: number, workDate: string, field: string, value: any): Promise<boolean> {
     const allowedFields = ['start_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days', 'alias'];
@@ -3666,7 +3666,7 @@ export class PgDailyAssignmentsService {
     }
 
     try {
-      // Alias: only update cleaner_aliases (cleaners.alias no longer used)
+      // Alias: only update aliases (cleaners.alias no longer used)
       if (field === 'alias') {
         if (value) {
           let cleanerData = await query(
@@ -3682,14 +3682,14 @@ export class PgDailyAssignmentsService {
           const name = cleanerData.rows[0]?.name || null;
           const lastname = cleanerData.rows[0]?.lastname || null;
           await query(`
-            INSERT INTO cleaner_aliases (cleaner_id, alias, name, lastname, updated_at)
+            INSERT INTO aliases (cleaner_id, alias, name, lastname, updated_at)
             VALUES ($1, $2, $3, $4, NOW())
             ON CONFLICT (cleaner_id) DO UPDATE SET alias = $2, updated_at = NOW()
           `, [cleanerId, value, name, lastname]);
-          console.log(`✅ PG: Alias salvato in cleaner_aliases per cleaner ${cleanerId}: ${value}`);
+          console.log(`✅ PG: Alias salvato in aliases per cleaner ${cleanerId}: ${value}`);
         } else {
-          await query('DELETE FROM cleaner_aliases WHERE cleaner_id = $1', [cleanerId]);
-          console.log(`✅ PG: Alias rimosso da cleaner_aliases per cleaner ${cleanerId}`);
+          await query('DELETE FROM aliases WHERE cleaner_id = $1', [cleanerId]);
+          console.log(`✅ PG: Alias rimosso da aliases per cleaner ${cleanerId}`);
         }
         return true;
       }
@@ -3737,12 +3737,12 @@ export class PgDailyAssignmentsService {
   // ==================== CLEANER ALIASES (PERMANENT) ====================
 
   /**
-   * Get alias for a cleaner (from permanent cleaner_aliases table)
+   * Get alias for a cleaner (from permanent aliases table)
    */
   async getCleanerAlias(cleanerId: number): Promise<string | null> {
     try {
       const result = await query(
-        'SELECT alias FROM cleaner_aliases WHERE cleaner_id = $1',
+        'SELECT alias FROM aliases WHERE cleaner_id = $1',
         [cleanerId]
       );
       return result.rows[0]?.alias || null;
@@ -3757,7 +3757,7 @@ export class PgDailyAssignmentsService {
    */
   async getAllCleanerAliases(): Promise<Map<number, { alias: string; name?: string; lastname?: string }>> {
     try {
-      const result = await query('SELECT cleaner_id, alias, name, lastname FROM cleaner_aliases');
+      const result = await query('SELECT cleaner_id, alias, name, lastname FROM aliases');
       const aliasMap = new Map();
       for (const row of result.rows) {
         aliasMap.set(row.cleaner_id, {
@@ -3779,11 +3779,11 @@ export class PgDailyAssignmentsService {
   async saveCleanerAlias(cleanerId: number, alias: string, name?: string, lastname?: string): Promise<boolean> {
     try {
       await query(`
-        INSERT INTO cleaner_aliases (cleaner_id, alias, name, lastname, updated_at)
+        INSERT INTO aliases (cleaner_id, alias, name, lastname, updated_at)
         VALUES ($1, $2, $3, $4, NOW())
         ON CONFLICT (cleaner_id) 
-        DO UPDATE SET alias = $2, name = COALESCE($3, cleaner_aliases.name), 
-                      lastname = COALESCE($4, cleaner_aliases.lastname), updated_at = NOW()
+        DO UPDATE SET alias = $2, name = COALESCE($3, aliases.name), 
+                      lastname = COALESCE($4, aliases.lastname), updated_at = NOW()
       `, [cleanerId, alias, name || null, lastname || null]);
       console.log(`✅ PG: Alias salvato per cleaner ${cleanerId}: ${alias}`);
       return true;
@@ -3798,7 +3798,7 @@ export class PgDailyAssignmentsService {
    */
   async deleteCleanerAlias(cleanerId: number): Promise<boolean> {
     try {
-      await query('DELETE FROM cleaner_aliases WHERE cleaner_id = $1', [cleanerId]);
+      await query('DELETE FROM aliases WHERE cleaner_id = $1', [cleanerId]);
       console.log(`✅ PG: Alias rimosso per cleaner ${cleanerId}`);
       return true;
     } catch (error) {
@@ -3821,7 +3821,7 @@ export class PgDailyAssignmentsService {
         if (isNaN(cleanerId)) continue;
         
         await client.query(`
-          INSERT INTO cleaner_aliases (cleaner_id, alias, name, lastname, updated_at)
+          INSERT INTO aliases (cleaner_id, alias, name, lastname, updated_at)
           VALUES ($1, $2, $3, $4, NOW())
           ON CONFLICT (cleaner_id) 
           DO UPDATE SET alias = EXCLUDED.alias, name = EXCLUDED.name, 

@@ -26,10 +26,10 @@ export async function hydrateTasksFromLogisticsContainers(driverData: any, workD
     const result = await query(
       `
       SELECT task_id, lat, lng, address FROM (
-        SELECT task_id, lat::numeric, lng::numeric, address FROM daily_logistics_assignments_current
+        SELECT task_id, lat::numeric, lng::numeric, address FROM lg_timeline
         WHERE work_date = $1 AND task_id = ANY($2)
         UNION ALL
-        SELECT task_id, lat::numeric, lng::numeric, address FROM daily_logistics_containers
+        SELECT task_id, lat::numeric, lng::numeric, address FROM lg_containers
         WHERE work_date = $1 AND task_id = ANY($2)
       ) combined
     `,

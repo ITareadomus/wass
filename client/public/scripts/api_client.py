@@ -181,7 +181,7 @@ class ApiClient:
         return self._get("/api/logistics-containers", {"date": date})
 
     def save_logistics_containers(self, date: str, containers_data: Dict) -> Dict:
-        """Salva logistics containers su PostgreSQL (tabella daily_logistics_containers)."""
+        """Salva logistics containers su PostgreSQL (tabella lg_containers)."""
         payload = {"date": date, "containers": containers_data}
         return self._post("/api/logistics-containers", payload)
 
