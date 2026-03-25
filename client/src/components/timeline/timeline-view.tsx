@@ -966,6 +966,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
       const available = dateCleaners.filter((c: any) =>
         c.active === true &&
+        c.role !== "Ufficio" &&
         !selectedCleanerIds.has(c.id) &&
         !timelineCleanerIds.has(c.id) // NUOVO: escludi anche quelli già in timeline
       );
@@ -980,10 +981,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           if (cleaner.role === "Straordinario") return 2;
           // 3. Premium (solo se NON straordinario)
           if (cleaner.role === "Premium") return 3;
-          // 4. Ufficio
-          if (cleaner.role === "Ufficio") return 4;
-          // 5. Standard / qualsiasi altro
-          return 5;
+          // 4. Standard / qualsiasi altro
+          return 4;
         };
 
         const priorityA = getPriority(a);

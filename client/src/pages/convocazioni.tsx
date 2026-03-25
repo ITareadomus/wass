@@ -146,6 +146,11 @@ export default function Convocazioni() {
         const rosterData = await rosterResponse.json();
         let dateCleaners = (isDrivers ? rosterData.drivers : rosterData.cleaners) || [];
 
+        // Convocazioni (cleaners): escludi i cleaner Ufficio dall'estrazione/lista.
+        if (!isDrivers) {
+          dateCleaners = dateCleaners.filter((c: any) => c?.role !== "Ufficio");
+        }
+
         if (isDrivers) {
           const vRes = await fetch(`/api/logistics-vehicles?date=${dateStr}`, {
             cache: "no-store",
@@ -220,13 +225,12 @@ export default function Convocazioni() {
         const availableCleaners = dateCleaners.filter((c: any) => c.active === true);
         availableCleaners.sort((a: any, b: any) => {
           // Mantieni lo stesso ordinamento del dialog "Aggiungi cleaner":
-          // Formatore -> Straordinario -> Premium -> Ufficio -> Standard/altro
+          // Formatore -> Straordinario -> Premium -> Standard/altro
           const getPriority = (cleaner: any) => {
             if (cleaner.role === "Formatore") return 1;
             if (cleaner.role === "Straordinario") return 2;
             if (cleaner.role === "Premium") return 3;
-            if (cleaner.role === "Ufficio") return 4;
-            return 5;
+            return 4;
           };
 
           const priorityA = getPriority(a);
@@ -251,7 +255,10 @@ export default function Convocazioni() {
         setCleaners(availableCleaners);
         setFilteredCleaners(availableCleaners);
 
-        const allPreselectedIds = new Set([...alreadySelectedIds, ...preselectedIds]);
+        const visibleIds = new Set(availableCleaners.map((c: any) => c.id));
+        const allPreselectedIds = new Set(
+          [...alreadySelectedIds, ...preselectedIds].filter((id) => visibleIds.has(id))
+        );
         setSelectedCleaners(allPreselectedIds);
         setSelectedVehicleByDriver(preselectedVehicleByDriver);
 
