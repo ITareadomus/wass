@@ -1778,6 +1778,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Resolve housekeeping cleaner for a logistics task (daily_assignments_current + aliases)
+  app.get("/api/logistics-task-housekeeping-cleaner", async (req, res) => {
+    try {
+      const workDate = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const taskIdRaw = req.query.taskId as string;
+      const taskId = Number(taskIdRaw);
+
+      if (!Number.isFinite(taskId)) {
+        return res.status(400).json({ success: false, error: "taskId must be numeric" });
+      }
+
+      const { query } = await import("../shared/pg-db");
+      const [housekeepingResult, logisticsResult] = await Promise.all([
+        query(
+          `
+            SELECT
+              dac.cleaner_id,
+              dac.cleaner_name,
+              dac.cleaner_lastname,
+              dac.sequence,
+              a.alias,
+              COALESCE(
+                NULLIF(TRIM(a.alias), ''),
+                NULLIF(TRIM(CONCAT(COALESCE(dac.cleaner_name, ''), ' ', COALESCE(dac.cleaner_lastname, ''))), ''),
+                'Cleaner ' || dac.cleaner_id::text
+              ) AS cleaner_label
+            FROM daily_assignments_current dac
+            LEFT JOIN aliases a ON a.cleaner_id = dac.cleaner_id
+            WHERE dac.work_date = $1
+              AND dac.task_id = $2
+            ORDER BY dac.sequence ASC, dac.id ASC
+            LIMIT 1
+          `,
+          [workDate, taskId]
+        ),
+        query(
+          `
+            SELECT lt.sequence
+            FROM lg_timeline lt
+            WHERE lt.work_date = $1
+              AND (lt.task_id = $2 OR lt.logistic_code = $2)
+            ORDER BY lt.sequence ASC, lt.id ASC
+            LIMIT 1
+          `,
+          [workDate, taskId]
+        ),
+      ]);
+
+      const hkRow = housekeepingResult.rows?.[0];
+      const lgRow = logisticsResult.rows?.[0];
+
+      if (!hkRow && !lgRow) {
+        return res.json({ success: true, found: false });
+      }
+
+      res.json({
+        success: true,
+        found: true,
+        cleanerId: hkRow?.cleaner_id ?? null,
+        alias: hkRow?.alias || null,
+        cleanerName: hkRow?.cleaner_name || null,
+        cleanerLastname: hkRow?.cleaner_lastname || null,
+        sequence: hkRow?.sequence ?? null,
+        logisticsSequence: lgRow?.sequence ?? null,
+        cleanerLabel: hkRow?.cleaner_label || null,
+      });
+    } catch (error: any) {
+      console.error("GET /api/logistics-task-housekeeping-cleaner:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Lightweight endpoint: logistics driver badge + logistics sequence for current task
+  app.get("/api/logistics-task-driver-details", async (req, res) => {
+    try {
+      const workDate = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const taskIdRaw = req.query.taskId as string;
+      const preferredDriverIdRaw = req.query.driverId as string | undefined;
+      const taskId = Number(taskIdRaw);
+      const preferredDriverId =
+        preferredDriverIdRaw != null && preferredDriverIdRaw !== ""
+          ? Number(preferredDriverIdRaw)
+          : null;
+
+      if (!Number.isFinite(taskId)) {
+        return res.status(400).json({ success: false, error: "taskId must be numeric" });
+      }
+
+      const { query } = await import("../shared/pg-db");
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+
+      const result = await query(
+        `
+          SELECT
+            lt.driver_id,
+            lt.sequence,
+            lt.id,
+            d.name AS driver_name,
+            d.lastname AS driver_lastname,
+            a.alias AS driver_alias
+          FROM lg_timeline lt
+          LEFT JOIN lg_drivers d
+            ON d.work_date = lt.work_date
+           AND d.driver_id = lt.driver_id
+          LEFT JOIN aliases a
+            ON a.cleaner_id = lt.driver_id
+          WHERE lt.work_date = $1
+            AND (lt.task_id = $2 OR lt.logistic_code = $2)
+          ORDER BY
+            CASE WHEN $3::int IS NOT NULL AND lt.driver_id = $3::int THEN 0 ELSE 1 END,
+            lt.sequence ASC,
+            lt.id ASC
+          LIMIT 1
+        `,
+        [workDate, taskId, Number.isFinite(preferredDriverId as number) ? preferredDriverId : null]
+      );
+
+      const row = result.rows?.[0];
+      if (!row) {
+        return res.json({ success: true, found: false });
+      }
+
+      const driverId = Number(row.driver_id);
+      const assignments = await pgDailyAssignmentsService.loadSelectedLogisticsDriverVehicleAssignments(
+        workDate
+      );
+      const assignment = assignments?.[String(driverId)] || null;
+      const vehicleName = String(assignment?.vehicle_name ?? "").trim() || "Veicolo N/D";
+      const fullName = `${row.driver_name ?? ""} ${row.driver_lastname ?? ""}`.trim();
+      const alias = String(row.driver_alias ?? "").trim();
+      const driverLabel = alias || fullName || `Driver ${driverId}`;
+
+      res.json({
+        success: true,
+        found: true,
+        driverId,
+        driverBadge: `${driverLabel} - ${vehicleName}`,
+        sequence: row.sequence ?? null,
+      });
+    } catch (error: any) {
+      console.error("GET /api/logistics-task-driver-details:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   app.get("/api/selected-logistics-drivers", async (req, res) => {
     try {
       const workDate = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");

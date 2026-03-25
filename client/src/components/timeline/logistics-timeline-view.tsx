@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { Droppable, Draggable } from "react-beautiful-dnd";
+import { Droppable } from "react-beautiful-dnd";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -1155,32 +1155,23 @@ export default function LogisticsTimelineView({
                               />
                             ))}
                           </div>
-                          <div className="relative z-10 flex items-center h-full min-h-[45px] px-0.5 gap-0.5 flex-wrap">
+                          <div className="relative z-10 flex items-center h-full min-h-[45px] px-0 gap-0 flex-wrap">
                             {tasks.map((task, index) => (
-                              <Draggable
+                              <TaskCard
                                 key={`${task.id}-${driver.id}`}
-                                draggableId={`${task.id}-cleaner-${driver.id}`}
+                                task={task}
                                 index={index}
+                                isInTimeline
+                                allTasks={tasks}
+                                currentContainer=""
+                                cleanerId={driver.id}
+                                isReadOnly={isReadOnly}
                                 isDragDisabled={isReadOnly || Boolean((task as any).locked)}
-                              >
-                                {(dragProvided) => (
-                                  <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} {...dragProvided.dragHandleProps}>
-                                    <TaskCard
-                                      task={task}
-                                      index={index}
-                                      isInTimeline
-                                      allTasks={tasks}
-                                      currentContainer=""
-                                      cleanerId={driver.id}
-                                      isReadOnly={isReadOnly}
-                                      globalTimeSlots={globalTimeSlots.length}
-                                      timelineWidthPx={timelineWidthPx}
-                                      operationsScope="logistics"
-                                      isHighlighted={hi.has(String(task.id))}
-                                    />
-                                  </div>
-                                )}
-                              </Draggable>
+                                globalTimeSlots={globalTimeSlots.length}
+                                timelineWidthPx={timelineWidthPx}
+                                operationsScope="logistics"
+                                isHighlighted={hi.has(String(task.id))}
+                              />
                             ))}
                             {provided.placeholder}
                           </div>
@@ -1574,7 +1565,7 @@ export default function LogisticsTimelineView({
         >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 w-full">
-              <span className="flex items-center gap-2 flex-wrap">
+              <span className="flex min-w-0 items-center gap-2">
                 Dettagli Driver #{selectedDriverForDetails?.id}
                 {selectedDriverForDetails &&
                   (selectedDriverForDetails.role === "Straordinario" ? (
@@ -1608,7 +1599,7 @@ export default function LogisticsTimelineView({
                 if (!vehicleName) return null;
                 const isScooterVehicle = /^piaggio\b/i.test(vehicleName);
                 return (
-                  <span className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded border text-sm font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
+                  <span className="ml-auto inline-flex items-center gap-1.5 whitespace-nowrap px-2.5 py-0.5 rounded border text-sm font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
                     {isScooterVehicle ? (
                       <Bike className="h-3.5 w-3.5" />
                     ) : (
