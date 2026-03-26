@@ -21,11 +21,21 @@ import { HelpCircle, Home } from "lucide-react";
 
 function GlobalHeader() {
   const [location] = useLocation();
+  const currentScope =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("scope")
+      : null;
+  const savedScope =
+    typeof window !== "undefined" ? localStorage.getItem("assignments_scope") : null;
+  const isOfficeScope = currentScope === "office" || (!currentScope && savedScope === "office");
+  const assignmentsHomeHref = isOfficeScope
+    ? "/generate-assignments?scope=office"
+    : "/generate-assignments";
   const selectedDate =
     typeof window !== "undefined" ? localStorage.getItem("selected_work_date") : null;
   const unconfirmedHref = selectedDate
-    ? `/unconfirmed-tasks?date=${selectedDate}`
-    : "/unconfirmed-tasks";
+    ? `/unconfirmed-tasks?date=${selectedDate}${isOfficeScope ? "&scope=office" : ""}`
+    : `/unconfirmed-tasks${isOfficeScope ? "?scope=office" : ""}`;
   const isConvocazioniPage =
     location === "/convocazioni" || location.startsWith("/convocazioni?");
   const isUnconfirmedTasksPage =
@@ -38,7 +48,11 @@ function GlobalHeader() {
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("kind") === "drivers"
       ? "/generate-logistics-assignments"
-      : "/generate-assignments";
+      : isConvocazioniPage &&
+          typeof window !== "undefined" &&
+          new URLSearchParams(window.location.search).get("kind") === "office"
+        ? "/generate-assignments?scope=office"
+        : assignmentsHomeHref;
 
   return (
     <WassSiteHeader

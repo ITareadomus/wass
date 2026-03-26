@@ -362,7 +362,22 @@ export default function GenerateAssignments() {
   const [isTransferringToAdam, setIsTransferringToAdam] = useState(false);
   const [lastSavedTimestamp, setLastSavedTimestamp] = useState<string | null>(null); // Renamed from lastSavedAssignment
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const isOfficeScope = useMemo(() => {
+    if (typeof window !== "undefined") {
+      return new URLSearchParams(window.location.search).get("scope") === "office";
+    }
+    return location.includes("scope=office");
+  }, [location]);
+  const scopeValue = isOfficeScope ? "office" : "housekeeping";
+  const withScope = useCallback((url: string) => {
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}scope=${scopeValue}`;
+  }, [scopeValue]);
+
+  useEffect(() => {
+    localStorage.setItem("assignments_scope", scopeValue);
+  }, [scopeValue]);
 
   // Nuova variabile di stato per gestire il caricamento generale
   const [isLoading, setIsLoading] = useState(false);
@@ -396,7 +411,7 @@ export default function GenerateAssignments() {
 
   const fetchAdamFingerprint = useCallback(async (workDate: string): Promise<AdamFingerprint | null> => {
     try {
-      const r = await fetch(`/api/adam/housekeeping/fingerprint?date=${encodeURIComponent(workDate)}`, {
+      const r = await fetch(withScope(`/api/adam/housekeeping/fingerprint?date=${encodeURIComponent(workDate)}`), {
         cache: "no-store",
         headers: { "Cache-Control": "no-cache, no-store, must-revalidate" }
       });
@@ -471,7 +486,7 @@ export default function GenerateAssignments() {
       const response = await fetch('/api/load-saved-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
+        body: JSON.stringify({ date: dateStr, scope: scopeValue })
       });
 
       if (!response.ok) {
@@ -491,7 +506,7 @@ export default function GenerateAssignments() {
         setHasUnsavedChanges(false);
 
         // CRITICAL: Verifica e aggiorna la data nella timeline dopo il caricamento
-        const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`, {
+        const timelineResponse = await fetch(withScope(`/api/timeline?date=${dateStr}`), {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         });
@@ -596,7 +611,7 @@ export default function GenerateAssignments() {
       const checkResponse = await fetch('/api/check-saved-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr })
+        body: JSON.stringify({ date: dateStr, scope: scopeValue })
       });
 
       const checkResult = await checkResponse.json();
@@ -615,7 +630,7 @@ export default function GenerateAssignments() {
         const loadResponse = await fetch('/api/load-saved-assignments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: dateStr })
+          body: JSON.stringify({ date: dateStr, scope: scopeValue })
         });
 
         const loadResult = await loadResponse.json();
@@ -625,7 +640,7 @@ export default function GenerateAssignments() {
           setLastSavedTimestamp(checkResult.formattedDateTime || null);
 
           // CRITICAL: Verifica che la timeline sia valida prima di caricare
-          const timelineCheckResponse = await fetch(`/api/timeline?date=${dateStr}`, {
+          const timelineCheckResponse = await fetch(withScope(`/api/timeline?date=${dateStr}`), {
             cache: 'no-store',
             headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
           });
@@ -711,7 +726,7 @@ export default function GenerateAssignments() {
 
         // Verifica se esiste timeline locale (da DB)
         try {
-          const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`, {
+          const timelineResponse = await fetch(withScope(`/api/timeline?date=${dateStr}`), {
             cache: 'no-store',
             headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
           });
@@ -802,7 +817,7 @@ export default function GenerateAssignments() {
       const response = await fetch('/api/extract-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr, created_by: currentUsername })
+        body: JSON.stringify({ date: dateStr, created_by: currentUsername, scope: scopeValue })
       });
 
       if (!response.ok) {
@@ -910,11 +925,11 @@ export default function GenerateAssignments() {
       console.log("🔄 Caricamento task da PostgreSQL...");
 
       const [containersResponse, timelineResponse] = await Promise.all([
-        fetch(`/api/containers?date=${dateStr}`, {
+        fetch(withScope(`/api/containers?date=${dateStr}`), {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         }),
-        fetch(`/api/timeline?date=${dateStr}`, {
+        fetch(withScope(`/api/timeline?date=${dateStr}`), {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         })
@@ -1237,7 +1252,7 @@ export default function GenerateAssignments() {
       const response = await fetch("/api/optimizer/run-wave", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: dateStr, priority }),
+        body: JSON.stringify({ date: dateStr, priority, scope: scopeValue }),
       });
 
       const result = await response.json();
@@ -1356,6 +1371,7 @@ export default function GenerateAssignments() {
           taskData: task,
           priority: priority,
           date: dateStr,
+          scope: scopeValue,
           modified_by: currentUser.username || 'unknown',
           modification_type: modificationType
         }),
@@ -1389,6 +1405,7 @@ export default function GenerateAssignments() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: dateStr,
+          scope: scopeValue,
           cleanerId,
           taskId,
           logisticCode,
@@ -1430,7 +1447,7 @@ export default function GenerateAssignments() {
       const response = await fetch('/api/remove-timeline-assignment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, logisticCode, date: dateStr }),
+        body: JSON.stringify({ taskId, logisticCode, date: dateStr, scope: scopeValue }),
       });
       if (!response.ok) {
         console.error('Errore nella rimozione dell\'assegnazione dalla timeline');
@@ -1641,6 +1658,7 @@ export default function GenerateAssignments() {
               destCleanerId: toCleanerId,
               destIndex: correctIndex,
               date: dateStr,
+              scope: scopeValue,
               modified_by: currentUser.username || 'unknown'
             }),
           });
@@ -1949,7 +1967,7 @@ export default function GenerateAssignments() {
           <div className="mx-auto mb-3 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-4">
               <h1 className="flex items-center gap-2 text-[25px] leading-[44px] font-bold text-foreground">
-                HOUSEKEEPING del
+                {isOfficeScope ? "Assegnazioni Ufficio del" : "Assegnazioni Housekeeping del"}
               </h1>
               <Popover>
                 <PopoverTrigger asChild>
@@ -1975,7 +1993,7 @@ export default function GenerateAssignments() {
                 </PopoverContent>
               </Popover>
             </div>
-            <HousekeepingLogisticsSwitch active="housekeeping" />
+            <HousekeepingLogisticsSwitch active={isOfficeScope ? "office" : "housekeeping"} />
           </div>
         )}
 
@@ -2047,7 +2065,7 @@ export default function GenerateAssignments() {
                     const response = await fetch('/api/containers/refresh', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ date: dateStr })
+                      body: JSON.stringify({ date: dateStr, scope: scopeValue })
                     });
                     
                     if (!response.ok) throw new Error('Errore durante il refresh');
@@ -2111,6 +2129,7 @@ export default function GenerateAssignments() {
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ 
                         date: dateStr, 
+                        scope: scopeValue,
                         skipPhase4: false, 
                         applyToProduction: true 
                       })

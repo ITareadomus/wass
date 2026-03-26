@@ -1,8 +1,9 @@
-import { Building2, Truck } from "lucide-react";
+import { Building, Building2, Truck } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
+import type { MouseEvent } from "react";
 
-export type AssignmentsFlow = "housekeeping" | "logistics";
+export type AssignmentsFlow = "housekeeping" | "office" | "logistics";
 
 const segmentCommon =
   "inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
@@ -21,6 +22,18 @@ export function HousekeepingLogisticsSwitch({
   active,
   className,
 }: HousekeepingLogisticsSwitchProps) {
+  const goHousekeeping = (e: MouseEvent) => {
+    e.preventDefault();
+    localStorage.setItem("assignments_scope", "housekeeping");
+    window.location.assign("/generate-assignments");
+  };
+
+  const goOffice = (e: MouseEvent) => {
+    e.preventDefault();
+    localStorage.setItem("assignments_scope", "office");
+    window.location.assign("/generate-assignments?scope=office");
+  };
+
   return (
     <div
       className={cn(
@@ -28,7 +41,7 @@ export function HousekeepingLogisticsSwitch({
         className
       )}
       role="tablist"
-      aria-label="Passa tra Housekeeping e Logistica"
+      aria-label="Passa tra Housekeeping, Uffici e Logistica"
     >
       <Link
         href="/generate-assignments"
@@ -38,9 +51,23 @@ export function HousekeepingLogisticsSwitch({
         )}
         aria-current={active === "housekeeping" ? "page" : undefined}
         data-testid="switch-housekeeping"
+        onClick={goHousekeeping}
       >
         <Building2 className="h-4 w-4 shrink-0" aria-hidden />
         Housekeeping
+      </Link>
+      <Link
+        href="/generate-assignments?scope=office"
+        className={cn(
+          segmentCommon,
+          active === "office" ? segmentActive : segmentInactive
+        )}
+        aria-current={active === "office" ? "page" : undefined}
+        data-testid="switch-office"
+        onClick={goOffice}
+      >
+        <Building className="h-4 w-4 shrink-0" aria-hidden />
+        Uffici
       </Link>
       <Link
         href="/generate-logistics-assignments"

@@ -166,6 +166,11 @@ export default function TimelineView({
 
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const isOfficeScope =
+    (typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("scope") === "office") ||
+    (typeof window !== "undefined" && localStorage.getItem("assignments_scope") === "office");
+  const isTimelineInteractionDisabled = isReadOnly || isOfficeScope;
   const [editingAlias, setEditingAlias] = useState<string>("");
   const [isSavingAlias, setIsSavingAlias] = useState(false);
   const [isSavingCleanerLock, setIsSavingCleanerLock] = useState(false);
@@ -1808,12 +1813,12 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             <div>
               <h2 className="text-xl font-bold text-foreground flex items-center">
                 <CalendarIcon className="w-5 h-5 mr-2 text-custom-blue" />
-                Timeline Housekeeping - {cleaners.length} Cleaners
+                {isOfficeScope ? "Timeline Ufficio" : "Timeline Housekeeping"} - {cleaners.length} Cleaners
               </h2>
             </div>
             <div className="flex gap-3 print:hidden">
               <Button
-                onClick={() => setLocation('/convocazioni')}
+                onClick={() => setLocation(isOfficeScope ? '/convocazioni?kind=office' : '/convocazioni')}
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2 border-2 border-custom-blue"
@@ -2117,7 +2122,11 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                       </div>
                     </div>
                     {/* Timeline per questo cleaner - area unica droppable */}
-                    <Droppable droppableId={`timeline-${cleaner.id}`} direction="horizontal" isDropDisabled={isReadOnly}>
+                    <Droppable
+                      droppableId={`timeline-${cleaner.id}`}
+                      direction="horizontal"
+                      isDropDisabled={isTimelineInteractionDisabled}
+                    >
                       {(provided, snapshot) => (
                         <div
                           ref={provided.innerRef}
@@ -2343,7 +2352,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           index={idx}
                                           isInTimeline={true}
                                           allTasks={cleanerTasks}
-                                          isDragDisabled={isReadOnly}
+                                          isDragDisabled={isTimelineInteractionDisabled}
                                           isReadOnly={isReadOnly}
                                           timeOffset={seq === 1 ? timeOffset : 0}
                                           globalTimeSlots={globalTimeSlots.length}
@@ -2434,8 +2443,16 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     size="sm"
                     variant="outline"
                     className="h-full px-3 border-2 border-custom-blue"
-                    disabled={isReadOnly || !hasTasksInTimeline || isTransferringToAdam}
-                    title={isReadOnly ? "Non puoi trasferire in modalità storico" : !hasTasksInTimeline ? "Nessuna task assegnata nella timeline" : "Trasferisci le assegnazioni sul database ADAM"}
+                    disabled={isReadOnly || isOfficeScope || !hasTasksInTimeline || isTransferringToAdam}
+                    title={
+                      isOfficeScope
+                        ? "Trasferimento su ADAM non disponibile per WASS UFFICIO"
+                        : isReadOnly
+                          ? "Non puoi trasferire in modalità storico"
+                          : !hasTasksInTimeline
+                            ? "Nessuna task assegnata nella timeline"
+                            : "Trasferisci le assegnazioni sul database ADAM"
+                    }
                     data-testid="button-transfer-adam"
                   >
                     {isTransferringToAdam ? (

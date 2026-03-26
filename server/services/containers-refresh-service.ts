@@ -72,15 +72,17 @@ export async function refreshLogisticsContainersFromAdam(
 
 export async function refreshContainersFromAdam(
   workDate: string,
-  modifiedBy: string = 'system'
+  modifiedBy: string = 'system',
+  workflow: 'housekeeping' | 'office' = 'housekeeping'
 ): Promise<RefreshContainersResult> {
   console.log(`🔄 refreshContainersFromAdam: Rigenerazione containers dal DB ADAM per ${workDate}...`);
 
   try {
     const createContainersPath = path.join(process.cwd(), 'client/public/scripts/create_containers.py');
     
+    const workflowArg = workflow === 'office' ? ' --workflow office' : '';
     await new Promise<string>((resolve, reject) => {
-      exec(`python3 "${createContainersPath}" --date "${workDate}" --skip-extract --use-api`, (error, stdout, stderr) => {
+      exec(`python3 "${createContainersPath}" --date "${workDate}" --skip-extract --use-api${workflowArg}`, (error, stdout, stderr) => {
         if (error) {
           console.error(`❌ Errore create_containers: ${error.message}`);
           reject(new Error(stderr || error.message));

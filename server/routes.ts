@@ -26,6 +26,44 @@ const ROME_TIMEZONE = "Europe/Rome";
 function getRomeTimestamp(): string {
   return formatInTimeZone(new Date(), ROME_TIMEZONE, "yyyy-MM-dd'T'HH:mm:ss");
 }
+
+const OFFICE_OPERATION_IDS = new Set([15, 38]);
+
+function isOfficeScope(scope: unknown): boolean {
+  return String(scope || "").toLowerCase() === "office";
+}
+
+function filterContainersForOfficeScope(containersPayload: any): any {
+  if (!containersPayload?.containers) return containersPayload;
+
+  const clone = JSON.parse(JSON.stringify(containersPayload));
+  const buckets = ["early_out", "high_priority", "low_priority"] as const;
+
+  for (const bucket of buckets) {
+    const tasks = Array.isArray(clone.containers?.[bucket]?.tasks)
+      ? clone.containers[bucket].tasks
+      : [];
+    const filteredTasks = tasks.filter((task: any) => {
+      const opId = Number(task?.operation_id);
+      return Number.isFinite(opId) && OFFICE_OPERATION_IDS.has(opId);
+    });
+    clone.containers[bucket].tasks = filteredTasks;
+    clone.containers[bucket].count = filteredTasks.length;
+  }
+
+  const eo = clone.containers?.early_out?.count || 0;
+  const hp = clone.containers?.high_priority?.count || 0;
+  const lp = clone.containers?.low_priority?.count || 0;
+  clone.summary = {
+    ...(clone.summary || {}),
+    early_out: eo,
+    high_priority: hp,
+    low_priority: lp,
+    total_tasks: eo + hp + lp,
+  };
+
+  return clone;
+}
 import { storageService } from "./services/storage-service";
 import * as workspaceFiles from "./services/workspace-files";
 import {
@@ -1071,6 +1109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
       const workDate = dateParam;
+      const officeScope = isOfficeScope(req.query.scope);
 
       console.log(`📖 GET /api/containers - Caricamento containers per ${workDate}`);
 
@@ -1093,8 +1132,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      console.log(`✅ Containers caricati per ${workDate}: ${containers.summary?.total_tasks || 0} task totali`);
-      res.json(containers);
+      const responsePayload = officeScope
+        ? filterContainersForOfficeScope(containers)
+        : containers;
+
+      console.log(
+        `✅ Containers caricati per ${workDate}: ${responsePayload.summary?.total_tasks || 0} task totali`
+      );
+      res.json(responsePayload);
     } catch (error: any) {
       console.error("Errore nel load dei containers:", error);
       res.status(500).json({
@@ -1391,6 +1436,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const forLogistics =
         String(req.query.for || "").toLowerCase() === "logistics" ||
         String(req.query.workflow || "").toLowerCase() === "logistics";
+      const forOffice =
+        isOfficeScope(req.query.scope) ||
+        String(req.query.for || "").toLowerCase() === "office" ||
+        String(req.query.workflow || "").toLowerCase() === "office";
       connection = await mysql.createConnection({
         host: databaseConfig.mysql.host,
         port: databaseConfig.mysql.port,
@@ -1398,20 +1447,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         password: databaseConfig.mysql.password,
         database: databaseConfig.mysql.database,
       });
-      const enableClause = forLogistics ? "o.enable_route_drivers = 1" : "o.enable_wass = 1";
-      const [rows]: any = await connection.execute(
-        `SELECT o.id, l.name
-         FROM app_structure_operation o
-         INNER JOIN app_structure_operation_langs l
-           ON l.structure_operation_id = o.id AND l.id_lang = 1
-         WHERE o.active = 1 AND ${enableClause}
-         ORDER BY o.id`
-      );
+      let rows: any[] = [];
+      if (forOffice) {
+        const [officeRows]: any = await connection.execute(
+          `SELECT o.id, l.name
+           FROM app_structure_operation o
+           LEFT JOIN app_structure_operation_langs l
+             ON l.structure_operation_id = o.id AND l.id_lang = 1
+           WHERE o.id IN (15, 38)
+           ORDER BY FIELD(o.id, 15, 38)`
+        );
+        rows = Array.isArray(officeRows) ? officeRows : [];
+      } else {
+        const enableClause = forLogistics ? "o.enable_route_drivers = 1" : "o.enable_wass = 1";
+        const [defaultRows]: any = await connection.execute(
+          `SELECT o.id, l.name
+           FROM app_structure_operation o
+           INNER JOIN app_structure_operation_langs l
+             ON l.structure_operation_id = o.id AND l.id_lang = 1
+           WHERE o.active = 1 AND ${enableClause}
+           ORDER BY o.id`
+        );
+        rows = Array.isArray(defaultRows) ? defaultRows : [];
+      }
       const list = Array.isArray(rows) ? rows : [];
-      const active_operations = list.map((r: any) => ({
-        id: Number(r?.id),
-        name: r?.name != null ? String(r.name) : "",
-      })).filter((op: { id: number }) => Number.isFinite(op.id));
+      const officeFallbackNames: Record<number, string> = {
+        15: "PULIZIA UFFICI/ALTRO",
+        38: "PULIZIA UFFICI/ALTRO STRAORDINARIA",
+      };
+      const active_operations = list
+        .map((r: any) => {
+          const id = Number(r?.id);
+          const rawName = r?.name != null ? String(r.name).trim() : "";
+          const name = rawName || officeFallbackNames[id] || "";
+          return { id, name };
+        })
+        .filter((op: { id: number }) => Number.isFinite(op.id));
+
+      if (forOffice) {
+        const byId = new Map(active_operations.map((op: { id: number; name: string }) => [op.id, op]));
+        for (const id of [15, 38]) {
+          if (!byId.has(id)) {
+            active_operations.push({ id, name: officeFallbackNames[id] });
+          }
+        }
+        active_operations.sort((a: { id: number }, b: { id: number }) => a.id - b.id);
+      }
       res.json({
         active_operations,
         total_operations: active_operations.length,
@@ -1598,14 +1679,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/containers/refresh - Force refresh containers da ADAM
   app.post("/api/containers/refresh", async (req, res) => {
     try {
-      const { date, modified_by } = req.body;
+      const { date, modified_by, scope } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       const currentUsername = modified_by || getCurrentUsername(req);
+      const officeScope = isOfficeScope(scope);
 
       console.log(`🔄 Force refresh containers da ADAM per ${workDate}...`);
 
       const { refreshContainersFromAdam } = await import("./services/containers-refresh-service");
-      const refreshResult = await refreshContainersFromAdam(workDate, currentUsername);
+      const refreshResult = await refreshContainersFromAdam(
+        workDate,
+        currentUsername,
+        officeScope ? "office" : "housekeeping"
+      );
 
       if (!refreshResult.success) {
         return res.status(500).json({
@@ -3523,6 +3609,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/load-saved-assignments", async (req, res) => {
     try {
       const workDate = req.body?.date || format(new Date(), "yyyy-MM-dd");
+      const officeScope = isOfficeScope(req.body?.scope);
 
       console.log(`📥 Caricamento assegnazioni dal database per ${workDate}...`);
 
@@ -3544,9 +3631,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // SEMPRE rigenera containers dal DB ADAM (per avere le task aggiornate)
       console.log(`🔄 Rigenerazione containers dal DB ADAM per ${workDate}...`);
       const createContainersPath = path.join(process.cwd(), 'client/public/scripts/create_containers.py');
+      const workflowArg = officeScope ? ' --workflow office' : '';
       try {
         await new Promise<string>((resolve, reject) => {
-          exec(`python3 "${createContainersPath}" --date "${workDate}" --skip-extract --use-api`, (error, stdout, stderr) => {
+          exec(`python3 "${createContainersPath}" --date "${workDate}" --skip-extract --use-api${workflowArg}`, (error, stdout, stderr) => {
             if (error) {
               console.error(`❌ Errore create_containers: ${error.message}`);
               reject(new Error(stderr || error.message));
@@ -7124,8 +7212,9 @@ app.post("/api/transfer-to-adam", async (req, res) => {
   // Endpoint per estrarre i dati
   app.post("/api/extract-data", async (req, res) => {
     try {
-      const { date, created_by } = req.body;
+      const { date, created_by, scope } = req.body;
       const createdBy = created_by || 'unknown';
+      const officeScope = isOfficeScope(scope);
       const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
 
       // CRITICAL: Esegui extract_cleaners_optimized.py ma non bloccare se fallisce
@@ -7240,9 +7329,10 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
       // Esegui SEMPRE create_containers.py per avere dati freschi dal database
       console.log(`Eseguendo create_containers.py per data ${date}...`);
+      const workflowArg = officeScope ? " --workflow office" : "";
       const containersResult = await new Promise<string>((resolve, reject) => {
         exec(
-          `python3 client/public/scripts/create_containers.py --date ${date} --use-api`,
+          `python3 client/public/scripts/create_containers.py --date ${date} --use-api${workflowArg}`,
           (error, stdout, stderr) => {
             if (error) {
               console.error("Errore create_containers:", stderr);

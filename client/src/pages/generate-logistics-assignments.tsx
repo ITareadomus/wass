@@ -853,7 +853,7 @@ export default function GenerateLogisticsAssignments() {
           <div className="mx-auto mb-6 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-4">
               <h1 className="flex items-center gap-2 text-[25px] font-bold text-foreground">
-                LOGISTICS del
+                Assegnazioni Logistica del
               </h1>
               <Popover>
                 <PopoverTrigger asChild>

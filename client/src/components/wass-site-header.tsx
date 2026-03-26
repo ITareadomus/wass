@@ -7,9 +7,8 @@ interface WassSiteHeaderProps {
   className?: string;
 }
 
-/** Altezza minima barra header; py dà respiro verticale a logo e titolo. */
-const HEADER_BAR =
-  "min-h-[3.25rem] py-2 md:min-h-[3.5rem] md:py-2.5";
+/** Altezza fissa barra header, leggermente piu ariosa e uniforme su tutte le route. */
+const HEADER_BAR = "h-[3.5rem] md:h-[3.75rem]";
 
 export function WassSiteHeader({ right, className }: WassSiteHeaderProps) {
   return (

@@ -884,7 +884,7 @@ export default function LogisticsTimelineView({
             <div>
               <h2 className="text-xl font-bold text-foreground flex items-center">
                 <CalendarIcon className="w-5 h-5 mr-2 text-custom-blue" />
-                Timeline Logistica — {drivers.length} driver
+                Timeline Logistica - {drivers.length} Driver
               </h2>
             </div>
             <div className="flex gap-3 print:hidden">

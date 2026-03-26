@@ -87,6 +87,16 @@ export default function UnconfirmedTasks() {
     const savedDate = localStorage.getItem("selected_work_date");
     return savedDate || format(new Date(), "yyyy-MM-dd");
   });
+  const scopeFromUrl =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("scope")
+      : null;
+  const savedScope =
+    typeof window !== "undefined" ? localStorage.getItem("assignments_scope") : null;
+  const isOfficeScope = scopeFromUrl === "office" || (!scopeFromUrl && savedScope === "office");
+  const assignmentsHomeHref = isOfficeScope
+    ? "/generate-assignments?scope=office"
+    : "/generate-assignments";
 
   useEffect(() => {
     localStorage.setItem("selected_work_date", selectedDate);
@@ -101,19 +111,36 @@ export default function UnconfirmedTasks() {
   const [expandedTaskId, setExpandedTaskId] = useState<string | number | null>(null);
 
   const { data: operationsData } = useQuery<OperationsData>({
-    queryKey: ["/api/operations"],
+    queryKey: ["/api/operations", isOfficeScope ? "office" : "default"],
     queryFn: async () => {
-      const response = await fetch("/api/operations");
+      const response = await fetch(isOfficeScope ? "/api/operations?scope=office" : "/api/operations");
       if (!response.ok) throw new Error("Failed to fetch operations");
       return response.json();
     },
     staleTime: 60000,
   });
 
-  const operationNames: Record<number, string> = operationsData?.active_operations?.reduce(
+  const officeOperationNames: Record<number, string> = {
+    15: "PULIZIA UFFICI/ALTRO",
+    38: "PULIZIA UFFICI/ALTRO STRAORDINARIA",
+  };
+  const fetchedOperations = operationsData?.active_operations || [];
+  const fetchedOpsById = new Map<number, string>(
+    fetchedOperations.map((op) => [Number(op.id), String(op.name || "").trim()])
+  );
+  const allowedOperations = isOfficeScope
+    ? [15, 38].map((id) => ({
+        id,
+        name: fetchedOpsById.get(id) || officeOperationNames[id],
+      }))
+    : fetchedOperations;
+
+  const operationNames: Record<number, string> = allowedOperations.reduce(
     (acc, op) => ({ ...acc, [op.id]: op.name }),
-    {} as Record<number, string>
-  ) || { 1: "FERMATA", 2: "PARTENZA", 3: "PULIZIA STRAORDINARIA", 4: "RIPASSO" };
+    isOfficeScope
+      ? { ...officeOperationNames }
+      : ({ 1: "FERMATA", 2: "PARTENZA", 3: "PULIZIA STRAORDINARIA", 4: "RIPASSO" } as Record<number, string>)
+  );
 
   
   // 🔄 Prima rigeneriamo i containers per la data selezionata:
@@ -297,14 +324,7 @@ export default function UnconfirmedTasks() {
   };
 
   const getOperationName = (opId: number) => {
-    const names: Record<number, string> = {
-      0: "Nessuna",
-      1: "FERMATA",
-      2: "PARTENZA",
-      3: "STRAORDINARIA",
-      4: "RIPASSO"
-    };
-    return names[opId] || `Operazione ${opId}`;
+    return operationNames[opId] || `Operazione ${opId}`;
   };
 
   return (
@@ -399,7 +419,7 @@ export default function UnconfirmedTasks() {
               <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigate("/generate-assignments")}
+                  onClick={() => navigate(assignmentsHomeHref)}
                   disabled={false}
                   data-testid="button-go-home"
                   className="border-2 border-custom-blue"
@@ -658,7 +678,7 @@ export default function UnconfirmedTasks() {
                               >
                                 Nessuna
                               </button>
-                              {(operationsData?.active_operations || []).map((op) => (
+                              {allowedOperations.map((op) => (
                                 <button
                                   key={op.id}
                                   onClick={() => {
@@ -723,7 +743,7 @@ export default function UnconfirmedTasks() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigate("/generate-assignments")}
+                  onClick={() => navigate(assignmentsHomeHref)}
                   disabled={false}
                   data-testid="button-go-home"
                   className="border-2 border-custom-blue"
@@ -771,11 +791,11 @@ export default function UnconfirmedTasks() {
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="0">Nessuna</SelectItem>
-                                    <SelectItem value="1">FERMATA</SelectItem>
-                                    <SelectItem value="2">PARTENZA</SelectItem>
-                                    <SelectItem value="3">STRAORDINARIA</SelectItem>
-                                    <SelectItem value="4">RIPASSO</SelectItem>
+                                    {allowedOperations.map((op) => (
+                                      <SelectItem key={op.id} value={String(op.id)}>
+                                        {op.name}
+                                      </SelectItem>
+                                    ))}
                                   </SelectContent>
                                 </Select>
                               )}

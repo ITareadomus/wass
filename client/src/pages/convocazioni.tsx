@@ -48,15 +48,20 @@ interface TaskStats {
   premium: number;
   standard: number;
   straordinarie: number;
+  officeInternal: number;
+  logistics: number;
 }
 
-function convocationKindFromSearch(): "cleaners" | "drivers" {
+function convocationKindFromSearch(): "cleaners" | "drivers" | "office" {
   if (typeof window === "undefined") return "cleaners";
-  return new URLSearchParams(window.location.search).get("kind") === "drivers" ? "drivers" : "cleaners";
+  const kind = new URLSearchParams(window.location.search).get("kind");
+  if (kind === "drivers") return "drivers";
+  if (kind === "office") return "office";
+  return "cleaners";
 }
 
-function useConvocationKind(): "cleaners" | "drivers" {
-  const [kind, setKind] = useState<"cleaners" | "drivers">(convocationKindFromSearch);
+function useConvocationKind(): "cleaners" | "drivers" | "office" {
+  const [kind, setKind] = useState<"cleaners" | "drivers" | "office">(convocationKindFromSearch);
   useEffect(() => {
     const sync = () => setKind(convocationKindFromSearch());
     sync();
@@ -69,9 +74,10 @@ function useConvocationKind(): "cleaners" | "drivers" {
 export default function Convocazioni() {
   const convKind = useConvocationKind();
   const isDrivers = convKind === "drivers";
+  const isOffice = convKind === "office";
 
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
-  const [taskStats, setTaskStats] = useState<TaskStats>({ total: 0, premium: 0, standard: 0, straordinarie: 0 });
+  const [taskStats, setTaskStats] = useState<TaskStats>({ total: 0, premium: 0, standard: 0, straordinarie: 0, officeInternal: 0, logistics: 0 });
   const [selectedCleaners, setSelectedCleaners] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -99,18 +105,49 @@ export default function Convocazioni() {
   });
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
   // Aggiunto uno stato per i cleaners filtrati per evitare che vengano sovrascritti quando cambia la data
   const [filteredCleaners, setFilteredCleaners] = useState<Cleaner[]>([]);
   const [showOnlyNotConvocatiDaDueGiorni, setShowOnlyNotConvocatiDaDueGiorni] = useState(false);
 
+  // Blocca lo scroll della pagina mentre Convocazioni e montata
   useEffect(() => {
+    if (typeof document === "undefined") return;
+    const previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, []);
+
+  // Canonical URL: rimuovi il parametro date dalla querystring
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("date")) return;
+    const kind = params.get("kind");
+    setLocation(kind ? `/convocazioni?kind=${kind}` : "/convocazioni");
+  }, [location, setLocation]);
+  const handleDateSelect = (date: Date | undefined) => {
+    if (!date) return;
+    setSelectedDate(date);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
     const loadCleaners = async () => {
       try {
         setIsLoading(true);
+        // Evita di mostrare selezioni stale mentre cambia data/kind
+        setSelectedCleaners(new Set());
+        setSelectedVehicleByDriver({});
         setLoadingMessage(
-          isDrivers ? "Estrazione driver dal database..." : "Estrazione cleaners dal database..."
+          isDrivers
+            ? "Estrazione driver dal database..."
+            : isOffice
+              ? "Estrazione cleaners ufficio dal database..."
+              : "Estrazione cleaners dal database..."
         );
 
         const dateStr = format(selectedDate, "yyyy-MM-dd");
@@ -130,7 +167,13 @@ export default function Convocazioni() {
         const extractResult = await extractResponse.json();
         console.log("Estrazione completata:", extractResult);
 
-        setLoadingMessage(isDrivers ? "Caricamento driver..." : "Caricamento cleaners...");
+        setLoadingMessage(
+          isDrivers
+            ? "Caricamento driver..."
+            : isOffice
+              ? "Caricamento cleaners ufficio..."
+              : "Caricamento cleaners..."
+        );
 
         const rosterUrl = isDrivers
           ? `/api/logistics-drivers?date=${dateStr}`
@@ -146,9 +189,11 @@ export default function Convocazioni() {
         const rosterData = await rosterResponse.json();
         let dateCleaners = (isDrivers ? rosterData.drivers : rosterData.cleaners) || [];
 
-        // Convocazioni (cleaners): escludi i cleaner Ufficio dall'estrazione/lista.
+        // Convocazioni: cleaners standard esclude Ufficio; ufficio include solo Ufficio.
         if (!isDrivers) {
-          dateCleaners = dateCleaners.filter((c: any) => c?.role !== "Ufficio");
+          dateCleaners = isOffice
+            ? dateCleaners.filter((c: any) => c?.role === "Ufficio")
+            : dateCleaners.filter((c: any) => c?.role !== "Ufficio");
         }
 
         if (isDrivers) {
@@ -252,6 +297,7 @@ export default function Convocazioni() {
           return hoursB - hoursA;
         });
 
+        if (cancelled) return;
         setCleaners(availableCleaners);
         setFilteredCleaners(availableCleaners);
 
@@ -259,22 +305,36 @@ export default function Convocazioni() {
         const allPreselectedIds = new Set(
           [...alreadySelectedIds, ...preselectedIds].filter((id) => visibleIds.has(id))
         );
+        if (cancelled) return;
         setSelectedCleaners(allPreselectedIds);
         setSelectedVehicleByDriver(preselectedVehicleByDriver);
 
         setLoadingMessage("Caricamento statistiche task...");
         await loadTaskStats(dateStr, isDrivers);
 
+        if (cancelled) return;
         setIsLoading(false);
         setLoadingMessage("Caricamento completato!");
       } catch (error) {
         console.error("Errore nel caricamento convocazioni:", error);
-        setLoadingMessage(isDrivers ? "Errore nel caricamento dei driver" : "Errore nel caricamento dei cleaners");
+        if (cancelled) return;
+        setLoadingMessage(
+          isDrivers
+            ? "Errore nel caricamento dei driver"
+            : isOffice
+              ? "Errore nel caricamento dei cleaners ufficio"
+              : "Errore nel caricamento dei cleaners"
+        );
         setIsLoading(false);
+        setSelectedCleaners(new Set());
+        setSelectedVehicleByDriver({});
       }
     };
 
     void loadCleaners();
+    return () => {
+      cancelled = true;
+    };
   }, [selectedDate, convKind]);
 
   const loadTaskStats = async (dateStr: string, driversMode: boolean) => {
@@ -291,16 +351,41 @@ export default function Convocazioni() {
         ...(c.high_priority?.tasks || []),
         ...(c.low_priority?.tasks || []),
       ];
-      let total = 0, premium = 0, standard = 0, straordinarie = 0;
+      let total = 0, premium = 0, standard = 0, straordinarie = 0, officeInternal = 0, logistics = 0;
+      let logisticsOperationIds = new Set<number>();
+      if (driversMode) {
+        try {
+          const opsRes = await fetch('/api/operations?for=logistics', {
+            cache: "no-store",
+            headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+          });
+          if (opsRes.ok) {
+            const opsData = await opsRes.json();
+            const ops = Array.isArray(opsData?.active_operations) ? opsData.active_operations : [];
+            logisticsOperationIds = new Set(
+              ops
+                .filter((op: any) => String(op?.name || "").toLowerCase().includes("logistica"))
+                .map((op: any) => Number(op?.id))
+                .filter((id: number) => Number.isFinite(id))
+            );
+          }
+        } catch (error) {
+          console.warn("Impossibile caricare operation LOGISTICA:", error);
+        }
+      }
       for (const t of allTasks) {
         const isStraordinaria = t.straordinaria === true || (t as any).is_straordinaria === true || Number(t.operation_id) === 3;
         const isPremium = t.premium === true || t.premium === 1 || t.premium === "1";
+        const isOfficeInternal = Number((t as any).operation_id) === 15;
+        const opId = Number((t as any).operation_id);
         total += 1;
         if (isStraordinaria) straordinarie += 1;
         else if (isPremium) premium += 1;
         else standard += 1;
+        if (isOfficeInternal) officeInternal += 1;
+        if (driversMode && Number.isFinite(opId) && logisticsOperationIds.has(opId)) logistics += 1;
       }
-      setTaskStats({ total, premium, standard, straordinarie });
+      setTaskStats({ total, premium, standard, straordinarie, officeInternal, logistics });
     } catch (error) {
       console.error('Errore nel caricamento delle statistiche task:', error);
     }
@@ -708,7 +793,7 @@ export default function Convocazioni() {
           });
         }
         sessionStorage.setItem("preserveAssignments", "true");
-        setLocation("/generate-assignments");
+        setLocation(isOffice ? "/generate-assignments?scope=office" : "/generate-assignments");
       }
     } catch (error) {
       console.error("Errore nell'aggiunta:", error);
@@ -725,16 +810,16 @@ export default function Convocazioni() {
   };
 
   return (
-    <div className="bg-background text-foreground min-h-screen">
-      <div className="p-4 w-full">
-        <div className="mb-6 space-y-4">
+    <div className="bg-background text-foreground h-[calc(100vh-64px)] overflow-hidden">
+      <div className="w-full h-full flex flex-col px-4 pt-3 pb-6">
+        <div className="mb-3 space-y-3 shrink-0">
           {/* Header con titolo e selettore data */}
           {!isLoading && (
             <div className="flex justify-between items-center flex-wrap gap-4">
               <div className="flex items-center gap-3">
                 <h1 className="text-3xl font-bold text-foreground flex items-center gap-2 flex-wrap">
                   <Users className="w-8 h-8 text-custom-blue" />
-                  {isDrivers ? "CONVOCAZIONI DRIVER del" : "CONVOCAZIONI del"}
+                  {isDrivers ? "CONVOCAZIONI DRIVER del" : isOffice ? "CONVOCAZIONI UFFICIO del" : "CONVOCAZIONI HOUSEKEEPING del" }
                 </h1>
                 <Popover>
                   <PopoverTrigger asChild>
@@ -753,7 +838,7 @@ export default function Convocazioni() {
                     <Calendar
                       mode="single"
                       selected={selectedDate}
-                      onSelect={(date) => date && setSelectedDate(date)}
+                      onSelect={handleDateSelect}
                       initialFocus
                       locale={it}
                     />
@@ -778,11 +863,11 @@ export default function Convocazioni() {
             </div>
           ) : (
             /* Barra Contatore */
-            <div className="bg-custom-blue-light rounded-xl border-2 border-custom-blue shadow-lg p-6">
+            <div className="bg-custom-blue-light rounded-xl border-2 border-custom-blue shadow-lg p-4">
               <div className="flex items-center gap-4 w-full">
                 <div className="flex items-center gap-4 shrink-0">
                   <div className="text-lg font-semibold text-foreground">
-                    {isDrivers ? "DRIVERS SELEZIONATI" : "CLEANERS SELEZIONATI"}
+                    {isDrivers ? "DRIVERS SELEZIONATI" : isOffice ? "CLEANERS UFFICIO SELEZIONATI" : "CLEANERS SELEZIONATI"}
                   </div>
                   <div className="text-lg font-bold">
                     <span className="text-primary">{isDrivers ? selectedDrivers.length : selectedCleaners.size}</span>
@@ -801,7 +886,7 @@ export default function Convocazioni() {
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
                 >
-                  {isDrivers ? "Driver" : "Cleaners"} non convocati da due giorni o più:{" "}
+                  {isDrivers ? "Driver" : isOffice ? "Cleaners ufficio" : "Cleaners"} non convocati da due giorni o più:{" "}
                   <span className="font-bold text-yellow-500 dark:text-yellow-400">{notConvocatiDaDueGiorniCount}</span>
                   {showOnlyNotConvocatiDaDueGiorni && " (clicca per mostrare tutti)"}
                 </button>
@@ -812,13 +897,13 @@ export default function Convocazioni() {
 
         {/* Grid con lista cleaners e statistiche affiancate */}
         {!isLoading && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
           {/* Lista Cleaners - 2/3 dello spazio */}
-          <Card className="p-6 lg:col-span-2 flex flex-col overflow-hidden border-2 border-custom-blue bg-custom-blue-light dark:bg-custom-blue">
-            <div className="mb-4 relative">
+          <Card className="p-4 lg:col-span-2 flex flex-col h-full min-h-0 overflow-hidden border-2 border-custom-blue bg-custom-blue-light dark:bg-custom-blue">
+            <div className="mb-3 relative shrink-0">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-custom-blue" />
               <Input
-                placeholder={isDrivers ? "Cerca driver per nome..." : "Cerca cleaner per nome..."}
+                placeholder={isDrivers ? "Cerca driver per nome..." : isOffice ? "Cerca cleaner ufficio per nome..." : "Cerca cleaner per nome..."}
                 value={searchCleaner}
                 onChange={(e) => setSearchCleaner(e.target.value)}
                 className="pl-10 border-2 border-custom-blue"
@@ -826,7 +911,7 @@ export default function Convocazioni() {
               />
             </div>
 
-            <div className="space-y-3 flex-1 overflow-y-auto pr-2">
+            <div className="space-y-2.5 flex-1 min-h-0 overflow-y-auto pr-2">
               {visibleRoster
                 .filter((cleaner) =>
                   `${cleaner.name} ${cleaner.lastname}`
@@ -868,7 +953,7 @@ export default function Convocazioni() {
                     <div
                       key={cleaner.id}
                       onClick={() => toggleCleanerSelection(cleaner.id, isAvailable)}
-                      className={`flex items-center justify-between p-4 rounded-lg transition-all ${borderColor} ${bgColor} ${
+                      className={`flex items-center justify-between p-3 rounded-lg transition-all ${borderColor} ${bgColor} ${
                         !isAvailable
                           ? "opacity-60 cursor-pointer hover:opacity-70"
                           : "hover:opacity-80 cursor-pointer"
@@ -877,7 +962,7 @@ export default function Convocazioni() {
                   <div className="flex items-start gap-4 flex-1">
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-foreground text-lg">
+                        <span className="font-semibold text-foreground text-base">
                           {cleaner.name.toUpperCase()} {cleaner.lastname.toUpperCase()}
                         </span>
                         <div className="flex items-center gap-1.5">
@@ -1005,7 +1090,7 @@ export default function Convocazioni() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-4">
                     <div className={`flex items-center gap-1 bg-background border-2 rounded-lg px-3 py-1 ${borderColor}`}>
                       <span className="text-xs font-semibold text-foreground mr-2">Start Time:</span>
                       <Button
@@ -1098,12 +1183,12 @@ export default function Convocazioni() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <div className="flex justify-center mt-4 pt-4 border-t">
+          <div className="flex justify-center mt-3 pt-3 border-t shrink-0">
             <Button
               onClick={async () => {
                 const ok = await handleSaveSelection();
                 if (ok) {
-                  setLocation(isDrivers ? "/generate-logistics-assignments" : "/generate-assignments");
+                  setLocation(isDrivers ? "/generate-logistics-assignments" : isOffice ? "/generate-assignments?scope=office" : "/generate-assignments");
                 }
               }}
               size="lg"
@@ -1123,8 +1208,8 @@ export default function Convocazioni() {
         </Card>
 
         {/* Pannello Statistiche - 1/3 dello spazio - FISSO */}
-        <Card className="p-6 border-2 bg-background flex flex-col h-full overflow-hidden">
-          <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+        <Card className="p-4 border-2 bg-background flex flex-col h-full overflow-hidden">
+          <h3 className="text-lg font-semibold text-foreground mb-3 flex items-center">
             <svg
               className="w-5 h-5 mr-2 text-custom-blue"
               fill="none"
@@ -1142,36 +1227,71 @@ export default function Convocazioni() {
           </h3>
 
           {/* Statistiche Task */}
-          <div className="mb-4 pb-3 border-b border-border">
-            <h4 className="text-xs font-semibold text-muted-foreground mb-2">Task Giornata</h4>
+          <div className="mb-3 pb-2 border-b border-border shrink-0">
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2">
+              {isOffice ? "Task Ufficio" : "Task Giornata"}
+            </h4>
             <div className="grid grid-cols-2 gap-2">
-              <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-2 border-2 border-blue-300 dark:border-blue-700">
-                <div className="text-lg font-bold text-blue-800 dark:text-blue-200">{taskStats.total}</div>
-                <div className="text-[10px] text-blue-800 dark:text-blue-200">Totale</div>
-              </div>
-              <div className="bg-yellow-100 dark:bg-yellow-950/50 rounded-lg p-2 border-2 border-yellow-300 dark:border-yellow-700">
-                <div className="text-lg font-bold text-yellow-800 dark:text-yellow-200">{taskStats.premium}</div>
-                <div className="text-[10px] text-yellow-800 dark:text-yellow-200">Premium</div>
-              </div>
-              <div className="bg-green-100 dark:bg-green-950/50 rounded-lg p-2 border-2 border-green-300 dark:border-green-700">
-                <div className="text-lg font-bold text-green-800 dark:text-green-200">{taskStats.standard}</div>
-                <div className="text-[10px] text-green-800 dark:text-green-200">Standard</div>
-              </div>
-              <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-2 border-2 border-red-300 dark:border-red-700">
-                <div className="text-lg font-bold text-red-800 dark:text-red-200">{taskStats.straordinarie}</div>
-                <div className="text-[10px] text-red-800 dark:text-red-200">Straordinarie</div>
-              </div>
+              {isOffice ? (
+                <>
+                  <div className="col-span-2 bg-blue-100 dark:bg-blue-950/50 rounded-lg p-2 border-2 border-blue-300 dark:border-blue-700">
+                    <div className="text-lg font-bold text-blue-800 dark:text-blue-200">{taskStats.total}</div>
+                    <div className="text-[10px] text-blue-800 dark:text-blue-200">Totale</div>
+                  </div>
+                  <div className="bg-sky-100 dark:bg-sky-950/50 rounded-lg p-2 border-2 border-sky-300 dark:border-sky-700">
+                    <div className="text-lg font-bold text-sky-800 dark:text-sky-200">
+                      {Math.max(0, taskStats.total - taskStats.straordinarie)}
+                    </div>
+                    <div className="text-[10px] text-sky-800 dark:text-sky-200">Pulizia Ufficio</div>
+                  </div>
+                  <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-2 border-2 border-red-300 dark:border-red-700">
+                    <div className="text-lg font-bold text-red-800 dark:text-red-200">{taskStats.straordinarie}</div>
+                    <div className="text-[10px] text-red-800 dark:text-red-200">Pulizia Ufficio Straordinaria</div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="col-span-2 bg-blue-100 dark:bg-blue-950/50 rounded-lg p-2 border-2 border-blue-300 dark:border-blue-700">
+                    <div className="text-lg font-bold text-blue-800 dark:text-blue-200">{taskStats.total}</div>
+                    <div className="text-[10px] text-blue-800 dark:text-blue-200">Totale</div>
+                  </div>
+                  <div className="bg-green-100 dark:bg-green-950/50 rounded-lg p-2 border-2 border-green-300 dark:border-green-700">
+                    <div className="text-lg font-bold text-green-800 dark:text-green-200">{taskStats.standard}</div>
+                    <div className="text-[10px] text-green-800 dark:text-green-200">Standard</div>
+                  </div>
+                  <div className="bg-yellow-100 dark:bg-yellow-950/50 rounded-lg p-2 border-2 border-yellow-300 dark:border-yellow-700">
+                    <div className="text-lg font-bold text-yellow-800 dark:text-yellow-200">{taskStats.premium}</div>
+                    <div className="text-[10px] text-yellow-800 dark:text-yellow-200">Premium</div>
+                  </div>
+                  <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-2 border-2 border-red-300 dark:border-red-700">
+                    <div className="text-lg font-bold text-red-800 dark:text-red-200">{taskStats.straordinarie}</div>
+                    <div className="text-[10px] text-red-800 dark:text-red-200">Straordinarie</div>
+                  </div>
+                  {isDrivers && (
+                    <div className="bg-sky-100 dark:bg-sky-950/50 rounded-lg p-2 border-2 border-sky-300 dark:border-sky-700">
+                      <div className="text-lg font-bold text-sky-800 dark:text-sky-200">{taskStats.logistics}</div>
+                      <div className="text-[10px] text-sky-800 dark:text-sky-200">Logistica</div>
+                    </div>
+                  )}
+                  {!isDrivers && !isOffice && (
+                    <div className="bg-sky-100 dark:bg-sky-950/50 rounded-lg p-2 border-2 border-sky-300 dark:border-sky-700">
+                      <div className="text-lg font-bold text-sky-800 dark:text-sky-200">-</div>
+                      <div className="text-[10px] text-sky-800 dark:text-sky-200">Pulizia Ufficio Interna</div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
 
           {/* Statistiche roster */}
-          <h4 className="text-xs font-semibold text-muted-foreground mb-2">
-            {isDrivers ? "Driver" : "Cleaners"}
+          <h4 className="text-xs font-semibold text-muted-foreground mb-2 shrink-0">
+            {isDrivers ? "Driver" : isOffice ? "Cleaners Ufficio" : "Cleaners"}
           </h4>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 auto-rows-[112px] shrink-0">
             {/* Disponibili */}
-            <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-2 h-[117px] flex flex-col items-center justify-center border-2 border-blue-300 dark:border-blue-700">
-              <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
+            <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-2.5 h-[112px] flex flex-col items-center justify-center border-2 border-blue-300 dark:border-blue-700">
+              <svg className="w-14 h-14 mb-1" viewBox="0 0 100 100">
                 <circle
                   cx="50"
                   cy="50"
@@ -1204,15 +1324,15 @@ export default function Convocazioni() {
                 {driversRoster.length > 0 ? Math.round((driversRoster.filter(c => c.available !== false).length / driversRoster.length) * 100) : 0}%
                 </text>
               </svg>
-              <span className="text-[10px] font-semibold text-blue-800 dark:text-blue-200 text-center">Disponibili</span>
-              <span className="text-[9px] text-blue-800 dark:text-blue-200">
+              <span className="text-[11px] font-semibold text-blue-800 dark:text-blue-200 text-center">Disponibili</span>
+              <span className="text-[10px] text-blue-800 dark:text-blue-200">
                 {driversRoster.filter(c => c.available !== false).length}/{driversRoster.length}
               </span>
             </div>
 
             {/* Non Disponibili */}
-            <div className="bg-gray-100 dark:bg-gray-950/50 rounded-lg p-2 h-[117px] flex flex-col items-center justify-center border-2 border-gray-300 dark:border-gray-700">
-              <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
+            <div className="bg-gray-100 dark:bg-gray-950/50 rounded-lg p-2.5 h-[112px] flex flex-col items-center justify-center border-2 border-gray-300 dark:border-gray-700">
+              <svg className="w-14 h-14 mb-1" viewBox="0 0 100 100">
                 <circle
                   cx="50"
                   cy="50"
@@ -1245,17 +1365,17 @@ export default function Convocazioni() {
                   {driversRoster.length > 0 ? Math.round((driversRoster.filter(c => c.available === false).length / driversRoster.length) * 100) : 0}%
                 </text>
               </svg>
-              <span className="text-[10px] font-semibold text-gray-800 dark:text-gray-200 text-center">Non Disponibili</span>
-              <span className="text-[9px] text-gray-800 dark:text-gray-200">
+              <span className="text-[11px] font-semibold text-gray-800 dark:text-gray-200 text-center">Non Disponibili</span>
+              <span className="text-[10px] text-gray-800 dark:text-gray-200">
                 {driversRoster.filter(c => c.available === false).length}/{driversRoster.length}
               </span>
             </div>
 
-            {!isDrivers && (
+            {!isDrivers && !isOffice && (
               <>
             {/* Premium */}
-            <div className="bg-yellow-100 dark:bg-yellow-950/50 rounded-lg p-2 flex flex-col items-center justify-center border-2 border-yellow-300 dark:border-yellow-700">
-              <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
+            <div className="bg-yellow-100 dark:bg-yellow-950/50 rounded-lg p-2 h-[112px] flex flex-col items-center justify-center border-2 border-yellow-300 dark:border-yellow-700">
+              <svg className="w-14 h-14 mb-1" viewBox="0 0 100 100">
                 <circle
                   cx="50"
                   cy="50"
@@ -1288,15 +1408,15 @@ export default function Convocazioni() {
                   {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.role === "Premium").length / filteredCleaners.length) * 100) : 0}%
                 </text>
               </svg>
-              <span className="text-[10px] font-semibold text-yellow-800 dark:text-yellow-200 text-center">Premium</span>
-              <span className="text-[9px] text-yellow-800 dark:text-yellow-200">
+              <span className="text-[11px] font-semibold text-yellow-800 dark:text-yellow-200 text-center">Premium</span>
+              <span className="text-[10px] text-yellow-800 dark:text-yellow-200">
                 {filteredCleaners.filter(c => c.role === "Premium").length}/{filteredCleaners.length}
               </span>
             </div>
 
             {/* Standard */}
-            <div className="bg-green-100 dark:bg-green-950/50 rounded-lg p-2 flex flex-col items-center justify-center border-2 border-green-300 dark:border-green-700">
-              <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
+            <div className="bg-green-100 dark:bg-green-950/50 rounded-lg p-2 h-[112px] flex flex-col items-center justify-center border-2 border-green-300 dark:border-green-700">
+              <svg className="w-14 h-14 mb-1" viewBox="0 0 100 100">
                 <circle
                   cx="50"
                   cy="50"
@@ -1329,15 +1449,15 @@ export default function Convocazioni() {
                   {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.role === "Standard").length / filteredCleaners.length) * 100) : 0}%
                 </text>
               </svg>
-              <span className="text-[10px] font-semibold text-green-800 dark:text-green-200 text-center">Standard</span>
-              <span className="text-[9px] text-green-800 dark:text-green-200">
+              <span className="text-[11px] font-semibold text-green-800 dark:text-green-200 text-center">Standard</span>
+              <span className="text-[10px] text-green-800 dark:text-green-200">
                 {filteredCleaners.filter(c => c.role === "Standard").length}/{filteredCleaners.length}
               </span>
             </div>
 
             {/* Formatori */}
-            <div className="bg-orange-100 dark:bg-orange-950/50 rounded-lg p-2 flex flex-col items-center justify-center border-2 border-orange-300 dark:border-orange-700">
-              <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
+            <div className="bg-orange-100 dark:bg-orange-950/50 rounded-lg p-2 h-[112px] flex flex-col items-center justify-center border-2 border-orange-300 dark:border-orange-700">
+              <svg className="w-14 h-14 mb-1" viewBox="0 0 100 100">
                 <circle
                   cx="50"
                   cy="50"
@@ -1370,15 +1490,15 @@ export default function Convocazioni() {
                   {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.role === "Formatore").length / filteredCleaners.length) * 100) : 0}%
                 </text>
               </svg>
-              <span className="text-[10px] font-semibold text-orange-800 dark:text-orange-200 text-center">Formatori</span>
-              <span className="text-[9px] text-orange-800 dark:text-orange-200">
+              <span className="text-[11px] font-semibold text-orange-800 dark:text-orange-200 text-center">Formatori</span>
+              <span className="text-[10px] text-orange-800 dark:text-orange-200">
                 {filteredCleaners.filter(c => c.role === "Formatore").length}/{filteredCleaners.length}
               </span>
             </div>
 
             {/* Straordinari */}
-            <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-2 flex flex-col items-center justify-center border-2 border-red-300 dark:border-red-700">
-              <svg className="w-16 h-16 mb-1" viewBox="0 0 100 100">
+            <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-2 h-[112px] flex flex-col items-center justify-center border-2 border-red-300 dark:border-red-700">
+              <svg className="w-14 h-14 mb-1" viewBox="0 0 100 100">
                 <circle
                   cx="50"
                   cy="50"
@@ -1411,19 +1531,26 @@ export default function Convocazioni() {
                   {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.role === "Straordinario").length / filteredCleaners.length) * 100) : 0}%
                 </text>
               </svg>
-              <span className="text-[10px] font-semibold text-red-800 dark:text-red-200 text-center">Straordinari</span>
-              <span className="text-[9px] text-red-800 dark:text-red-200">
+              <span className="text-[11px] font-semibold text-red-800 dark:text-red-200 text-center">Straordinari</span>
+              <span className="text-[10px] text-red-800 dark:text-red-200">
                 {filteredCleaners.filter(c => c.role === "Straordinario").length}/{filteredCleaners.length}
               </span>
             </div>
               </>
             )}
+
           </div>
 
+          {isOffice && (
+            <div className="mt-3 pt-3 border-t border-border flex flex-col flex-1 min-h-0">
+              <h4 className="text-xs font-semibold text-muted-foreground mb-2">Legenda Ufficio</h4>
+            </div>
+          )}
+
           {isDrivers && (
-            <div className="mt-4 pt-3 border-t border-border flex-1 min-h-0">
+            <div className="mt-3 pt-3 border-t border-border flex flex-col flex-1 min-h-0">
               <h4 className="text-xs font-semibold text-muted-foreground mb-2">Veicoli</h4>
-              <div className="bg-slate-100 dark:bg-slate-950/50 rounded-lg p-3 border-2 border-slate-300 dark:border-slate-700 h-[calc(100%-12px)] mb-[12px] overflow-y-auto">
+              <div className="bg-slate-100 dark:bg-slate-950/50 rounded-lg p-3 border-2 border-slate-300 dark:border-slate-700 flex-1 min-h-0 overflow-y-auto">
                 {selectedDriverNames.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
                     Nessun driver selezionato.

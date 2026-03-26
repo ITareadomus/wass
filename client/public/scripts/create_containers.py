@@ -99,6 +99,11 @@ def get_active_operations_logistics():
     connection.close()
     return [row['id'] for row in results]
 
+
+def get_active_operations_office():
+    """Operazioni consentite per workflow uffici."""
+    return [15, 38]
+
 def get_operation_names(operation_ids):
     """Recupera i nomi delle operazioni dalla tabella app_structure_operation_langs"""
     if not operation_ids:
@@ -134,6 +139,9 @@ def get_tasks_from_db(selected_date, assigned_task_ids=None, workflow="housekeep
     if workflow == "logistics":
         print(f"Aggiorno la lista delle operazioni attive (enable_route_drivers) dal DB...")
         ops = get_active_operations_logistics()
+    elif workflow == "office":
+        print("Workflow office: filtro operation_id consentiti [15, 38]")
+        ops = get_active_operations_office()
     else:
         print(f"Aggiorno la lista delle operazioni attive (enable_wass) dal DB...")
         ops = get_active_operations()
@@ -482,9 +490,9 @@ def main():
     parser.add_argument(
         '--workflow',
         type=str,
-        choices=['housekeeping', 'logistics'],
+        choices=['housekeeping', 'office', 'logistics'],
         default='housekeeping',
-        help='housekeeping: enable_wass (default). logistics: enable_route_drivers → /api/logistics-containers',
+        help='housekeeping: enable_wass (default). office: operation_id [15,38]. logistics: enable_route_drivers → /api/logistics-containers',
     )
     args = parser.parse_args()
     workflow = getattr(args, 'workflow', 'housekeeping') or 'housekeeping'
@@ -522,7 +530,7 @@ def main():
     assigned_task_ids = set()
     timeline_data = None
 
-    if workflow == "housekeeping":
+    if workflow != "logistics":
         try:
             timeline_data = api_client.load_timeline(target_date)
             if timeline_data:
@@ -544,7 +552,7 @@ def main():
     )  # Non filtrare
 
     # CRITICAL: Preserva timeline.json aggiornando SOLO i dati modificati dal DB
-    if workflow == "housekeeping" and timeline_data and assigned_task_ids:
+    if workflow != "logistics" and timeline_data and assigned_task_ids:
         db_tasks_map = {task["task_id"]: task for task in all_tasks_from_db}
         updated_count = 0
 
@@ -578,7 +586,7 @@ def main():
             print(f"✅ Aggiornate {updated_count} task in timeline via API (preservati campi timeline: start_time, end_time, travel_time, sequence)")
 
     # Filtra le task già assegnate per containers.json (solo housekeeping)
-    if workflow == "housekeeping":
+    if workflow != "logistics":
         all_tasks = [t for t in all_tasks_from_db if t["task_id"] not in assigned_task_ids]
     else:
         all_tasks = list(all_tasks_from_db)
@@ -663,7 +671,12 @@ def extract_tasks_from_db(work_date=None, assigned_task_ids=None, workflow="hous
 
     print(f"📋 Estrazione task dal database per {work_date}...")
 
-    ops = get_active_operations_logistics() if workflow == "logistics" else get_active_operations()
+    if workflow == "logistics":
+        ops = get_active_operations_logistics()
+    elif workflow == "office":
+        ops = get_active_operations_office()
+    else:
+        ops = get_active_operations()
 
     valid_operation_ids = ops + [0, None]
     non_null_operation_ids = [op for op in valid_operation_ids if op is not None]

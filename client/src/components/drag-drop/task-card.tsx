@@ -172,7 +172,7 @@ interface TaskCardProps {
   cleanerId?: number | null;
   isPriorityWindowViolation?: boolean;
   /** housekeeping → /api/operations (enable_wass); logistics → enable_route_drivers */
-  operationsScope?: "housekeeping" | "logistics";
+  operationsScope?: "housekeeping" | "office" | "logistics";
 }
 
 interface AssignedTask {
@@ -219,22 +219,42 @@ export default function TaskCard({
 const displayClickableInputClass =
   "h-9 border-transparent bg-transparent shadow-none focus-visible:ring-0 px-0";
 
+  const isOfficeScope = (() => {
+    if (operationsScope === "office") return true;
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("scope") === "office";
+  })();
+
   // Carica le operazioni da API (DB)
   const { data: operationsData } = useQuery<{ active_operations: { id: number; name: string }[] }>({
-    queryKey: ["/api/operations", operationsScope],
+    queryKey: ["/api/operations", operationsScope, isOfficeScope ? "office" : "default"],
     queryFn: async () => {
-      const q = operationsScope === "logistics" ? "?for=logistics" : "";
+      const q =
+        operationsScope === "logistics"
+          ? "?for=logistics"
+          : isOfficeScope
+            ? "?scope=office"
+            : "";
       const response = await fetch(`/api/operations${q}`);
       if (!response.ok) throw new Error("Failed to fetch operations");
       return response.json();
     },
     staleTime: 60000,
   });
-  
+
+  const officeOperationNames: Record<number, string> = {
+    15: "PULIZIA UFFICI/ALTRO",
+    38: "PULIZIA UFFICI/ALTRO STRAORDINARIA",
+  };
+
   const operationNames: Record<number, string> = operationsData?.active_operations?.reduce(
     (acc, op) => ({ ...acc, [op.id]: op.name }),
-    {} as Record<number, string>
-  ) || { 1: "FERMATA", 2: "PARTENZA", 3: "PULIZIA STRAORDINARIA", 4: "RIPASSO" };
+    isOfficeScope
+      ? ({ ...officeOperationNames } as Record<number, string>)
+      : ({ 1: "FERMATA", 2: "PARTENZA", 3: "PULIZIA STRAORDINARIA", 4: "RIPASSO" } as Record<number, string>)
+  ) || (isOfficeScope
+    ? { ...officeOperationNames }
+    : { 1: "FERMATA", 2: "PARTENZA", 3: "PULIZIA STRAORDINARIA", 4: "RIPASSO" });
 
   const normalizeOperationName = (name: string | null | undefined) =>
     (name || "").toLowerCase().trim();
@@ -249,7 +269,9 @@ const displayClickableInputClass =
     normalizeOperationName(getOperationNameFromTask(taskObj)) === "pulizia uffici/altro";
 
   const isOfficeStraordinariaOperation = (taskObj: any) =>
-    normalizeOperationName(getOperationNameFromTask(taskObj)) === "pulizia uffici straordinaria";
+    ["pulizia uffici straordinaria", "pulizia uffici/altro straordinaria"].includes(
+      normalizeOperationName(getOperationNameFromTask(taskObj))
+    );
 
   const [isMapFiltered, setIsMapFiltered] = useState(false);
   
