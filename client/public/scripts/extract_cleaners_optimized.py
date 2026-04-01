@@ -21,6 +21,12 @@ def _daterange(start, end_excl):
 # Manteniamo la stessa semantica dello script originale:
 # - target_date = oggi se non specificato da argv
 # - counter_days si basa su "ieri" rispetto ad OGGI reale
+scope = "housekeeping"
+if len(sys.argv) > 2:
+    scope_arg = str(sys.argv[2]).strip().lower()
+    if scope_arg in ("housekeeping", "office"):
+        scope = scope_arg
+
 if len(sys.argv) > 1:
     try:
         selected_date_str = sys.argv[1]

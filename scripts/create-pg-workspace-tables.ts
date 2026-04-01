@@ -20,10 +20,11 @@ async function createWorkspaceTables() {
       CREATE TABLE IF NOT EXISTS daily_selected_cleaners (
         id SERIAL PRIMARY KEY,
         work_date DATE NOT NULL,
+        scope VARCHAR(32) NOT NULL DEFAULT 'housekeeping',
         cleaners JSONB DEFAULT '[]',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        UNIQUE(work_date)
+        UNIQUE(work_date, scope)
       );
     `);
     

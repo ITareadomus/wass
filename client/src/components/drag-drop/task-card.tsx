@@ -273,6 +273,13 @@ const displayClickableInputClass =
       normalizeOperationName(getOperationNameFromTask(taskObj))
     );
 
+  const isRipassoOperation = (taskObj: any) => {
+    const opId = Number(taskObj?.operation_id);
+    if (opId === 4) return true;
+    const n = normalizeOperationName(getOperationNameFromTask(taskObj));
+    return n.includes("ripasso");
+  };
+
   const [isMapFiltered, setIsMapFiltered] = useState(false);
   
   // Estrai locked e locked_reason dal task per dependency stabili
@@ -809,9 +816,17 @@ const displayClickableInputClass =
 
   const { label: typeLabel, colorClass: baseCardColorClass } =
     getTaskTypeStyle(cardIsStraordinaria, cardIsPremium);
-  
+
+  const ripassoCardColorClass = (() => {
+    if (!isRipassoOperation(taskWithPendingEdits)) return null;
+    if (cardIsStraordinaria) return "task-straordinaria-ripasso";
+    if (cardIsPremium) return "task-premium-ripasso";
+    return "task-standard-ripasso";
+  })();
+  const resolvedCardTypeColor = ripassoCardColorClass ?? baseCardColorClass;
+
   // Se la task è bloccata, usa grigio invece del colore normale
-  const cardColorClass = isLocked && !isInTimeline ? "bg-gray-100 opacity-70 dark:bg-gray-500 dark:opacity-90" : baseCardColorClass;
+  const cardColorClass = isLocked && !isInTimeline ? "bg-gray-100 opacity-70 dark:bg-gray-500 dark:opacity-90" : resolvedCardTypeColor;
 
   useEffect(() => {
     const calculateAssignmentTimes = () => {

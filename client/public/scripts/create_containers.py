@@ -18,11 +18,13 @@ OUTPUT_CONTAINERS = OUTPUT_DIR / "containers.json"
 USE_API = False
 api_client = None
 
-def init_api_client():
+def init_api_client(workflow="housekeeping"):
     global api_client
     try:
         from api_client import ApiClient
-        api_client = ApiClient()
+        scope = "office" if workflow == "office" else "housekeeping"
+        api_client = ApiClient(scope=scope)
+        print(f"API client scope: {scope}")
         return api_client.test_connection()
     except Exception as e:
         print(f"⚠️ Failed to initialize API client: {e}")
@@ -506,7 +508,7 @@ def main():
     
     # API mode initialization
     if args.use_api:
-        if init_api_client():
+        if init_api_client(workflow):
             print("✅ API client connesso - salvataggio via API")
             USE_API = True
         else:

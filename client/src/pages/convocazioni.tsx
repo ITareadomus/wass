@@ -75,6 +75,9 @@ export default function Convocazioni() {
   const convKind = useConvocationKind();
   const isDrivers = convKind === "drivers";
   const isOffice = convKind === "office";
+  const scopeValue: "housekeeping" | "office" = isOffice ? "office" : "housekeeping";
+  const withScope = (url: string) =>
+    `${url}${url.includes("?") ? "&" : "?"}scope=${scopeValue}`;
 
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [taskStats, setTaskStats] = useState<TaskStats>({ total: 0, premium: 0, standard: 0, straordinarie: 0, officeInternal: 0, logistics: 0 });
@@ -157,7 +160,9 @@ export default function Convocazioni() {
         const extractResponse = await fetch(extractUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ date: dateStr }),
+          body: JSON.stringify(
+            isDrivers ? { date: dateStr } : { date: dateStr, scope: scopeValue }
+          ),
         });
 
         if (!extractResponse.ok) {
@@ -177,7 +182,7 @@ export default function Convocazioni() {
 
         const rosterUrl = isDrivers
           ? `/api/logistics-drivers?date=${dateStr}`
-          : `/api/cleaners?date=${dateStr}`;
+          : withScope(`/api/cleaners?date=${dateStr}`);
         const rosterResponse = await fetch(rosterUrl, {
           cache: "no-store",
           headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
@@ -213,7 +218,7 @@ export default function Convocazioni() {
 
         const selectedUrl = isDrivers
           ? `/api/selected-logistics-drivers?date=${dateStr}`
-          : `/api/selected-cleaners?date=${dateStr}`;
+          : withScope(`/api/selected-cleaners?date=${dateStr}`);
         const selectedResponse = await fetch(selectedUrl, {
           cache: "no-store",
           headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
@@ -244,7 +249,9 @@ export default function Convocazioni() {
           }
         }
 
-        const timelineUrl = isDrivers ? `/api/logistics-timeline?date=${dateStr}` : `/api/timeline?date=${dateStr}`;
+        const timelineUrl = isDrivers
+          ? `/api/logistics-timeline?date=${dateStr}`
+          : withScope(`/api/timeline?date=${dateStr}`);
         const timelineResponse = await fetch(timelineUrl);
         if (timelineResponse.ok) {
           try {
@@ -341,7 +348,7 @@ export default function Convocazioni() {
     try {
       const statsUrl = driversMode
         ? `/api/logistics-containers?date=${encodeURIComponent(dateStr)}`
-        : `/api/containers?date=${encodeURIComponent(dateStr)}`;
+        : withScope(`/api/containers?date=${encodeURIComponent(dateStr)}`);
       const res = await fetch(statsUrl);
       if (!res.ok) throw new Error('Errore durante il caricamento dei containers');
       const data = await res.json();
@@ -604,7 +611,7 @@ export default function Convocazioni() {
           description: `Salvati su PG e sincronizzati su ADAM per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
         });
       } else {
-        const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`);
+        const timelineResponse = await fetch(withScope(`/api/timeline?date=${dateStr}`));
         let timelineCleaners: Cleaner[] = [];
         if (timelineResponse.ok) {
           try {
@@ -629,6 +636,7 @@ export default function Convocazioni() {
             cleaners: selectedCleanersData,
             total_selected: selectedCleanersData.length,
             date: dateStr,
+            scope: scopeValue,
             action_type: "replace",
           }),
         });
@@ -739,7 +747,7 @@ export default function Convocazioni() {
         sessionStorage.setItem("preserveAssignments", "true");
         setLocation("/generate-logistics-assignments");
       } else {
-        const timelineResponse = await fetch(`/api/timeline?date=${dateStr}`);
+        const timelineResponse = await fetch(withScope(`/api/timeline?date=${dateStr}`));
         let timelineCleaners: Cleaner[] = [];
         if (timelineResponse.ok) {
           try {
@@ -753,7 +761,7 @@ export default function Convocazioni() {
             console.warn("⚠️ Errore caricamento timeline cleaners:", e);
           }
         }
-        const currentResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
+        const currentResponse = await fetch(withScope(`/api/selected-cleaners?date=${dateStr}`), {
           cache: "no-store",
           headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
         });
@@ -773,6 +781,7 @@ export default function Convocazioni() {
             cleaners: mergedCleaners,
             total_selected: mergedCleaners.length,
             date: dateStr,
+            scope: scopeValue,
             action_type: "add",
           }),
         });

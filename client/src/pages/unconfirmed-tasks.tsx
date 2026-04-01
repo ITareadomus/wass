@@ -94,6 +94,8 @@ export default function UnconfirmedTasks() {
   const savedScope =
     typeof window !== "undefined" ? localStorage.getItem("assignments_scope") : null;
   const isOfficeScope = scopeFromUrl === "office" || (!scopeFromUrl && savedScope === "office");
+  const scopeValue: "housekeeping" | "office" = isOfficeScope ? "office" : "housekeeping";
+  const withScope = (url: string) => `${url}${url.includes("?") ? "&" : "?"}scope=${scopeValue}`;
   const assignmentsHomeHref = isOfficeScope
     ? "/generate-assignments?scope=office"
     : "/generate-assignments";
@@ -156,7 +158,7 @@ export default function UnconfirmedTasks() {
       const response = await fetch("/api/containers/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: selectedDate }),
+        body: JSON.stringify({ date: selectedDate, scope: scopeValue }),
       });
       if (!response.ok) {
         const msg = await response.text().catch(() => "");
@@ -177,7 +179,7 @@ export default function UnconfirmedTasks() {
     enabled: !!refreshResult?.success,
     queryFn: async () => {
       const response = await fetch(
-        `/api/containers-enriched?date=${selectedDate}`,
+        withScope(`/api/containers-enriched?date=${selectedDate}`),
       );
       if (!response.ok) throw new Error("Failed to fetch containers");
       return response.json();
@@ -298,7 +300,7 @@ export default function UnconfirmedTasks() {
       const response = await fetch("/api/update-task-details", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ updates }),
+        body: JSON.stringify({ updates, scope: scopeValue }),
       });
 
       if (!response.ok) throw new Error("Errore nel salvataggio");

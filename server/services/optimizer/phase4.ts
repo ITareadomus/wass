@@ -245,33 +245,21 @@ function checkHardConstraints(
   const cleanerRole = schedule.role || 'Standard';
   const normalizedRole = normalizeCleanerRole(cleanerRole);
   const officeTask = isOfficeTask(task, officeOperationIds);
-  const roleRules = taskTypesByCleaner?.[normalizedRole];
+  void taskTypesByCleaner;
   const fixedCount = schedule.fixedTaskCount ?? 0;
   const totalExistingCount = fixedCount + (schedule.tasks?.length ?? 0);
   const fixedHasAnyOT = schedule.fixedHasAnyOT === true;
   const fixedHasLongOT = schedule.fixedHasLongOT === true;
 
   if (officeTask) {
-    return roleRules?.ufficio_apt === true
+    return normalizedRole === 'ufficio_cleaner'
       ? { compatible: true }
-      : { compatible: false, reason: 'OFFICE_TASK_NOT_ALLOWED_BY_SETTINGS' };
+      : { compatible: false, reason: 'OFFICE_TASK_REQUIRES_UFFICIO_CLEANER' };
   }
 
-  // For cleaner role Ufficio, non-office compatibility is fully driven by app_settings checkboxes.
-  if (normalizedRole === 'ufficio_cleaner' && taskTypesByCleaner) {
-    if (task.straordinaria) {
-      return roleRules?.straordinario_apt
-        ? { compatible: true }
-        : { compatible: false, reason: 'UFFICIO_CLEANER_STRAORDINARIO_DISABLED' };
-    }
-    if (task.premium) {
-      return roleRules?.premium_apt
-        ? { compatible: true }
-        : { compatible: false, reason: 'UFFICIO_CLEANER_PREMIUM_DISABLED' };
-    }
-    return roleRules?.standard_apt
-      ? { compatible: true }
-      : { compatible: false, reason: 'UFFICIO_CLEANER_STANDARD_DISABLED' };
+  // Cleaner ufficio non prende task non-ufficio.
+  if (normalizedRole === 'ufficio_cleaner') {
+    return { compatible: false, reason: 'UFFICIO_CLEANER_NON_OFFICE_TASK' };
   }
   
   // 0. Verifica premium: task premium richiede cleaner Premium

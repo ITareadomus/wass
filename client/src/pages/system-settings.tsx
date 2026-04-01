@@ -21,7 +21,6 @@ interface CleanerAptRules {
   standard_apt: boolean;
   premium_apt: boolean;
   straordinario_apt: boolean;
-  ufficio_apt: boolean;
 }
 
 interface CleanerPriorityRules {
@@ -47,21 +46,18 @@ interface SettingsData {
     premium_apt: string[];
     straordinario_apt: string[];
     formatore_apt: string[];
-    ufficio_apt: string[];
   };
   task_types: {
     standard_cleaner: CleanerAptRules;
     premium_cleaner: CleanerAptRules;
     straordinario_cleaner: CleanerAptRules;
     formatore_cleaner: CleanerAptRules;
-    ufficio_cleaner: CleanerAptRules;
   };
   priority_types: {
     standard_cleaner: CleanerPriorityRules;
     premium_cleaner: CleanerPriorityRules;
     straordinario_cleaner: CleanerPriorityRules;
     formatore_cleaner: CleanerPriorityRules;
-    ufficio_cleaner: CleanerPriorityRules;
   };
 }
 
@@ -70,7 +66,6 @@ function withSettingsDefaults(data: Partial<SettingsData>): SettingsData {
     standard_apt: false,
     premium_apt: false,
     straordinario_apt: false,
-    ufficio_apt: false,
   };
   const defaultPriorityRules: CleanerPriorityRules = {
     early_out: false,
@@ -95,21 +90,18 @@ function withSettingsDefaults(data: Partial<SettingsData>): SettingsData {
       premium_apt: data.apartment_types?.premium_apt ?? [],
       straordinario_apt: data.apartment_types?.straordinario_apt ?? [],
       formatore_apt: data.apartment_types?.formatore_apt ?? [],
-      ufficio_apt: data.apartment_types?.ufficio_apt ?? [],
     },
     task_types: {
       standard_cleaner: { ...defaultAptRules, ...data.task_types?.standard_cleaner },
       premium_cleaner: { ...defaultAptRules, ...data.task_types?.premium_cleaner },
       straordinario_cleaner: { ...defaultAptRules, ...data.task_types?.straordinario_cleaner },
       formatore_cleaner: { ...defaultAptRules, ...data.task_types?.formatore_cleaner },
-      ufficio_cleaner: { ...defaultAptRules, ...data.task_types?.ufficio_cleaner },
     },
     priority_types: {
       standard_cleaner: { ...defaultPriorityRules, ...data.priority_types?.standard_cleaner },
       premium_cleaner: { ...defaultPriorityRules, ...data.priority_types?.premium_cleaner },
       straordinario_cleaner: { ...defaultPriorityRules, ...data.priority_types?.straordinario_cleaner },
       formatore_cleaner: { ...defaultPriorityRules, ...data.priority_types?.formatore_cleaner },
-      ufficio_cleaner: { ...defaultPriorityRules, ...data.priority_types?.ufficio_cleaner },
     },
   };
 }
@@ -545,7 +537,7 @@ export default function SystemSettings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="bg-custom-blue-light">
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 w-full">
                 {/* Cleaner STANDARD */}
                 <div className="space-y-3">
                   <div className="border-b pb-2 flex items-center justify-center gap-2">
@@ -619,18 +611,6 @@ export default function SystemSettings() {
                         />
                         <Label htmlFor="standard-straord" className="text-sm cursor-pointer">
                           Apt Straordinario
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="standard-ufficio"
-                          checked={settings.task_types.standard_cleaner.ufficio_apt}
-                          onCheckedChange={(checked) =>
-                            updateTaskTypeRule("standard_cleaner", "ufficio_apt", !!checked)
-                          }
-                        />
-                        <Label htmlFor="standard-ufficio" className="text-sm cursor-pointer">
-                          Apt Ufficio
                         </Label>
                       </div>
                       <div className="border-t pt-2 space-y-2">
@@ -750,18 +730,6 @@ export default function SystemSettings() {
                           Apt Straordinario
                         </Label>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="premium-ufficio"
-                          checked={settings.task_types.premium_cleaner.ufficio_apt}
-                          onCheckedChange={(checked) =>
-                            updateTaskTypeRule("premium_cleaner", "ufficio_apt", !!checked)
-                          }
-                        />
-                        <Label htmlFor="premium-ufficio" className="text-sm cursor-pointer">
-                          Apt Ufficio
-                        </Label>
-                      </div>
                       <div className="border-t pt-2 space-y-2">
                         <div className="flex items-center space-x-2">
                           <Checkbox
@@ -877,18 +845,6 @@ export default function SystemSettings() {
                         />
                         <Label htmlFor="straord-straord" className="text-sm cursor-pointer">
                           Apt Straordinario
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="straord-ufficio"
-                          checked={settings.task_types.straordinario_cleaner.ufficio_apt}
-                          onCheckedChange={(checked) =>
-                            updateTaskTypeRule("straordinario_cleaner", "ufficio_apt", !!checked)
-                          }
-                        />
-                        <Label htmlFor="straord-ufficio" className="text-sm cursor-pointer">
-                          Apt Ufficio
                         </Label>
                       </div>
                       <div className="border-t pt-2 space-y-2">
@@ -1008,18 +964,6 @@ export default function SystemSettings() {
                           Apt Straordinario
                         </Label>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="formatore-ufficio"
-                          checked={settings.task_types.formatore_cleaner.ufficio_apt}
-                          onCheckedChange={(checked) =>
-                            updateTaskTypeRule("formatore_cleaner", "ufficio_apt", !!checked)
-                          }
-                        />
-                        <Label htmlFor="formatore-ufficio" className="text-sm cursor-pointer">
-                          Apt Ufficio
-                        </Label>
-                      </div>
                       <div className="border-t pt-2 space-y-2">
                         <div className="flex items-center space-x-2">
                           <Checkbox
@@ -1062,134 +1006,6 @@ export default function SystemSettings() {
                   </div>
                 </div>
 
-                {/* Cleaner UFFICIO */}
-                <div className="space-y-3">
-                  <div className="border-b pb-2 flex items-center justify-center gap-2">
-                    <span className="text-sm font-medium text-sky-800 dark:text-sky-200">Cleaner</span>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-500/30 text-sky-800 dark:bg-sky-500/40 dark:text-sky-200 border-sky-600 dark:border-sky-400">
-                      Ufficio
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                    {/* Colonna sinistra: Tipo A-X */}
-                    <div className="space-y-2">
-                      {["A", "B", "C", "D", "E", "F", "X"].map((type) => (
-                        <div key={`ufficio-${type}`} className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id={`ufficio-${type}`}
-                            checked={settings.apartment_types.ufficio_apt.includes(type)}
-                            onChange={(e) => {
-                              const newTypes = e.target.checked
-                                ? [...settings.apartment_types.ufficio_apt, type]
-                                : settings.apartment_types.ufficio_apt.filter((t) => t !== type);
-                              setSettings({
-                                ...settings,
-                                apartment_types: {
-                                  ...settings.apartment_types,
-                                  ufficio_apt: newTypes,
-                                },
-                              });
-                            }}
-                            className="h-4 w-4 rounded border-gray-300"
-                          />
-                          <Label htmlFor={`ufficio-${type}`} className="text-sm cursor-pointer">
-                            Tipo {type}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                    {/* Colonna destra: Apt Types + Priorità */}
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="ufficio-std"
-                          checked={settings.task_types.ufficio_cleaner.standard_apt}
-                          onCheckedChange={(checked) =>
-                            updateTaskTypeRule("ufficio_cleaner", "standard_apt", !!checked)
-                          }
-                        />
-                        <Label htmlFor="ufficio-std" className="text-sm cursor-pointer">
-                          Apt Standard
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="ufficio-prem"
-                          checked={settings.task_types.ufficio_cleaner.premium_apt}
-                          onCheckedChange={(checked) =>
-                            updateTaskTypeRule("ufficio_cleaner", "premium_apt", !!checked)
-                          }
-                        />
-                        <Label htmlFor="ufficio-prem" className="text-sm cursor-pointer">
-                          Apt Premium
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="ufficio-straord"
-                          checked={settings.task_types.ufficio_cleaner.straordinario_apt}
-                          onCheckedChange={(checked) =>
-                            updateTaskTypeRule("ufficio_cleaner", "straordinario_apt", !!checked)
-                          }
-                        />
-                        <Label htmlFor="ufficio-straord" className="text-sm cursor-pointer">
-                          Apt Straordinario
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="ufficio-ufficio"
-                          checked={settings.task_types.ufficio_cleaner.ufficio_apt}
-                          onCheckedChange={(checked) =>
-                            updateTaskTypeRule("ufficio_cleaner", "ufficio_apt", !!checked)
-                          }
-                        />
-                        <Label htmlFor="ufficio-ufficio" className="text-sm cursor-pointer">
-                          Apt Ufficio
-                        </Label>
-                      </div>
-                      <div className="border-t pt-2 space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="ufficio-eo"
-                            checked={settings.priority_types.ufficio_cleaner.early_out}
-                            onCheckedChange={(checked) =>
-                              updatePriorityTypeRule("ufficio_cleaner", "early_out", !!checked)
-                            }
-                          />
-                          <Badge className="bg-blue-500 text-white border-blue-700 text-xs px-2 py-0">
-                            EO
-                          </Badge>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="ufficio-hp"
-                            checked={settings.priority_types.ufficio_cleaner.high_priority}
-                            onCheckedChange={(checked) =>
-                              updatePriorityTypeRule("ufficio_cleaner", "high_priority", !!checked)
-                            }
-                          />
-                          <Badge className="bg-orange-500 text-white border-orange-700 text-xs px-2 py-0">
-                            HP
-                          </Badge>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="ufficio-lp"
-                            checked={settings.priority_types.ufficio_cleaner.low_priority}
-                            onCheckedChange={(checked) =>
-                              updatePriorityTypeRule("ufficio_cleaner", "low_priority", !!checked)
-                            }
-                          />
-                          <Badge className="bg-gray-500 text-white border-gray-700 text-xs px-2 py-0">
-                            LP
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
             </CardContent>
           </Card>

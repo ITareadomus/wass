@@ -52,6 +52,21 @@ export function CleanerSelectorDialog({
   existingCollaboratorCount = 0,
   isLoading = false,
 }: CleanerSelectorDialogProps) {
+  const scopeValue: "housekeeping" | "office" =
+    typeof window !== "undefined" &&
+    (() => {
+      const params = new URLSearchParams(window.location.search);
+      return (
+        params.get("scope") === "office" ||
+        params.get("kind") === "office" ||
+        localStorage.getItem("assignments_scope") === "office"
+      );
+    })()
+      ? "office"
+      : "housekeeping";
+  const withScope = (url: string) =>
+    `${url}${url.includes("?") ? "&" : "?"}scope=${scopeValue}`;
+
   const [convocatiCleaners, setConvocatiCleaners] = useState<Cleaner[]>([]);
   const [nonConvocatiCleaners, setNonConvocatiCleaners] = useState<Cleaner[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -72,7 +87,7 @@ export function CleanerSelectorDialog({
         await fetch('/api/extract-cleaners-optimized', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: workDate }),
+          body: JSON.stringify({ date: workDate, scope: scopeValue }),
           signal: AbortSignal.timeout(30000),
         });
         // Attendi un momento per permettere al database di propagare i dati
@@ -82,12 +97,12 @@ export function CleanerSelectorDialog({
       }
 
       const [cleanersResponse, selectedResponse] = await Promise.all([
-        fetch(`/api/cleaners?date=${workDate}`, {
+        fetch(withScope(`/api/cleaners?date=${workDate}`), {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
           signal: AbortSignal.timeout(15000),
         }),
-        fetch(`/api/selected-cleaners?date=${workDate}`, {
+        fetch(withScope(`/api/selected-cleaners?date=${workDate}`), {
           signal: AbortSignal.timeout(15000),
         })
       ]);

@@ -73,17 +73,13 @@ def is_real_straordinaria(task, office_operation_ids):
 
 def task_cleaner_compatible(cleaner, task, apartment_types, office_operation_ids, task_types_by_cleaner):
     role_key = normalize_role(cleaner.get("role"))
-    role_rules = task_types_by_cleaner.get(role_key) or {}
+    _ = task_types_by_cleaner
     office_task = is_office_task(task, office_operation_ids)
     if office_task:
-        return bool(role_rules.get("ufficio_apt", False))
+        return role_key == "ufficio_cleaner"
 
     if role_key == "ufficio_cleaner":
-        if is_real_straordinaria(task, office_operation_ids):
-            return bool(role_rules.get("straordinario_apt", False))
-        if task.get("premium"):
-            return bool(role_rules.get("premium_apt", False))
-        return bool(role_rules.get("standard_apt", False))
+        return False
     if task.get("premium") and role_key != "premium_cleaner":
         return False
     if is_real_straordinaria(task, office_operation_ids) and role_key != "straordinario_cleaner":
