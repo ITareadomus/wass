@@ -60,6 +60,7 @@ interface Cleaner {
   id: number;
   name: string;
   lastname: string;
+  alias?: string;
   role: string;
   active: boolean;
   ranking: number;
@@ -719,6 +720,36 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       "#D97706", "#E11D48", "#0284C7", "#15803D", "#059669"
     ];
     return colors[cleanerId % colors.length];
+  };
+
+  const isIdPlaceholder = (value: string | undefined | null, cleanerId: number) => {
+    const normalized = String(value ?? "").trim();
+    if (!normalized) return false;
+    return normalized.toUpperCase() === `ID ${cleanerId}` || /^ID\s+\d+$/i.test(normalized);
+  };
+
+  const getCleanerDisplayData = (cleaner: Cleaner) => {
+    const aliasEntry = cleanersAliases[cleaner.id];
+    const cleanerAlias = typeof cleaner.alias === "string" ? cleaner.alias.trim() : "";
+    const alias = (aliasEntry?.alias || cleanerAlias || "").trim();
+
+    const rawName = String(cleaner.name ?? "").trim();
+    const rawLastname = String(cleaner.lastname ?? "").trim();
+
+    const name = isIdPlaceholder(rawName, cleaner.id) ? "" : rawName;
+    const lastname = rawLastname || aliasEntry?.lastname || "";
+    const fallbackName = aliasEntry?.name || "";
+    const resolvedName = name || fallbackName;
+    const fullName = `${resolvedName} ${lastname}`.trim();
+    const primaryLabel = alias || fullName || `ID ${cleaner.id}`;
+
+    return {
+      alias,
+      name: resolvedName,
+      lastname,
+      fullName,
+      primaryLabel,
+    };
   };
 
   // Funzione per caricare i cleaner da API (PostgreSQL/MySQL)
@@ -2090,7 +2121,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           />
                         )}
                         <div className="break-words font-bold text-[13px] flex-1">
-                          {cleanersAliases[cleaner.id]?.alias || `${(cleaner.name || '').toUpperCase()} ${(cleaner.lastname || '').toUpperCase()}`}
+                          {getCleanerDisplayData(cleaner).primaryLabel.toUpperCase()}
                         </div>
                         {isRemoved && (
                           <div className="bg-red-600 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
@@ -3079,7 +3110,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                       if (!isReadOnly) handleOpenAliasDialog(selectedCleaner);
                     }}
                   >
-                    {cleanersAliases[selectedCleaner.id]?.alias || `${selectedCleaner.name} ${selectedCleaner.lastname}`}
+                    {getCleanerDisplayData(selectedCleaner).primaryLabel}
                   </p>
                 </div>
 
@@ -3087,7 +3118,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 <div className="col-span-1">
                   <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">Nome</p>
                   <Input
-                    value={selectedCleaner.name.toUpperCase()}
+                    value={getCleanerDisplayData(selectedCleaner).name.toUpperCase()}
                     readOnly
                     className={displayInputClass}
                   />
@@ -3097,7 +3128,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 <div className="col-span-1">
                   <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">Cognome</p>
                   <Input
-                    value={selectedCleaner.lastname.toUpperCase()}
+                    value={getCleanerDisplayData(selectedCleaner).lastname.toUpperCase()}
                     readOnly
                     className={displayInputClass}
                   />
@@ -3192,7 +3223,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                               value={String(cleaner.id)}
                               data-testid={`option-cleaner-${cleaner.id}`}
                             >
-                              {cleanersAliases[cleaner.id]?.alias || `${cleaner.name || ''} ${cleaner.lastname || ''}`.trim() || String(cleaner.id)}
+                              {getCleanerDisplayData(cleaner).primaryLabel}
                             </SelectItem>
                           ))}
                       </SelectContent>
