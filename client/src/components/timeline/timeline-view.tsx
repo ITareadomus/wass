@@ -145,6 +145,8 @@ export default function TimelineView({
         const taskId = String((task as any).id || (task as any).task_id || '');
         const logisticCode = String((task as any).logisticCode || (task as any).logistic_code || (task as any).name || '');
         const address = String((task as any).address || '');
+        const customerName = String((task as any).customer_name || (task as any).customerName || '');
+        const customerAlias = String((task as any).alias || (task as any).customer_alias || '');
         const customerReference = String(
           (task as any).customer_reference ||
           (task as any).customerReference ||
@@ -155,6 +157,8 @@ export default function TimelineView({
           taskId.toLowerCase().includes(lowerSearch) ||
           logisticCode.toLowerCase().includes(lowerSearch) ||
           address.toLowerCase().includes(lowerSearch) ||
+          customerName.toLowerCase().includes(lowerSearch) ||
+          customerAlias.toLowerCase().includes(lowerSearch) ||
           customerReference.toLowerCase().includes(lowerSearch)
         );
       })
