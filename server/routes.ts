@@ -7289,6 +7289,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       const { date, created_by, scope } = req.body;
       const createdBy = created_by || 'unknown';
       const officeScope = isOfficeScope(scope);
+      const resolvedScope = officeScope ? "office" : "housekeeping";
       const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
 
       // CRITICAL: Esegui extract_cleaners_optimized.py ma non bloccare se fallisce
@@ -7297,7 +7298,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       try {
         const extractResult = await new Promise<string>((resolve, reject) => {
           exec(
-            `python3 client/public/scripts/extract_cleaners_optimized.py ${date}`,
+            `python3 client/public/scripts/extract_cleaners_optimized.py ${date} ${resolvedScope}`,
             { timeout: 30000 },
             (error, stdout, stderr) => {
               if (error) {
@@ -7320,7 +7321,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       // create_containers.py aggiornerà i dati delle task esistenti
       let timelineExists = false;
       try {
-        const existingTimeline = await workspaceFiles.loadTimeline(date, resolveScopeFromReq(req));
+        const existingTimeline = await workspaceFiles.loadTimeline(date, resolvedScope);
 
         if (existingTimeline) {
           timelineExists = true;
@@ -7334,7 +7335,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
             if (!existingTimeline.metadata.created_by) {
               existingTimeline.metadata.created_by = createdBy;
             }
-            await workspaceFiles.saveTimeline(date, existingTimeline, false, 'system', 'manual', undefined, resolveScopeFromReq(req));
+            await workspaceFiles.saveTimeline(date, existingTimeline, false, 'system', 'manual', undefined, resolvedScope);
           } else {
             console.log(`✅ Timeline già presente per ${date}, mantieni assegnazioni esistenti`);
           }
@@ -7353,20 +7354,20 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           cleaners_assignments: [],
           meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
         };
-        await workspaceFiles.saveTimeline(date, emptyTimeline, false, 'system', 'manual', undefined, resolveScopeFromReq(req));
+        await workspaceFiles.saveTimeline(date, emptyTimeline, false, 'system', 'manual', undefined, resolvedScope);
         timelineExists = false;
       }
 
       // CRITICAL: Gestione selected_cleaners via PostgreSQL
       // Carica selected_cleaners correnti da PostgreSQL
-      const currentSelectedData = await workspaceFiles.loadSelectedCleaners(date, resolveScopeFromReq(req));
+      const currentSelectedData = await workspaceFiles.loadSelectedCleaners(date, resolvedScope);
       const currentSelectedDate = currentSelectedData?.metadata?.date || null;
 
       // Verifica se esistono dati salvati per la data target
       let hasExistingTimeline = false;
       let timelineDataForCheck: any = null;
       try {
-        timelineDataForCheck = await workspaceFiles.loadTimeline(date, resolveScopeFromReq(req));
+        timelineDataForCheck = await workspaceFiles.loadTimeline(date, resolvedScope);
         hasExistingTimeline = timelineDataForCheck?.metadata?.date === date &&
                              timelineDataForCheck?.cleaners_assignments?.length > 0;
       } catch (err) {
@@ -7383,19 +7384,40 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           total_selected: 0,
           metadata: { date }
         };
-        await workspaceFiles.saveSelectedCleaners(date, emptySelection, true, 'system', 'INIT', resolveScopeFromReq(req));
+        await workspaceFiles.saveSelectedCleaners(date, emptySelection, true, 'system', 'INIT', resolvedScope);
         console.log(`ℹ️ selected_cleaners resettato in PostgreSQL per ${date}`);
       } else if (currentSelectedDate !== date && hasExistingTimeline) {
         console.log(`✅ Data cambiata da ${currentSelectedDate} a ${date} - mantieni dati esistenti (timeline con ${timelineDataForCheck.cleaners_assignments.length} cleaners)`);
         // Ricostruisci selected_cleaners dalla timeline esistente
         const cleanersInTimeline = timelineDataForCheck.cleaners_assignments.map((ca: any) => ca.cleaner).filter(Boolean);
+        const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+        const cleanerIds = cleanersInTimeline
+          .map((c: any) => Number(c?.id))
+          .filter((id: number) => Number.isFinite(id));
+        const cleanersFromDb = cleanerIds.length > 0
+          ? await pgDailyAssignmentsService.loadCleanersByIds(cleanerIds, date, resolvedScope)
+          : [];
+        const cleanersById = new Map<number, any>(
+          (cleanersFromDb || []).map((c: any) => [Number(c.id), c])
+        );
+        const enrichedCleanersInTimeline = cleanersInTimeline.map((cleaner: any) => {
+          const cleanerId = Number(cleaner?.id);
+          const dbCleaner = cleanersById.get(cleanerId);
+          const timelineRole = typeof cleaner?.role === "string" ? cleaner.role.trim() : "";
+          const dbRole = typeof dbCleaner?.role === "string" ? dbCleaner.role.trim() : "";
+          return {
+            ...(dbCleaner || {}),
+            ...cleaner,
+            role: dbRole || timelineRole || cleaner?.role || null,
+          };
+        });
 
         const selectionFromTimeline = {
-          cleaners: cleanersInTimeline,
-          total_selected: cleanersInTimeline.length,
+          cleaners: enrichedCleanersInTimeline,
+          total_selected: enrichedCleanersInTimeline.length,
           metadata: { date }
         };
-        await workspaceFiles.saveSelectedCleaners(date, selectionFromTimeline, true, 'system', 'INIT', resolveScopeFromReq(req));
+        await workspaceFiles.saveSelectedCleaners(date, selectionFromTimeline, true, 'system', 'INIT', resolvedScope);
         console.log(`✅ selected_cleaners ricostruito da timeline in PostgreSQL per ${date}`);
       } else {
         console.log(`✅ Stessa data (${date}) - mantieni selected_cleaners`);

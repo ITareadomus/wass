@@ -3871,12 +3871,25 @@ export class PgDailyAssignmentsService {
         SELECT cleaner_id, alias, name, lastname FROM aliases
       `);
       const aliasMap = new Map(permanentAliases.rows.map((r: any) => [r.cleaner_id, r.alias]));
+      const existingRolesResult = await client.query(
+        `SELECT cleaner_id, role FROM cleaners WHERE work_date = $1`,
+        [workDate]
+      );
+      const existingRolesByCleanerId = new Map<number, string>(
+        existingRolesResult.rows
+          .map((r: any) => [Number(r.cleaner_id), String(r.role || "").trim()] as const)
+          .filter(([id, role]) => Number.isFinite(id) && role.length > 0)
+      );
 
       // Cleaner roster e unico per data: lo scope e derivato dal role (Ufficio vs non Ufficio).
       await client.query("DELETE FROM cleaners WHERE work_date = $1", [workDate]);
 
       // Insert new cleaners; alias only in aliases (cleaners.alias no longer used)
       for (const cleaner of cleaners) {
+        const normalizedIncomingRole = String(cleaner?.role || "").trim();
+        const preservedRole = existingRolesByCleanerId.get(Number(cleaner?.id)) || "";
+        const resolvedRole = normalizedIncomingRole || preservedRole || "Standard";
+
         // If cleaner has a new alias, save it to aliases (permanent)
         if (cleaner.alias && !aliasMap.has(cleaner.id)) {
           await client.query(`
@@ -3898,7 +3911,7 @@ export class PgDailyAssignmentsService {
           workDate,
           cleaner.name || '',
           cleaner.lastname || '',
-          cleaner.role || 'Standard',
+          resolvedRole,
           cleaner.active !== false,
           cleaner.ranking || 0,
           cleaner.counter_hours || 0,
