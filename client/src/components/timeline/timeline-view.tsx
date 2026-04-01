@@ -168,12 +168,22 @@ export default function TimelineView({
   const [, setLocation] = useLocation();
   const isOfficeScope =
     (typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get("scope") === "office") ||
-    (typeof window !== "undefined" && localStorage.getItem("assignments_scope") === "office");
-  const isTimelineInteractionDisabled = isReadOnly || isOfficeScope;
+      (() => {
+        const params = new URLSearchParams(window.location.search);
+        return (
+          params.get("scope") === "office" ||
+          params.get("kind") === "office" ||
+          localStorage.getItem("assignments_scope") === "office"
+        );
+      })()) ||
+    false;
+  const scopeValue = isOfficeScope ? "office" : "housekeeping";
+  const withScope = (url: string) => `${url}${url.includes("?") ? "&" : "?"}scope=${scopeValue}`;
+  const isTimelineInteractionDisabled = isReadOnly;
   const [editingAlias, setEditingAlias] = useState<string>("");
   const [isSavingAlias, setIsSavingAlias] = useState(false);
   const [isSavingCleanerLock, setIsSavingCleanerLock] = useState(false);
+  const [isLoadingAvailableCleaners, setIsLoadingAvailableCleaners] = useState(false);
   const [aliasDialog, setAliasDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
   const [editingStartTime, setEditingStartTime] = useState<string>("10:00");
   const [startTimeEditDialog, setStartTimeEditDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
@@ -266,7 +276,7 @@ export default function TimelineView({
   useEffect(() => {
     const fetchLastTransfer = async () => {
       try {
-        const response = await fetch(`/api/last-adam-transfer?date=${workDate}`);
+        const response = await fetch(withScope(`/api/last-adam-transfer?date=${workDate}`));
         const data = await response.json();
         if (data.success && data.lastTransfer) {
           setLastAdamTransfer(data.lastTransfer);
@@ -279,7 +289,7 @@ export default function TimelineView({
       }
     };
     fetchLastTransfer();
-  }, [workDate]);
+  }, [workDate, scopeValue]);
 
   const loadCleanerLocks = async () => {
     try {
@@ -352,6 +362,7 @@ export default function TimelineView({
       const response = await apiRequest("POST", "/api/remove-cleaner-from-selected", {
         cleanerId,
         date: workDate,
+        scope: scopeValue,
         modified_by: currentUser.username || 'unknown'
       });
       return await response.json();
@@ -401,6 +412,7 @@ export default function TimelineView({
         cleaners: [],
         total_selected: 0,
         date: workDate,
+        scope: scopeValue,
         action_type: "CLEAR_ALL",
         modified_by: currentUser.username || 'unknown'
       });
@@ -444,6 +456,7 @@ export default function TimelineView({
       const response = await apiRequest("POST", "/api/add-cleaner-to-timeline", {
         cleanerId,
         date: workDate,
+        scope: scopeValue,
         modified_by: currentUser.username || 'unknown'
       });
       return await response.json();
@@ -475,7 +488,7 @@ export default function TimelineView({
 
       // Trova il cleaner appena aggiunto per mostrare nome e cognome
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const cleanersResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
+      const cleanersResponse = await fetch(withScope(`/api/selected-cleaners?date=${dateStr}`), {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
       });
@@ -507,7 +520,8 @@ export default function TimelineView({
         sourceCleanerId,
         destCleanerId,
         date: workDate,
-        modified_by: currentUser.username || 'unknown'
+        modified_by: currentUser.username || 'unknown',
+        scope: scopeValue,
       });
       return await response.json();
     },
@@ -714,11 +728,11 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
       // Carica sia selected_cleaners che timeline da API per verificare la sincronizzazione
       const [selectedResponse, timelineResponse] = await Promise.all([
-        fetch(`/api/selected-cleaners?date=${dateStr}`, {
+        fetch(withScope(`/api/selected-cleaners?date=${dateStr}`), {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         }),
-        fetch(`/api/timeline?date=${dateStr}`, {
+        fetch(withScope(`/api/timeline?date=${dateStr}`), {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         })
@@ -761,7 +775,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
         console.log('🔄 Caricamento cleaners dalla timeline per visualizzazione');
 
         // Carica i dati completi dei cleaners da API (PostgreSQL)
-        const cleanersResponse = await fetch(`/api/cleaners?date=${format(selectedDate, 'yyyy-MM-dd')}`, {
+        const cleanersResponse = await fetch(withScope(`/api/cleaners?date=${format(selectedDate, 'yyyy-MM-dd')}`), {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         });
@@ -808,7 +822,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
   const loadTimelineData = async () => {
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const response = await fetch(`/api/timeline?date=${dateStr}`, {
+      const response = await fetch(withScope(`/api/timeline?date=${dateStr}`), {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
       });
@@ -922,6 +936,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
   // Funzione per caricare i cleaner disponibili (non già in timeline)
   const loadAvailableCleaners = async () => {
+    setIsLoadingAvailableCleaners(true);
     try {
       // Non bloccare se l'estrazione fallisce - continua con i cleaners da PostgreSQL
       try {
@@ -929,7 +944,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
         const extractResponse = await fetch('/api/extract-cleaners-optimized', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: workDate })
+          body: JSON.stringify({ date: workDate, scope: scopeValue })
         });
 
         if (extractResponse.ok) {
@@ -945,7 +960,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       }
 
       // Carica tutti i cleaners per la data corrente da API (PostgreSQL)
-      const cleanersResponse = await fetch(`/api/cleaners?date=${workDate}`, {
+      const cleanersResponse = await fetch(withScope(`/api/cleaners?date=${workDate}`), {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
         signal: AbortSignal.timeout(15000) // Timeout di 15 secondi
@@ -969,12 +984,16 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
         (timelineCleaners || []).map(tc => tc.cleaner?.id).filter(Boolean)
       );
 
-      const available = dateCleaners.filter((c: any) =>
-        c.active === true &&
-        c.role !== "Ufficio" &&
-        !selectedCleanerIds.has(c.id) &&
-        !timelineCleanerIds.has(c.id) // NUOVO: escludi anche quelli già in timeline
-      );
+      const available = dateCleaners.filter((c: any) => {
+        const isOfficeCleaner = String(c?.role || "").toLowerCase().includes("ufficio");
+        const roleMatchesScope = isOfficeScope ? isOfficeCleaner : !isOfficeCleaner;
+        return (
+          c.active === true &&
+          roleMatchesScope &&
+          !selectedCleanerIds.has(c.id) &&
+          !timelineCleanerIds.has(c.id) // NUOVO: escludi anche quelli già in timeline
+        );
+      });
 
       // Ordina per tipologia (Formatori → Straordinari → Premium → Standard)
       // e per ore della settimana (weekly_hours) DESC all'interno di ogni gruppo
@@ -1018,6 +1037,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     } catch (error) {
       console.error('Errore nel caricamento dei cleaners disponibili:', error);
       setAvailableCleaners([]);
+    } finally {
+      setIsLoadingAvailableCleaners(false);
     }
   };
 
@@ -1066,6 +1087,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           cleanerId: cleanerId,
           startTime: pendingStartTime,
           date: workDate,
+          scope: scopeValue,
           modified_by: currentUser.username || 'unknown'
         }),
       });
@@ -1122,35 +1144,19 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     if (confirmUnavailableDialog.cleanerId) {
       // Prima salva lo start time aggiornato
       try {
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
-        const selectedResponse = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        await fetch('/api/update-cleaner-start-time', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cleanerId: confirmUnavailableDialog.cleanerId,
+            startTime: pendingStartTime,
+            date: workDate,
+            scope: scopeValue,
+            modified_by: currentUser.username || 'unknown',
+          }),
         });
-        const selectedData = await selectedResponse.json();
-
-        const cleanerIndex = selectedData.cleaners.findIndex((c: Cleaner) => c.id === confirmUnavailableDialog.cleanerId);
-        const cleanerToUpdate = selectedData.cleaners[cleanerIndex];
-
-        if (cleanerIndex !== -1) {
-          selectedData.cleaners[cleanerIndex] = {
-            ...cleanerToUpdate,
-            start_time: pendingStartTime,
-            available: true // Imposta come disponibile
-          };
-
-          // Invia la modifica al backend
-          await fetch('/api/update-cleaner-data', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              data: selectedData,
-              date: workDate,
-              cleanerId: confirmUnavailableDialog.cleanerId
-            }),
-          });
-          console.log(`✅ Cleaner ${confirmUnavailableDialog.cleanerId} impostato come disponibile con start time ${pendingStartTime}`);
-        }
+        console.log(`✅ Start time aggiornato per cleaner ${confirmUnavailableDialog.cleanerId}: ${pendingStartTime}`);
       } catch (error) {
         console.error("Errore nel salvataggio dello start time e disponibilità:", error);
       }
@@ -1281,6 +1287,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           cleanerId: startTimeEditDialog.cleanerId,
           startTime: editingStartTime,
           date: workDate,
+          scope: scopeValue,
           modified_by: currentUser.username || 'unknown'
         }),
       });
@@ -1445,7 +1452,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
   const loadTimelineCleaners = async (onLoadComplete?: () => void) => {
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const response = await fetch(`/api/timeline?date=${dateStr}`);
+      const response = await fetch(withScope(`/api/timeline?date=${dateStr}`));
       if (!response.ok) {
         console.warn(`Timeline not found (${response.status}), using empty timeline`);
         setTimelineCleaners([]);
@@ -1716,6 +1723,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 operationId: taskEdit.operationId,
                 date: workDate,
                 modified_by: currentUser.username || 'system',
+                scope: scopeValue,
               }),
             });
             const updateResult = await updateResponse.json();
@@ -1743,7 +1751,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
         body: JSON.stringify({
           date: workDate,
           username: currentUser.username || 'system',
-          pendingTaskEdits: pendingEdits // Passa le modifiche pendenti
+          pendingTaskEdits: pendingEdits, // Passa le modifiche pendenti
+          scope: scopeValue,
         }),
         signal: controller.signal
       });
@@ -2443,15 +2452,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     size="sm"
                     variant="outline"
                     className="h-full px-3 border-2 border-custom-blue"
-                    disabled={isReadOnly || isOfficeScope || !hasTasksInTimeline || isTransferringToAdam}
+                    disabled={isReadOnly || !hasTasksInTimeline || isTransferringToAdam}
                     title={
-                      isOfficeScope
-                        ? "Trasferimento su ADAM non disponibile per WASS UFFICIO"
-                        : isReadOnly
-                          ? "Non puoi trasferire in modalità storico"
-                          : !hasTasksInTimeline
-                            ? "Nessuna task assegnata nella timeline"
-                            : "Trasferisci le assegnazioni sul database ADAM"
+                      isReadOnly
+                        ? "Non puoi trasferire in modalità storico"
+                        : !hasTasksInTimeline
+                          ? "Nessuna task assegnata nella timeline"
+                          : "Trasferisci le assegnazioni sul database ADAM"
                     }
                     data-testid="button-transfer-adam"
                   >
@@ -2747,10 +2754,14 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 mt-4">
-            {availableCleaners.length === 0 ? (
+            {isLoadingAvailableCleaners ? (
               <div className="flex items-center justify-center py-8">
                 <RefreshCw className="h-6 w-6 animate-spin text-custom-blue mr-2" />
                 <p className="text-muted-foreground">Caricamento cleaners disponibili...</p>
+              </div>
+            ) : availableCleaners.length === 0 ? (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-muted-foreground">Nessun cleaner disponibile per questo scope.</p>
               </div>
             ) : (
               availableCleaners.map((cleaner) => {

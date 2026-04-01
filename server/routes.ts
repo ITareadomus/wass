@@ -27,11 +27,17 @@ function getRomeTimestamp(): string {
   return formatInTimeZone(new Date(), ROME_TIMEZONE, "yyyy-MM-dd'T'HH:mm:ss");
 }
 
-const OFFICE_OPERATION_IDS = new Set([15, 38]);
-
 function isOfficeScope(scope: unknown): boolean {
   return String(scope || "").toLowerCase() === "office";
 }
+
+function resolveScopeFromReq(req: any): "housekeeping" | "office" {
+  return isOfficeScope(req?.query?.scope) || isOfficeScope(req?.body?.scope)
+    ? "office"
+    : "housekeeping";
+}
+
+const OFFICE_OPERATION_IDS = new Set([15, 38]);
 
 function filterContainersForOfficeScope(containersPayload: any): any {
   if (!containersPayload?.containers) return containersPayload;
@@ -64,6 +70,7 @@ function filterContainersForOfficeScope(containersPayload: any): any {
 
   return clone;
 }
+
 import { storageService } from "./services/storage-service";
 import * as workspaceFiles from "./services/workspace-files";
 import {
@@ -158,10 +165,14 @@ function isValidWorkDate(dateStr: string): boolean {
  * Helper: Load cleaner start_time from PostgreSQL (selected cleaners)
  * Falls back to filesystem if PostgreSQL fails
  */
-async function getCleanerStartTime(cleanerId: number, workDate: string): Promise<string | null> {
+async function getCleanerStartTime(
+  cleanerId: number,
+  workDate: string,
+  scope: "housekeeping" | "office" = "housekeeping"
+): Promise<string | null> {
   try {
     // Try PostgreSQL first
-    const selectedCleaners = await workspaceFiles.loadSelectedCleaners(workDate);
+    const selectedCleaners = await workspaceFiles.loadSelectedCleaners(workDate, scope);
     if (selectedCleaners?.cleaners) {
       const cleaner = selectedCleaners.cleaners.find((c: any) => c.id === cleanerId);
       if (cleaner?.start_time) {
@@ -177,10 +188,14 @@ async function getCleanerStartTime(cleanerId: number, workDate: string): Promise
 /**
  * Helper: Load full cleaner data from PostgreSQL
  */
-async function getCleanerData(cleanerId: number, workDate: string): Promise<any | null> {
+async function getCleanerData(
+  cleanerId: number,
+  workDate: string,
+  scope: "housekeeping" | "office" = "housekeeping"
+): Promise<any | null> {
   try {
     const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
-    return await pgDailyAssignmentsService.loadCleanerById(cleanerId, workDate);
+    return await pgDailyAssignmentsService.loadCleanerById(cleanerId, workDate, scope);
   } catch (err) {
     console.warn(`⚠️ Could not load cleaner ${cleanerId} from PostgreSQL`);
     return null;
@@ -190,10 +205,13 @@ async function getCleanerData(cleanerId: number, workDate: string): Promise<any 
 /**
  * Helper: Load all cleaners for a date from PostgreSQL
  */
-async function getAllCleanersForDate(workDate: string): Promise<any[]> {
+async function getAllCleanersForDate(
+  workDate: string,
+  scope: "housekeeping" | "office" = "housekeeping"
+): Promise<any[]> {
   try {
     const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
-    const cleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate);
+    const cleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate, scope);
     return cleaners || [];
   } catch (err) {
     console.warn(`⚠️ Could not load cleaners from PostgreSQL for ${workDate}`);
@@ -423,6 +441,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await pgDailyAssignmentsService.ensureCleanerAliasesAndRevisionsTables();
     await pgDailyAssignmentsService.ensureLockedColumns();
     await pgDailyAssignmentsService.ensureTaskLocksTable();
+    await pgDailyAssignmentsService.ensureDailyAssignmentsRevisionsScopeUnique();
+    await pgDailyAssignmentsService.ensureDailyContainersScopeUnique();
+    await pgDailyAssignmentsService.ensureSelectedCleanersScopeStructure();
     await pgDailyAssignmentsService.ensureLogisticsWorkspaceTables();
     
     // Migrate existing users from JSON if table is empty
@@ -530,7 +551,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername, 'timeline_reset');
+      await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername, 'timeline_reset', undefined, resolveScopeFromReq(req));
       console.log(`✅ Timeline svuotata su PostgreSQL`);
 
       // 2. Cancella le collaborazioni dalla tabella task_collaborators
@@ -689,7 +710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // --- END COLLABORATION-AWARE LOGIC ---
 
       // Carica timeline da PostgreSQL
-      let timelineData: any = await workspaceFiles.loadTimeline(workDate);
+      let timelineData: any = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
       if (!timelineData) {
         timelineData = { cleaners_assignments: [], metadata: { date: workDate }, meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 } };
       }
@@ -724,7 +745,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Se il cleaner di destinazione non esiste ancora, crealo
       if (!destEntry) {
         // Carica i dati del cleaner da PostgreSQL
-        const cleanersData = await workspaceFiles.loadSelectedCleaners(workDate);
+        const cleanersData = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
         const cleanerInfo = cleanersData?.cleaners?.find((c: any) => c.id === destCleanerId);
 
         if (!cleanerInfo) {
@@ -815,7 +836,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUser, 'dnd_between_cleaners');
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUser, 'dnd_between_cleaners', undefined, resolveScopeFromReq(req));
 
       console.log(`✅ Task ${logisticCode} spostata da cleaner ${sourceCleanerId} a cleaner ${destCleanerId}`);
       res.json({ success: true, message: "Task spostata con successo tra cleaners" });
@@ -868,7 +889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Carica timeline da PostgreSQL
-      let timelineData: any = await workspaceFiles.loadTimeline(workDate);
+      let timelineData: any = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
       if (!timelineData) {
         timelineData = { cleaners_assignments: [], metadata: { date: workDate }, meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 } };
       }
@@ -880,7 +901,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let destEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === destCleanerId);
 
       // Se non esistono, creali con array vuoto (usa PostgreSQL)
-      const selectedData = await workspaceFiles.loadSelectedCleaners(workDate);
+      const selectedData = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
       
       if (!sourceEntry) {
         const cleanerData = selectedData?.cleaners?.find((c: any) => c.id === sourceCleanerId);
@@ -1037,7 +1058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUser, 'swap_cleaners_tasks');
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUser, 'swap_cleaners_tasks', undefined, resolveScopeFromReq(req));
 
       // After swap + reconcile, restore primary according to swapped cleaner mapping (best-effort).
       // Note: saveTimeline already reconciles membership; here we only adjust primary when needed.
@@ -1077,11 +1098,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
       const workDate = dateParam;
+      const officeScope = isOfficeScope(req.query.scope);
 
       console.log(`📖 GET /api/timeline - Caricamento timeline per ${workDate}`);
 
       // Carica la timeline da PostgreSQL
-      const timeline = await workspaceFiles.loadTimeline(workDate);
+      const timeline = await workspaceFiles.loadTimeline(workDate, officeScope ? "office" : "housekeeping");
 
       if (!timeline) {
         // Restituisci struttura vuota invece di 404 per compatibilità frontend
@@ -1113,7 +1135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`📖 GET /api/containers - Caricamento containers per ${workDate}`);
 
-      const containers = await workspaceFiles.loadContainers(workDate);
+      const containers = await workspaceFiles.loadContainers(workDate, officeScope ? "office" : "housekeeping");
 
       if (!containers) {
         return res.json({
@@ -1155,10 +1177,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
       const workDate = dateParam;
+      const officeScope = isOfficeScope(req.query.scope);
 
       console.log(`📖 GET /api/selected-cleaners - Caricamento cleaners selezionati per ${workDate}`);
 
-      const selectedCleaners = await workspaceFiles.loadSelectedCleaners(workDate);
+      const selectedCleaners = await workspaceFiles.loadSelectedCleaners(workDate, officeScope ? "office" : "housekeeping");
 
       if (!selectedCleaners) {
         return res.json({
@@ -1172,10 +1195,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cleanersList = selectedCleaners.cleaners || [];
       if (cleanersList.length > 0) {
         const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
-        const lastTransfer = await pgDailyAssignmentsService.getLastTransferToAdamTimestamp(workDate);
+        const lastTransfer = await pgDailyAssignmentsService.getLastTransferToAdamTimestamp(
+          workDate,
+          officeScope ? "office" : "housekeeping"
+        );
         let inProgramIds: Set<number>;
         if (!lastTransfer) {
-          const selectedIds = await pgDailyAssignmentsService.loadSelectedCleaners(workDate);
+          const selectedIds = await pgDailyAssignmentsService.loadSelectedCleaners(
+            workDate,
+            officeScope ? "office" : "housekeeping"
+          );
           inProgramIds = new Set(selectedIds ?? []);
         } else {
           inProgramIds = new Set();
@@ -1291,11 +1320,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
       const workDate = dateParam;
+      const officeScope = isOfficeScope(req.query.scope);
 
       console.log(`📖 GET /api/cleaners - Caricamento cleaners per ${workDate}`);
 
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
-      let cleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate);
+      let cleaners = await pgDailyAssignmentsService.loadCleanersForDate(
+        workDate,
+        officeScope ? "office" : "housekeeping"
+      );
 
       if (!cleaners || cleaners.length === 0) {
         // PostgreSQL is the only source of truth - no filesystem fallback
@@ -1308,10 +1341,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // show_plus_one: in programma per la data ma senza report ancora. Fonte "in programma": prima invio = selected_cleaners, dopo invio = ADAM (titolari + collaboratori)
-      const lastTransfer = await pgDailyAssignmentsService.getLastTransferToAdamTimestamp(workDate);
+      const lastTransfer = await pgDailyAssignmentsService.getLastTransferToAdamTimestamp(
+        workDate,
+        officeScope ? "office" : "housekeeping"
+      );
       let inProgramIds: Set<number>;
       if (!lastTransfer) {
-        const selectedIds = await pgDailyAssignmentsService.loadSelectedCleaners(workDate);
+        const selectedIds = await pgDailyAssignmentsService.loadSelectedCleaners(
+          workDate,
+          officeScope ? "office" : "housekeeping"
+        );
         inProgramIds = new Set(selectedIds ?? []);
       } else {
         inProgramIds = new Set();
@@ -1553,8 +1592,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/timeline - Salva timeline completa (per script Python)
   app.post("/api/timeline", async (req, res) => {
     try {
-      const { date, timeline } = req.body;
+      const { date, timeline, scope } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const resolvedScope = isOfficeScope(scope) ? "office" : "housekeeping";
 
       if (!timeline) {
         return res.status(400).json({ success: false, error: "timeline data required" });
@@ -1602,7 +1642,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Salva via workspaceFiles (scrive su PostgreSQL + filesystem per compatibilità)
-      await workspaceFiles.saveTimeline(workDate, timelineData, false, 'python_script', 'api_save_timeline');
+      await workspaceFiles.saveTimeline(
+        workDate,
+        timelineData,
+        false,
+        'python_script',
+        'api_save_timeline',
+        undefined,
+        resolvedScope
+      );
 
       const taskCount = timelineData.cleaners_assignments?.reduce(
         (sum: number, c: any) => sum + (c.tasks?.length || 0), 0
@@ -1627,8 +1675,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/containers - Salva containers completi (per script Python)
   app.post("/api/containers", async (req, res) => {
     try {
-      const { date, containers } = req.body;
+      const { date, containers, scope } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const resolvedScope = isOfficeScope(scope) ? "office" : "housekeeping";
 
       if (!containers) {
         return res.status(400).json({ success: false, error: "containers data required" });
@@ -1659,7 +1708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Salva via workspaceFiles (scrive su PostgreSQL + filesystem per compatibilità)
-      await workspaceFiles.saveContainers(workDate, containersData);
+      await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', resolvedScope);
 
       console.log(`✅ Containers salvati per ${workDate}: EO=${eoTasks.length}, HP=${hpTasks.length}, LP=${lpTasks.length}`);
       res.json({ 
@@ -2832,8 +2881,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/selected-cleaners - Salva selected cleaners (per script Python)
   app.post("/api/selected-cleaners", async (req, res) => {
     try {
-      const { date, cleaner_ids, cleaners } = req.body;
+      const { date, cleaner_ids, cleaners, scope } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const resolvedScope = isOfficeScope(scope) ? "office" : "housekeeping";
 
       // Supporta sia array di ID che array di oggetti cleaner
       let ids: number[] = [];
@@ -2852,7 +2902,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const actionType = req.body.action_type || 'API_UPDATE';
       const performedBy = req.body.performed_by || 'api';
-      await pgDailyAssignmentsService.saveSelectedCleaners(workDate, ids, actionType, null, performedBy);
+      await pgDailyAssignmentsService.saveSelectedCleaners(
+        workDate,
+        ids,
+        actionType,
+        null,
+        performedBy,
+        resolvedScope
+      );
 
       console.log(`✅ Selected cleaners salvati per ${workDate}: ${ids.length} cleaners`);
       res.json({ 
@@ -2872,8 +2929,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per salvare/aggiornare i cleaners per una data (bulk import)
   app.post("/api/cleaners", async (req, res) => {
     try {
-      const { date, cleaners, snapshotReason } = req.body;
+      const { date, cleaners, snapshotReason, scope } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const resolvedScope = isOfficeScope(scope) ? "office" : "housekeeping";
 
       if (!cleaners || !Array.isArray(cleaners)) {
         return res.status(400).json({ success: false, error: "cleaners array required" });
@@ -2885,7 +2943,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // CRITICAL: Carica gli start_time esistenti da PostgreSQL PRIMA di sovrascrivere
       // Questo preserva gli start_time custom impostati dall'utente
-      const existingCleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate);
+      const existingCleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate, resolvedScope);
       const existingStartTimes = new Map<number, string>();
       if (existingCleaners && existingCleaners.length > 0) {
         for (const c of existingCleaners) {
@@ -2908,7 +2966,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
       
-      const success = await pgDailyAssignmentsService.saveCleanersForDate(workDate, mergedCleaners, snapshotReason || 'api_update');
+      const success = await pgDailyAssignmentsService.saveCleanersForDate(
+        workDate,
+        mergedCleaners,
+        snapshotReason || 'api_update',
+        resolvedScope
+      );
 
       if (success) {
         res.json({ success: true, message: `${cleaners.length} cleaners salvati per ${workDate}` });
@@ -2930,7 +2993,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
       
-      const assignments = await pgDailyAssignmentsService.getAssignments(dateParam);
+      const assignments = await pgDailyAssignmentsService.getAssignments(dateParam, resolveScopeFromReq(req));
       const count = assignments.length;
       
       console.log(`📊 PG: ${count} assegnazioni trovate per ${dateParam}`);
@@ -2959,7 +3022,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (revisionParam) {
         // Get specific revision
-        const assignments = await pgDailyAssignmentsService.getHistoryByRevision(dateParam, revisionParam);
+        const assignments = await pgDailyAssignmentsService.getHistoryByRevision(dateParam, revisionParam, resolveScopeFromReq(req));
         res.json({
           success: true,
           date: dateParam,
@@ -2969,7 +3032,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         // Get list of revisions
-        const revisions = await pgDailyAssignmentsService.getHistoryRevisions(dateParam);
+        const revisions = await pgDailyAssignmentsService.getHistoryRevisions(dateParam, resolveScopeFromReq(req));
         console.log(`📜 PG History: ${revisions.length} revisioni trovate per ${dateParam}`);
         
         res.json({
@@ -3037,7 +3100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // SEMPRE carica i containers da PostgreSQL - necessario per salvare la history e rimuovere la task
       let containersData = null;
       try {
-        containersData = await workspaceFiles.loadContainers(workDate);
+        containersData = await workspaceFiles.loadContainers(workDate, resolveScopeFromReq(req));
       } catch (error) {
         console.error(`Failed to load containers:`, error);
         // Continue without containers data
@@ -3106,7 +3169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
       // Carica timeline esistente o crea nuova struttura usando workspace helper
-      let timelineData = await workspaceFiles.loadTimeline(workDate);
+      let timelineData = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
 
       if (!timelineData) {
         // Crea nuova struttura se non esiste
@@ -3159,7 +3222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!cleanerEntry) {
         // Carica dati del cleaner da PostgreSQL
-        const cleanersData = await workspaceFiles.loadSelectedCleaners(workDate) || { cleaners: [] };
+        const cleanersData = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req)) || { cleaners: [] };
         const cleanerInfo = cleanersData.cleaners?.find((c: any) => c.id === normalizedCleanerId);
 
         cleanerEntry = {
@@ -3255,7 +3318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // CRITICAL: Carica start_time aggiornato da PostgreSQL PRIMA di ricalcolare
       try {
-        const selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate);
+        const selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
         const selectedCleaner = selectedCleanersData?.cleaners?.find((c: any) => c.id === normalizedCleanerId);
         
         if (selectedCleaner?.start_time) {
@@ -3320,7 +3383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline usando workspace helper (scrive su filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUserFromRequest, modificationType);
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUserFromRequest, modificationType, undefined, resolveScopeFromReq(req));
 
       // RIMUOVI SEMPRE la task da containers.json quando salvata in timeline
       if (containersData && containersData.containers) {
@@ -3369,7 +3432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
 
             // Salva containers.json aggiornato usando workspace helper (filesystem + Object Storage)
-            await workspaceFiles.saveContainers(workDate, containersData);
+            await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', resolveScopeFromReq(req));
             console.log(`✅ Containers.json aggiornato e sincronizzato con timeline`);
           }
         } catch (containerError) {
@@ -3396,7 +3459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Rimozione assegnazione timeline - taskId: ${taskId}, logisticCode: ${logisticCode}, date: ${workDate}`);
 
       // Carica timeline usando workspace helper
-      let assignmentsData = await workspaceFiles.loadTimeline(workDate);
+      let assignmentsData = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
       if (!assignmentsData) {
         // Crea struttura vuota se non esiste
         assignmentsData = {
@@ -3487,7 +3550,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline usando workspace helper (filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, assignmentsData, false, modifyingUser, 'task_removed_from_timeline');
+      await workspaceFiles.saveTimeline(workDate, assignmentsData, false, modifyingUser, 'task_removed_from_timeline', undefined, resolveScopeFromReq(req));
 
       // RIPORTA la task nel container corretto
       if (removedTask) {
@@ -3501,7 +3564,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.warn(`⚠️ Could not save containers history (non-blocking):`, historyError);
           }
           
-          const containersData = await workspaceFiles.loadContainers(workDate) || { containers: { early_out: { tasks: [] }, high_priority: { tasks: [] }, low_priority: { tasks: [] } }, summary: {} };
+          const containersData = await workspaceFiles.loadContainers(workDate, resolveScopeFromReq(req)) || { containers: { early_out: { tasks: [] }, high_priority: { tasks: [] }, low_priority: { tasks: [] } }, summary: {} };
 
           // Determina il container corretto in base alla priority della task
           const priority = removedTask.priority || 'low_priority';
@@ -3550,7 +3613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Salva containers.json usando workspace helper (filesystem + Object Storage)
-          await workspaceFiles.saveContainers(workDate, containersData);
+          await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', resolveScopeFromReq(req));
           console.log(`✅ Task ${logisticCode} riportata nel container ${containerType}`);
         } catch (containerError) {
           console.warn('Errore nel ripristino del container:', containerError);
@@ -3571,7 +3634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
 
       // Usa la tabella daily_assignments_revisions (PostgreSQL) come sorgente di verità
-      const revisions = await pgDailyAssignmentsService.getHistoryRevisions(workDate);
+      const revisions = await pgDailyAssignmentsService.getHistoryRevisions(workDate, resolveScopeFromReq(req));
 
       if (revisions && revisions.length > 0) {
         const latest = revisions[0];
@@ -3614,9 +3677,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📥 Caricamento assegnazioni dal database per ${workDate}...`);
 
       // Carica timeline, selected_cleaners E CONTAINERS da PostgreSQL via workspace-files
-      const timelineData = await workspaceFiles.loadTimeline(workDate);
-      const selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate);
-      let containersData = await workspaceFiles.loadContainers(workDate);
+      const timelineData = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
+      const selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
+      let containersData = await workspaceFiles.loadContainers(workDate, resolveScopeFromReq(req));
 
       // CRITICAL: Considera found=true anche se abbiamo solo containers (per date passate)
       if (!timelineData && !selectedCleanersData && !containersData) {
@@ -3646,7 +3709,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Carica i containers appena rigenerati da PostgreSQL (salvati da Python via API)
-        containersData = await workspaceFiles.loadContainers(workDate);
+        containersData = await workspaceFiles.loadContainers(workDate, resolveScopeFromReq(req));
         // Guard against null containersData
         if (!containersData) {
           containersData = {
@@ -3691,7 +3754,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Salva containers sincronizzati su PostgreSQL (e filesystem come cache per Python scripts)
-        await workspaceFiles.saveContainers(workDate, containersData, 'system', 'containers_synced_from_adam');
+        await workspaceFiles.saveContainers(workDate, containersData, 'system', 'containers_synced_from_adam', resolveScopeFromReq(req));
         console.log(`✅ Containers sincronizzati: rimosse ${removedCount} task già assegnate, salvati su PostgreSQL`);
       } catch (err) {
         console.error('❌ Errore nella rigenerazione containers:', err);
@@ -3717,7 +3780,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timelineData.metadata.loaded_at = getRomeTimestamp().replace('T', ' ').slice(0, 19);
 
         // Salva timeline su PostgreSQL (e filesystem come cache per Python scripts)
-        await workspaceFiles.saveTimeline(workDate, timelineData, true, 'system', 'timeline_loaded_from_db');
+        await workspaceFiles.saveTimeline(workDate, timelineData, true, 'system', 'timeline_loaded_from_db', undefined, resolveScopeFromReq(req));
         const taskCount = timelineData.cleaners_assignments?.reduce((sum: number, c: any) => sum + (c.tasks?.length || 0), 0) || 0;
         console.log(`✅ Timeline sincronizzata da database per ${workDate} (${taskCount} task)`);
       } else {
@@ -3726,7 +3789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           metadata: { date: workDate, saved_at: getRomeTimestamp() },
           cleaners_assignments: []
         };
-        await workspaceFiles.saveTimeline(workDate, emptyTimeline, true, 'system', 'timeline_initialized_empty');
+        await workspaceFiles.saveTimeline(workDate, emptyTimeline, true, 'system', 'timeline_initialized_empty', undefined, resolveScopeFromReq(req));
         console.log(`✅ Inizializzato timeline vuota per ${workDate} (nessun dato in database)`);
       }
 
@@ -3768,7 +3831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
 
       // Carica i cleaners selezionati da PostgreSQL
-      let selectedData: any = await workspaceFiles.loadSelectedCleaners(workDate);
+      let selectedData: any = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
       if (!selectedData) {
         selectedData = { cleaners: [], total_selected: 0 };
       }
@@ -3777,7 +3840,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let timelineData: any;
       let hasTasks = false;
       try {
-        timelineData = await workspaceFiles.loadTimeline(workDate);
+        timelineData = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
 
         const cleanerEntry = timelineData?.cleaners_assignments?.find(
           (c: any) => c.cleaner?.id === cleanerId
@@ -3801,10 +3864,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Salva su PostgreSQL con action_type 'removal'
       const { pgDailyAssignmentsService: pgService } = await import('./services/pg-daily-assignments-service');
       const remainingIds = selectedData.cleaners.map((c: any) => typeof c === 'number' ? c : c.id);
-      await pgService.saveSelectedCleaners(workDate, remainingIds, 'removal', { removed_cleaner_id: cleanerId }, currentUsername);
+      await pgService.saveSelectedCleaners(
+        workDate,
+        remainingIds,
+        'removal',
+        { removed_cleaner_id: cleanerId },
+        currentUsername,
+        resolveScopeFromReq(req)
+      );
 
       // Salva selected_cleaners usando workspace helper (filesystem come cache)
-      await workspaceFiles.saveSelectedCleaners(workDate, selectedData, false, currentUsername);
+      await workspaceFiles.saveSelectedCleaners(workDate, selectedData, false, currentUsername, 'MANUAL', resolveScopeFromReq(req));
 
       let message = "";
 
@@ -3826,7 +3896,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
 
         // Salva timeline.json (dual-write: filesystem + Object Storage)
-        await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'cleaner_removed_from_selection');
+        await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'cleaner_removed_from_selection', undefined, resolveScopeFromReq(req));
 
         console.log(`✅ Cleaner ${cleanerId} rimosso completamente (nessuna task)`);
         console.log(`   - Rimosso da PostgreSQL selected_cleaners (${cleanersBefore} -> ${selectedData.cleaners.length})`);
@@ -3852,7 +3922,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per salvare i cleaners selezionati (PostgreSQL only)
   app.post("/api/save-selected-cleaners", async (req, res) => {
     try {
-      const { cleaners: selectedCleaners, total_selected, date, action_type = 'replace' } = req.body;
+      const { cleaners: selectedCleaners, total_selected, date, action_type = 'replace', scope } = req.body;
 
       if (!selectedCleaners || !Array.isArray(selectedCleaners)) {
         return res.status(400).json({
@@ -3863,11 +3933,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Usa la data fornita o la data corrente
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      const resolvedScope = isOfficeScope(scope) ? "office" : "housekeeping";
 
       // Carica dati completi dei cleaners da PostgreSQL
       const { pgDailyAssignmentsService } = await import('./services/pg-daily-assignments-service');
       const cleanerIds = selectedCleaners.map((c: any) => typeof c === 'number' ? c : c.id);
-      const fullCleanersData = await pgDailyAssignmentsService.loadCleanersByIds(cleanerIds, workDate);
+      const fullCleanersData = await pgDailyAssignmentsService.loadCleanersByIds(cleanerIds, workDate, resolvedScope);
 
       // Crea mappa completa dei cleaners per ID
       const cleanersMap = new Map();
@@ -3905,10 +3976,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Salva su PostgreSQL con action_type descrittivo
       const { pgDailyAssignmentsService: pgService } = await import('./services/pg-daily-assignments-service');
-      await pgService.saveSelectedCleaners(workDate, cleanerIds, action_type, null, currentUsername);
+      await pgService.saveSelectedCleaners(workDate, cleanerIds, action_type, null, currentUsername, resolvedScope);
       
       // Salva anche su filesystem per backward compat
-      await workspaceFiles.saveSelectedCleaners(workDate, dataToSave, false, currentUsername);
+      await workspaceFiles.saveSelectedCleaners(workDate, dataToSave, false, currentUsername, 'MANUAL', resolvedScope);
 
       console.log(`✅ Salvati ${enrichedCleaners.length} cleaners in PostgreSQL per ${workDate} by ${currentUsername}`);
 
@@ -3937,7 +4008,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Carica dati del cleaner da PostgreSQL
       const { pgDailyAssignmentsService } = await import('./services/pg-daily-assignments-service');
-      const cleanersFromPg = await pgDailyAssignmentsService.loadCleanersByIds([cleanerId], workDate);
+      const cleanersFromPg = await pgDailyAssignmentsService.loadCleanersByIds([cleanerId], workDate, resolveScopeFromReq(req));
       
       let cleanerData = cleanersFromPg.length > 0 ? cleanersFromPg[0] : null;
 
@@ -3947,7 +4018,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verifica se esiste già uno start_time impostato dall'utente in selected_cleaners
-      const selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate) || { cleaners: [], total_selected: 0, metadata: { date: workDate } };
+      const selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req)) || { cleaners: [], total_selected: 0, metadata: { date: workDate } };
       const existingCleaner = selectedCleanersData.cleaners?.find((c: any) => c.id === cleanerId);
       if (existingCleaner?.start_time) {
         cleanerData.start_time = existingCleaner.start_time;
@@ -3959,7 +4030,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const selectedCleanerIds = new Set(selectedCleanersData.cleaners.map((c: any) => c.id));
 
       // Carica timeline da PostgreSQL
-      let timelineData: any = await workspaceFiles.loadTimeline(workDate);
+      let timelineData: any = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
       
       if (!timelineData) {
         console.log("Timeline non trovata, creazione nuova struttura");
@@ -4044,7 +4115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, replacedCleanerId ? 'cleaner_replaced' : 'cleaner_added_to_timeline');
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, replacedCleanerId ? 'cleaner_replaced' : 'cleaner_added_to_timeline', undefined, resolveScopeFromReq(req));
 
       // Aggiungi il cleaner a PostgreSQL (se non già presente)
       const existingCleanerIndex = selectedCleanersData.cleaners.findIndex((c: any) => c.id === cleanerId);
@@ -4065,7 +4136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Salva selected_cleaners su PostgreSQL
-      await workspaceFiles.saveSelectedCleaners(workDate, selectedCleanersData, false, currentUsername);
+      await workspaceFiles.saveSelectedCleaners(workDate, selectedCleanersData, false, currentUsername, 'MANUAL', resolveScopeFromReq(req));
 
       console.log(`✅ Operazione completata: cleaner ${cleanerId} ${replacedCleanerId ? `ha sostituito ${replacedCleanerId}` : 'aggiunto'}`);
 
@@ -4091,7 +4162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assignmentsPath = path.join(process.cwd(), 'client/public/data/output/assignments.json');
 
       // Carica i dati dei cleaners da PostgreSQL
-      const cleanersData = await workspaceFiles.loadSelectedCleaners(workDate) || { cleaners: [] };
+      const cleanersData = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req)) || { cleaners: [] };
 
       // Trova il cleaner corrispondente (per ora usa un mapping, poi sarà dinamico)
       const cleanerMapping: { [key: string]: number } = {
@@ -4211,7 +4282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Carica containers da PostgreSQL
-      const containersData: any = await workspaceFiles.loadContainers(workDate);
+      const containersData: any = await workspaceFiles.loadContainers(workDate, resolveScopeFromReq(req));
 
       const containers = containersData?.containers;
       if (!containers) {
@@ -4271,7 +4342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           recalc();
           // Salva containers (dual-write: filesystem + Object Storage)
-          await workspaceFiles.saveContainers(workDate, containersData);
+          await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', resolveScopeFromReq(req));
 
           return res.json({ success: true, message: 'Riordino nello stesso container eseguito' });
         }
@@ -4286,7 +4357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         recalc();
         // Salva containers (dual-write: filesystem + Object Storage)
-        await workspaceFiles.saveContainers(workDate, containersData);
+        await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', resolveScopeFromReq(req));
 
         return res.json({ success: true, message: 'Riordino fallback (append) eseguito' });
       }
@@ -4320,7 +4391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       recalc();
 
       // Salva containers (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveContainers(workDate, containersData);
+      await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', resolveScopeFromReq(req));
 
       return res.json({ success: true, message: 'Task spostata tra containers' });
     } catch (err: any) {
@@ -4333,8 +4404,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/update-cleaner-start-time", async (req, res) => {
     try {
       const { cleanerId, startTime, date, modified_by } = req.body;
+      const cleanerIdNum = Number(cleanerId);
 
-      if (!cleanerId || !startTime || !date) {
+      if (!Number.isFinite(cleanerIdNum) || !startTime || !date) {
         return res.status(400).json({
           success: false,
           message: "cleanerId, startTime e date sono richiesti"
@@ -4346,7 +4418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Carica selected_cleaners da PostgreSQL
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
-      const selectedCleanersResult = await workspaceFiles.loadSelectedCleaners(workDate);
+      const selectedCleanersResult = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
       let selectedCleanersData = selectedCleanersResult || {
         cleaners: [],
         total_selected: 0,
@@ -4354,14 +4426,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Trova e aggiorna il cleaner se esiste
-      const cleanerIndex = selectedCleanersData.cleaners.findIndex((c: any) => c.id === cleanerId);
+      const cleanerIndex = selectedCleanersData.cleaners.findIndex((c: any) => Number(c.id) === cleanerIdNum);
       if (cleanerIndex !== -1) {
         selectedCleanersData.cleaners[cleanerIndex].start_time = startTime;
       } else {
         // CRITICAL: Se il cleaner non esiste ancora in selected_cleaners,
         // caricalo da PostgreSQL e aggiungilo con lo start_time
-        const cleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate);
-        let cleanerData = cleaners?.find((c: any) => c.id === cleanerId);
+        const cleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate, resolveScopeFromReq(req));
+        let cleanerData = cleaners?.find((c: any) => Number(c.id) === cleanerIdNum);
 
         if (!cleanerData) {
           return res.status(404).json({
@@ -4378,16 +4450,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Aggiorna start_time in PostgreSQL cleaners table
-      await pgDailyAssignmentsService.updateCleanerField(cleanerId, workDate, 'start_time', startTime);
+      await pgDailyAssignmentsService.updateCleanerField(cleanerIdNum, workDate, 'start_time', startTime);
 
       // Salva selected_cleaners su PostgreSQL (skipRevision=true)
-      await workspaceFiles.saveSelectedCleaners(workDate, selectedCleanersData, true);
+      await workspaceFiles.saveSelectedCleaners(workDate, selectedCleanersData, true, 'system', 'INIT', resolveScopeFromReq(req));
 
       // Aggiorna anche la timeline se il cleaner è presente
       try {
-        const timelineData = await workspaceFiles.loadTimeline(workDate);
+        const timelineData = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
         if (timelineData) {
-          const cleanerAssignment = timelineData.cleaners_assignments?.find((ca: any) => ca.cleaner?.id === cleanerId);
+          const cleanerAssignment = timelineData.cleaners_assignments?.find((ca: any) => Number(ca.cleaner?.id) === cleanerIdNum);
           if (cleanerAssignment && cleanerAssignment.cleaner) {
             cleanerAssignment.cleaner.start_time = startTime;
 
@@ -4406,7 +4478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
 
             // Salva timeline su PostgreSQL (skipRevision=true)
-            await workspaceFiles.saveTimeline(workDate, timelineData, true);
+            await workspaceFiles.saveTimeline(workDate, timelineData, true, 'system', 'manual', undefined, resolveScopeFromReq(req));
           }
         }
       } catch (error) {
@@ -5569,7 +5641,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const [workDate, dateUpdates] of Array.from(updatesByDate.entries())) {
           try {
             // Carica containers una volta per data
-            const containersData = await workspaceFiles.loadContainers(workDate) || { containers: {} };
+            const containersData = await workspaceFiles.loadContainers(workDate, resolveScopeFromReq(req)) || { containers: {} };
             let anyUpdated = false;
             
             for (const update of dateUpdates) {
@@ -5623,7 +5695,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Salva containers una volta per data (se qualcosa è stato aggiornato)
             if (anyUpdated) {
-              await workspaceFiles.saveContainers(workDate, containersData);
+              await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', resolveScopeFromReq(req));
             }
           } catch (err: any) {
             for (const update of dateUpdates) {
@@ -5660,8 +5732,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Carica entrambi da PostgreSQL
       const [containersData, timelineData] = await Promise.all([
-        workspaceFiles.loadContainers(workDate).then(d => d || { containers: {} }),
-        workspaceFiles.loadTimeline(workDate).then(d => d || { cleaners_assignments: [] })
+        workspaceFiles.loadContainers(workDate, resolveScopeFromReq(req)).then(d => d || { containers: {} }),
+        workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req)).then(d => d || { cleaners_assignments: [] })
       ]);
 
       let taskUpdated = false;
@@ -5759,10 +5831,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } : undefined;
 
       // Salva containers (PostgreSQL)
-      await workspaceFiles.saveContainers(workDate, containersData);
+      await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', resolveScopeFromReq(req));
       
       // Salva timeline con tracking delle modifiche (skipRevision=false per creare revision in PostgreSQL)
-      await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'task_edit', editOptions);
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'task_edit', editOptions, resolveScopeFromReq(req));
 
       // CRITICAL: Propaga le modifiche al database ADAM (app_housekeeping)
       // SOLO se skipAdam non è true
@@ -5962,7 +6034,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     }
 
     // === Carica timeline da PostgreSQL ===
-    const timelineData = await workspaceFiles.loadTimeline(workDate);
+    const timelineData = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
     if (!timelineData?.cleaners_assignments?.length) {
       console.log("⚠️ Nessuna assegnazione trovata per il trasferimento");
       return res.json({
@@ -5975,7 +6047,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     const { pgDailyAssignmentsService } = await import(
       "./services/pg-daily-assignments-service"
     );
-    const transferCount = await pgDailyAssignmentsService.countTransferToAdamForDate(workDate);
+    const transferCount = await pgDailyAssignmentsService.countTransferToAdamForDate(workDate, resolveScopeFromReq(req));
     const isSecondOrLaterTransfer = transferCount >= 1;
 
     // === Crea sempre una revision (timestamp transfer) ===
@@ -5987,7 +6059,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       "transfer_to_adam",
       [],
       [],
-      []
+      [],
+      resolveScopeFromReq(req)
     );
 
     // === Utente ADAM (updated_by) ===
@@ -6033,7 +6106,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     }
 
     const containerTaskIds = new Set<number>();
-    const containersData = await workspaceFiles.loadContainers(workDate);
+    const containersData = await workspaceFiles.loadContainers(workDate, resolveScopeFromReq(req));
     if (containersData?.containers) {
       for (const key of ['early_out', 'high_priority', 'low_priority']) {
         const bucket = containersData.containers[key];
@@ -6664,7 +6737,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       }
 
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
-      const lastTransfer = await pgDailyAssignmentsService.getLastTransferToAdamTimestamp(date);
+      const lastTransfer = await pgDailyAssignmentsService.getLastTransferToAdamTimestamp(date, resolveScopeFromReq(req));
 
       res.json({
         success: true,
@@ -6681,6 +6754,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
   app.get("/api/adam/housekeeping/fingerprint", async (req, res) => {
     let connection: any = null;
     try {
+      const officeScope = isOfficeScope(req.query.scope);
       const date = (req.query.date as string) || "";
       if (!date || !isValidWorkDate(date)) {
         return res.status(400).json({
@@ -6697,8 +6771,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         database: databaseConfig.mysql.database,
       });
 
-      // Coerenza con create_containers.py: considera solo operation_id "attive" (enable_wass)
-      const activeOps = await getCachedActiveAdamOperationIds(connection);
+      // In office scope usa le operation ufficio (15,38), altrimenti enable_wass.
+      const activeOps = officeScope ? [15, 38] : await getCachedActiveAdamOperationIds(connection);
       const opPlaceholders = activeOps.length > 0 ? activeOps.map(() => "?").join(",") : "";
 
       // Firma basata SOLO sui campi che impattano containers (checkin/checkout/time/op/pax)
@@ -6943,13 +7017,13 @@ app.post("/api/transfer-to-adam", async (req, res) => {
   // Endpoint per estrarre i cleaners (versione ottimizzata)
   app.post("/api/extract-cleaners-optimized", async (req, res) => {
     try {
-      const { date } = req.body;
+      const { date, scope } = req.body || {};
+      const resolvedScope = isOfficeScope(scope) ? "office" : "housekeeping";
       const scriptPath = path.join(process.cwd(), 'client', 'public', 'scripts', 'extract_cleaners_optimized.py');
 
       // Se la data è fornita, passala come argomento allo script
-      const command = date
-        ? `python3 ${scriptPath} ${date}`
-        : `python3 ${scriptPath}`;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const command = `python3 ${scriptPath} ${workDate} ${resolvedScope}`;
 
       console.log("Eseguendo extract_cleaners_optimized.py con comando:", command);
 
@@ -7246,7 +7320,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       // create_containers.py aggiornerà i dati delle task esistenti
       let timelineExists = false;
       try {
-        const existingTimeline = await workspaceFiles.loadTimeline(date);
+        const existingTimeline = await workspaceFiles.loadTimeline(date, resolveScopeFromReq(req));
 
         if (existingTimeline) {
           timelineExists = true;
@@ -7260,7 +7334,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
             if (!existingTimeline.metadata.created_by) {
               existingTimeline.metadata.created_by = createdBy;
             }
-            await workspaceFiles.saveTimeline(date, existingTimeline);
+            await workspaceFiles.saveTimeline(date, existingTimeline, false, 'system', 'manual', undefined, resolveScopeFromReq(req));
           } else {
             console.log(`✅ Timeline già presente per ${date}, mantieni assegnazioni esistenti`);
           }
@@ -7279,20 +7353,20 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           cleaners_assignments: [],
           meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 }
         };
-        await workspaceFiles.saveTimeline(date, emptyTimeline);
+        await workspaceFiles.saveTimeline(date, emptyTimeline, false, 'system', 'manual', undefined, resolveScopeFromReq(req));
         timelineExists = false;
       }
 
       // CRITICAL: Gestione selected_cleaners via PostgreSQL
       // Carica selected_cleaners correnti da PostgreSQL
-      const currentSelectedData = await workspaceFiles.loadSelectedCleaners(date);
+      const currentSelectedData = await workspaceFiles.loadSelectedCleaners(date, resolveScopeFromReq(req));
       const currentSelectedDate = currentSelectedData?.metadata?.date || null;
 
       // Verifica se esistono dati salvati per la data target
       let hasExistingTimeline = false;
       let timelineDataForCheck: any = null;
       try {
-        timelineDataForCheck = await workspaceFiles.loadTimeline(date);
+        timelineDataForCheck = await workspaceFiles.loadTimeline(date, resolveScopeFromReq(req));
         hasExistingTimeline = timelineDataForCheck?.metadata?.date === date &&
                              timelineDataForCheck?.cleaners_assignments?.length > 0;
       } catch (err) {
@@ -7309,7 +7383,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           total_selected: 0,
           metadata: { date }
         };
-        await workspaceFiles.saveSelectedCleaners(date, emptySelection, true);
+        await workspaceFiles.saveSelectedCleaners(date, emptySelection, true, 'system', 'INIT', resolveScopeFromReq(req));
         console.log(`ℹ️ selected_cleaners resettato in PostgreSQL per ${date}`);
       } else if (currentSelectedDate !== date && hasExistingTimeline) {
         console.log(`✅ Data cambiata da ${currentSelectedDate} a ${date} - mantieni dati esistenti (timeline con ${timelineDataForCheck.cleaners_assignments.length} cleaners)`);
@@ -7321,7 +7395,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           total_selected: cleanersInTimeline.length,
           metadata: { date }
         };
-        await workspaceFiles.saveSelectedCleaners(date, selectionFromTimeline, true);
+        await workspaceFiles.saveSelectedCleaners(date, selectionFromTimeline, true, 'system', 'INIT', resolveScopeFromReq(req));
         console.log(`✅ selected_cleaners ricostruito da timeline in PostgreSQL per ${date}`);
       } else {
         console.log(`✅ Stessa data (${date}) - mantieni selected_cleaners`);
@@ -7650,7 +7724,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       let containersData: any = null;
 
       try {
-        timelineData = await workspaceFiles.loadTimeline(workDate);
+        timelineData = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
         if (!timelineData) {
           timelineData = { metadata: { date: workDate }, cleaners_assignments: [] };
         }
@@ -7659,7 +7733,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       }
 
       try {
-        containersData = await workspaceFiles.loadContainers(workDate);
+        containersData = await workspaceFiles.loadContainers(workDate, resolveScopeFromReq(req));
       } catch (err) {
         console.error('Errore caricamento containers:', err);
       }
@@ -7756,12 +7830,12 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
           
           // Cerca prima nei selected_cleaners da PostgreSQL
-          const selectedData = await workspaceFiles.loadSelectedCleaners(workDate);
+          const selectedData = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
           let cleanerInfo = selectedData?.cleaners?.find((c: any) => c.id === toCleanerId);
 
           // Se non trovato, cerca in cleaners per la data
           if (!cleanerInfo) {
-            const allCleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate);
+            const allCleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate, resolveScopeFromReq(req));
             cleanerInfo = allCleaners?.find((c: any) => c.id === toCleanerId);
           }
 
@@ -7846,10 +7920,10 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       }
 
       // Save the updated timeline
-      const saved = await workspaceFiles.saveTimeline(workDate, timelineData, false, req.body.currentUser?.username || 'unknown', modificationType);
+      const saved = await workspaceFiles.saveTimeline(workDate, timelineData, false, req.body.currentUser?.username || 'unknown', modificationType, undefined, resolveScopeFromReq(req));
 
       if (containersData) {
-        await workspaceFiles.saveContainers(workDate, containersData);
+        await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', resolveScopeFromReq(req));
       }
 
       const message = typeof fromCleanerId === 'number'
@@ -7872,7 +7946,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
 
       // Carica timeline da PostgreSQL
-      let timelineData: any = await workspaceFiles.loadTimeline(workDate);
+      let timelineData: any = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
       if (!timelineData) {
         return res.status(404).json({ success: false, message: "Timeline non trovata per questa data" });
       }
@@ -7956,7 +8030,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       for (const t of cleanerEntry.tasks) t.manually_moved = true;
 
       // Salva timeline (dual-write: filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUser, 'task_reordered_same_cleaner');
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUser, 'task_reordered_same_cleaner', undefined, resolveScopeFromReq(req));
 
       console.log(`✅ Task ${logisticCode} riordinata da posizione ${fromIndex} a ${toIndex} per cleaner ${cleanerId}`);
       console.log(`   Nuova sequenza delle task: ${cleanerEntry.tasks.map((t: any) => `${t.logistic_code}(${t.sequence})`).join(', ')}`);
@@ -8253,7 +8327,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       console.log(`🔄 Sincronizzazione dati ADAM per timeline ${workDate}...`);
 
       // 1. Carica la timeline corrente
-      let timelineData = await workspaceFiles.loadTimeline(workDate);
+      let timelineData = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
       if (!timelineData || !timelineData.cleaners_assignments || timelineData.cleaners_assignments.length === 0) {
         return res.json({
           success: true,
@@ -8326,7 +8400,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
       // 6. Salva la timeline aggiornata
       if (updatedCount > 0) {
-        await workspaceFiles.saveTimeline(workDate, timelineData, false, 'system', 'sync_from_adam');
+        await workspaceFiles.saveTimeline(workDate, timelineData, false, 'system', 'sync_from_adam', undefined, resolveScopeFromReq(req));
         console.log(`✅ Sincronizzate ${updatedCount} task con dati ADAM per ${workDate}`);
       }
 
@@ -8350,7 +8424,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
       console.log(`📖 GET /api/containers-enriched - Caricamento containers per ${workDate}`);
 
-      const containers = await workspaceFiles.loadContainers(workDate);
+      const containers = await workspaceFiles.loadContainers(workDate, resolveScopeFromReq(req));
 
       if (!containers || !containers.containers) {
         return res.json({
@@ -8383,7 +8457,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       console.log(`📖 GET /api/unconfirmed-tasks-summary - Conteggio task non confermate per ${workDate}`);
 
       // 1. Carica containers da PostgreSQL (contengono già confirmed_operation)
-      const containers = await workspaceFiles.loadContainers(workDate);
+      const containers = await workspaceFiles.loadContainers(workDate, resolveScopeFromReq(req));
 
       if (!containers || !containers.containers) {
         return res.json({ unconfirmedCount: 0, date: workDate });

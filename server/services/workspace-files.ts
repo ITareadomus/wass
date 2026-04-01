@@ -127,10 +127,13 @@ function getNormalizedLogisticsTimeline(data: any): any {
  * Load timeline for a specific work date
  * SOURCE: PostgreSQL only
  */
-export async function loadTimeline(workDate: string): Promise<any | null> {
+export async function loadTimeline(
+  workDate: string,
+  scope: 'housekeeping' | 'office' = 'housekeeping'
+): Promise<any | null> {
   try {
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
-    const pgTimeline = await pgDailyAssignmentsService.loadTimeline(workDate);
+    const pgTimeline = await pgDailyAssignmentsService.loadTimeline(workDate, scope);
     
     if (pgTimeline) {
       console.log(`✅ Timeline loaded from PostgreSQL for ${workDate}`);
@@ -161,9 +164,12 @@ export async function saveTimeline(
     editedFields?: string[];
     oldValues?: string[];
     newValues?: string[];
-  }
+  },
+  scope?: 'housekeeping' | 'office'
 ): Promise<boolean> {
   try {
+    const resolvedScope: 'housekeeping' | 'office' =
+      scope ?? (data?.metadata?.scope === 'office' ? 'office' : 'housekeeping');
     const normalizedData = getNormalizedTimeline(data);
 
     normalizedData.metadata = normalizedData.metadata || {};
@@ -173,7 +179,7 @@ export async function saveTimeline(
     // Save to PostgreSQL (primary and only storage)
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
     
-    await pgDailyAssignmentsService.saveTimeline(workDate, normalizedData);
+    await pgDailyAssignmentsService.saveTimeline(workDate, normalizedData, resolvedScope);
     console.log(`✅ Timeline saved to PostgreSQL for ${workDate}`);
 
     // Keep task_collaborators in sync with daily_assignments_current.
@@ -214,7 +220,8 @@ export async function saveTimeline(
         modificationType,
         editedFields,
         oldValues,
-        newValues
+        newValues,
+        resolvedScope
       );
       console.log(`✅ Timeline history saved in PostgreSQL for ${workDate} by ${createdBy}`);
     }
@@ -229,10 +236,13 @@ export async function saveTimeline(
 /**
  * Internal helper to load containers without logging
  */
-async function loadContainersInternal(workDate: string): Promise<any | null> {
+async function loadContainersInternal(
+  workDate: string,
+  scope: 'housekeeping' | 'office' = 'housekeeping'
+): Promise<any | null> {
   try {
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
-    return await pgDailyAssignmentsService.loadContainers(workDate);
+    return await pgDailyAssignmentsService.loadContainers(workDate, scope);
   } catch (err) {
     return null;
   }
@@ -242,10 +252,13 @@ async function loadContainersInternal(workDate: string): Promise<any | null> {
  * Load containers for a specific work date
  * SOURCE: PostgreSQL only
  */
-export async function loadContainers(workDate: string): Promise<any | null> {
+export async function loadContainers(
+  workDate: string,
+  scope: 'housekeeping' | 'office' = 'housekeeping'
+): Promise<any | null> {
   try {
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
-    const pgContainers = await pgDailyAssignmentsService.loadContainers(workDate);
+    const pgContainers = await pgDailyAssignmentsService.loadContainers(workDate, scope);
     
     if (pgContainers) {
       console.log(`✅ Containers loaded from PostgreSQL for ${workDate}`);
@@ -263,11 +276,19 @@ export async function loadContainers(workDate: string): Promise<any | null> {
  * Save containers for a specific work date
  * WRITES TO: PostgreSQL only
  */
-export async function saveContainers(workDate: string, data: any, createdBy: string = 'system', modificationType: string = 'manual'): Promise<boolean> {
+export async function saveContainers(
+  workDate: string,
+  data: any,
+  createdBy: string = 'system',
+  modificationType: string = 'manual',
+  scope?: 'housekeeping' | 'office'
+): Promise<boolean> {
   try {
+    const resolvedScope: 'housekeeping' | 'office' =
+      scope ?? (data?.metadata?.scope === 'office' ? 'office' : 'housekeeping');
     // Save to PostgreSQL (primary and only storage)
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
-    await pgDailyAssignmentsService.saveContainers(workDate, data);
+    await pgDailyAssignmentsService.saveContainers(workDate, data, resolvedScope);
     console.log(`✅ Containers saved to PostgreSQL for ${workDate}`);
 
     return true;
@@ -313,13 +334,16 @@ export async function saveLogisticsContainers(
  * Load selected_cleaners from PostgreSQL for internal operations
  * No filesystem fallback - PostgreSQL is the only source
  */
-async function loadSelectedCleanersFromPg(workDate: string): Promise<any | null> {
+async function loadSelectedCleanersFromPg(
+  workDate: string,
+  scope: 'housekeeping' | 'office' = 'housekeeping'
+): Promise<any | null> {
   try {
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
-    const pgCleanerIds = await pgDailyAssignmentsService.loadSelectedCleaners(workDate);
+    const pgCleanerIds = await pgDailyAssignmentsService.loadSelectedCleaners(workDate, scope);
     
     if (pgCleanerIds && pgCleanerIds.length > 0) {
-      const fullCleaners = await pgDailyAssignmentsService.loadCleanersByIds(pgCleanerIds, workDate);
+      const fullCleaners = await pgDailyAssignmentsService.loadCleanersByIds(pgCleanerIds, workDate, scope);
       const cleanersData = fullCleaners.length > 0 ? fullCleaners : pgCleanerIds.map(id => ({ id }));
       return {
         cleaners: cleanersData,
@@ -338,43 +362,46 @@ async function loadSelectedCleanersFromPg(workDate: string): Promise<any | null>
  * Load selected_cleaners for a specific work date
  * SOURCE: PostgreSQL only (IDs from daily_selected_cleaners + full data from cleaners table)
  */
-export async function loadSelectedCleaners(workDate: string): Promise<any | null> {
+export async function loadSelectedCleaners(
+  workDate: string,
+  scope: 'housekeeping' | 'office' = 'housekeeping'
+): Promise<any | null> {
   try {
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
-    const pgCleanerIds = await pgDailyAssignmentsService.loadSelectedCleaners(workDate);
+    const pgCleanerIds = await pgDailyAssignmentsService.loadSelectedCleaners(workDate, scope);
     
     if (pgCleanerIds && pgCleanerIds.length > 0) {
-      // Get full cleaner data from cleaners table
-      const fullCleaners = await pgDailyAssignmentsService.loadCleanersByIds(pgCleanerIds, workDate);
+      // Get full cleaner data from cleaners table for the current scope.
+      // Fallback to aliases table for display names when roster rows are temporarily unavailable.
+      const fullCleaners = await pgDailyAssignmentsService.loadCleanersByIds(pgCleanerIds, workDate, scope);
+      const aliasMap = await pgDailyAssignmentsService.getAllCleanerAliases();
+      const fullById = new Map<number, any>(
+        fullCleaners.map((c: any) => [Number(c.id), c])
+      );
       
       // Ensure all cleaners have required fields
-      const cleanersData = fullCleaners.length > 0 
-        ? fullCleaners.map(c => ({
-            id: c.id,
-            name: c.name || 'Unknown',
-            lastname: c.lastname || '',
-            role: c.role || 'Standard',
-            premium: c.premium || false,
-            start_time: c.start_time ?? '10:00',
-            active: c.active !== false,
-            available: c.available !== false,
-            ranking: c.ranking || 0,
-            counter_hours: c.counter_hours || 0,
-            counter_days: c.counter_days || 0,
-            contract_type: c.contract_type || null,
-            preferred_customers: c.preferred_customers || [],
-            telegram_id: c.telegram_id || null,
-            alias: c.alias || null
-          }))
-        : pgCleanerIds.map(id => ({ 
-            id, 
-            name: 'Unknown', 
-            lastname: '', 
-            role: 'Standard', 
-            premium: false,
-            start_time: '10:00',
-            alias: null
-          }));
+      const cleanersData = pgCleanerIds.map((rawId: any) => {
+        const id = Number(rawId);
+        const c = fullById.get(id);
+        const aliasData = aliasMap.get(id);
+        return {
+          id,
+          name: c?.name || aliasData?.name || `ID ${id}`,
+          lastname: c?.lastname || aliasData?.lastname || '',
+          role: c?.role || (scope === 'office' ? 'Ufficio' : 'Standard'),
+          premium: Boolean(c?.premium),
+          start_time: c?.start_time ?? '10:00',
+          active: c?.active !== false,
+          available: c?.available !== false,
+          ranking: c?.ranking || 0,
+          counter_hours: c?.counter_hours || 0,
+          counter_days: c?.counter_days || 0,
+          contract_type: c?.contract_type || null,
+          preferred_customers: c?.preferred_customers || [],
+          telegram_id: c?.telegram_id || null,
+          alias: c?.alias || aliasData?.alias || null,
+        };
+      });
       
       const scData = {
         cleaners: cleanersData,
@@ -410,9 +437,12 @@ export async function saveSelectedCleaners(
   data: any, 
   skipRevision: boolean = false, 
   createdBy: string = 'system', 
-  modificationType: string = 'MANUAL'
+  modificationType: string = 'MANUAL',
+  scope?: 'housekeeping' | 'office'
 ): Promise<boolean> {
   try {
+    const resolvedScope: 'housekeeping' | 'office' =
+      scope ?? (data?.metadata?.scope === 'office' ? 'office' : 'housekeeping');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const targetDate = new Date(workDate);
@@ -436,11 +466,11 @@ export async function saveSelectedCleaners(
     // Build action payload
     const actionPayload = data.actionPayload || null;
     
-    await pgDailyAssignmentsService.saveSelectedCleaners(workDate, cleanerIds, actionType, actionPayload, createdBy);
+    await pgDailyAssignmentsService.saveSelectedCleaners(workDate, cleanerIds, actionType, actionPayload, createdBy, resolvedScope);
     
     // Also save full cleaner data to cleaners table if available
     if (cleanersArray.length > 0 && typeof cleanersArray[0] === 'object') {
-      await pgDailyAssignmentsService.saveCleanersForDate(workDate, cleanersArray);
+      await pgDailyAssignmentsService.saveCleanersForDate(workDate, cleanersArray, undefined, resolvedScope);
     }
     
     console.log(`✅ Selected cleaners saved to PostgreSQL for ${workDate}: ${cleanerIds.length} IDs`);
@@ -687,7 +717,12 @@ export async function saveSelectedLogisticsDrivers(
   }
 }
 
-export async function resetTimeline(workDate: string, createdBy: string = 'system', modificationType: string = 'reset'): Promise<boolean> {
+export async function resetTimeline(
+  workDate: string,
+  createdBy: string = 'system',
+  modificationType: string = 'reset',
+  scope: 'housekeeping' | 'office' = 'housekeeping'
+): Promise<boolean> {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -715,8 +750,8 @@ export async function resetTimeline(workDate: string, createdBy: string = 'syste
 
     // Save empty timeline to PostgreSQL
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
-    await pgDailyAssignmentsService.saveTimeline(workDate, emptyTimeline);
-    await pgDailyAssignmentsService.saveToHistory(workDate, emptyTimeline, createdBy, modificationType, [], [], []);
+    await pgDailyAssignmentsService.saveTimeline(workDate, emptyTimeline, scope);
+    await pgDailyAssignmentsService.saveToHistory(workDate, emptyTimeline, createdBy, modificationType, [], [], [], scope);
     console.log(`✅ Timeline reset in PostgreSQL for ${workDate}`);
 
     // PostgreSQL is the only source of truth - no legacy MySQL writes

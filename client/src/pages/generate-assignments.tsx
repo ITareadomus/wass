@@ -365,9 +365,13 @@ export default function GenerateAssignments() {
   const [location, setLocation] = useLocation();
   const isOfficeScope = useMemo(() => {
     if (typeof window !== "undefined") {
-      return new URLSearchParams(window.location.search).get("scope") === "office";
+      const params = new URLSearchParams(window.location.search);
+      const scopeParam = params.get("scope");
+      const kindParam = params.get("kind");
+      const storedScope = localStorage.getItem("assignments_scope");
+      return scopeParam === "office" || kindParam === "office" || storedScope === "office";
     }
-    return location.includes("scope=office");
+    return location.includes("scope=office") || location.includes("kind=office");
   }, [location]);
   const scopeValue = isOfficeScope ? "office" : "housekeeping";
   const withScope = useCallback((url: string) => {

@@ -97,10 +97,12 @@ async function createCleanersTables() {
       await query(`
         CREATE TABLE daily_selected_cleaners (
           id SERIAL PRIMARY KEY,
-          work_date DATE NOT NULL UNIQUE,
+          work_date DATE NOT NULL,
+          scope VARCHAR(32) NOT NULL DEFAULT 'housekeeping',
           cleaners INTEGER[] DEFAULT '{}',
           created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
+          updated_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(work_date, scope)
         )
       `);
       console.log('✅ Tabella daily_selected_cleaners creata con cleaners INTEGER[]');

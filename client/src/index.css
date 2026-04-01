@@ -225,6 +225,25 @@
     border-color: #22c55e;
   }
 
+  /* RIPASSO: stessa famiglia cromatica ma tonalità più scura del tipo base */
+  .task-standard-ripasso {
+    background-color: #4ade80;
+    color: #052e16;
+    border-color: #15803d;
+  }
+
+  .task-premium-ripasso {
+    background-color: #f59e0b;
+    color: #451a03;
+    border-color: #b45309;
+  }
+
+  .task-straordinaria-ripasso {
+    background-color: #f87171;
+    color: #450a0a;
+    border-color: #b91c1c;
+  }
+
   /* Responsive width utilities per task cards */
   @media (max-width: 639px) {
     /* Mobile: larghezze ridotte */
@@ -440,7 +459,10 @@
   /* Mantieni i colori delle task */
   .task-straordinaria,
   .task-premium,
-  .task-standard {
+  .task-standard,
+  .task-standard-ripasso,
+  .task-premium-ripasso,
+  .task-straordinaria-ripasso {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }

@@ -28,13 +28,27 @@ export default function MapSection({ tasks }: MapSectionProps) {
   const [cleanerAliases, setCleanerAliases] = useState<Record<string, { id: number; name: string; lastname: string; alias: string }>>({});
   const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
   const [filteredTaskId, setFilteredTaskId] = useState<string | null>(null);
+  const scopeValue: "housekeeping" | "office" =
+    typeof window !== "undefined" &&
+    (() => {
+      const params = new URLSearchParams(window.location.search);
+      return (
+        params.get("scope") === "office" ||
+        params.get("kind") === "office" ||
+        localStorage.getItem("assignments_scope") === "office"
+      );
+    })()
+      ? "office"
+      : "housekeeping";
+  const withScope = (url: string) =>
+    `${url}${url.includes("?") ? "&" : "?"}scope=${scopeValue}`;
 
   // Carica i cleaners
   useEffect(() => {
     const loadCleaners = async () => {
       try {
         const dateStr = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
-        const response = await fetch(`/api/selected-cleaners?date=${dateStr}`, {
+        const response = await fetch(withScope(`/api/selected-cleaners?date=${dateStr}`), {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         });
@@ -48,7 +62,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
     const loadCleanerAliases = async () => {
       try {
         const dateStr = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
-        const response = await fetch(`/api/cleaners-aliases?date=${dateStr}`, {
+        const response = await fetch(withScope(`/api/cleaners-aliases?date=${dateStr}`), {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         });

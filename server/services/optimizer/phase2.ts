@@ -297,28 +297,17 @@ export function isCleanerCompatible(
 ): { compatible: boolean; reason?: string } {
   const normalizedRole = normalizeCleanerRole(cleaner.role);
   const officeTask = isOfficeTask(task, officeOperationIds);
-  const roleRules = taskTypesByCleaner?.[normalizedRole];
+  void taskTypesByCleaner;
 
   if (officeTask) {
-    if (roleRules?.ufficio_apt === true) return { compatible: true };
-    return { compatible: false, reason: 'OFFICE_TASK_NOT_ALLOWED_BY_SETTINGS' };
+    return normalizedRole === 'ufficio_cleaner'
+      ? { compatible: true }
+      : { compatible: false, reason: 'OFFICE_TASK_REQUIRES_UFFICIO_CLEANER' };
   }
 
-  // For cleaner role Ufficio, non-office compatibility is fully driven by app_settings checkboxes.
-  if (normalizedRole === 'ufficio_cleaner' && taskTypesByCleaner) {
-    if (isRealStraordinariaTask(task, officeOperationIds)) {
-      return roleRules?.straordinario_apt
-        ? { compatible: true }
-        : { compatible: false, reason: 'UFFICIO_CLEANER_STRAORDINARIO_DISABLED' };
-    }
-    if (task.premium) {
-      return roleRules?.premium_apt
-        ? { compatible: true }
-        : { compatible: false, reason: 'UFFICIO_CLEANER_PREMIUM_DISABLED' };
-    }
-    return roleRules?.standard_apt
-      ? { compatible: true }
-      : { compatible: false, reason: 'UFFICIO_CLEANER_STANDARD_DISABLED' };
+  // Cleaner ufficio non prende task non-ufficio.
+  if (normalizedRole === 'ufficio_cleaner') {
+    return { compatible: false, reason: 'UFFICIO_CLEANER_NON_OFFICE_TASK' };
   }
 
   if (task.premium && normalizedRole !== 'premium_cleaner') {

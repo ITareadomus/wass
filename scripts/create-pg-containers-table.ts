@@ -35,6 +35,7 @@ async function createContainersTable() {
         operation_id INTEGER,
         confirmed_operation BOOLEAN DEFAULT FALSE,
         straordinaria BOOLEAN DEFAULT FALSE,
+        scope VARCHAR(32),
         type_apt VARCHAR(10),
         alias VARCHAR(50),
         customer_name VARCHAR(255),
@@ -43,7 +44,6 @@ async function createContainersTable() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         
-        UNIQUE(work_date, task_id)
       );
     `);
     
@@ -55,6 +55,11 @@ async function createContainersTable() {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_containers_task_id 
       ON daily_containers(task_id);
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS daily_containers_work_date_task_scope_uidx
+      ON daily_containers (work_date, task_id, (COALESCE(scope, 'housekeeping'::text)));
     `);
     
     console.log('✅ Table daily_containers created successfully');

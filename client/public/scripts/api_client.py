@@ -32,11 +32,25 @@ from datetime import datetime
 class ApiClient:
     """Client per API REST del backend."""
     
-    def __init__(self, base_url: str = None):
+    def __init__(self, base_url: str = None, scope: Optional[str] = None):
         if base_url is None:
             base_url = os.environ.get("API_URL", "http://localhost:5000")
         self.base_url = base_url.rstrip("/")
         self.timeout = 30  # secondi
+        normalized_scope = (scope or "").strip().lower()
+        self.scope = normalized_scope if normalized_scope in ("housekeeping", "office") else None
+
+    def _params_with_scope(self, params: Optional[Dict] = None) -> Optional[Dict]:
+        out = dict(params or {})
+        if self.scope:
+            out["scope"] = self.scope
+        return out or None
+
+    def _payload_with_scope(self, payload: Dict) -> Dict:
+        out = dict(payload or {})
+        if self.scope:
+            out["scope"] = self.scope
+        return out
     
     def _get(self, endpoint: str, params: Optional[Dict] = None) -> Dict:
         """Esegue GET request usando urllib (built-in)."""
@@ -117,7 +131,7 @@ class ApiClient:
                 ]
             }
         """
-        data = self._get("/api/timeline", {"date": date})
+        data = self._get("/api/timeline", self._params_with_scope({"date": date}))
         return data
     
     def save_timeline(self, date: str, timeline_data: Dict) -> Dict:
@@ -131,10 +145,10 @@ class ApiClient:
         Returns:
             Risposta API con conferma
         """
-        payload = {
+        payload = self._payload_with_scope({
             "date": date,
             "timeline": timeline_data
-        }
+        })
         return self._post("/api/timeline", payload)
     
     # ==================== CONTAINERS ====================
@@ -156,7 +170,7 @@ class ApiClient:
                 }
             }
         """
-        data = self._get("/api/containers", {"date": date})
+        data = self._get("/api/containers", self._params_with_scope({"date": date}))
         return data
     
     def save_containers(self, date: str, containers_data: Dict) -> Dict:
@@ -170,10 +184,10 @@ class ApiClient:
         Returns:
             Risposta API con conferma
         """
-        payload = {
+        payload = self._payload_with_scope({
             "date": date,
             "containers": containers_data
-        }
+        })
         return self._post("/api/containers", payload)
 
     def get_logistics_containers(self, date: str) -> Dict:
@@ -197,7 +211,7 @@ class ApiClient:
         Returns:
             Lista di cleaners con tutti i campi
         """
-        data = self._get("/api/cleaners", {"date": date})
+        data = self._get("/api/cleaners", self._params_with_scope({"date": date}))
         return data.get("cleaners", [])
     
     def get_selected_cleaners(self, date: str) -> List[Dict]:
@@ -210,7 +224,7 @@ class ApiClient:
         Returns:
             Lista di cleaners selezionati
         """
-        data = self._get("/api/selected-cleaners", {"date": date})
+        data = self._get("/api/selected-cleaners", self._params_with_scope({"date": date}))
         return data.get("cleaners", [])
     
     def save_selected_cleaners(self, date: str, cleaner_ids: List[int]) -> Dict:
@@ -224,10 +238,10 @@ class ApiClient:
         Returns:
             Risposta API con conferma
         """
-        payload = {
+        payload = self._payload_with_scope({
             "date": date,
             "cleaner_ids": cleaner_ids
-        }
+        })
         return self._post("/api/selected-cleaners", payload)
     
     def save_cleaners(self, date: str, cleaners: List[Dict]) -> Dict:
@@ -242,11 +256,11 @@ class ApiClient:
         Returns:
             Risposta API con conferma
         """
-        payload = {
+        payload = self._payload_with_scope({
             "date": date,
             "cleaners": cleaners,
             "snapshotReason": "extract_cleaners_optimized"
-        }
+        })
         return self._post("/api/cleaners", payload)
 
     def save_logistics_drivers(self, date: str, drivers: List[Dict]) -> Dict:

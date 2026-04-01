@@ -144,6 +144,9 @@ export interface PgLogisticsAssignmentRow {
 }
 
 export class PgDailyAssignmentsService {
+  private normalizeScope(scope?: string | null): 'housekeeping' | 'office' {
+    return String(scope || '').toLowerCase() === 'office' ? 'office' : 'housekeeping';
+  }
 
   /**
    * Ensure aliases and selected_cleaners_revisions tables exist
@@ -165,6 +168,7 @@ export class PgDailyAssignmentsService {
           id SERIAL PRIMARY KEY,
           selected_cleaners_id INTEGER NOT NULL,
           work_date DATE NOT NULL,
+          scope VARCHAR(32) NOT NULL DEFAULT 'housekeeping',
           revision_number INTEGER NOT NULL,
           cleaners_before INTEGER[] NOT NULL DEFAULT '{}',
           cleaners_after INTEGER[] NOT NULL DEFAULT '{}',
@@ -229,6 +233,165 @@ export class PgDailyAssignmentsService {
       console.log('✅ PG: Tabella daily_task_locks verificata');
     } catch (error) {
       console.warn('⚠️ PG: Errore (ignorabile) nella creazione daily_task_locks:', error);
+    }
+  }
+
+  /**
+   * Dopo l'aggiunta di `scope` su daily_assignments_revisions, il vecchio UNIQUE(work_date, revision)
+   * fa collidere housekeeping e office (stesso revision per stessa data).
+   * Rimuove quel vincolo e crea UNIQUE(work_date, revision, scope).
+   */
+  async ensureDailyAssignmentsRevisionsScopeUnique(): Promise<void> {
+    try {
+      const col = await query(`
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'daily_assignments_revisions'
+          AND column_name = 'scope'
+      `);
+      if (!col.rows.length) {
+        return;
+      }
+
+      await query(`
+        UPDATE daily_assignments_revisions
+        SET scope = 'housekeeping'
+        WHERE scope IS NULL
+      `);
+
+      await query(`
+        DO $$
+        DECLARE r RECORD;
+        BEGIN
+          FOR r IN
+            SELECT c.conname
+            FROM pg_constraint c
+            JOIN pg_class t ON c.conrelid = t.oid
+            JOIN pg_namespace n ON t.relnamespace = n.oid
+            WHERE n.nspname = 'public'
+              AND t.relname = 'daily_assignments_revisions'
+              AND c.contype = 'u'
+              AND pg_get_constraintdef(c.oid) NOT LIKE '%scope%'
+          LOOP
+            EXECUTE format('ALTER TABLE daily_assignments_revisions DROP CONSTRAINT %I', r.conname);
+          END LOOP;
+        END $$
+      `);
+
+      await query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS daily_assignments_revisions_work_date_revision_scope_uidx
+        ON daily_assignments_revisions (work_date, revision, (COALESCE(scope, 'housekeeping'::text)))
+      `);
+      console.log('✅ PG: daily_assignments_revisions UNIQUE allineato a (work_date, revision, scope)');
+    } catch (error) {
+      console.warn('⚠️ PG: ensureDailyAssignmentsRevisionsScopeUnique:', error);
+    }
+  }
+
+  /**
+   * Dopo lo split per scope, il vecchio UNIQUE(work_date, task_id) su daily_containers
+   * genera collisioni tra housekeeping e office sulla stessa task/data.
+   * Migra verso univocita per scope.
+   */
+  async ensureDailyContainersScopeUnique(): Promise<void> {
+    try {
+      const col = await query(`
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'daily_containers'
+          AND column_name = 'scope'
+      `);
+      if (!col.rows.length) {
+        return;
+      }
+
+      await query(`
+        UPDATE daily_containers
+        SET scope = 'housekeeping'
+        WHERE scope IS NULL
+      `);
+
+      await query(`
+        DO $$
+        DECLARE r RECORD;
+        BEGIN
+          FOR r IN
+            SELECT c.conname
+            FROM pg_constraint c
+            JOIN pg_class t ON c.conrelid = t.oid
+            JOIN pg_namespace n ON t.relnamespace = n.oid
+            WHERE n.nspname = 'public'
+              AND t.relname = 'daily_containers'
+              AND c.contype = 'u'
+              AND pg_get_constraintdef(c.oid) NOT LIKE '%scope%'
+          LOOP
+            EXECUTE format('ALTER TABLE daily_containers DROP CONSTRAINT %I', r.conname);
+          END LOOP;
+        END $$
+      `);
+
+      await query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS daily_containers_work_date_task_scope_uidx
+        ON daily_containers (work_date, task_id, (COALESCE(scope, 'housekeeping'::text)))
+      `);
+      console.log('✅ PG: daily_containers UNIQUE allineato a (work_date, task_id, scope)');
+    } catch (error) {
+      console.warn('⚠️ PG: ensureDailyContainersScopeUnique:', error);
+    }
+  }
+
+  /**
+   * Scope migration for selected cleaners tables:
+   * - daily_selected_cleaners: unique per (work_date, scope)
+   * - selected_cleaners_revisions: scope column + indexes
+   */
+  async ensureSelectedCleanersScopeStructure(): Promise<void> {
+    try {
+      await query(`ALTER TABLE daily_selected_cleaners ADD COLUMN IF NOT EXISTS scope VARCHAR(32)`);
+      await query(`UPDATE daily_selected_cleaners SET scope = 'housekeeping' WHERE scope IS NULL`);
+      await query(`ALTER TABLE daily_selected_cleaners ALTER COLUMN scope SET NOT NULL`);
+      await query(`ALTER TABLE daily_selected_cleaners ALTER COLUMN scope SET DEFAULT 'housekeeping'`);
+
+      await query(`
+        DO $$
+        DECLARE r RECORD;
+        BEGIN
+          FOR r IN
+            SELECT c.conname
+            FROM pg_constraint c
+            JOIN pg_class t ON c.conrelid = t.oid
+            JOIN pg_namespace n ON t.relnamespace = n.oid
+            WHERE n.nspname = 'public'
+              AND t.relname = 'daily_selected_cleaners'
+              AND c.contype = 'u'
+              AND pg_get_constraintdef(c.oid) NOT LIKE '%scope%'
+          LOOP
+            EXECUTE format('ALTER TABLE daily_selected_cleaners DROP CONSTRAINT %I', r.conname);
+          END LOOP;
+        END $$;
+      `);
+
+      await query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS daily_selected_cleaners_work_date_scope_uidx
+        ON daily_selected_cleaners (work_date, scope)
+      `);
+
+      await query(`ALTER TABLE selected_cleaners_revisions ADD COLUMN IF NOT EXISTS scope VARCHAR(32)`);
+      await query(`UPDATE selected_cleaners_revisions SET scope = 'housekeeping' WHERE scope IS NULL`);
+      await query(`ALTER TABLE selected_cleaners_revisions ALTER COLUMN scope SET NOT NULL`);
+      await query(`ALTER TABLE selected_cleaners_revisions ALTER COLUMN scope SET DEFAULT 'housekeeping'`);
+      await query(`
+        CREATE INDEX IF NOT EXISTS idx_sel_cleaners_revisions_work_date_scope
+        ON selected_cleaners_revisions(work_date, scope, revision_number DESC)
+      `);
+      await query(`
+        CREATE INDEX IF NOT EXISTS idx_sel_cleaners_revisions_sel_scope
+        ON selected_cleaners_revisions(selected_cleaners_id, scope, revision_number DESC)
+      `);
+
+      console.log('✅ PG: Struttura selected_cleaners allineata a scope');
+    } catch (error) {
+      console.warn('⚠️ PG: ensureSelectedCleanersScopeStructure:', error);
     }
   }
 
@@ -625,21 +788,29 @@ export class PgDailyAssignmentsService {
   /**
    * Save timeline to PostgreSQL (replaces all rows for workDate)
    */
-  async saveTimeline(workDate: string, timeline: any): Promise<number> {
+  async saveTimeline(workDate: string, timeline: any, scope: string | null = 'housekeeping'): Promise<number> {
     const client = await pool.connect();
 
     try {
       const rows = this.timelineToRows(workDate, timeline);
+      const normalizedScope = this.normalizeScope(scope);
 
       console.log(`📝 PG: Salvando ${rows.length} righe per ${workDate}...`);
 
       await client.query('BEGIN');
 
       // Delete existing rows for this work_date
-      await client.query(
-        'DELETE FROM daily_assignments_current WHERE work_date = $1',
-        [workDate]
-      );
+      if (normalizedScope === 'office') {
+        await client.query(
+          "DELETE FROM daily_assignments_current WHERE work_date = $1 AND scope = 'office'",
+          [workDate]
+        );
+      } else {
+        await client.query(
+          "DELETE FROM daily_assignments_current WHERE work_date = $1 AND (scope = 'housekeeping' OR scope IS NULL)",
+          [workDate]
+        );
+      }
 
       if (rows.length === 0) {
         await client.query('COMMIT');
@@ -651,6 +822,7 @@ export class PgDailyAssignmentsService {
       for (const row of rows) {
         await client.query(`
           INSERT INTO daily_assignments_current (
+            scope,
             work_date, cleaner_id, cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time,
             task_id, logistic_code, client_id,
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
@@ -659,15 +831,17 @@ export class PgDailyAssignmentsService {
             type_apt, alias, customer_name, customer_reference, reasons, manually_moved, priority,
             start_time, end_time, followup, sequence, travel_time
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7,
-            $8, $9, $10,
-            $11, $12, $13, $14, $15, $16,
-            $17, $18, $19, $20,
-            $21, $22, $23, $24, $25, $26,
-            $27, $28, $29, $30, $31, $32, $33,
-            $34, $35, $36, $37, $38
+            $1,
+            $2, $3, $4, $5, $6, $7, $8,
+            $9, $10, $11,
+            $12, $13, $14, $15, $16, $17,
+            $18, $19, $20, $21,
+            $22, $23, $24, $25, $26, $27,
+            $28, $29, $30, $31, $32, $33, $34,
+            $35, $36, $37, $38, $39
           )
         `, [
+          normalizedScope,
           row.work_date,
           row.cleaner_id,
           row.cleaner_name,
@@ -725,12 +899,18 @@ export class PgDailyAssignmentsService {
   /**
    * Get all assignments for a work_date (flat rows)
    */
-  async getAssignments(workDate: string): Promise<PgDailyAssignmentRow[]> {
+  async getAssignments(workDate: string, scope: string | null = 'housekeeping'): Promise<PgDailyAssignmentRow[]> {
     try {
-      const result = await query(
-        'SELECT * FROM daily_assignments_current WHERE work_date = $1 ORDER BY cleaner_id, sequence',
-        [workDate]
-      );
+      const normalizedScope = this.normalizeScope(scope);
+      const result = normalizedScope === 'office'
+        ? await query(
+            "SELECT * FROM daily_assignments_current WHERE work_date = $1 AND scope = 'office' ORDER BY cleaner_id, sequence",
+            [workDate]
+          )
+        : await query(
+            "SELECT * FROM daily_assignments_current WHERE work_date = $1 AND (scope = 'housekeeping' OR scope IS NULL) ORDER BY cleaner_id, sequence",
+            [workDate]
+          );
       return result.rows;
     } catch (error) {
       console.error('❌ PG: Errore nel caricamento:', error);
@@ -751,9 +931,9 @@ export class PgDailyAssignmentsService {
    *   metadata: { date, last_updated }
    * }
    */
-  async loadTimeline(workDate: string): Promise<any | null> {
+  async loadTimeline(workDate: string, scope: string | null = 'housekeeping'): Promise<any | null> {
     try {
-      const rows = await this.getAssignments(workDate);
+      const rows = await this.getAssignments(workDate, scope);
 
       if (rows.length === 0) {
         console.log(`📖 PG: Nessuna assegnazione trovata per ${workDate}`);
@@ -905,12 +1085,18 @@ export class PgDailyAssignmentsService {
   /**
    * Count assignments for a work_date
    */
-  async countAssignments(workDate: string): Promise<number> {
+  async countAssignments(workDate: string, scope: string | null = 'housekeeping'): Promise<number> {
     try {
-      const result = await query(
-        'SELECT COUNT(*) as count FROM daily_assignments_current WHERE work_date = $1',
-        [workDate]
-      );
+      const normalizedScope = this.normalizeScope(scope);
+      const result = normalizedScope === 'office'
+        ? await query(
+            "SELECT COUNT(*) as count FROM daily_assignments_current WHERE work_date = $1 AND scope = 'office'",
+            [workDate]
+          )
+        : await query(
+            "SELECT COUNT(*) as count FROM daily_assignments_current WHERE work_date = $1 AND (scope = 'housekeeping' OR scope IS NULL)",
+            [workDate]
+          );
       return parseInt(result.rows[0]?.count || '0');
     } catch (error) {
       console.error('❌ PG: Errore nel conteggio:', error);
@@ -937,27 +1123,41 @@ export class PgDailyAssignmentsService {
     modificationType: string = 'manual',
     editedFields: string[] = [],
     oldValues: string[] = [],
-    newValues: string[] = []
+    newValues: string[] = [],
+    scope: string | null = 'housekeeping'
   ): Promise<number> {
     const client = await pool.connect();
 
     try {
       const rows = this.timelineToRows(workDate, timeline);
+      const normalizedScope = this.normalizeScope(scope);
 
       await client.query('BEGIN');
 
       // Lock the revisions table for this work_date to prevent race conditions
       // Use a separate SELECT FOR UPDATE on the table itself, then calculate MAX
-      await client.query(
-        'SELECT 1 FROM daily_assignments_revisions WHERE work_date = $1 FOR UPDATE',
-        [workDate]
-      );
+      if (normalizedScope === 'office') {
+        await client.query(
+          "SELECT 1 FROM daily_assignments_revisions WHERE work_date = $1 AND scope = 'office' FOR UPDATE",
+          [workDate]
+        );
+      } else {
+        await client.query(
+          "SELECT 1 FROM daily_assignments_revisions WHERE work_date = $1 AND (scope = 'housekeeping' OR scope IS NULL) FOR UPDATE",
+          [workDate]
+        );
+      }
 
       // Now safely get the next revision number
-      const revResult = await client.query(
-        'SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_assignments_revisions WHERE work_date = $1',
-        [workDate]
-      );
+      const revResult = normalizedScope === 'office'
+        ? await client.query(
+            "SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_assignments_revisions WHERE work_date = $1 AND scope = 'office'",
+            [workDate]
+          )
+        : await client.query(
+            "SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_assignments_revisions WHERE work_date = $1 AND (scope = 'housekeeping' OR scope IS NULL)",
+            [workDate]
+          );
       const revision = parseInt(revResult.rows[0]?.next_revision || '1');
 
       console.log(`📜 PG History: Salvando revisione ${revision} con ${rows.length} righe per ${workDate}...`);
@@ -966,14 +1166,15 @@ export class PgDailyAssignmentsService {
       // This ensures revision numbers advance reliably
       // Includes change tracking: edited_fields, old_values, new_values
       await client.query(`
-        INSERT INTO daily_assignments_revisions (work_date, revision, task_count, created_by, modification_type, edited_fields, old_values, new_values)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      `, [workDate, revision, rows.length, createdBy, modificationType, editedFields, oldValues, newValues]);
+        INSERT INTO daily_assignments_revisions (scope, work_date, revision, task_count, created_by, modification_type, edited_fields, old_values, new_values)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `, [normalizedScope, workDate, revision, rows.length, createdBy, modificationType, editedFields, oldValues, newValues]);
 
       // Insert task rows if any (includes cleaner data for full reconstruction)
       for (const row of rows) {
         await client.query(`
           INSERT INTO daily_assignments_history (
+            scope,
             work_date, revision, cleaner_id, cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time,
             task_id, logistic_code, client_id,
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
@@ -982,15 +1183,17 @@ export class PgDailyAssignmentsService {
             type_apt, alias, customer_name, customer_reference, reasons, manually_moved, priority,
             start_time, end_time, followup, sequence, travel_time, created_by
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8,
-            $9, $10, $11,
-            $12, $13, $14, $15, $16, $17,
-            $18, $19, $20, $21,
-            $22, $23, $24, $25, $26, $27,
-            $28, $29, $30, $31, $32, $33, $34,
-            $35, $36, $37, $38, $39, $40
+            $1,
+            $2, $3, $4, $5, $6, $7, $8, $9,
+            $10, $11, $12,
+            $13, $14, $15, $16, $17, $18,
+            $19, $20, $21, $22,
+            $23, $24, $25, $26, $27, $28,
+            $29, $30, $31, $32, $33, $34, $35,
+            $36, $37, $38, $39, $40, $41
           )
         `, [
+          normalizedScope,
           row.work_date,
           revision,
           row.cleaner_id,
@@ -1052,7 +1255,7 @@ export class PgDailyAssignmentsService {
    * Uses the revisions metadata table for reliable revision tracking
    * Includes change tracking fields: edited_fields, old_values, new_values
    */
-  async getHistoryRevisions(workDate: string): Promise<{ 
+  async getHistoryRevisions(workDate: string, scope: string | null = 'housekeeping'): Promise<{ 
     revision: number; 
     created_at: Date; 
     created_by: string; 
@@ -1063,11 +1266,13 @@ export class PgDailyAssignmentsService {
     new_values: string[];
   }[]> {
     try {
+      const normalizedScope = this.normalizeScope(scope);
       const result = await query(`
         SELECT revision, created_at, created_by, task_count, modification_type, 
                edited_fields, old_values, new_values
         FROM daily_assignments_revisions 
         WHERE work_date = $1
+          AND (${normalizedScope === 'office' ? "scope = 'office'" : "(scope = 'housekeeping' OR scope IS NULL)"})
         ORDER BY revision DESC
       `, [workDate]);
       return result.rows;
@@ -1080,12 +1285,18 @@ export class PgDailyAssignmentsService {
   /**
    * Get assignments for a specific revision
    */
-  async getHistoryByRevision(workDate: string, revision: number): Promise<PgDailyAssignmentRow[]> {
+  async getHistoryByRevision(workDate: string, revision: number, scope: string | null = 'housekeeping'): Promise<PgDailyAssignmentRow[]> {
     try {
-      const result = await query(
-        'SELECT * FROM daily_assignments_history WHERE work_date = $1 AND revision = $2 ORDER BY cleaner_id, sequence',
-        [workDate, revision]
-      );
+      const normalizedScope = this.normalizeScope(scope);
+      const result = normalizedScope === 'office'
+        ? await query(
+            "SELECT * FROM daily_assignments_history WHERE work_date = $1 AND revision = $2 AND scope = 'office' ORDER BY cleaner_id, sequence",
+            [workDate, revision]
+          )
+        : await query(
+            "SELECT * FROM daily_assignments_history WHERE work_date = $1 AND revision = $2 AND (scope = 'housekeeping' OR scope IS NULL) ORDER BY cleaner_id, sequence",
+            [workDate, revision]
+          );
       return result.rows;
     } catch (error) {
       console.error('❌ PG History: Errore nel caricamento revisione:', error);
@@ -1097,12 +1308,14 @@ export class PgDailyAssignmentsService {
    * Get the user who created the last revision for a work_date
    * Returns null if no revisions exist
    */
-  async getLastRevisionUser(workDate: string): Promise<string | null> {
+  async getLastRevisionUser(workDate: string, scope: string | null = 'housekeeping'): Promise<string | null> {
     try {
+      const normalizedScope = this.normalizeScope(scope);
       const result = await query(`
         SELECT created_by 
         FROM daily_assignments_revisions 
         WHERE work_date = $1
+          AND (${normalizedScope === 'office' ? "scope = 'office'" : "(scope = 'housekeeping' OR scope IS NULL)"})
         ORDER BY revision DESC
         LIMIT 1
       `, [workDate]);
@@ -1118,12 +1331,14 @@ export class PgDailyAssignmentsService {
    * Looks ONLY for 'transfer_to_adam' modification_type (actual ADAM transfers)
    * NOT 'api_save_timeline' which is only local PostgreSQL saves
    */
-  async getLastTransferToAdamTimestamp(workDate: string): Promise<Date | null> {
+  async getLastTransferToAdamTimestamp(workDate: string, scope: string | null = 'housekeeping'): Promise<Date | null> {
     try {
+      const normalizedScope = this.normalizeScope(scope);
       const result = await query(`
         SELECT created_at 
         FROM daily_assignments_revisions 
         WHERE work_date = $1 AND modification_type = 'transfer_to_adam'
+          AND (${normalizedScope === 'office' ? "scope = 'office'" : "(scope = 'housekeeping' OR scope IS NULL)"})
         ORDER BY created_at DESC
         LIMIT 1
       `, [workDate]);
@@ -1177,11 +1392,13 @@ export class PgDailyAssignmentsService {
    * Count how many transfer_to_adam revisions exist for a work_date.
    * Used to detect "second or later transfer" for cleanup phase (clear unassigned tasks on ADAM).
    */
-  async countTransferToAdamForDate(workDate: string): Promise<number> {
+  async countTransferToAdamForDate(workDate: string, scope: string | null = 'housekeeping'): Promise<number> {
     try {
+      const normalizedScope = this.normalizeScope(scope);
       const result = await query(
         `SELECT COUNT(*)::int AS cnt FROM daily_assignments_revisions
-         WHERE work_date = $1 AND modification_type = 'transfer_to_adam'`,
+         WHERE work_date = $1 AND modification_type = 'transfer_to_adam'
+           AND (${normalizedScope === 'office' ? "scope = 'office'" : "(scope = 'housekeeping' OR scope IS NULL)"})`,
         [workDate]
       );
       return result.rows[0]?.cnt ?? 0;
@@ -1534,12 +1751,18 @@ export class PgDailyAssignmentsService {
    * Returns same structure as create_containers.py:
    * { containers: { early_out: { tasks: [...], count: N }, high_priority: {...}, low_priority: {...} } }
    */
-  async loadContainers(workDate: string): Promise<any | null> {
+  async loadContainers(workDate: string, scope: string | null = 'housekeeping'): Promise<any | null> {
     try {
-      const result = await query(
-        'SELECT * FROM daily_containers WHERE work_date = $1 ORDER BY priority, task_id',
-        [workDate]
-      );
+      const normalizedScope = this.normalizeScope(scope);
+      const result = normalizedScope === 'office'
+        ? await query(
+            "SELECT * FROM daily_containers WHERE work_date = $1 AND scope = 'office' ORDER BY priority, task_id",
+            [workDate]
+          )
+        : await query(
+            "SELECT * FROM daily_containers WHERE work_date = $1 AND (scope = 'housekeeping' OR scope IS NULL) ORDER BY priority, task_id",
+            [workDate]
+          );
 
       if (result.rows.length === 0) {
         console.log(`📖 PG: Nessun container trovato per ${workDate}`);
@@ -1821,14 +2044,19 @@ export class PgDailyAssignmentsService {
    * - create_containers.py: { containers: { early_out: { tasks: [...] }, high_priority: {...}, low_priority: {...} } }
    * - simplified: { containers: { early_out: [...], high: [...], low: [...] } }
    */
-  async saveContainers(workDate: string, containersData: any): Promise<boolean> {
+  async saveContainers(workDate: string, containersData: any, scope: string | null = 'housekeeping'): Promise<boolean> {
     const client = await pool.connect();
 
     try {
+      const normalizedScope = this.normalizeScope(scope);
       await client.query('BEGIN');
 
       // Delete existing containers for this date
-      await client.query('DELETE FROM daily_containers WHERE work_date = $1', [workDate]);
+      if (normalizedScope === 'office') {
+        await client.query("DELETE FROM daily_containers WHERE work_date = $1 AND scope = 'office'", [workDate]);
+      } else {
+        await client.query("DELETE FROM daily_containers WHERE work_date = $1 AND (scope = 'housekeeping' OR scope IS NULL)", [workDate]);
+      }
 
       const containers = containersData?.containers || {};
       let totalInserted = 0;
@@ -1859,6 +2087,7 @@ export class PgDailyAssignmentsService {
 
           await client.query(`
             INSERT INTO daily_containers (
+              scope,
               work_date, priority,
               task_id, logistic_code, client_id, premium, address, lat, lng,
               cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
@@ -1866,11 +2095,13 @@ export class PgDailyAssignmentsService {
               straordinaria, type_apt, alias, customer_name, reasons, customer_reference,
               locked, locked_reason
             ) VALUES (
-              $1, $2, $3, $4, $5, $6, $7, $8, $9,
-              $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-              $20, $21, $22, $23, $24, $25, $26, $27
+              $1,
+              $2, $3, $4, $5, $6, $7, $8, $9, $10,
+              $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+              $21, $22, $23, $24, $25, $26, $27, $28
             )
           `, [
+            normalizedScope,
             workDate,
             config.dbName,
             task.task_id,
@@ -2970,12 +3201,18 @@ export class PgDailyAssignmentsService {
    * Load selected cleaner IDs for a work_date
    * Returns array of cleaner IDs (integers)
    */
-  async loadSelectedCleaners(workDate: string): Promise<number[] | null> {
+  async loadSelectedCleaners(workDate: string, scope: string | null = 'housekeeping'): Promise<number[] | null> {
     try {
-      const result = await query(
-        'SELECT cleaners FROM daily_selected_cleaners WHERE work_date = $1',
-        [workDate]
-      );
+      const normalizedScope = this.normalizeScope(scope);
+      const result = normalizedScope === 'office'
+        ? await query(
+            "SELECT cleaners FROM daily_selected_cleaners WHERE work_date = $1 AND scope = 'office'",
+            [workDate]
+          )
+        : await query(
+            "SELECT cleaners FROM daily_selected_cleaners WHERE work_date = $1 AND (scope = 'housekeeping' OR scope IS NULL)",
+            [workDate]
+          );
       if (result.rows.length > 0 && result.rows[0].cleaners) {
         // cleaners is now an integer[] array, not JSON
         const cleanerIds = result.rows[0].cleaners;
@@ -3001,17 +3238,24 @@ export class PgDailyAssignmentsService {
     cleanerIds: number[], 
     actionType: string = 'replace',
     actionPayload: any = null,
-    performedBy: string = 'system'
+    performedBy: string = 'system',
+    scope: string | null = 'housekeeping'
   ): Promise<boolean> {
     const client = await pool.connect();
     try {
+      const normalizedScope = this.normalizeScope(scope);
       await client.query('BEGIN');
 
       // 1. Load current state (before)
-      const currentResult = await client.query(
-        'SELECT id, cleaners FROM daily_selected_cleaners WHERE work_date = $1',
-        [workDate]
-      );
+      const currentResult = normalizedScope === 'office'
+        ? await client.query(
+            "SELECT id, cleaners FROM daily_selected_cleaners WHERE work_date = $1 AND scope = 'office'",
+            [workDate]
+          )
+        : await client.query(
+            "SELECT id, cleaners FROM daily_selected_cleaners WHERE work_date = $1 AND (scope = 'housekeeping' OR scope IS NULL)",
+            [workDate]
+          );
       const cleanersBefore: number[] = currentResult.rows[0]?.cleaners || [];
       let selectedCleanersId = currentResult.rows[0]?.id;
 
@@ -3019,15 +3263,15 @@ export class PgDailyAssignmentsService {
       if (selectedCleanersId) {
         await client.query(`
           UPDATE daily_selected_cleaners 
-          SET cleaners = $2::integer[], updated_at = NOW()
+          SET cleaners = $2::integer[], scope = $3, updated_at = NOW()
           WHERE id = $1
-        `, [selectedCleanersId, cleanerIds]);
+        `, [selectedCleanersId, cleanerIds, normalizedScope]);
       } else {
         const insertResult = await client.query(`
-          INSERT INTO daily_selected_cleaners (work_date, cleaners, updated_at)
-          VALUES ($1, $2::integer[], NOW())
+          INSERT INTO daily_selected_cleaners (work_date, scope, cleaners, updated_at)
+          VALUES ($1, $2, $3::integer[], NOW())
           RETURNING id
-        `, [workDate, cleanerIds]);
+        `, [workDate, normalizedScope, cleanerIds]);
         selectedCleanersId = insertResult.rows[0].id;
       }
 
@@ -3040,17 +3284,18 @@ export class PgDailyAssignmentsService {
         const revResult = await client.query(`
           SELECT COALESCE(MAX(revision_number), 0) + 1 as next_rev
           FROM selected_cleaners_revisions
-          WHERE selected_cleaners_id = $1
-        `, [selectedCleanersId]);
+          WHERE selected_cleaners_id = $1 AND scope = $2
+        `, [selectedCleanersId, normalizedScope]);
         const revisionNumber = revResult.rows[0].next_rev;
 
         await client.query(`
           INSERT INTO selected_cleaners_revisions 
-          (selected_cleaners_id, work_date, revision_number, cleaners_before, cleaners_after, action_type, action_payload, performed_by)
-          VALUES ($1, $2, $3, $4::integer[], $5::integer[], $6, $7, $8)
+          (selected_cleaners_id, work_date, scope, revision_number, cleaners_before, cleaners_after, action_type, action_payload, performed_by)
+          VALUES ($1, $2, $3, $4, $5::integer[], $6::integer[], $7, $8, $9)
         `, [
           selectedCleanersId,
           workDate,
+          normalizedScope,
           revisionNumber,
           cleanersBefore,
           cleanerIds,
@@ -3076,17 +3321,23 @@ export class PgDailyAssignmentsService {
   /**
    * Rollback selected cleaners to a specific revision
    */
-  async rollbackSelectedCleaners(workDate: string, toRevisionNumber: number, performedBy: string = 'system'): Promise<boolean> {
+  async rollbackSelectedCleaners(
+    workDate: string,
+    toRevisionNumber: number,
+    performedBy: string = 'system',
+    scope: string | null = 'housekeeping'
+  ): Promise<boolean> {
     const client = await pool.connect();
     try {
+      const normalizedScope = this.normalizeScope(scope);
       await client.query('BEGIN');
 
       // Get the revision to rollback to
       const revResult = await client.query(`
         SELECT cleaners_before, selected_cleaners_id 
         FROM selected_cleaners_revisions 
-        WHERE work_date = $1 AND revision_number = $2
-      `, [workDate, toRevisionNumber]);
+        WHERE work_date = $1 AND revision_number = $2 AND scope = $3
+      `, [workDate, toRevisionNumber, normalizedScope]);
 
       if (revResult.rows.length === 0) {
         console.error(`❌ PG: Revision ${toRevisionNumber} non trovata per ${workDate}`);
@@ -3099,7 +3350,8 @@ export class PgDailyAssignmentsService {
 
       // Get current state for the new revision record
       const currentResult = await client.query(
-        'SELECT cleaners FROM daily_selected_cleaners WHERE work_date = $1',
+        `SELECT cleaners FROM daily_selected_cleaners
+         WHERE work_date = $1 AND ${normalizedScope === 'office' ? "scope = 'office'" : "scope = 'housekeeping'"}`,
         [workDate]
       );
       const cleanersBefore = currentResult.rows[0]?.cleaners || [];
@@ -3107,24 +3359,25 @@ export class PgDailyAssignmentsService {
       // Update selected_cleaners
       await client.query(`
         UPDATE daily_selected_cleaners 
-        SET cleaners = $1::integer[], updated_at = NOW()
-        WHERE work_date = $2
-      `, [cleanersToRestore, workDate]);
+        SET cleaners = $1::integer[], updated_at = NOW(), scope = $3
+        WHERE work_date = $2 AND scope = $3
+      `, [cleanersToRestore, workDate, normalizedScope]);
 
       // Create a new revision with ROLLBACK action
       const nextRevResult = await client.query(`
         SELECT COALESCE(MAX(revision_number), 0) + 1 as next_rev
         FROM selected_cleaners_revisions
-        WHERE selected_cleaners_id = $1
-      `, [selectedCleanersId]);
+        WHERE selected_cleaners_id = $1 AND scope = $2
+      `, [selectedCleanersId, normalizedScope]);
 
       await client.query(`
         INSERT INTO selected_cleaners_revisions 
-        (selected_cleaners_id, work_date, revision_number, cleaners_before, cleaners_after, action_type, action_payload, performed_by)
-        VALUES ($1, $2, $3, $4::integer[], $5::integer[], 'ROLLBACK', $6, $7)
+        (selected_cleaners_id, work_date, scope, revision_number, cleaners_before, cleaners_after, action_type, action_payload, performed_by)
+        VALUES ($1, $2, $3, $4, $5::integer[], $6::integer[], 'ROLLBACK', $7, $8)
       `, [
         selectedCleanersId,
         workDate,
+        normalizedScope,
         nextRevResult.rows[0].next_rev,
         cleanersBefore,
         cleanersToRestore,
@@ -3147,14 +3400,16 @@ export class PgDailyAssignmentsService {
   /**
    * Get revision history for a work_date
    */
-  async getSelectedCleanersRevisions(workDate: string): Promise<any[]> {
+  async getSelectedCleanersRevisions(workDate: string, scope: string | null = 'housekeeping'): Promise<any[]> {
     try {
+      const normalizedScope = this.normalizeScope(scope);
       const result = await query(`
         SELECT 
           revision_number, cleaners_before, cleaners_after, 
           action_type, action_payload, performed_by, created_at
         FROM selected_cleaners_revisions 
         WHERE work_date = $1
+          AND ${normalizedScope === 'office' ? "scope = 'office'" : "scope = 'housekeeping'"}
         ORDER BY revision_number DESC
       `, [workDate]);
       return result.rows;
@@ -3371,8 +3626,9 @@ export class PgDailyAssignmentsService {
    * Load all cleaners for a work_date from PostgreSQL.
    * Alias comes from aliases only (cleaners.alias no longer used).
    */
-  async loadCleanersForDate(workDate: string): Promise<any[] | null> {
+  async loadCleanersForDate(workDate: string, scope: string | null = 'housekeeping'): Promise<any[] | null> {
     try {
+      const normalizedScope = this.normalizeScope(scope);
       const result = await query(`
         SELECT 
           c.cleaner_id as id, c.name, c.lastname, c.role, c.active, c.ranking,
@@ -3381,7 +3637,11 @@ export class PgDailyAssignmentsService {
           ca.alias
         FROM cleaners c
         LEFT JOIN aliases ca ON ca.cleaner_id = c.cleaner_id
-        WHERE c.work_date = $1 AND c.active = true
+        WHERE c.work_date = $1
+          AND c.active = true
+          AND (${normalizedScope === 'office'
+            ? "LOWER(TRIM(COALESCE(c.role, ''))) = 'ufficio'"
+            : "LOWER(TRIM(COALESCE(c.role, ''))) <> 'ufficio'"})
         ORDER BY c.counter_hours DESC
       `, [workDate]);
 
@@ -3399,8 +3659,9 @@ export class PgDailyAssignmentsService {
   /**
    * Load a single cleaner by ID and date. Alias from aliases only.
    */
-  async loadCleanerById(cleanerId: number, workDate: string): Promise<any | null> {
+  async loadCleanerById(cleanerId: number, workDate: string, scope: string | null = 'housekeeping'): Promise<any | null> {
     try {
+      const normalizedScope = this.normalizeScope(scope);
       const result = await query(`
         SELECT 
           c.cleaner_id as id, c.name, c.lastname, c.role, c.active, c.ranking,
@@ -3410,6 +3671,9 @@ export class PgDailyAssignmentsService {
         FROM cleaners c
         LEFT JOIN aliases ca ON ca.cleaner_id = c.cleaner_id
         WHERE c.cleaner_id = $1 AND c.work_date = $2
+          AND (${normalizedScope === 'office'
+            ? "LOWER(TRIM(COALESCE(c.role, ''))) = 'ufficio'"
+            : "LOWER(TRIM(COALESCE(c.role, ''))) <> 'ufficio'"})
       `, [cleanerId, workDate]);
 
       if (result.rows.length > 0) {
@@ -3425,10 +3689,11 @@ export class PgDailyAssignmentsService {
   /**
    * Load multiple cleaners by IDs for a specific date. Alias from aliases only.
    */
-  async loadCleanersByIds(cleanerIds: number[], workDate: string): Promise<any[]> {
+  async loadCleanersByIds(cleanerIds: number[], workDate: string, scope: string | null = 'housekeeping'): Promise<any[]> {
     if (!cleanerIds || cleanerIds.length === 0) return [];
 
     try {
+      const normalizedScope = this.normalizeScope(scope);
       const result = await query(`
         SELECT 
           c.cleaner_id as id, c.name, c.lastname, c.role, c.active, c.ranking,
@@ -3438,6 +3703,9 @@ export class PgDailyAssignmentsService {
         FROM cleaners c
         LEFT JOIN aliases ca ON ca.cleaner_id = c.cleaner_id
         WHERE c.cleaner_id = ANY($1) AND c.work_date = $2
+          AND (${normalizedScope === 'office'
+            ? "LOWER(TRIM(COALESCE(c.role, ''))) = 'ufficio'"
+            : "LOWER(TRIM(COALESCE(c.role, ''))) <> 'ufficio'"})
       `, [cleanerIds, workDate]);
 
       console.log(`✅ PG: ${result.rows.length} cleaners caricati per IDs ${cleanerIds.join(',')}`);
@@ -3587,9 +3855,15 @@ export class PgDailyAssignmentsService {
    * Replaces all cleaners for the date
    * NOTE: Aliases are now stored in aliases table (permanent, date-independent)
    */
-  async saveCleanersForDate(workDate: string, cleaners: any[], snapshotReason?: string): Promise<boolean> {
+  async saveCleanersForDate(
+    workDate: string,
+    cleaners: any[],
+    snapshotReason?: string,
+    scope: string | null = 'housekeeping'
+  ): Promise<boolean> {
     const client = await pool.connect();
     try {
+      void scope;
       await client.query('BEGIN');
 
       // Load permanent aliases from aliases table
@@ -3598,8 +3872,8 @@ export class PgDailyAssignmentsService {
       `);
       const aliasMap = new Map(permanentAliases.rows.map((r: any) => [r.cleaner_id, r.alias]));
 
-      // Delete existing cleaners for this date
-      await client.query('DELETE FROM cleaners WHERE work_date = $1', [workDate]);
+      // Cleaner roster e unico per data: lo scope e derivato dal role (Ufficio vs non Ufficio).
+      await client.query("DELETE FROM cleaners WHERE work_date = $1", [workDate]);
 
       // Insert new cleaners; alias only in aliases (cleaners.alias no longer used)
       for (const cleaner of cleaners) {

@@ -6,7 +6,6 @@ interface CleanerTaskRules {
   standard_apt: boolean;
   premium_apt: boolean;
   straordinario_apt: boolean;
-  ufficio_apt?: boolean;
 }
 
 interface TaskTypesByCleaner {
@@ -18,7 +17,6 @@ interface ApartmentTypesConfig {
   premium_apt?: string[];
   straordinario_apt?: string[];
   formatore_apt?: string[];
-  ufficio_apt?: string[];
 }
 
 interface PriorityTypesConfig {
@@ -45,6 +43,7 @@ const OFFICE_OPERATION_NAMES = new Set([
   "pulizia uffici/altro",
   "pulizia uffici straordinaria",
 ]);
+const OFFICE_OPERATION_IDS_FALLBACK = new Set<number>([15]);
 
 async function loadOfficeOperationIds(): Promise<void> {
   if (cachedOfficeOperationIds) return;
@@ -60,7 +59,10 @@ async function loadOfficeOperationIds(): Promise<void> {
     for (const operation of operations) {
       const id = Number(operation?.id);
       const normalizedName = String(operation?.name ?? "").toLowerCase().trim();
-      if (Number.isFinite(id) && OFFICE_OPERATION_NAMES.has(normalizedName)) {
+      if (
+        Number.isFinite(id) &&
+        (OFFICE_OPERATION_NAMES.has(normalizedName) || normalizedName.includes("uffic"))
+      ) {
         cachedOfficeOperationIds.add(id);
       }
     }
@@ -123,7 +125,10 @@ function isOfficeTask(task: any): boolean {
 
   const operationIdRaw = task.operation_id ?? task.operationId;
   const operationId = operationIdRaw != null ? Number(operationIdRaw) : NaN;
-  if (Number.isFinite(operationId) && cachedOfficeOperationIds?.has(operationId)) {
+  if (
+    Number.isFinite(operationId) &&
+    (cachedOfficeOperationIds?.has(operationId) || OFFICE_OPERATION_IDS_FALLBACK.has(operationId))
+  ) {
     return true;
   }
 
@@ -135,7 +140,7 @@ function isOfficeTask(task: any): boolean {
   )
     .toLowerCase()
     .trim();
-  return OFFICE_OPERATION_NAMES.has(operationName);
+  return OFFICE_OPERATION_NAMES.has(operationName) || operationName.includes("uffic");
 }
 
 type TaskTypeKey = keyof CleanerTaskRules;
@@ -145,8 +150,6 @@ function determineTaskType(task: any): TaskTypeKey | null {
   if (typeof task !== 'object' || task === null) {
     return null;
   }
-
-  if (isOfficeTask(task)) return 'ufficio_apt';
 
   const isPremium = Boolean(task.premium);
   const isStraordinaria = Boolean(task.straordinaria);
@@ -197,6 +200,11 @@ export function canCleanerHandleTaskSync(
   const roleKey = normalizeCleanerRole(cleanerRole);
   const officeTask = isOfficeTask(task);
 
+  // Regola semplificata ufficio: task ufficio solo a cleaner con ruolo Ufficio.
+  if (officeTask) return roleKey === 'ufficio_cleaner';
+  // Cleaner ufficio non gestisce task non-ufficio.
+  if (roleKey === 'ufficio_cleaner') return false;
+
   const taskType = determineTaskType(task);
   // If the task type cannot be determined, assume it can be handled.
   if (!taskType) return true;
@@ -206,13 +214,8 @@ export function canCleanerHandleTaskSync(
   // If there are no specific rules for this role, assume it can handle the task.
   if (!roleRules) return true;
 
-  // Office tasks are controlled by the dedicated checkbox per role (task_types.<role>.ufficio_apt).
-  if (officeTask) {
-    return roleRules.ufficio_apt === true;
-  }
-
   // Straordinario tasks: only cleaners with role "Straordinario" can handle them
-  if (taskType === "straordinario_apt" && roleKey !== 'ufficio_cleaner') {
+  if (taskType === "straordinario_apt") {
     return roleKey === 'straordinario_cleaner';
   }
 

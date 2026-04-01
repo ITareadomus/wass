@@ -9,20 +9,25 @@ async function createRevisionsMetaTable() {
         id SERIAL PRIMARY KEY,
         work_date DATE NOT NULL,
         revision INTEGER NOT NULL,
+        scope VARCHAR(32),
         task_count INTEGER DEFAULT 0,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         created_by VARCHAR(100) DEFAULT 'system',
         modification_type VARCHAR(100),
         edited_fields TEXT[] DEFAULT '{}',
         old_values TEXT[] DEFAULT '{}',
-        new_values TEXT[] DEFAULT '{}',
-        UNIQUE(work_date, revision)
+        new_values TEXT[] DEFAULT '{}'
       );
     `);
-    
+
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_revisions_work_date 
       ON daily_assignments_revisions(work_date, revision DESC);
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS daily_assignments_revisions_work_date_revision_scope_uidx
+      ON daily_assignments_revisions (work_date, revision, (COALESCE(scope, 'housekeeping'::text)));
     `);
     
     console.log('✅ Table daily_assignments_revisions created successfully');
