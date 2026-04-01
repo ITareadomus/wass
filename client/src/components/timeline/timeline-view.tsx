@@ -53,7 +53,7 @@ interface TimelineViewProps {
   isLoadingDragDrop?: boolean; // Mostra loading overlay durante drag&drop
   lastValidDragIndex?: number | null; // Indice valido durante il drag (da container verso timeline)
   draggingOverCleanerId?: number | null; // ID del cleaner su cui si sta trascinando
-  searchTask?: string; // Ricerca task per ID, logistic code o address
+  searchTask?: string; // Ricerca task per ID, logistic code, address o customer reference
 }
 
 interface Cleaner {
@@ -145,11 +145,17 @@ export default function TimelineView({
         const taskId = String((task as any).id || (task as any).task_id || '');
         const logisticCode = String((task as any).logisticCode || (task as any).logistic_code || (task as any).name || '');
         const address = String((task as any).address || '');
+        const customerReference = String(
+          (task as any).customer_reference ||
+          (task as any).customerReference ||
+          ''
+        );
         
         return (
           taskId.toLowerCase().includes(lowerSearch) ||
           logisticCode.toLowerCase().includes(lowerSearch) ||
-          address.toLowerCase().includes(lowerSearch)
+          address.toLowerCase().includes(lowerSearch) ||
+          customerReference.toLowerCase().includes(lowerSearch)
         );
       })
       .map(t => String((t as any).id || (t as any).task_id || '')));
