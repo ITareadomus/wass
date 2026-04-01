@@ -372,12 +372,26 @@ export async function loadSelectedCleaners(
     
     if (pgCleanerIds && pgCleanerIds.length > 0) {
       // Get full cleaner data from cleaners table for the current scope.
-      // Fallback to aliases table for display names when roster rows are temporarily unavailable.
+      // If some IDs are not found in the current scope, fallback to same-date roster without scope filter
+      // to preserve role/name integrity during scope transitions.
       const fullCleaners = await pgDailyAssignmentsService.loadCleanersByIds(pgCleanerIds, workDate, scope);
+      const scopedFoundIds = new Set<number>(fullCleaners.map((c: any) => Number(c.id)));
+      const missingIds = pgCleanerIds
+        .map((id: any) => Number(id))
+        .filter((id: number) => Number.isFinite(id) && !scopedFoundIds.has(id));
+      const fallbackCleaners =
+        missingIds.length > 0
+          ? await pgDailyAssignmentsService.loadCleanersByIdsAnyScope(missingIds, workDate)
+          : [];
       const aliasMap = await pgDailyAssignmentsService.getAllCleanerAliases();
-      const fullById = new Map<number, any>(
-        fullCleaners.map((c: any) => [Number(c.id), c])
-      );
+      const fullById = new Map<number, any>();
+      for (const c of fullCleaners) {
+        fullById.set(Number(c.id), c);
+      }
+      for (const c of fallbackCleaners) {
+        const id = Number(c.id);
+        if (!fullById.has(id)) fullById.set(id, c);
+      }
       
       // Ensure all cleaners have required fields
       const cleanersData = pgCleanerIds.map((rawId: any) => {
@@ -388,7 +402,7 @@ export async function loadSelectedCleaners(
           id,
           name: c?.name || aliasData?.name || `ID ${id}`,
           lastname: c?.lastname || aliasData?.lastname || '',
-          role: c?.role || (scope === 'office' ? 'Ufficio' : 'Standard'),
+          role: c?.role || null,
           premium: Boolean(c?.premium),
           start_time: c?.start_time ?? '10:00',
           active: c?.active !== false,
@@ -429,7 +443,7 @@ export async function loadSelectedCleaners(
 
 /**
  * Save selected_cleaners for a specific work date
- * PRIMARY: PostgreSQL (IDs to daily_selected_cleaners, full data to cleaners table)
+ * PRIMARY: PostgreSQL (IDs to daily_selected_cleaners)
  * Now with revision tracking via selected_cleaners_revisions table
  */
 export async function saveSelectedCleaners(
@@ -467,11 +481,6 @@ export async function saveSelectedCleaners(
     const actionPayload = data.actionPayload || null;
     
     await pgDailyAssignmentsService.saveSelectedCleaners(workDate, cleanerIds, actionType, actionPayload, createdBy, resolvedScope);
-    
-    // Also save full cleaner data to cleaners table if available
-    if (cleanersArray.length > 0 && typeof cleanersArray[0] === 'object') {
-      await pgDailyAssignmentsService.saveCleanersForDate(workDate, cleanersArray, undefined, resolvedScope);
-    }
     
     console.log(`✅ Selected cleaners saved to PostgreSQL for ${workDate}: ${cleanerIds.length} IDs`);
 

@@ -942,6 +942,11 @@ export class PgDailyAssignmentsService {
 
       // Load collaborations map for this work_date
       const collaborationsMap = await taskCollaborationService.getCollaborationsMap(workDate);
+      const uniqueCleanerIds = Array.from(new Set(rows.map((r) => Number(r.cleaner_id)).filter((id) => Number.isFinite(id))));
+      const cleanersAnyScope = await this.loadCleanersByIdsAnyScope(uniqueCleanerIds, workDate);
+      const rosterById = new Map<number, any>(
+        cleanersAnyScope.map((c: any) => [Number(c.id), c])
+      );
 
       // Group rows by cleaner_id
       const cleanerMap = new Map<number, { cleaner: any; tasks: any[] }>();
@@ -949,10 +954,21 @@ export class PgDailyAssignmentsService {
       for (const row of rows) {
         if (!cleanerMap.has(row.cleaner_id)) {
           // Build cleaner object from stored data
+          const rosterCleaner = rosterById.get(Number(row.cleaner_id));
+          const rawName = typeof row.cleaner_name === 'string' ? row.cleaner_name.trim() : '';
+          const rawLastname = typeof row.cleaner_lastname === 'string' ? row.cleaner_lastname.trim() : '';
+          const isIdPlaceholderName =
+            !!rawName &&
+            (rawName.toUpperCase() === `ID ${row.cleaner_id}` || /^ID\s+\d+$/i.test(rawName));
+          const resolvedName = !rawName || isIdPlaceholderName ? (rosterCleaner?.name || rawName) : rawName;
+          const resolvedLastname = rawLastname || rosterCleaner?.lastname || '';
+          const resolvedRole = row.cleaner_role || rosterCleaner?.role || null;
+
           const cleaner: any = { id: row.cleaner_id };
-          if (row.cleaner_name) cleaner.name = row.cleaner_name;
-          if (row.cleaner_lastname) cleaner.lastname = row.cleaner_lastname;
-          if (row.cleaner_role) cleaner.role = row.cleaner_role;
+          if (resolvedName) cleaner.name = resolvedName;
+          if (resolvedLastname) cleaner.lastname = resolvedLastname;
+          if (resolvedRole) cleaner.role = resolvedRole;
+          if (rosterCleaner?.alias) cleaner.alias = rosterCleaner.alias;
           if (row.cleaner_premium !== null) cleaner.premium = row.cleaner_premium;
           cleaner.start_time = row.cleaner_start_time ?? '10:00';
 
@@ -3716,6 +3732,32 @@ export class PgDailyAssignmentsService {
     }
   }
 
+  /**
+   * Load cleaners by IDs for a date, without scope filter.
+   * Used as a fallback to preserve role/name when scope-specific rows are temporarily unavailable.
+   */
+  async loadCleanersByIdsAnyScope(cleanerIds: number[], workDate: string): Promise<any[]> {
+    if (!cleanerIds || cleanerIds.length === 0) return [];
+
+    try {
+      const result = await query(`
+        SELECT
+          c.cleaner_id as id, c.name, c.lastname, c.role, c.active, c.ranking,
+          c.counter_hours, c.counter_days, c.available, c.contract_type,
+          c.preferred_customers, c.telegram_id, c.start_time,
+          ca.alias
+        FROM cleaners c
+        LEFT JOIN aliases ca ON ca.cleaner_id = c.cleaner_id
+        WHERE c.cleaner_id = ANY($1) AND c.work_date = $2
+      `, [cleanerIds, workDate]);
+
+      return result.rows;
+    } catch (error) {
+      console.error('❌ PG: Errore nel caricamento cleaners any-scope per IDs:', error);
+      return [];
+    }
+  }
+
   // ==================== LOGISTICS DRIVERS ROSTER (lg_drivers, ADAM user_role_id = 9) ====================
 
   async loadLgDriversForDate(workDate: string): Promise<any[] | null> {
@@ -3863,7 +3905,7 @@ export class PgDailyAssignmentsService {
   ): Promise<boolean> {
     const client = await pool.connect();
     try {
-      void scope;
+      const normalizedScope = this.normalizeScope(scope);
       await client.query('BEGIN');
 
       // Load permanent aliases from aliases table
@@ -3872,7 +3914,12 @@ export class PgDailyAssignmentsService {
       `);
       const aliasMap = new Map(permanentAliases.rows.map((r: any) => [r.cleaner_id, r.alias]));
       const existingRolesResult = await client.query(
-        `SELECT cleaner_id, role FROM cleaners WHERE work_date = $1`,
+        `SELECT cleaner_id, role
+         FROM cleaners
+         WHERE work_date = $1
+           AND (${normalizedScope === 'office'
+             ? "LOWER(TRIM(COALESCE(role, ''))) = 'ufficio'"
+             : "LOWER(TRIM(COALESCE(role, ''))) <> 'ufficio'"})`,
         [workDate]
       );
       const existingRolesByCleanerId = new Map<number, string>(
@@ -3881,8 +3928,15 @@ export class PgDailyAssignmentsService {
           .filter(([id, role]) => Number.isFinite(id) && role.length > 0)
       );
 
-      // Cleaner roster e unico per data: lo scope e derivato dal role (Ufficio vs non Ufficio).
-      await client.query("DELETE FROM cleaners WHERE work_date = $1", [workDate]);
+      // Scope-safe rewrite: aggiorna solo il segmento office/non-office della data.
+      await client.query(
+        `DELETE FROM cleaners
+         WHERE work_date = $1
+           AND (${normalizedScope === 'office'
+             ? "LOWER(TRIM(COALESCE(role, ''))) = 'ufficio'"
+             : "LOWER(TRIM(COALESCE(role, ''))) <> 'ufficio'"})`,
+        [workDate]
+      );
 
       // Insert new cleaners; alias only in aliases (cleaners.alias no longer used)
       for (const cleaner of cleaners) {
