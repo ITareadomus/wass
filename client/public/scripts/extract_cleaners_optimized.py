@@ -56,13 +56,22 @@ week_end_excl = week_start + timedelta(days=7)  # [week_start, week_end_excl)
 conn = mysql.connector.connect(**db_config)
 cur = conn.cursor(dictionary=True)
 
-# 1) Lista cleaners (7=Standard, 13=Formatore, 15=Premium, 17=Cleaner Ufficio, 20=Straordinario)
+# 1) Lista cleaners scope-aware
+# - office: solo user_role_id=17 (Cleaner Ufficio)
+# - housekeeping: escludi role ufficio per evitare conflitti cross-scope in PostgreSQL
 # NOTA: Leggiamo tw_start da ADAM per usarlo come default se non c'è custom PostgreSQL
-cur.execute("""
-    SELECT id, name, lastname, user_role_id, active, contract_type_id, telegram_id, tw_start
-    FROM app_users 
-    WHERE user_role_id IN (7, 13, 15, 17, 20) AND active = 1;
-""")
+if scope == "office":
+    cur.execute("""
+        SELECT id, name, lastname, user_role_id, active, contract_type_id, telegram_id, tw_start
+        FROM app_users
+        WHERE user_role_id = 17 AND active = 1;
+    """)
+else:
+    cur.execute("""
+        SELECT id, name, lastname, user_role_id, active, contract_type_id, telegram_id, tw_start
+        FROM app_users
+        WHERE user_role_id IN (7, 13, 15, 20) AND active = 1;
+    """)
 cleaners = cur.fetchall()
 
 # 2) Ore settimanali (set-based, senza DATE(colonna))
@@ -177,13 +186,24 @@ try:
             pg_cur = pg_conn.cursor(cursor_factory=RealDictCursor)
             # Leggi TUTTI i cleaners esistenti da PostgreSQL per questa data
             # Li preserveremo se non sono in ADAM
-            pg_cur.execute("""
-                SELECT cleaner_id, name, lastname, role, active, ranking,
-                       counter_hours, counter_days, available, contract_type,
-                       preferred_customers, telegram_id, start_time
-                FROM cleaners
-                WHERE work_date = %s
-            """, (target_date_str,))
+            if scope == "office":
+                pg_cur.execute("""
+                    SELECT cleaner_id, name, lastname, role, active, ranking,
+                           counter_hours, counter_days, available, contract_type,
+                           preferred_customers, telegram_id, start_time
+                    FROM cleaners
+                    WHERE work_date = %s
+                      AND LOWER(TRIM(COALESCE(role, ''))) = 'ufficio'
+                """, (target_date_str,))
+            else:
+                pg_cur.execute("""
+                    SELECT cleaner_id, name, lastname, role, active, ranking,
+                           counter_hours, counter_days, available, contract_type,
+                           preferred_customers, telegram_id, start_time
+                    FROM cleaners
+                    WHERE work_date = %s
+                      AND LOWER(TRIM(COALESCE(role, ''))) <> 'ufficio'
+                """, (target_date_str,))
             for row in pg_cur.fetchall():
                 cid = row["cleaner_id"]
                 existing_pg_cleaners[cid] = {
@@ -308,7 +328,7 @@ from api_client import ApiClient
 print(f"📅 Data target: {target_date_str}")
 print(f"👥 Cleaners trovati: {len(cleaners_data)}")
 
-api = ApiClient()
+api = ApiClient(scope=scope)
 result = api.save_cleaners(target_date_str, cleaners_data)
 print(f"✅ Cleaners salvati su PostgreSQL via API: {result.get('message', 'OK')}")
 print(f"🔄 Completato - {len(cleaners_data)} cleaners salvati per {target_date_str}")

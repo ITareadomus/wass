@@ -2174,9 +2174,10 @@ export class PgDailyAssignmentsService {
           WHERE work_date = $1
             AND logistic_code IS NOT NULL
             AND logistic_code <> 0
+            AND COALESCE(scope, 'housekeeping') = $3
         ),
         to_lock AS (
-          SELECT work_date, task_id
+          SELECT DISTINCT work_date, task_id
           FROM ranked
           WHERE rn > 1
         ),
@@ -2192,7 +2193,7 @@ export class PgDailyAssignmentsService {
         WHERE dc.work_date = tl.work_date
           AND dc.task_id = tl.task_id
           AND COALESCE(dc.locked, FALSE) = FALSE
-      `, [workDate, autoDuplicateLockReason]);
+      `, [workDate, autoDuplicateLockReason, normalizedScope]);
 
       const lockDupesUpsert = await client.query(`
         WITH ranked AS (
@@ -2210,9 +2211,10 @@ export class PgDailyAssignmentsService {
           WHERE work_date = $1
             AND logistic_code IS NOT NULL
             AND logistic_code <> 0
+            AND COALESCE(scope, 'housekeeping') = $4
         ),
         to_lock AS (
-          SELECT work_date, task_id
+          SELECT DISTINCT work_date, task_id
           FROM ranked
           WHERE rn > 1
         )
@@ -2234,7 +2236,7 @@ export class PgDailyAssignmentsService {
           END,
           locked_by = COALESCE(daily_task_locks.locked_by, EXCLUDED.locked_by),
           updated_at = NOW()
-      `, [workDate, autoDuplicateLockReason, autoDuplicateLockedBy]);
+      `, [workDate, autoDuplicateLockReason, autoDuplicateLockedBy, normalizedScope]);
 
       // Se un task era stato auto-lockato in passato ma ora è il "winner",
       // sbloccalo (solo se il lock era quello automatico da doppione).
@@ -2254,9 +2256,10 @@ export class PgDailyAssignmentsService {
           WHERE work_date = $1
             AND logistic_code IS NOT NULL
             AND logistic_code <> 0
+            AND COALESCE(scope, 'housekeeping') = $3
         ),
         winners AS (
-          SELECT work_date, task_id
+          SELECT DISTINCT work_date, task_id
           FROM ranked
           WHERE rn = 1
         )
@@ -2268,7 +2271,7 @@ export class PgDailyAssignmentsService {
           AND dc.task_id = w.task_id
           AND dc.locked = TRUE
           AND dc.locked_reason = $2
-      `, [workDate, autoDuplicateLockReason]);
+      `, [workDate, autoDuplicateLockReason, normalizedScope]);
 
       await client.query(`
         WITH ranked AS (
@@ -2286,9 +2289,10 @@ export class PgDailyAssignmentsService {
           WHERE work_date = $1
             AND logistic_code IS NOT NULL
             AND logistic_code <> 0
+            AND COALESCE(scope, 'housekeeping') = $4
         ),
         winners AS (
-          SELECT work_date, task_id
+          SELECT DISTINCT work_date, task_id
           FROM ranked
           WHERE rn = 1
         )
@@ -2303,7 +2307,7 @@ export class PgDailyAssignmentsService {
           AND l.locked = TRUE
           AND l.locked_reason = $2
           AND l.locked_by = $3
-      `, [workDate, autoDuplicateLockReason, autoDuplicateLockedBy]);
+      `, [workDate, autoDuplicateLockReason, autoDuplicateLockedBy, normalizedScope]);
 
       if ((lockDupesUpdate.rowCount || 0) > 0 || (lockDupesUpsert.rowCount || 0) > 0) {
         console.log(
@@ -3943,6 +3947,13 @@ export class PgDailyAssignmentsService {
         const normalizedIncomingRole = String(cleaner?.role || "").trim();
         const preservedRole = existingRolesByCleanerId.get(Number(cleaner?.id)) || "";
         const resolvedRole = normalizedIncomingRole || preservedRole || "Standard";
+        const roleIsOffice = resolvedRole.toLowerCase() === "ufficio";
+
+        // Guardrail: accetta solo righe coerenti con lo scope richiesto.
+        // Evita collisioni UNIQUE(cleaner_id, work_date) quando input cross-scope arriva per errore.
+        if (normalizedScope === "office" ? !roleIsOffice : roleIsOffice) {
+          continue;
+        }
 
         // If cleaner has a new alias, save it to aliases (permanent)
         if (cleaner.alias && !aliasMap.has(cleaner.id)) {
