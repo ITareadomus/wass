@@ -30,12 +30,15 @@ interface CleanerSelectorDialogProps {
   onClose: () => void;
   onConfirm: (selectedCleanerIds: number[]) => void;
   excludeCleanerId?: number | null;
+  excludeCleanerIds?: number[];
   workDate: string;
   title?: string;
   description?: string;
   confirmLabel?: string;
   baseCleaningTime?: number;
   existingCollaboratorCount?: number;
+  preselectedCleanerIds?: number[];
+  primaryCleanerId?: number | null;
   isLoading?: boolean;
 }
 
@@ -44,12 +47,15 @@ export function CleanerSelectorDialog({
   onClose,
   onConfirm,
   excludeCleanerId = null,
+  excludeCleanerIds = [],
   workDate,
   title = "Seleziona Collaboratori",
   description = "Seleziona uno o più cleaners da aggiungere come collaboratori",
   confirmLabel = "Conferma",
   baseCleaningTime = 0,
   existingCollaboratorCount = 0,
+  preselectedCleanerIds = [],
+  primaryCleanerId = null,
   isLoading = false,
 }: CleanerSelectorDialogProps) {
   const scopeValue: "housekeeping" | "office" =
@@ -75,9 +81,12 @@ export function CleanerSelectorDialog({
   useEffect(() => {
     if (isOpen) {
       loadCleaners();
-      setSelectedIds([]);
+      setSelectedIds(Array.from(new Set(preselectedCleanerIds)));
     }
-  }, [isOpen, workDate]);
+  }, [isOpen, workDate, preselectedCleanerIds]);
+
+  const preselectedSet = new Set(preselectedCleanerIds);
+  const newlySelectedIds = selectedIds.filter((id) => !preselectedSet.has(id));
 
   const loadCleaners = async () => {
     setIsLoadingCleaners(true);
@@ -140,6 +149,12 @@ export function CleanerSelectorDialog({
           (c: Cleaner) => c.id !== excludeCleanerId && c.cleaner_id !== excludeCleanerId
         );
       }
+      if (excludeCleanerIds.length > 0) {
+        const excluded = new Set(excludeCleanerIds.filter((id) => Number.isFinite(id)));
+        allCleaners = allCleaners.filter(
+          (c: Cleaner) => !excluded.has(c.id) && !excluded.has(Number(c.cleaner_id))
+        );
+      }
 
       const sortCleaners = (list: Cleaner[]) => {
         return list.sort((a: Cleaner, b: Cleaner) => {
@@ -187,6 +202,7 @@ export function CleanerSelectorDialog({
   };
 
   const toggleCleaner = (cleanerId: number) => {
+    if (preselectedSet.has(cleanerId)) return;
     setSelectedIds((prev) =>
       prev.includes(cleanerId)
         ? prev.filter((id) => id !== cleanerId)
@@ -195,14 +211,14 @@ export function CleanerSelectorDialog({
   };
 
   const handleConfirm = () => {
-    if (selectedIds.length > 0) {
-      onConfirm(selectedIds);
+    if (newlySelectedIds.length > 0) {
+      onConfirm(newlySelectedIds);
     }
   };
 
   const calculatePreviewDuration = () => {
-    if (selectedIds.length === 0 || baseCleaningTime === 0) return null;
-    const totalCollaborators = existingCollaboratorCount + selectedIds.length;
+    if (newlySelectedIds.length === 0 || baseCleaningTime === 0) return null;
+    const totalCollaborators = existingCollaboratorCount + newlySelectedIds.length;
     const perCleaner = Math.ceil(baseCleaningTime / totalCollaborators);
     const hours = Math.floor(perCleaner / 60);
     const mins = perCleaner % 60;
@@ -253,7 +269,10 @@ export function CleanerSelectorDialog({
                   <div className="space-y-2">
                     {convocatiCleaners.map((cleaner) => {
                       const isSelected = selectedIds.includes(cleaner.id);
-                      const isPrimary = selectedIds.length > 0 && selectedIds[0] === cleaner.id;
+                      const isPrimary = primaryCleanerId != null
+                        ? cleaner.id === primaryCleanerId
+                        : selectedIds.length > 0 && selectedIds[0] === cleaner.id;
+                      const isPreselected = preselectedSet.has(cleaner.id);
                       const displayName = cleaner.lastname
                         ? `${cleaner.name} ${cleaner.lastname}`
                         : cleaner.name;
@@ -266,6 +285,7 @@ export function CleanerSelectorDialog({
                             isSelected
                               ? "bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700"
                               : "hover:bg-accent",
+                            isPreselected && "ring-1 ring-purple-300 dark:ring-purple-700",
                             !cleaner.available && "opacity-70"
                           )}
                         >
@@ -273,12 +293,16 @@ export function CleanerSelectorDialog({
                             <Checkbox
                               checked={isSelected}
                               onCheckedChange={() => toggleCleaner(cleaner.id)}
+                              disabled={isPreselected}
                             />
                             <div>
                               <p className="font-semibold">
                                 {displayName}
                                 {isPrimary && (
                                   <span className="ml-2 text-xs font-bold text-blue-600 dark:text-blue-400">(P)</span>
+                                )}
+                                {isPreselected && (
+                                  <span className="ml-2 text-xs font-semibold text-purple-600 dark:text-purple-400">(già selezionato)</span>
                                 )}
                               </p>
                               <p className="text-sm text-muted-foreground">
@@ -335,7 +359,10 @@ export function CleanerSelectorDialog({
                   <div className="space-y-2">
                     {nonConvocatiCleaners.map((cleaner) => {
                       const isSelected = selectedIds.includes(cleaner.id);
-                      const isPrimary = selectedIds.length > 0 && selectedIds[0] === cleaner.id;
+                      const isPrimary = primaryCleanerId != null
+                        ? cleaner.id === primaryCleanerId
+                        : selectedIds.length > 0 && selectedIds[0] === cleaner.id;
+                      const isPreselected = preselectedSet.has(cleaner.id);
                       const displayName = cleaner.lastname
                         ? `${cleaner.name} ${cleaner.lastname}`
                         : cleaner.name;
@@ -348,6 +375,7 @@ export function CleanerSelectorDialog({
                             isSelected
                               ? "bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700"
                               : "hover:bg-accent",
+                            isPreselected && "ring-1 ring-purple-300 dark:ring-purple-700",
                             !cleaner.available && "opacity-70"
                           )}
                         >
@@ -355,12 +383,16 @@ export function CleanerSelectorDialog({
                             <Checkbox
                               checked={isSelected}
                               onCheckedChange={() => toggleCleaner(cleaner.id)}
+                              disabled={isPreselected}
                             />
                             <div>
                               <p className="font-semibold">
                                 {displayName}
                                 {isPrimary && (
                                   <span className="ml-2 text-xs font-bold text-blue-600 dark:text-blue-400">(P)</span>
+                                )}
+                                {isPreselected && (
+                                  <span className="ml-2 text-xs font-semibold text-purple-600 dark:text-purple-400">(già selezionato)</span>
                                 )}
                               </p>
                               <p className="text-sm text-muted-foreground">
@@ -413,7 +445,7 @@ export function CleanerSelectorDialog({
 
         {/* Footer fisso: preview + bottoni */}
         <div className="flex-shrink-0 border-t pt-4 mt-4 space-y-4">
-          {selectedIds.length > 0 && baseCleaningTime > 0 && previewDuration && (
+          {newlySelectedIds.length > 0 && baseCleaningTime > 0 && previewDuration && (
             <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
               <p className="text-sm font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-2">
                 <Users className="w-4 h-4" />
@@ -427,7 +459,7 @@ export function CleanerSelectorDialog({
               </p>
               {existingCollaboratorCount > 0 && (
                 <p className="text-xs text-purple-400 dark:text-purple-600 mt-1 italic">
-                  ({existingCollaboratorCount} esistenti + {selectedIds.length} nuov{selectedIds.length > 1 ? "i" : "o"})
+                  ({existingCollaboratorCount} esistenti + {newlySelectedIds.length} nuov{newlySelectedIds.length > 1 ? "i" : "o"})
                 </p>
               )}
             </div>
@@ -440,7 +472,7 @@ export function CleanerSelectorDialog({
             <Button
               variant="outline"
               onClick={handleConfirm}
-              disabled={selectedIds.length === 0 || isLoading}
+              disabled={newlySelectedIds.length === 0 || isLoading}
               className="border-2 border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
             >
               {isLoading ? (
@@ -451,7 +483,7 @@ export function CleanerSelectorDialog({
               ) : (
                 <>
                   {confirmLabel}
-                  {selectedIds.length > 0 && ` (${selectedIds.length})`}
+                  {newlySelectedIds.length > 0 && ` (${newlySelectedIds.length})`}
                 </>
               )}
             </Button>

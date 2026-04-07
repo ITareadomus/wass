@@ -4727,22 +4727,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
-      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       
       const collaboration = await taskCollaborationService.getCollaboration(workDate, taskId);
       
-      // Recupera alias per i collaboratori
+      // Recupera alias e nominativi per i collaboratori
       const { query } = await import("../shared/pg-db");
-      const aliasesResult = await query(
-        `SELECT cleaner_id, alias FROM aliases WHERE cleaner_id = ANY($1)`,
-        [collaboration.cleanerIds]
-      );
+      const [aliasesResult, cleanersResult] = await Promise.all([
+        query(
+          `SELECT cleaner_id, alias FROM aliases WHERE cleaner_id = ANY($1)`,
+          [collaboration.cleanerIds]
+        ),
+        query(
+          `SELECT cleaner_id, name, lastname
+           FROM cleaners
+           WHERE cleaner_id = ANY($1)
+             AND work_date = $2`,
+          [collaboration.cleanerIds, workDate]
+        ),
+      ]);
       
       const aliasMap = new Map(aliasesResult.rows.map(r => [r.cleaner_id, r.alias]));
+      const cleanerNameMap = new Map(
+        cleanersResult.rows.map((r: any) => [
+          r.cleaner_id,
+          `${String(r.name ?? "").trim()} ${String(r.lastname ?? "").trim()}`.trim(),
+        ])
+      );
       
       const collaborators = collaboration.cleanerIds.map(id => ({
         id,
-        alias: aliasMap.get(id) || `Cleaner ${id}`,
+        alias: String(aliasMap.get(id) ?? "").trim() || cleanerNameMap.get(id) || `Cleaner ${id}`,
         isPrimary: id === collaboration.primaryCleanerId
       }));
 
@@ -4818,9 +4832,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // 3.5 AUTO-CONVOCAZIONE: Se il cleaner non è nei selected_cleaners, aggiungilo atomicamente
         // Usa UPSERT con ON CONFLICT per evitare race conditions anche quando la riga non esiste
+        const selectedScope = resolveScopeFromReq(req);
         const selectedCleanersResult = await client.query(
-          'SELECT cleaners FROM daily_selected_cleaners WHERE work_date = $1 FOR UPDATE',
-          [workDate]
+          `SELECT cleaners
+           FROM daily_selected_cleaners
+           WHERE work_date = $1 AND scope = $2
+           FOR UPDATE`,
+          [workDate, selectedScope]
         );
         let currentSelectedCleaners: number[] = selectedCleanersResult.rows[0]?.cleaners || [];
         let wasAutoSummoned = false;
@@ -4831,12 +4849,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // UPSERT atomico: INSERT con ON CONFLICT per gestire sia create che update
           await client.query(
-            `INSERT INTO daily_selected_cleaners (work_date, cleaners, updated_at)
-             VALUES ($1, ARRAY[$2::integer], NOW())
-             ON CONFLICT (work_date) DO UPDATE 
+            `INSERT INTO daily_selected_cleaners (work_date, scope, cleaners, updated_at)
+             VALUES ($1, $3, ARRAY[$2::integer], NOW())
+             ON CONFLICT (work_date, scope) DO UPDATE 
              SET cleaners = ARRAY(SELECT DISTINCT unnest(array_append(daily_selected_cleaners.cleaners, $2::integer))),
                  updated_at = NOW()`,
-            [workDate, Number(cleanerId)]
+            [workDate, Number(cleanerId), selectedScope]
           );
           console.log(`✅ Cleaner ${cleanerId} aggiunto ai selected_cleaners per ${workDate}`);
         }
@@ -5080,9 +5098,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // 2.5 AUTO-CONVOCAZIONE: Aggiungi atomicamente cleaners non convocati ai selected_cleaners
         // Usa UPSERT con ON CONFLICT per evitare race conditions anche quando la riga non esiste
+        const selectedScope = resolveScopeFromReq(req);
         const selectedCleanersResult = await client.query(
-          'SELECT cleaners FROM daily_selected_cleaners WHERE work_date = $1 FOR UPDATE',
-          [workDate]
+          `SELECT cleaners
+           FROM daily_selected_cleaners
+           WHERE work_date = $1 AND scope = $2
+           FOR UPDATE`,
+          [workDate, selectedScope]
         );
         let currentSelectedCleaners: number[] = selectedCleanersResult.rows[0]?.cleaners || [];
         const autoSummonedCleaners: number[] = [];
@@ -5098,12 +5120,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // UPSERT atomico: INSERT con ON CONFLICT per gestire sia create che update
           await client.query(
-            `INSERT INTO daily_selected_cleaners (work_date, cleaners, updated_at)
-             VALUES ($1, $2::integer[], NOW())
-             ON CONFLICT (work_date) DO UPDATE 
+            `INSERT INTO daily_selected_cleaners (work_date, scope, cleaners, updated_at)
+             VALUES ($1, $3, $2::integer[], NOW())
+             ON CONFLICT (work_date, scope) DO UPDATE 
              SET cleaners = ARRAY(SELECT DISTINCT unnest(array_cat(daily_selected_cleaners.cleaners, $2::integer[]))),
                  updated_at = NOW()`,
-            [workDate, autoSummonedCleaners]
+            [workDate, autoSummonedCleaners, selectedScope]
           );
           console.log(`✅ ${autoSummonedCleaners.length} cleaners aggiunti ai selected_cleaners per ${workDate}`);
         }

@@ -206,6 +206,7 @@ export default function TaskCard({
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showDissolveDialog, setShowDissolveDialog] = useState(false);
+  const [isCollaborationDetailsOpen, setIsCollaborationDetailsOpen] = useState(false);
   const [isDissolvingCollaboration, setIsDissolvingCollaboration] = useState(false);
   
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
@@ -378,6 +379,7 @@ const displayClickableInputClass =
   const [hasResolvedHousekeepingCleanerDetails, setHasResolvedHousekeepingCleanerDetails] = useState(false);
   const [resolvedHousekeepingTaskKey, setResolvedHousekeepingTaskKey] = useState<string>("");
   const isLogisticsTimelineDetails = operationsScope === "logistics" && isInTimeline;
+  const isTimelineDetailsDialog = isInTimeline && !isOfficeScope;
   const { toast } = useToast();
 
   // Handler per toggle blocco task
@@ -851,7 +853,7 @@ const displayClickableInputClass =
     let cancelled = false;
 
     const loadLogisticsDriverBadge = async () => {
-      if (!isLogisticsTimelineDetails || !isModalOpen) {
+      if (!isTimelineDetailsDialog || !isModalOpen) {
         if (!cancelled) {
           setIsLoadingLogisticsDriverBadge(false);
           setHasResolvedLogisticsDriverBadge(false);
@@ -919,13 +921,13 @@ const displayClickableInputClass =
     return () => {
       cancelled = true;
     };
-  }, [isLogisticsTimelineDetails, isModalOpen, cleanerId, displayTask, task]);
+  }, [isTimelineDetailsDialog, isModalOpen, cleanerId, displayTask, task]);
 
   useEffect(() => {
     let cancelled = false;
 
     const loadHousekeepingCleanerLabel = async () => {
-      if (!isLogisticsTimelineDetails || !isModalOpen) {
+      if (!isTimelineDetailsDialog || !isModalOpen) {
         if (!cancelled) {
           setIsLoadingHousekeepingCleanerDetails(false);
           setHasResolvedHousekeepingCleanerDetails(false);
@@ -995,7 +997,7 @@ const displayClickableInputClass =
     return () => {
       cancelled = true;
     };
-  }, [isLogisticsTimelineDetails, isModalOpen, displayTask, task]);
+  }, [isTimelineDetailsDialog, isModalOpen, displayTask, task]);
 
   // Supporto navigazione con frecce da tastiera
   useEffect(() => {
@@ -1701,6 +1703,23 @@ const displayClickableInputClass =
     displayTaskAny.sofaBeds ??
     displayTaskAny.divani_letto ??
     "—";
+  // "Schedulato alle" nel box logistica deve usare solo dati logistici dedicati
+  // (non l'orario di start housekeeping).
+  const logisticsScheduledAtRaw =
+    taskAny.logistics_start_time ??
+    taskAny.logisticsStartTime ??
+    taskAny.logistics_scheduled_time ??
+    taskAny.logisticsScheduledTime ??
+    taskAny.driver_start_time ??
+    taskAny.driverStartTime ??
+    displayTaskAny.logistics_start_time ??
+    displayTaskAny.logisticsStartTime ??
+    displayTaskAny.logistics_scheduled_time ??
+    displayTaskAny.logisticsScheduledTime ??
+    displayTaskAny.driver_start_time ??
+    displayTaskAny.driverStartTime ??
+    null;
+  const logisticsScheduledAt = String(logisticsScheduledAtRaw ?? "").trim();
   const alertText = String(logisticsAlertMessage ?? "").trim();
   const notesText = String(logisticsNotes ?? "").trim();
   const logisticsHousekeepingAlias =
@@ -1736,6 +1755,16 @@ const displayClickableInputClass =
       ? String(logisticsHousekeepingAlias || "").trim()
       : "") ||
     "non assegnato";
+  const hasCollaboration = Number((displayTask as any).collaborator_count || 0) > 1;
+  const primaryCollaboratorLabel = (() => {
+    const primary = taskCollaborators.find((c: any) => Boolean(c?.isPrimary));
+    if (!primary) return "";
+    return String(primary.alias ?? primary.name ?? (primary.id != null ? `Cleaner ${primary.id}` : "")).trim();
+  })();
+  const cleanerDetailsAssignedTo =
+    hasCollaboration && primaryCollaboratorLabel
+      ? primaryCollaboratorLabel
+      : logisticsAssignedTo;
 
   return (
     <>
@@ -1979,8 +2008,10 @@ const displayClickableInputClass =
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent
           className={cn(
-            "overflow-y-auto",
-            isLogisticsTimelineDetails ? "sm:max-w-5xl max-h-[80vh]" : "sm:max-w-xl max-h-[75vh]"
+            "overflow-y-auto overflow-x-hidden",
+            isTimelineDetailsDialog
+              ? "w-[min(96vw,1100px)] max-w-[1100px] max-h-[85vh]"
+              : "sm:max-w-xl max-h-[75vh]"
           )}
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
@@ -1997,7 +2028,7 @@ const displayClickableInputClass =
                 <ChevronLeft className="h-5 w-5" />
               </Button>
 
-              <DialogTitle className="flex items-center gap-2 flex-1 justify-center">
+              <DialogTitle className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-2 text-center">
                 Dettagli Task #{getTaskKey(displayTask)}
                 <Badge
                   variant="outline"
@@ -2057,113 +2088,114 @@ const displayClickableInputClass =
             </div>
           </DialogHeader>
 
-          <div className={cn(isLogisticsTimelineDetails && "mt-3 grid grid-cols-1 sm:grid-cols-[340px_1fr] gap-4 items-stretch")}>
-            {isLogisticsTimelineDetails && (
+          <div className={cn(isTimelineDetailsDialog && "mt-3 grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-4 items-stretch")}>
+            {isTimelineDetailsDialog && (
               <div className="flex h-full flex-col gap-3">
-                <div className="relative h-full min-h-0 rounded-md border border-border bg-muted/20 p-3">
-                  <div className="absolute -top-3 left-3 inline-flex items-center gap-1.5 rounded-t-md rounded-b-sm border border-border bg-background px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-foreground shadow-sm">
-                    <Truck className="h-3.5 w-3.5 shrink-0" />
-                    <span>Dettagli Logistica</span>
-                  </div>
+                {isTimelineDetailsDialog && (
+                  <div className="relative h-full min-h-0 rounded-md border border-border bg-muted/20 p-3">
+                    <div className="absolute -top-3 left-3 inline-flex items-center gap-1.5 rounded-t-md rounded-b-sm border border-border bg-background px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-foreground shadow-sm">
+                      <Truck className="h-3.5 w-3.5 shrink-0" />
+                      <span>Dettagli Logistica</span>
+                    </div>
 
-                  <div className="grid grid-rows-[repeat(4,minmax(56px,auto))] gap-3 pt-2">
-                    <div className="grid min-h-[56px] grid-cols-[1fr_auto] gap-3 items-start">
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground">Autista - Veicolo</p>
-                        <Badge variant="outline" className="mt-[8px] text-xs min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap">
-                          {String(
-                            effectiveDriverBadge ??
-                              (!shouldShowResolvedDriverFallback
-                                ? ""
-                                : "non assegnato")
-                          )}
-                        </Badge>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground">Sequenza</p>
-                        <div className="flex justify-center">
-                          <Badge variant="outline" className="mt-[8px] text-xs shrink-0">
-                            {String(logisticsTimelineSequence ?? "—")}
+                    <div className="grid gap-3 pt-2">
+                      <div className="grid min-h-[56px] grid-cols-[1fr_auto] gap-3 items-start">
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground">Autista - Veicolo</p>
+                          <Badge variant="outline" className="mt-[8px] text-xs min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap">
+                            {String(
+                              effectiveDriverBadge ??
+                                (!shouldShowResolvedDriverFallback
+                                  ? ""
+                                  : "non assegnato")
+                            )}
                           </Badge>
                         </div>
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground">Sequenza</p>
+                          <div className="flex justify-center">
+                            <Badge variant="outline" className="mt-[8px] text-xs shrink-0">
+                              {String(logisticsTimelineSequence ?? "—")}
+                            </Badge>
+                          </div>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="grid min-h-[56px] grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground">Travel Time</p>
+                      <div className="grid min-h-[56px] grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground">Travel Time</p>
+                          <Input
+                            value={
+                              assignmentTimes.travel_time !== undefined
+                                ? `${assignmentTimes.travel_time} minuti`
+                                : "non assegnato"
+                            }
+                            readOnly
+                            className={displayInputClass}
+                            tabIndex={-1}
+                            onFocus={(e) => e.currentTarget.blur()}
+                          />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground">Schedulato alle</p>
+                          <Input
+                          value={logisticsScheduledAt || "non assegnato"}
+                            readOnly
+                            className={displayInputClass}
+                            tabIndex={-1}
+                            onFocus={(e) => e.currentTarget.blur()}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid min-h-[56px] grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground">Messaggi di allerta</p>
+                          <Input
+                            value={alertText || "—"}
+                            readOnly
+                            className={displayInputClass}
+                            tabIndex={-1}
+                            onFocus={(e) => e.currentTarget.blur()}
+                          />
+                        </div>
+
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground">Notes</p>
+                          <Input
+                            value={notesText || "—"}
+                            readOnly
+                            className={displayInputClass}
+                            tabIndex={-1}
+                            onFocus={(e) => e.currentTarget.blur()}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="min-h-[56px]">
+                        <p className="text-sm font-semibold text-muted-foreground">Divani letto</p>
                         <Input
-                          value={
-                            assignmentTimes.travel_time !== undefined
-                              ? `${assignmentTimes.travel_time} minuti`
-                              : "non assegnato"
-                          }
+                          value={String(logisticsSofaBeds)}
                           readOnly
                           className={displayInputClass}
                           tabIndex={-1}
                           onFocus={(e) => e.currentTarget.blur()}
                         />
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground">Schedulato alle</p>
-                        <Input
-                          value={String(assignmentTimes.start_time ?? "non assegnato")}
-                          readOnly
-                          className={displayInputClass}
-                          tabIndex={-1}
-                          onFocus={(e) => e.currentTarget.blur()}
-                        />
-                      </div>
                     </div>
-
-                    <div className="grid min-h-[56px] grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground">Messaggi di allerta</p>
-                        <Input
-                          value={alertText || "—"}
-                          readOnly
-                          className={displayInputClass}
-                          tabIndex={-1}
-                          onFocus={(e) => e.currentTarget.blur()}
-                        />
-                      </div>
-
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground">Notes</p>
-                        <Input
-                          value={notesText || "—"}
-                          readOnly
-                          className={displayInputClass}
-                          tabIndex={-1}
-                          onFocus={(e) => e.currentTarget.blur()}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="min-h-[56px]">
-                      <p className="text-sm font-semibold text-muted-foreground">Divani letto</p>
-                      <Input
-                        value={String(logisticsSofaBeds)}
-                        readOnly
-                        className={displayInputClass}
-                        tabIndex={-1}
-                        onFocus={(e) => e.currentTarget.blur()}
-                      />
-                    </div>
-
                   </div>
-                </div>
+                )}
 
-                <div className="relative mt-2 rounded-md border border-border bg-muted/20 p-3 flex-none">
+                <div className={cn("relative rounded-md border border-border bg-muted/20 p-3 flex-none", isTimelineDetailsDialog && "mt-2")}>
                   <div className="absolute -top-3 left-3 inline-flex items-center gap-1.5 rounded-t-md rounded-b-sm border border-border bg-background px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-foreground shadow-sm">
                     <User className="h-3.5 w-3.5 shrink-0" />
                     <span>Dettagli Cleaner</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                     <div>
                       <p className="text-sm font-semibold text-muted-foreground">Task assegnato a</p>
                       <Input
-                        value={logisticsAssignedTo}
+                        value={cleanerDetailsAssignedTo}
                         readOnly
                         className={displayInputClass}
                         tabIndex={-1}
@@ -2190,14 +2222,14 @@ const displayClickableInputClass =
               </div>
             )}
 
-            <div className={cn(isLogisticsTimelineDetails ? "relative h-full min-h-0 rounded-md border border-border bg-muted/20 p-3" : "space-y-3")}>
-            {isLogisticsTimelineDetails && (
+            <div className={cn(isTimelineDetailsDialog ? "relative h-full min-h-0 min-w-0 rounded-md border border-border bg-muted/20 p-3" : "space-y-3")}>
+            {isTimelineDetailsDialog && (
               <div className="absolute -top-3 left-3 inline-flex items-center gap-1.5 rounded-t-md rounded-b-sm border border-border bg-background px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-foreground shadow-sm">
                 <Building2 className="h-3.5 w-3.5 shrink-0" />
-                <span>Dettagli Housekeeping</span>
+                <span>{isLogisticsTimelineDetails ? "Dettagli Housekeeping" : "Dettagli Task"}</span>
               </div>
             )}
-            <div className={cn(isLogisticsTimelineDetails ? "grid grid-rows-[repeat(6,minmax(56px,auto))] gap-3 pt-2" : "space-y-3")}>
+            <div className={cn(isTimelineDetailsDialog ? "grid gap-3 pt-2" : "space-y-3")}>
             {/* Prima riga: Codice ADAM | Cliente */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
               <div className="self-start">
@@ -2341,7 +2373,7 @@ const displayClickableInputClass =
             </div>
 
             {/* Quinta riga: Pax-In - Pax-Out */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Pax-In
@@ -2365,7 +2397,7 @@ const displayClickableInputClass =
             </div>
 
             {/* Sesta riga: Travel Time - Start Time - End Time (Start/End nella colonna destra) */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Travel Time</p>
                 <Input
@@ -2377,7 +2409,7 @@ const displayClickableInputClass =
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Start Time</p>
                   <Input value={String(assignmentTimes.start_time ?? "non assegnato")} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
@@ -2394,8 +2426,29 @@ const displayClickableInputClass =
             {/* Settima riga: Gestione Collaboratori - solo timeline housekeeping (nascosta in logistics) */}
             {isInTimeline && operationsScope !== "logistics" && (
               <div className="pt-3 border-t mt-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
+                <div
+                  className={cn(
+                    "flex items-center justify-between mb-2 rounded-md px-2 py-1 transition-colors",
+                    hasCollaboration && "cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                  )}
+                  role={hasCollaboration ? "button" : undefined}
+                  tabIndex={hasCollaboration ? 0 : -1}
+                  onClick={() => {
+                    if (hasCollaboration) setIsCollaborationDetailsOpen(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (!hasCollaboration) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setIsCollaborationDetailsOpen(true);
+                    }
+                  }}
+                >
+                  <div
+                    className={cn(
+                      "flex items-center gap-2 rounded px-1 py-0.5"
+                    )}
+                  >
                     <Users className="w-4 h-4 text-purple-600" />
                     <span className="text-sm font-semibold text-muted-foreground">
                       Collaboratori
@@ -2424,56 +2477,22 @@ const displayClickableInputClass =
                       </Badge>
                     )}
                   </div>
-                  {!isReadOnly && (
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={openAddCollaboratorDialog}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openAddCollaboratorDialog();
+                      }}
+                      disabled={isReadOnly}
                       className="flex items-center gap-1 border-2 border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
                     >
                       <UserPlus className="w-3 h-3" />
                       Aggiungi collaboratore
                     </Button>
-                  )}
-                </div>
-
-                {/* Info collaborazione attuale */}
-                {(displayTask as any).collaborator_count > 1 && (
-                  <div className="text-xs text-muted-foreground mb-2 p-3 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-300 dark:border-purple-700">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Users className="w-4 h-4 text-purple-600" />
-                      <span className="font-semibold text-purple-700 dark:text-purple-300">
-                        Collaborazione ({(displayTask as any).collaborator_count} cleaners)
-                      </span>
-                    </div>
-                    <p>
-                      <strong>Durata originale:</strong> {(() => {
-                        const baseTime = (displayTask as any).base_cleaning_time || 0;
-                        const hours = Math.floor(baseTime / 60);
-                        const mins = baseTime % 60;
-                        return `${hours}:${String(mins).padStart(2, '0')} ore`;
-                      })()}
-                    </p>
-                    <p>
-                      <strong>Durata per cleaner:</strong> {(displayTask.duration || "0.0").replace(".", ":")} ore
-                    </p>
-                    {(displayTask as any).is_primary && (
-                      <p className="text-blue-600 font-semibold mt-1">Questo cleaner è il Primary</p>
-                    )}
-                    {!isReadOnly && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="mt-3 w-full flex items-center justify-center gap-2"
-                        onClick={() => setShowDissolveDialog(true)}
-                        disabled={isDissolvingCollaboration}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        {isDissolvingCollaboration ? "Rimozione..." : "Rimuovi collaborazione"}
-                      </Button>
-                    )}
                   </div>
-                )}
+                </div>
               </div>
             )}
 
@@ -2549,6 +2568,62 @@ const displayClickableInputClass =
 
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog a scomparsa: dettagli collaborazione */}
+      <Dialog open={isCollaborationDetailsOpen} onOpenChange={setIsCollaborationDetailsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-purple-600" />
+              Dettagli collaborazione
+            </DialogTitle>
+            <DialogDescription>
+              Informazioni della collaborazione per la task <strong>#{getTaskKey(displayTask)}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          {hasCollaboration ? (
+            <div className="text-sm text-muted-foreground mt-2 p-3 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-300 dark:border-purple-700">
+              <div className="flex items-center gap-2 mb-2">
+                <Users className="w-4 h-4 text-purple-600" />
+                <span className="font-semibold text-purple-700 dark:text-purple-300">
+                  Collaborazione ({(displayTask as any).collaborator_count} cleaners)
+                </span>
+              </div>
+              <p>
+                <strong>Durata originale:</strong> {(() => {
+                  const baseTime = (displayTask as any).base_cleaning_time || 0;
+                  const hours = Math.floor(baseTime / 60);
+                  const mins = baseTime % 60;
+                  return `${hours}:${String(mins).padStart(2, '0')} ore`;
+                })()}
+              </p>
+              <p>
+                <strong>Durata per cleaner:</strong> {(displayTask.duration || "0.0").replace(".", ":")} ore
+              </p>
+              {(displayTask as any).is_primary && (
+                <p className="text-blue-600 font-semibold mt-1">Questo cleaner è il Primary</p>
+              )}
+              {!isReadOnly && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="mt-3 w-full flex items-center justify-center gap-2"
+                  onClick={() => {
+                    setIsCollaborationDetailsOpen(false);
+                    setShowDissolveDialog(true);
+                  }}
+                  disabled={isDissolvingCollaboration}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  {isDissolvingCollaboration ? "Rimozione..." : "Rimuovi collaborazione"}
+                </Button>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-2">Nessuna collaborazione attiva per questa task.</p>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -3002,6 +3077,7 @@ const displayClickableInputClass =
         onClose={() => setIsCleanerSelectorOpen(false)}
         onConfirm={handleCollaboratorSelection}
         excludeCleanerId={(displayTask as any).cleaner_id || (displayTask as any).assignedCleaner}
+        excludeCleanerIds={taskCollaborators.map((c: any) => Number(c.id)).filter((id: number) => Number.isFinite(id))}
         workDate={localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0]}
         title="Aggiungi Collaboratori"
         description="Seleziona uno o più cleaners da aggiungere come collaboratori a questa task"
@@ -3017,6 +3093,13 @@ const displayClickableInputClass =
           return baseTime;
         })()}
         existingCollaboratorCount={(displayTask as any).collaborator_count || 1}
+        preselectedCleanerIds={[]}
+        primaryCleanerId={
+          (() => {
+            const p = taskCollaborators.find((c: any) => Boolean(c?.isPrimary));
+            return p ? Number(p.id) : null;
+          })()
+        }
         isLoading={isCollaboratorLoading}
       />
     </>
