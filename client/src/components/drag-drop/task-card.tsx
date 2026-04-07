@@ -2017,7 +2017,7 @@ const displayClickableInputClass =
                     : isOfficeOtherOperation(displayTask)
                       ? "PULIZIA UFFICI"
                       : isContinuazioneStraordinariaTask(displayTask)
-                        ? "CONTINUAZIONE STRAORDINARIA"
+                        ? "CONTINUAZIONE PS"
                         : getTaskTypeStyle(
                             Boolean(displayTask.straordinaria) || isContinuazioneStraordinariaTask(displayTask),
                             Boolean(displayTask.premium)
