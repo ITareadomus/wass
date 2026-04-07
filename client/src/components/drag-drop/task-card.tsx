@@ -42,6 +42,7 @@ import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Calendar as Calend
 import { CleanerSelectorDialog } from "@/components/dialogs/cleaner-selector-dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
 import {
   Select,
   SelectContent,
@@ -796,7 +797,10 @@ const displayClickableInputClass =
 
   // Determina il tipo della CARD dai flag dell'oggetto *task* (non quelli della navigazione nel modale)
   const cardIsPremium = Boolean(task.premium);
-  const cardIsStraordinaria = Boolean(task.straordinaria) || isOfficeStraordinariaOperation(task);
+  const cardIsStraordinaria =
+    Boolean(task.straordinaria) ||
+    isContinuazioneStraordinariaTask(task) ||
+    isOfficeStraordinariaOperation(task);
 
   // Il modale invece usa displayTask (vedi più sotto)
 
@@ -2001,7 +2005,7 @@ const displayClickableInputClass =
                     "text-xs shrink-0 px-2 py-0.5 rounded border font-medium",
                     isOfficeOtherOperation(displayTask) || isOfficeStraordinariaOperation(displayTask)
                       ? "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700"
-                      : Boolean(displayTask.straordinaria)
+                    : (Boolean(displayTask.straordinaria) || isContinuazioneStraordinariaTask(displayTask))
                         ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
                         : Boolean(displayTask.premium)
                           ? "bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
@@ -2012,7 +2016,12 @@ const displayClickableInputClass =
                     ? "PULIZIA UFFICI STRAORDINARIA"
                     : isOfficeOtherOperation(displayTask)
                       ? "PULIZIA UFFICI"
-                      : getTaskTypeStyle(Boolean(displayTask.straordinaria), Boolean(displayTask.premium)).label}
+                      : isContinuazioneStraordinariaTask(displayTask)
+                        ? "CONTINUAZIONE STRAORDINARIA"
+                        : getTaskTypeStyle(
+                            Boolean(displayTask.straordinaria) || isContinuazioneStraordinariaTask(displayTask),
+                            Boolean(displayTask.premium)
+                          ).label}
                 </Badge>
                 {(displayTask as any).priority && (
                   <Badge

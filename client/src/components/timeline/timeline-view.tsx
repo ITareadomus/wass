@@ -26,7 +26,11 @@ import {
 } from "@/components/ui/select";
 import { useLocation } from 'wouter';
 import { format } from 'date-fns';
-import { loadValidationRules, canCleanerHandleTaskSync } from "@/lib/taskValidation";
+import {
+  loadValidationRules,
+  canCleanerHandleTaskSync,
+  isContinuazioneStraordinariaTask,
+} from "@/lib/taskValidation";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getCleanerHexColor } from "@/lib/cleaner-colors";
@@ -1533,7 +1537,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
   const normalizeTask = (task: any) => {
     // Normalizza SOLO i flag straordinaria/premium, NON il type
     const isPremium = Boolean(task.premium);
-    const isStraordinaria = Boolean(task.straordinaria);
+    const isStraordinaria = Boolean(task.straordinaria) || isContinuazioneStraordinariaTask(task);
 
     // Normalizza confirmed_operation
     const rawConfirmed = task.confirmed_operation;

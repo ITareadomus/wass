@@ -18,6 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
 
 interface RawTask {
   task_id: number;
@@ -46,6 +47,9 @@ interface RawTask {
   locked?: boolean;
   locked_reason?: string;
 }
+
+const isEquivalentStraordinariaTask = (task: any): boolean =>
+  Boolean(task?.straordinaria) || isContinuazioneStraordinariaTask(task);
 
 // === HELPERS per gestire id univoco e logisticCode non univoco ===
 function getLogisticCode(t: RawTask | Task | null | undefined): string | null {
@@ -897,7 +901,10 @@ export default function GenerateAssignments() {
       lat: rawTask.lat,
       lng: rawTask.lng,
       premium: rawTask.premium,
-      straordinaria: rawTask.straordinaria ?? (rawTask as any).is_straordinaria,
+      straordinaria:
+        rawTask.straordinaria ??
+        (rawTask as any).is_straordinaria ??
+        isContinuazioneStraordinariaTask(rawTask),
       confirmed_operation: rawTask.confirmed_operation,
       checkout_date: (rawTask as any).checkout_date,
       checkout_time: rawTask.checkout_time,
@@ -1151,7 +1158,7 @@ export default function GenerateAssignments() {
             lat: timelineAssignment.lat,
             lng: timelineAssignment.lng,
             premium: timelineAssignment.premium,
-            straordinaria: timelineAssignment.straordinaria,
+            straordinaria: isEquivalentStraordinariaTask(timelineAssignment),
             confirmed_operation: timelineAssignment.confirmed_operation,
             customer_reference: timelineAssignment.customer_reference,
             createdAt: new Date().toISOString(),
@@ -1188,7 +1195,10 @@ export default function GenerateAssignments() {
             lat: timelineAssignment.lat || baseTask.lat,
             lng: timelineAssignment.lng || baseTask.lng,
             premium: timelineAssignment.premium !== undefined ? timelineAssignment.premium : baseTask.premium,
-            straordinaria: timelineAssignment.straordinaria !== undefined ? timelineAssignment.straordinaria : (baseTask as any).straordinaria,
+            straordinaria:
+              timelineAssignment.straordinaria !== undefined
+                ? isEquivalentStraordinariaTask(timelineAssignment)
+                : isEquivalentStraordinariaTask(baseTask),
             confirmed_operation: timelineAssignment.confirmed_operation !== undefined ? timelineAssignment.confirmed_operation : (baseTask as any).confirmed_operation,
             customer_name: timelineAssignment.customer_name,
             customer_reference: timelineAssignment.customer_reference,
@@ -2320,7 +2330,7 @@ export default function GenerateAssignments() {
                   <div className="bg-yellow-100 dark:bg-yellow-950/50 rounded-lg p-3 border-2 border-yellow-300 dark:border-yellow-700">
                     <div className="text-xs text-yellow-700 dark:text-yellow-300 font-medium mb-1">Premium</div>
                     <div className="text-2xl font-bold text-yellow-800 dark:text-yellow-200">
-                      {allTasksWithAssignments.filter(t => !t.straordinaria && t.premium).length}
+                      {allTasksWithAssignments.filter(t => !isEquivalentStraordinariaTask(t) && t.premium).length}
                     </div>
                   </div>
 
@@ -2328,7 +2338,7 @@ export default function GenerateAssignments() {
                   <div className="bg-green-100 dark:bg-green-950/50 rounded-lg p-3 border-2 border-green-300 dark:border-green-700">
                     <div className="text-xs text-green-700 dark:text-green-300 font-medium mb-1">Standard</div>
                     <div className="text-2xl font-bold text-green-800 dark:text-green-200">
-                      {allTasksWithAssignments.filter(t => !t.straordinaria && !t.premium).length}
+                      {allTasksWithAssignments.filter(t => !isEquivalentStraordinariaTask(t) && !t.premium).length}
                     </div>
                   </div>
 
@@ -2336,7 +2346,7 @@ export default function GenerateAssignments() {
                   <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-3 border-2 border-red-300 dark:border-red-700">
                     <div className="text-xs text-red-700 dark:text-red-300 font-medium mb-1">Straordinarie</div>
                     <div className="text-2xl font-bold text-red-800 dark:text-red-200">
-                      {allTasksWithAssignments.filter(t => t.straordinaria).length}
+                      {allTasksWithAssignments.filter(t => isEquivalentStraordinariaTask(t)).length}
                     </div>
                   </div>
 

@@ -18,6 +18,7 @@ import { calculateDynamicLimits } from './phase2';
 import { DEFAULT_TRAVEL_POLICY } from './travelPolicy';
 import path from 'path';
 import { TimelineContext } from './timelineContext';
+import { CONTINUAZIONE_PS_OPERATION_ID, isTaskEquivalentToStraordinaria } from '../../utils/straordinaria-utils';
 
 export type WavePriority = 'early_out' | 'high_priority' | 'low_priority';
 
@@ -320,6 +321,7 @@ async function buildTimelineAnchorsForPhase1(
       end_time: string | null;
       lat: number | null;
       lng: number | null;
+      operation_id: number | null;
       straordinaria: boolean | null;
       cleaning_time: number | null;
       base_cleaning_time: number | null;
@@ -333,6 +335,7 @@ async function buildTimelineAnchorsForPhase1(
         end_time,
         lat,
         lng,
+        operation_id,
         straordinaria,
         cleaning_time,
         base_cleaning_time
@@ -372,7 +375,10 @@ async function buildTimelineAnchorsForPhase1(
         logisticCode: Number(row.logistic_code ?? 0),
         lat: row.lat as number,
         lng: row.lng as number,
-        straordinaria: row.straordinaria === true,
+        straordinaria: isTaskEquivalentToStraordinaria({
+          straordinaria: row.straordinaria === true,
+          operation_id: row.operation_id,
+        }),
         cleaningTimeMinutes: row.base_cleaning_time ?? row.cleaning_time ?? 60
       });
 
@@ -667,7 +673,7 @@ async function collectDetailedMetrics(
     const otStats = await pool.query(`
       WITH all_tasks AS (
         SELECT DISTINCT task_id, 
-          COALESCE(dc.straordinaria, false) as is_ot
+          (COALESCE(dc.straordinaria, false) OR dc.operation_id = ${CONTINUAZIONE_PS_OPERATION_ID}) as is_ot
         FROM daily_containers dc
         WHERE dc.work_date = $1
       ),
@@ -718,7 +724,7 @@ async function collectDetailedMetrics(
         SELECT 
           ou.task_id,
           ou.logistic_code,
-          COALESCE(dc.straordinaria, false) as is_straordinaria,
+          (COALESCE(dc.straordinaria, false) OR dc.operation_id = ${CONTINUAZIONE_PS_OPERATION_ID}) as is_straordinaria,
           ou.reason_code,
           dc.premium,
           COALESCE(dc.type_apt, 'C') as type_apt,
@@ -727,7 +733,7 @@ async function collectDetailedMetrics(
             FROM cleaner_details cd
             WHERE 
               (NOT COALESCE(dc.premium, false) OR cd.role = 'Premium')
-              AND (NOT COALESCE(dc.straordinaria, false) OR cd.role = 'Straordinario')
+              AND (NOT (COALESCE(dc.straordinaria, false) OR dc.operation_id = ${CONTINUAZIONE_PS_OPERATION_ID}) OR cd.role = 'Straordinario')
           ) as compatible_cleaners_count
         FROM optimizer.optimizer_unassigned ou
         LEFT JOIN daily_containers dc ON dc.task_id = ou.task_id AND dc.work_date = $2

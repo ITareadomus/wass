@@ -1,4 +1,5 @@
 import pool from '../../../shared/pg-db';
+import { isTaskEquivalentToStraordinaria } from '../../utils/straordinaria-utils';
 
 export interface OccupiedBlock {
   startMin: number;
@@ -62,6 +63,7 @@ interface TimelineRow {
   travel_time: number | null;
   lat: number | null;
   lng: number | null;
+  operation_id: number | null;
   straordinaria: boolean | null;
 }
 
@@ -105,6 +107,7 @@ export async function buildTimelineContext(workDate: string): Promise<TimelineCo
       travel_time,
       lat,
       lng,
+      operation_id,
       COALESCE(straordinaria, false) as straordinaria
     FROM daily_assignments_current
     WHERE work_date = $1
@@ -154,7 +157,10 @@ export async function buildTimelineContext(workDate: string): Promise<TimelineCo
     const stats = fixedStatsByCleaner.get(cleanerId)!;
     stats.fixedTaskCount += 1;
 
-    const isOT = row.straordinaria === true;
+    const isOT = isTaskEquivalentToStraordinaria({
+      straordinaria: row.straordinaria === true,
+      operation_id: row.operation_id,
+    });
     stats.fixedHasAnyOT = stats.fixedHasAnyOT || isOT;
 
     // Use base_cleaning_time when available (more stable for collaborations)
@@ -237,7 +243,10 @@ export async function buildTimelineContext(workDate: string): Promise<TimelineCo
         endMin: anchorMin,
         lat: row.lat,
         lng: row.lng,
-        straordinaria: row.straordinaria === true,
+        straordinaria: isTaskEquivalentToStraordinaria({
+          straordinaria: row.straordinaria === true,
+          operation_id: row.operation_id,
+        }),
         cleaningTimeMinutes: row.cleaning_time ?? null,
         baseCleaningTimeMinutes: row.base_cleaning_time ?? null
       });

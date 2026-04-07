@@ -1,20 +1,24 @@
 import { TaskType as Task } from "@shared/schema";
 import { BarChart3 } from "lucide-react";
+import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
 
 interface StatisticsPanelProps {
   tasks: Task[];
 }
 
 export default function StatisticsPanel({ tasks }: StatisticsPanelProps) {
+  const isEquivalentStraordinariaTask = (task: any): boolean =>
+    Boolean(task?.straordinaria) || isContinuazioneStraordinariaTask(task);
+
   const earlyOutCount = tasks.filter(task => task.priority === "early-out").length;
   const highPriorityCount = tasks.filter(task => task.priority === "high").length;
   const lowPriorityCount = tasks.filter(task => task.priority === "low").length;
   const unassignedCount = tasks.filter(task => !task.priority).length;
   
   // Conteggio corretto: straordinarie hanno priorità assoluta
-  const straordinarieCount = tasks.filter(task => (task as any).straordinaria === true).length;
-  const premiumCount = tasks.filter(task => (task as any).straordinaria !== true && (task as any).premium === true).length;
-  const standardCount = tasks.filter(task => (task as any).straordinaria !== true && (task as any).premium !== true).length;
+  const straordinarieCount = tasks.filter(task => isEquivalentStraordinariaTask(task)).length;
+  const premiumCount = tasks.filter(task => !isEquivalentStraordinariaTask(task) && (task as any).premium === true).length;
+  const standardCount = tasks.filter(task => !isEquivalentStraordinariaTask(task) && (task as any).premium !== true).length;
   
   const totalTasks = tasks.length;
   const assignedTasks = totalTasks - unassignedCount;

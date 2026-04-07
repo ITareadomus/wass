@@ -19,6 +19,8 @@ except ImportError:
 SCALE = 10
 LONG_OT_THRESHOLD = 360  # 6h
 EXTRA_TASK_MAX_MIN = 120  # 2h
+CONTINUAZIONE_PS_OPERATION_ID = 37
+CONTINUAZIONE_PS_OPERATION_NAME = "continuazione ps"
 
 
 def normalize_role(role):
@@ -68,7 +70,21 @@ def is_office_task(task, office_operation_ids):
 
 
 def is_real_straordinaria(task, office_operation_ids):
-    return bool(task.get("straordinaria")) and not is_office_task(task, office_operation_ids)
+    return (bool(task.get("straordinaria")) or is_continuazione_ps_task(task)) and not is_office_task(task, office_operation_ids)
+
+
+def is_continuazione_ps_task(task):
+    op_id = task.get("operationId")
+    try:
+        if op_id is None or int(op_id) != CONTINUAZIONE_PS_OPERATION_ID:
+            return False
+    except Exception:
+        return False
+
+    op_name = task.get("operationName") or task.get("operation_name") or task.get("operation_label")
+    if op_name is None or str(op_name).strip() == "":
+        return True
+    return str(op_name).strip().lower() == CONTINUAZIONE_PS_OPERATION_NAME
 
 
 def task_cleaner_compatible(cleaner, task, apartment_types, office_operation_ids, task_types_by_cleaner):

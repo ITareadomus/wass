@@ -1,4 +1,5 @@
 import { estimateTravelMinutes, TaskInput } from './phase1';
+import { isTaskEquivalentToStraordinaria } from '../../utils/straordinaria-utils';
 
 export interface CleanerInput {
   cleanerId: number;
@@ -251,7 +252,7 @@ function isOfficeTask(task: TaskForPhase2, officeOperationIds: Set<number>): boo
 }
 
 function isRealStraordinariaTask(task: TaskForPhase2, officeOperationIds: Set<number>): boolean {
-  return Boolean(task.straordinaria) && !isOfficeTask(task, officeOperationIds);
+  return isTaskEquivalentToStraordinaria(task) && !isOfficeTask(task, officeOperationIds);
 }
 
 function canCleanerHandleApartment(
@@ -596,7 +597,7 @@ export function runPhase2Algorithm(
   
   const otTaskIds = new Set<number>();
   tasksMap.forEach((task, taskId) => {
-    if (task.straordinaria && !isOfficeTask(task, officeOperationIds)) otTaskIds.add(taskId);
+    if (isRealStraordinariaTask(task, officeOperationIds)) otTaskIds.add(taskId);
   });
   const assignedOtTaskIds = new Set<number>();
   
@@ -620,7 +621,7 @@ export function runPhase2Algorithm(
       const incompatibleReasons: { cleanerId: number; reasons: string[] }[] = [];
       
       // Check if current group contains straordinaria and its duration
-      const groupStraordinariaTasks = tasks.filter(t => t.straordinaria && !isOfficeTask(t, officeOperationIds));
+      const groupStraordinariaTasks = tasks.filter(t => isRealStraordinariaTask(t, officeOperationIds));
       const groupHasStraordinaria = groupStraordinariaTasks.length > 0;
       const groupStraordinariaDuration = groupStraordinariaTasks.reduce((sum, t) => sum + t.cleaningTime, 0);
       const groupTotalCleaningTime = tasks.reduce((sum, t) => sum + t.cleaningTime, 0);
@@ -632,7 +633,7 @@ export function runPhase2Algorithm(
       // Invece di reject, droppa task fino a forma valida
       if (groupHasStraordinaria && tasks.length > 1) {
         const otTasks = groupStraordinariaTasks;
-        const nonOtTasks = tasks.filter(t => !t.straordinaria || isOfficeTask(t, officeOperationIds));
+        const nonOtTasks = tasks.filter(t => !isRealStraordinariaTask(t, officeOperationIds));
         
         // Se ci sono multipli OT, tieni solo il primo e droppa gli altri
         if (otTasks.length > 1) {
@@ -725,7 +726,7 @@ export function runPhase2Algorithm(
           continue; // Riprova con gruppo ridotto
         } else {
           // OT corta + 1 task extra: verifica che extra sia ≤2h
-          const extraTask = tasks.find(t => !t.straordinaria || isOfficeTask(t, officeOperationIds));
+          const extraTask = tasks.find(t => !isRealStraordinariaTask(t, officeOperationIds));
           if (extraTask && extraTask.cleaningTime > STRAORDINARIA_EXTRA_TASK_MAX_MIN) {
             // Extra troppo lungo: droppa l'extra, tieni solo l'OT
             const idx = currentTaskIds.indexOf(extraTask.taskId);
@@ -903,7 +904,7 @@ export function runPhase2Algorithm(
           cleanerStraordinariaDuration.set(assignedCleaner.cleanerId, existingStraDuration + groupStraordinariaDuration);
           // Marca le OT task come assegnate per rilasciare riserva cleaner straordinari
           tasks
-            .filter(t => t.straordinaria && !isOfficeTask(t, officeOperationIds))
+            .filter(t => isRealStraordinariaTask(t, officeOperationIds))
             .forEach(t => assignedOtTaskIds.add(t.taskId));
         }
         const existingCleaningTime = cleanerTotalCleaningTime.get(assignedCleaner.cleanerId) || 0;
@@ -989,8 +990,7 @@ export function runPhase2Algorithm(
           if (
             groupHasStraordinaria &&
             tasks.length === 1 &&
-            tasks[0].straordinaria &&
-            !isOfficeTask(tasks[0], officeOperationIds)
+            isRealStraordinariaTask(tasks[0], officeOperationIds)
           ) {
             assignedOtTaskIds.add(tasks[0].taskId);
           }

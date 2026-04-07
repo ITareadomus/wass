@@ -37,6 +37,8 @@ let cachedRules: TaskTypesByCleaner | null = null;
 let cachedApartmentTypes: ApartmentTypesConfig | null = null;
 let cachedPriorityTypes: PriorityTypesConfig | null = null;
 let cachedOfficeOperationIds: Set<number> | null = null;
+const CONTINUAZIONE_PS_OPERATION_ID = 37;
+const CONTINUAZIONE_PS_OPERATION_NAME = "continuazione ps";
 
 const OFFICE_OPERATION_NAMES = new Set([
   "pulizia uffici",
@@ -143,6 +145,27 @@ function isOfficeTask(task: any): boolean {
   return OFFICE_OPERATION_NAMES.has(operationName) || operationName.includes("uffic");
 }
 
+export function isContinuazioneStraordinariaTask(task: any): boolean {
+  if (typeof task !== "object" || task === null) return false;
+
+  const operationIdRaw =
+    task.operation_id ??
+    task.operationId;
+  const operationId = operationIdRaw != null ? Number(operationIdRaw) : NaN;
+  if (!Number.isFinite(operationId) || operationId !== CONTINUAZIONE_PS_OPERATION_ID) {
+    return false;
+  }
+
+  const operationNameRaw =
+    task.operation_name ??
+    task.operationName ??
+    task.operation_label;
+  if (operationNameRaw == null) return true;
+
+  const normalizedName = String(operationNameRaw).toLowerCase().trim();
+  return normalizedName === CONTINUAZIONE_PS_OPERATION_NAME;
+}
+
 type TaskTypeKey = keyof CleanerTaskRules;
 
 function determineTaskType(task: any): TaskTypeKey | null {
@@ -152,7 +175,7 @@ function determineTaskType(task: any): TaskTypeKey | null {
   }
 
   const isPremium = Boolean(task.premium);
-  const isStraordinaria = Boolean(task.straordinaria);
+  const isStraordinaria = Boolean(task.straordinaria) || isContinuazioneStraordinariaTask(task);
 
   if (isStraordinaria) return 'straordinario_apt';
   if (isPremium) return 'premium_apt';

@@ -38,6 +38,30 @@ function resolveScopeFromReq(req: any): "housekeeping" | "office" {
 }
 
 const OFFICE_OPERATION_IDS = new Set([15, 38]);
+const CONTINUAZIONE_PS_OPERATION_ID = 37;
+const CONTINUAZIONE_PS_OPERATION_NAME = "continuazione ps";
+
+function normalizeOperationName(value: unknown): string {
+  return String(value ?? "").toLowerCase().trim();
+}
+
+function isContinuazionePsTask(task: any): boolean {
+  const operationIdRaw = task?.operation_id ?? task?.operationId;
+  const operationId = operationIdRaw != null ? Number(operationIdRaw) : NaN;
+  if (!Number.isFinite(operationId) || operationId !== CONTINUAZIONE_PS_OPERATION_ID) {
+    return false;
+  }
+
+  const operationNameRaw = task?.operation_name ?? task?.operationName ?? task?.operation_label;
+  if (operationNameRaw == null || operationNameRaw === "") {
+    return true;
+  }
+  return normalizeOperationName(operationNameRaw) === CONTINUAZIONE_PS_OPERATION_NAME;
+}
+
+function isTaskEquivalentToStraordinaria(task: any): boolean {
+  return Boolean(task?.straordinaria) || isContinuazionePsTask(task);
+}
 
 function filterContainersForOfficeScope(containersPayload: any): any {
   if (!containersPayload?.containers) return containersPayload;
@@ -3277,7 +3301,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         confirmed_operation: fullTaskData.confirmed_operation !== undefined ? Boolean(fullTaskData.confirmed_operation) : true,
 
         // Straordinaria (solo questo campo, come negli script)
-        straordinaria: Boolean(fullTaskData.straordinaria),
+        straordinaria: isTaskEquivalentToStraordinaria(fullTaskData),
 
         // Tipo appartamento e alias
         type_apt: fullTaskData.type_apt || null,
@@ -4212,7 +4236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         checkin_time: task.checkin_time,
         checkout_time: task.checkout_time,
         premium: task.premium,
-        straordinaria: task.straordinaria,
+        straordinaria: isTaskEquivalentToStraordinaria(task),
         confirmed_operation: task.confirmed_operation,
         pax_in: task.pax_in,
         pax_out: task.pax_out,
@@ -5133,7 +5157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             effectiveCleaningTime, baseCleaningTime,
             sourceTask.checkin_date, sourceTask.checkout_date, sourceTask.checkin_time, sourceTask.checkout_time,
             sourceTask.pax_in, sourceTask.pax_out, sourceTask.small_equipment, 
-            sourceTask.operation_id, sourceTask.confirmed_operation, sourceTask.straordinaria,
+            sourceTask.operation_id, sourceTask.confirmed_operation, isTaskEquivalentToStraordinaria(sourceTask),
             sourceTask.type_apt, sourceTask.alias, sourceTask.customer_name, sourceTask.customer_reference,
             sourceTask.reasons || [], sourceTask.priority,
             sourceTask.followup, newSequence
@@ -5663,6 +5687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                         if (operationId !== undefined) {
                           task.operation_id = operationId;
                           task.confirmed_operation = true;
+                          task.straordinaria = operationId === CONTINUAZIONE_PS_OPERATION_ID || Boolean(task.straordinaria);
                         }
                         taskUpdated = true;
                         anyUpdated = true;
@@ -5793,6 +5818,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             oldValues.push(String(task.operation_id ?? 'null'));
             newValues.push(String(operationId));
             task.operation_id = operationId;
+            task.straordinaria = operationId === CONTINUAZIONE_PS_OPERATION_ID || Boolean(task.straordinaria);
           }
           taskUpdated = true;
           return true;
@@ -5957,7 +5983,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         task_stats.total += 1;
         if (premium) task_stats.premium += 1;
         else task_stats.standard += 1;
-        if (opId === 3) task_stats.straordinarie += 1;
+        if (opId === 3 || opId === CONTINUAZIONE_PS_OPERATION_ID) task_stats.straordinarie += 1;
       }
       res.json({
         success: true,

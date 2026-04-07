@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
 
 function getCurrentUsername(): string {
   try {
@@ -68,6 +69,9 @@ interface LogisticsTask {
   lat?: string | null;
   lng?: string | null;
 }
+
+const isEquivalentStraordinariaTask = (task: any): boolean =>
+  Boolean(task?.straordinaria) || isContinuazioneStraordinariaTask(task);
 
 interface LogisticsTaskLists {
   early_out: LogisticsTask[];
@@ -129,7 +133,7 @@ function convertLogisticsRawToTask(
     lat: raw.lat != null ? String(raw.lat) : undefined,
     lng: raw.lng != null ? String(raw.lng) : undefined,
     premium: Boolean(raw.premium),
-    straordinaria: Boolean(raw.straordinaria),
+    straordinaria: isEquivalentStraordinariaTask(raw),
     confirmed_operation,
     checkout_date: raw.checkout_date != null ? String(raw.checkout_date) : undefined,
     checkout_time: raw.checkout_time != null ? String(raw.checkout_time) : undefined,
@@ -217,7 +221,7 @@ function parseLogisticsSummary(data: any): LogisticsSummaryState {
   let standard = 0;
   let straordinarie = 0;
   for (const t of all) {
-    if (t?.straordinaria) straordinarie += 1;
+    if (isEquivalentStraordinariaTask(t)) straordinarie += 1;
     else if (t?.premium) premium += 1;
     else standard += 1;
   }
@@ -263,7 +267,7 @@ function timelineRowToTaskType(t: any, fallbackPriority: TaskType["priority"]): 
     scheduledTime: t.start_time ?? null,
     address: t.address != null ? String(t.address) : undefined,
     premium: Boolean(t.premium),
-    straordinaria: Boolean(t.straordinaria),
+    straordinaria: isEquivalentStraordinariaTask(t),
     locked: Boolean(t.locked),
     locked_reason: t.locked_reason != null ? String(t.locked_reason) : undefined,
     customer_name: t.customer_name != null ? String(t.customer_name) : undefined,

@@ -381,10 +381,14 @@ export default function Convocazioni() {
         }
       }
       for (const t of allTasks) {
-        const isStraordinaria = t.straordinaria === true || (t as any).is_straordinaria === true || Number(t.operation_id) === 3;
+        const opId = Number((t as any).operation_id);
+        const isStraordinaria =
+          t.straordinaria === true ||
+          (t as any).is_straordinaria === true ||
+          opId === 3 ||
+          opId === 37;
         const isPremium = t.premium === true || t.premium === 1 || t.premium === "1";
         const isOfficeInternal = Number((t as any).operation_id) === 15;
-        const opId = Number((t as any).operation_id);
         total += 1;
         if (isStraordinaria) straordinarie += 1;
         else if (isPremium) premium += 1;

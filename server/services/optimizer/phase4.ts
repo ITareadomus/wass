@@ -10,6 +10,7 @@ import { PriorityWindows, priorityPenalty, Priority } from './priorityWindows';
 import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, FairnessParams, DEFAULT_FAIRNESS_PARAMS, MinutesBasedTargets, FormatoreRules, TaskTypesByCleanerConfig } from './phase2';
 import { TravelPolicy, getWaveLevelConstraints } from './travelPolicy';
 import { runPhase4RepairBatch } from './phase4OrTools';
+import { isTaskEquivalentToStraordinaria } from '../../utils/straordinaria-utils';
 
 export interface Phase4Params {
   maxInsertionAttempts: number;
@@ -186,6 +187,10 @@ function isOfficeTask(task: TaskForScheduling, officeOperationIds: Set<number>):
   return operationId != null && officeOperationIds.has(operationId);
 }
 
+function isRealStraordinariaTask(task: TaskForScheduling, officeOperationIds: Set<number>): boolean {
+  return isTaskEquivalentToStraordinaria(task) && !isOfficeTask(task, officeOperationIds);
+}
+
 function canCleanerHandleApartment(
   cleanerRole: string,
   typeApt: string | undefined,
@@ -245,6 +250,7 @@ function checkHardConstraints(
   const cleanerRole = schedule.role || 'Standard';
   const normalizedRole = normalizeCleanerRole(cleanerRole);
   const officeTask = isOfficeTask(task, officeOperationIds);
+  const taskIsStraordinaria = isRealStraordinariaTask(task, officeOperationIds);
   void taskTypesByCleaner;
   const fixedCount = schedule.fixedTaskCount ?? 0;
   const totalExistingCount = fixedCount + (schedule.tasks?.length ?? 0);
@@ -273,7 +279,7 @@ function checkHardConstraints(
   }
   
   // 1. Verifica straordinaria: solo cleaner con role "Straordinario"
-  if (task.straordinaria && normalizedRole !== 'straordinario_cleaner') {
+  if (taskIsStraordinaria && normalizedRole !== 'straordinario_cleaner') {
     return { compatible: false, reason: 'CANNOT_DO_STRAORDINARIA' };
   }
 
@@ -292,16 +298,16 @@ function checkHardConstraints(
     if (task.premium && !formatoreRules.premiumApt) {
       return { compatible: false, reason: 'FORMATORE_TASK_TYPE_PREMIUM_NOT_ALLOWED' };
     }
-    if (task.straordinaria && !formatoreRules.straordinarioApt) {
+    if (taskIsStraordinaria && !formatoreRules.straordinarioApt) {
       return { compatible: false, reason: 'FORMATORE_TASK_TYPE_OT_NOT_ALLOWED' };
     }
-    if (!task.premium && !task.straordinaria && !formatoreRules.standardApt) {
+    if (!task.premium && !taskIsStraordinaria && !formatoreRules.standardApt) {
       return { compatible: false, reason: 'FORMATORE_TASK_TYPE_STANDARD_NOT_ALLOWED' };
     }
   }
   
   // 2. Regole OT per il nuovo task da inserire
-  if (task.straordinaria) {
+  if (taskIsStraordinaria) {
     const taskDurationMin = task.cleaningTimeMinutes || 60;
     
     // OT lunga (≥6h = 360min) deve essere sola
@@ -317,8 +323,8 @@ function checkHardConstraints(
       }
       // Conta quanti task non-OT ha già il cleaner
       const existingTasks = schedule.tasks.map(t => tasksMap.get(t.taskId)).filter(Boolean);
-      const existingOTs = existingTasks.filter(t => t?.straordinaria);
-      const existingNonOTs = existingTasks.filter(t => !t?.straordinaria);
+      const existingOTs = existingTasks.filter((t): t is TaskForScheduling => !!t && isRealStraordinariaTask(t, officeOperationIds));
+      const existingNonOTs = existingTasks.filter((t): t is TaskForScheduling => !!t && !isRealStraordinariaTask(t, officeOperationIds));
       
       // Se c'è già una OT, non può prenderne un'altra
       if (existingOTs.length > 0) {
@@ -352,7 +358,7 @@ function checkHardConstraints(
   
   // 3. Se il cleaner ha già una OT, non può prendere altri task
   const existingTasks = schedule.tasks.map(t => tasksMap.get(t.taskId)).filter(Boolean);
-  const existingOTs = existingTasks.filter(t => t?.straordinaria);
+  const existingOTs = existingTasks.filter((t): t is TaskForScheduling => !!t && isRealStraordinariaTask(t, officeOperationIds));
   
   // Se in timeline esiste una OT lunga fissa, non aggiungere nulla (append-only non deve violare)
   if (fixedHasLongOT) {
@@ -363,7 +369,7 @@ function checkHardConstraints(
   // - non aggiungere altre OT
   // - aggiungere un extra SOLO se l'ancora è proprio la OT (così possiamo stimare distanza)
   if (fixedHasAnyOT && existingOTs.length === 0) {
-    if (task.straordinaria) {
+    if (taskIsStraordinaria) {
       return { compatible: false, reason: 'CANNOT_ADD_OT_TO_OT_CLEANER' };
     }
     // Se il cleaner ha già >=2 task fisse, significa che ha già extra oltre alla OT → non aggiungere altro
@@ -376,7 +382,7 @@ function checkHardConstraints(
     }
     // Possiamo stimare travel solo se l'anchor è la OT con coordinate
     const otAnchor = schedule.anchorTask;
-    if (!otAnchor || otAnchor.straordinaria !== true) {
+    if (!otAnchor || !isTaskEquivalentToStraordinaria(otAnchor)) {
       return { compatible: false, reason: 'CLEANER_HAS_OT_ANCHOR_UNKNOWN' };
     }
     if (typeof otAnchor.lat !== 'number' || typeof otAnchor.lng !== 'number') {
@@ -404,7 +410,7 @@ function checkHardConstraints(
     }
     
     // Il nuovo task deve essere ≤2h e non OT
-    if (task.straordinaria) {
+    if (taskIsStraordinaria) {
       return { compatible: false, reason: 'CANNOT_ADD_OT_TO_OT_CLEANER' };
     }
     
@@ -815,7 +821,7 @@ function trySwapForTask(
       const removedTask = tasksMap.get(taskToRemove.taskId);
       
       // Non rimuovere straordinarie per fare spazio ad altri task
-      if (removedTask?.straordinaria) continue;
+      if (removedTask && isTaskEquivalentToStraordinaria(removedTask)) continue;
       
       // Calcola il "valore" del task rimosso (approssimativo)
       // Un task normale vale circa la baseUnassignedPenalty
@@ -1038,7 +1044,7 @@ function calculateUnassignedPenalty(
   
   for (const result of unassignedTasks) {
     const task = tasksMap.get(result.taskId);
-    if (task?.straordinaria) {
+    if (task && isTaskEquivalentToStraordinaria(task)) {
       straordinariaCount++;
     } else {
       normalCount++;
@@ -1135,8 +1141,8 @@ export async function runPhase4Algorithm(
     const taskB = tasksMap.get(b.taskId);
     
     // Straordinarie get highest priority (0 = straordinaria, 1 = normal)
-    const straordA = taskA?.straordinaria ? 0 : 1;
-    const straordB = taskB?.straordinaria ? 0 : 1;
+    const straordA = taskA && isTaskEquivalentToStraordinaria(taskA) ? 0 : 1;
+    const straordB = taskB && isTaskEquivalentToStraordinaria(taskB) ? 0 : 1;
     if (straordA !== straordB) return straordA - straordB;
     
     // Then by scarcity (più rari prima - meno compatibili = priorità più alta)
@@ -1526,7 +1532,7 @@ export async function runPhase4Algorithm(
           });
         } else {
           // Prova swap: rimuovi un task debole per fare spazio
-          const isStraordinaria = task.straordinaria === true;
+          const isStraordinaria = isTaskEquivalentToStraordinaria(task);
           
           // Calcola la penalità che si eviterebbe assegnando questo task
           const unassignedPenaltyValue = isStraordinaria 
