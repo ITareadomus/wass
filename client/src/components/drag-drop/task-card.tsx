@@ -161,8 +161,6 @@ interface TaskCardProps {
   isReadOnly?: boolean;
   multiSelectContext?: MultiSelectContextType | null;
   isIncompatible?: boolean;
-  timeOffset?: number;
-  globalTimeSlots?: number;
   timelineWidthPx?: number;
   travelTime?: number;
   travelWidthPx?: number;
@@ -194,8 +192,6 @@ export default function TaskCard({
   isReadOnly = false,
   multiSelectContext = null,
   isIncompatible = false,
-  timeOffset = 0,
-  globalTimeSlots = 0,
   timelineWidthPx = 0,
   travelTime = 0,
   travelWidthPx = 0,
@@ -1663,14 +1659,6 @@ const displayClickableInputClass =
   // Determina se il drag è disabilitato in base alla data, se la task è già salvata, o se è bloccata
   const shouldDisableDrag = isDragDisabled || (displayTask as any).checkin_date || isLocked;
 
-  // Calcola offset in pixel (usa timelineWidthPx da props)
-  const timelineWidth = timelineWidthPx || 0;
-  const virtualMinutes = globalTimeSlots * 60;
-  
-  const offsetWidthPx = timeOffset > 0 && virtualMinutes > 0 && timelineWidth > 0 
-    ? (timeOffset / virtualMinutes) * timelineWidth 
-    : 0;
-
   // Usa sequence per determinare se è la prima task o successive (più robusto di index)
   // CRITICAL: In timeline usare sempre task (la card rappresenta questa task), non displayTask (dialog)
   const seq = (task as any).sequence ?? (index + 1);
@@ -1765,14 +1753,6 @@ const displayClickableInputClass =
               }}
               className={isInTimeline ? "flex items-center" : ""}
             >
-              {/* Offset spacer per prima task (sequence === 1) - DENTRO il Draggable */}
-              {isInTimeline && seq === 1 && timeOffset > 0 && offsetWidthPx > 0 && (
-                <div
-                  className="flex-shrink-0"
-                  style={{ width: `${offsetWidthPx}px` }}
-                />
-              )}
-
           {/* Task card con drag handle */}
           <div {...provided.dragHandleProps}>
             {/* Task card effettiva */}

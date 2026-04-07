@@ -2302,6 +2302,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     const travelWidthPx = effectiveTravelMinutes > 0 && virtualMinutes > 0 && timelineWidth > 0
                                       ? (effectiveTravelMinutes / virtualMinutes) * timelineWidth
                                       : 0;
+                                    const initialOffsetWidthPx = seq === 1 && timeOffset > 0 && virtualMinutes > 0 && timelineWidth > 0
+                                      ? (timeOffset / virtualMinutes) * timelineWidth
+                                      : 0;
 
                                     // CRITICAL FIX: Calcola il "waitingGap" per task con sequence >= 2
                                     // Il waitingGap rappresenta l'attesa del cleaner quando arriva prima che l'appartamento si liberi
@@ -2352,6 +2355,14 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
                                     return (
                                       <React.Fragment key={uniqueKey}>
+                                        {/* Offset iniziale prima della prima task - FUORI dal Draggable */}
+                                        {seq === 1 && initialOffsetWidthPx > 0 && (
+                                          <div
+                                            className="flex-shrink-0"
+                                            style={{ width: `${initialOffsetWidthPx}px`, minHeight: '45px' }}
+                                            aria-hidden="true"
+                                          />
+                                        )}
 
                                         {/* Travel time marker - FUORI dal Draggable (solo per sequence >= 2) */}
                                         {seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
@@ -2404,8 +2415,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           allTasks={cleanerTasks}
                                           isDragDisabled={isTimelineInteractionDisabled}
                                           isReadOnly={isReadOnly}
-                                          timeOffset={seq === 1 ? timeOffset : 0}
-                                          globalTimeSlots={globalTimeSlots.length}
                                           timelineWidthPx={timelineWidthPx}
                                           isHighlighted={highlightedTaskIds.has(String(task.id))}
                                           cleanerId={cleaner.id}

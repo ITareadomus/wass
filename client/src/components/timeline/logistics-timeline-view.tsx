@@ -1167,7 +1167,6 @@ export default function LogisticsTimelineView({
                                 cleanerId={driver.id}
                                 isReadOnly={isReadOnly}
                                 isDragDisabled={isReadOnly || Boolean((task as any).locked)}
-                                globalTimeSlots={globalTimeSlots.length}
                                 timelineWidthPx={timelineWidthPx}
                                 operationsScope="logistics"
                                 isHighlighted={hi.has(String(task.id))}
