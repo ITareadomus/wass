@@ -2305,6 +2305,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     const initialOffsetWidthPx = seq === 1 && timeOffset > 0 && virtualMinutes > 0 && timelineWidth > 0
                                       ? (timeOffset / virtualMinutes) * timelineWidth
                                       : 0;
+                                    const shouldShowInitialOffset =
+                                      !snapshot.isDraggingOver && !Boolean(snapshot.draggingFromThisWith);
 
                                     // CRITICAL FIX: Calcola il "waitingGap" per task con sequence >= 2
                                     // Il waitingGap rappresenta l'attesa del cleaner quando arriva prima che l'appartamento si liberi
@@ -2356,7 +2358,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     return (
                                       <React.Fragment key={uniqueKey}>
                                         {/* Offset iniziale prima della prima task - FUORI dal Draggable */}
-                                        {seq === 1 && initialOffsetWidthPx > 0 && (
+                                        {seq === 1 && initialOffsetWidthPx > 0 && shouldShowInitialOffset && (
                                           <div
                                             className="flex-shrink-0"
                                             style={{ width: `${initialOffsetWidthPx}px`, minHeight: '45px' }}
