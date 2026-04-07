@@ -2260,37 +2260,32 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
                                     // Helper: normalizza date "2025-12-15T..." -> "2025-12-15"
                                     const normDate = (d?: string | null) => (d ? String(d).slice(0, 10) : null);
+                                    const parseClockToMinutes = (value?: string | null) => {
+                                      if (!value) return null;
+                                      const parts = String(value).split(':');
+                                      if (parts.length < 2) return null;
+                                      const hours = Number(parts[0]);
+                                      const minutes = Number(parts[1]);
+                                      if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+                                      return (hours * 60) + minutes;
+                                    };
 
                                     // Usa sequence se disponibile, altrimenti fallback su idx+1
                                     const seq = (taskObj as any).sequence ?? (idx + 1);
 
-                                    // Calcola offset iniziale basato sulla differenza tra start time del cleaner e start time ARROTONDATO della griglia
-                                    // CRITICAL: Usa seq === 1 invece di idx === 0 per coerenza con la logica sequence
+                                    // Calcola offset iniziale: per la prima task usa SEMPRE lo start_time della task
+                                    // (quando presente), così la posizione riflette il dato reale calcolato dal backend.
                                     let timeOffset = 0;
                                     if (seq === 1) {
-                                      // CRITICAL: Usa l'ora arrotondata (come la griglia) per calcolare l'offset
-                                      const [globalStartHour, globalStartMin] = globalStartTime.split(':').map(Number);
-                                      const globalStartHourRounded = globalStartMin > 0 ? globalStartHour : globalStartHour;
-                                      const gridStartMinutes = globalStartHourRounded * 60; // Ora intera della griglia
+                                      const gridStartMinutes = timeToMinutes(globalTimeSlots[0] || "10:00");
+                                      const taskStartMinutes = parseClockToMinutes(
+                                        taskObj.start_time || taskObj.fw_start_time || taskObj.startTime
+                                      );
+                                      const cleanerStartMinutes = parseClockToMinutes(cleanerStartTime);
+                                      const firstBlockStartMinutes = taskStartMinutes ?? cleanerStartMinutes ?? gridStartMinutes;
 
-                                      const [cleanerStartHour, cleanerStartMin] = cleanerStartTime.split(':').map(Number);
-                                      const cleanerStartMinutes = cleanerStartHour * 60 + cleanerStartMin;
-
-                                      // Se il cleaner inizia dopo l'ora arrotondata della griglia, aggiungi offset
-                                      const cleanerOffset = cleanerStartMinutes - gridStartMinutes;
-                                      if (cleanerOffset > 0) {
-                                        timeOffset = cleanerOffset;
-                                      }
-
-                                      // Se la task ha un start_time specifico, aggiungi ulteriore offset
-                                      if (taskObj.start_time) {
-                                        const [taskHours, taskMinutes] = taskObj.start_time.split(':').map(Number);
-                                        const taskStartMinutes = taskHours * 60 + taskMinutes;
-
-                                        const additionalOffset = taskStartMinutes - cleanerStartMinutes;
-                                        if (additionalOffset > 0) {
-                                          timeOffset += additionalOffset;
-                                        }
+                                      if (firstBlockStartMinutes > gridStartMinutes) {
+                                        timeOffset = firstBlockStartMinutes - gridStartMinutes;
                                       }
                                     }
 

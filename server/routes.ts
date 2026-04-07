@@ -782,14 +782,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Ricalcola cleaner di origine (se ha ancora task)
         if (sourceEntry && sourceEntry.tasks.length > 0) {
           await hydrateTasksFromContainers(sourceEntry, workDate);
-          const updatedSourceData = await recalculateCleanerTimes(sourceEntry);
+          const updatedSourceData = await recalculateCleanerTimes(sourceEntry, workDate);
           sourceEntry.tasks = updatedSourceData.tasks;
           console.log(`✅ Tempi ricalcolati per cleaner sorgente ${sourceCleanerId}`);
         }
 
         // Ricalcola cleaner di destinazione
         await hydrateTasksFromContainers(destEntry, workDate);
-        const updatedDestData = await recalculateCleanerTimes(destEntry);
+        const updatedDestData = await recalculateCleanerTimes(destEntry, workDate);
         destEntry.tasks = updatedDestData.tasks;
         console.log(`✅ Tempi ricalcolati per cleaner destinazione ${destCleanerId}`);
       } catch (pythonError: any) {
@@ -1004,14 +1004,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         if (sourceEntry.tasks.length > 0) {
           await hydrateTasksFromContainers(sourceEntry, workDate);
-          const updatedSourceData = await recalculateCleanerTimes(sourceEntry);
+          const updatedSourceData = await recalculateCleanerTimes(sourceEntry, workDate);
           sourceEntry.tasks = updatedSourceData.tasks;
           console.log(`✅ Tempi ricalcolati per cleaner ${sourceCleanerId} (dopo swap)`);
         }
 
         if (destEntry.tasks.length > 0) {
           await hydrateTasksFromContainers(destEntry, workDate);
-          const updatedDestData = await recalculateCleanerTimes(destEntry);
+          const updatedDestData = await recalculateCleanerTimes(destEntry, workDate);
           destEntry.tasks = updatedDestData.tasks;
           console.log(`✅ Tempi ricalcolati per cleaner ${destCleanerId} (dopo swap)`);
         }
@@ -3336,7 +3336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Ricalcola travel_time, start_time, end_time usando lo script Python
       try {
         await hydrateTasksFromContainers(cleanerEntry, workDate);
-        const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry);
+        const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate);
         cleanerEntry.tasks = updatedCleanerData.tasks;
         console.log(`✅ Tempi ricalcolati per cleaner ${normalizedCleanerId}`);
       } catch (pythonError: any) {
@@ -4070,7 +4070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (taskCount > 0) {
           try {
             await hydrateTasksFromContainers(cleanerToReplace, workDate);
-            const updatedData = await recalculateCleanerTimes(cleanerToReplace);
+            const updatedData = await recalculateCleanerTimes(cleanerToReplace, workDate);
             cleanerToReplace.tasks = updatedData.tasks;
             console.log(`✅ Tempi ricalcolati per ${taskCount} task del nuovo cleaner ${cleanerId}`);
           } catch (err) {
@@ -7904,7 +7904,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       // Ricalcola tempi usando lo script Python per avere start_time/end_time coerenti con la sequenza
       try {
         await hydrateTasksFromContainers(dstEntry, workDate);
-        const updatedDst = await recalculateCleanerTimes(dstEntry);
+        const updatedDst = await recalculateCleanerTimes(dstEntry, workDate);
         dstEntry.tasks = updatedDst.tasks;
         console.log(`✅ Tempi ricalcolati per cleaner ${toCleanerId} dopo inserimento`);
 
@@ -7913,7 +7913,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           const srcEntry = getCleanerEntry(fromCleanerId);
           if (srcEntry && srcEntry.tasks.length > 0) {
             await hydrateTasksFromContainers(srcEntry, workDate);
-            const updatedSrc = await recalculateCleanerTimes(srcEntry);
+            const updatedSrc = await recalculateCleanerTimes(srcEntry, workDate);
             srcEntry.tasks = updatedSrc.tasks;
             console.log(`✅ Tempi ricalcolati per cleaner ${fromCleanerId} dopo rimozione`);
           }
@@ -8007,7 +8007,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       // Ricalcola travel_time, start_time, end_time usando lo script Python
       try {
         await hydrateTasksFromContainers(cleanerEntry, workDate);
-        const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry);
+        const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate);
         // Sostituisci le task con quelle ricalcolate
         cleanerEntry.tasks = updatedCleanerData.tasks;
         console.log(`✅ Tempi ricalcolati per cleaner ${cleanerId}`);

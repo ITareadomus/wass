@@ -212,6 +212,7 @@ export default function GenerateAssignments() {
   
   // Traccia l'indice valido durante il drag per evitare bug con destination.index
   const [lastValidDragIndex, setLastValidDragIndex] = useState<number | null>(null);
+  const lastValidDragIndexRef = useRef<number | null>(null);
   
   // Traccia il cleaner su cui si sta trascinando per posizionare il placeholder
   const [draggingOverCleanerId, setDraggingOverCleanerId] = useState<number | null>(null);
@@ -1497,6 +1498,7 @@ export default function GenerateAssignments() {
     if (!destination) {
       setDragSequencePreview(null);
       setLastValidDragIndex(null);
+      lastValidDragIndexRef.current = null;
       setDraggingOverCleanerId(null);
       return;
     }
@@ -1507,12 +1509,14 @@ export default function GenerateAssignments() {
     if (toCleanerId === null) {
       setDragSequencePreview(null);
       setLastValidDragIndex(null);
+      lastValidDragIndexRef.current = null;
       setDraggingOverCleanerId(null);
       return;
     }
 
     // CRITICAL: Salva l'indice valido durante il drag per evitare bug con destination.index inaffidabile
     setLastValidDragIndex(destination.index);
+    lastValidDragIndexRef.current = destination.index;
     setDraggingOverCleanerId(toCleanerId);
     setDragSequencePreview({
       // index è 0-based, mostrato come 1-based
@@ -1526,6 +1530,7 @@ export default function GenerateAssignments() {
     setDraggingOverCleanerId(null);
 
     const { destination, source, draggableId } = result;
+    const dragIndexSnapshot = lastValidDragIndexRef.current;
     
     // Estrai container e cleaner ID dalle destinazioni
     const toContainer = parseContainerKey(destination?.droppableId);
@@ -1645,7 +1650,7 @@ export default function GenerateAssignments() {
       // Spostamento tra cleaners diversi
       if (fromCleanerId !== null && toCleanerId !== null && fromCleanerId !== toCleanerId) {
         // CRITICAL: Usa lastValidDragIndex salvato durante onDragUpdate per evitare bug di posizionamento
-        const correctIndex = lastValidDragIndex !== null ? lastValidDragIndex : destination.index;
+        const correctIndex = dragIndexSnapshot !== null ? dragIndexSnapshot : destination.index;
         dlog(`🔄 Spostamento task ${taskId} da cleaner ${fromCleanerId} a cleaner ${toCleanerId} @ index ${correctIndex}`);
 
         try {
@@ -1718,7 +1723,7 @@ export default function GenerateAssignments() {
 
       if (isAnyMultiSelectActive && selectedTasks.length > 0 && isDraggedTaskSelected && toCleanerId !== null && !toContainer) {
         // CRITICAL: Usa lastValidDragIndex salvato durante onDragUpdate per evitare bug di posizionamento
-        const correctBatchIndex = lastValidDragIndex !== null ? lastValidDragIndex : destination.index;
+        const correctBatchIndex = dragIndexSnapshot !== null ? dragIndexSnapshot : destination.index;
         dlog(`🔄 BATCH MOVE CROSS-CONTAINER: Spostamento di ${selectedTasks.length} task selezionate a cleaner ${toCleanerId} @ index ${correctBatchIndex}`);
 
         // ENFORCEMENT: Filtra task locked dalla selezione batch
@@ -1805,7 +1810,7 @@ export default function GenerateAssignments() {
 
       if (!fromCleanerId && fromContainer && toCleanerId !== null && !toContainer) {
         // CRITICAL: Usa lastValidDragIndex salvato durante onDragUpdate per evitare bug di posizionamento
-        const correctIndex = lastValidDragIndex !== null ? lastValidDragIndex : destination.index;
+        const correctIndex = dragIndexSnapshot !== null ? dragIndexSnapshot : destination.index;
         dlog(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId} @ index ${correctIndex}`);
 
         try {
@@ -1901,6 +1906,7 @@ export default function GenerateAssignments() {
     } finally {
       // CRITICAL: Rilascia SEMPRE il loader e il lock, indipendentemente da come si esce
       isDraggingRef.current = false;
+      lastValidDragIndexRef.current = null;
       if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
       setIsLoadingDragDrop(false);
     }
