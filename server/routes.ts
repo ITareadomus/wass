@@ -2015,6 +2015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
       const taskIdRaw = req.query.taskId as string;
       const preferredDriverIdRaw = req.query.driverId as string | undefined;
+      const structureIdRaw = req.query.structureId as string | undefined;
       const taskId = Number(taskIdRaw);
       const preferredDriverId =
         preferredDriverIdRaw != null && preferredDriverIdRaw !== ""
@@ -2027,6 +2028,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { query } = await import("../shared/pg-db");
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const sanitizeHousekeepingNotes = (value: unknown): string =>
+        String(value ?? "")
+          .replace(/<\s*\/?\s*br\s*\/?\s*>/gi, "\n")
+          .replace(/<[^>]*>/g, " ")
+          .replace(/\r\n/g, "\n")
+          .replace(/\n{3,}/g, "\n\n")
+          .replace(/[ \t]{2,}/g, " ")
+          .trim();
+      const toNullableInt = (value: unknown): number | null => {
+        if (value === null || value === undefined || value === "") return null;
+        const num = Number(value);
+        return Number.isFinite(num) ? num : null;
+      };
 
       const result = await query(
         `
@@ -2034,6 +2048,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lt.driver_id,
             lt.sequence,
             lt.id,
+            lt.task_id,
+            lt.logistic_code,
             d.name AS driver_name,
             d.lastname AS driver_lastname,
             a.alias AS driver_alias
@@ -2055,8 +2071,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       const row = result.rows?.[0];
+      let housekeepingNotes: string | null = null;
+      let structureBeds: {
+        single_beds: number | null;
+        double_beds: number | null;
+        single_sofabeds: number | null;
+        double_sofabeds: number | null;
+      } | null = null;
+      let structureAlertKeys: number | null = null;
+
+      const noteLookupCandidates = [
+        Number(row?.task_id),
+        taskId,
+      ].filter((id, idx, arr) => Number.isFinite(id) && arr.indexOf(id) === idx);
+
+      const structureLookupCandidates: number[] = [];
+      const pushStructureCandidate = (value: unknown) => {
+        const num = Number(value);
+        if (!Number.isFinite(num)) return;
+        if (!structureLookupCandidates.includes(num)) {
+          structureLookupCandidates.push(num);
+        }
+      };
+      const logisticCodeLookupCandidates: number[] = [];
+      const pushLogisticCodeCandidate = (value: unknown) => {
+        const num = Number(value);
+        if (!Number.isFinite(num)) return;
+        if (!logisticCodeLookupCandidates.includes(num)) {
+          logisticCodeLookupCandidates.push(num);
+        }
+      };
+      // Priorita': structure_id esplicito dal client (app_structures.id).
+      pushStructureCandidate(structureIdRaw);
+      // Fallback robusto: logistic_code del record timeline.
+      pushLogisticCodeCandidate(row?.logistic_code);
+
+      if (noteLookupCandidates.length > 0 || structureLookupCandidates.length > 0) {
+        try {
+          const adamConnection = await mysql.createConnection({
+            host: databaseConfig.mysql.host,
+            port: databaseConfig.mysql.port,
+            user: databaseConfig.mysql.user,
+            password: databaseConfig.mysql.password,
+            database: databaseConfig.mysql.database,
+          });
+          try {
+            for (const noteTaskId of noteLookupCandidates) {
+              const [rows]: any = await adamConnection.execute(
+                `
+                  SELECT
+                    h.notes,
+                    h.structure_id
+                  FROM app_housekeeping h
+                  WHERE h.id = ?
+                  LIMIT 1
+                `,
+                [noteTaskId]
+              );
+              const rowRaw = rows?.[0] ?? null;
+              if (!rowRaw) continue;
+              const noteRaw = rowRaw.notes;
+              const noteText = sanitizeHousekeepingNotes(noteRaw);
+              pushStructureCandidate(rowRaw.structure_id);
+              if (noteText) {
+                housekeepingNotes = noteText;
+              }
+              break;
+            }
+
+            for (const structureId of structureLookupCandidates) {
+              const [rows]: any = await adamConnection.execute(
+                `
+                  SELECT
+                    single_beds,
+                    double_beds,
+                    single_sofabeds,
+                    double_sofabeds,
+                    alert_keys
+                  FROM app_structures
+                  WHERE id = ?
+                  LIMIT 1
+                `,
+                [structureId]
+              );
+              const structureRaw = rows?.[0] ?? null;
+              if (!structureRaw) continue;
+              structureBeds = {
+                single_beds: toNullableInt(structureRaw.single_beds),
+                double_beds: toNullableInt(structureRaw.double_beds),
+                single_sofabeds: toNullableInt(structureRaw.single_sofabeds),
+                double_sofabeds: toNullableInt(structureRaw.double_sofabeds),
+              };
+              structureAlertKeys = toNullableInt(structureRaw.alert_keys);
+              break;
+            }
+
+            // Fallback: se non troviamo per id, prova con app_structures.logistic_code.
+            if (!structureBeds) {
+              for (const logisticCode of logisticCodeLookupCandidates) {
+                const [rows]: any = await adamConnection.execute(
+                  `
+                    SELECT
+                      single_beds,
+                      double_beds,
+                      single_sofabeds,
+                      double_sofabeds,
+                      alert_keys
+                    FROM app_structures
+                    WHERE logistic_code = ?
+                    LIMIT 1
+                  `,
+                  [logisticCode]
+                );
+                const structureRaw = rows?.[0] ?? null;
+                if (!structureRaw) continue;
+                structureBeds = {
+                  single_beds: toNullableInt(structureRaw.single_beds),
+                  double_beds: toNullableInt(structureRaw.double_beds),
+                  single_sofabeds: toNullableInt(structureRaw.single_sofabeds),
+                  double_sofabeds: toNullableInt(structureRaw.double_sofabeds),
+                };
+                structureAlertKeys = toNullableInt(structureRaw.alert_keys);
+                break;
+              }
+            }
+          } finally {
+            await adamConnection.end();
+          }
+        } catch (noteError: any) {
+          console.warn(
+            "GET /api/logistics-task-driver-details: unable to read app_housekeeping.notes:",
+            noteError?.message || noteError
+          );
+        }
+      }
+
       if (!row) {
-        return res.json({ success: true, found: false });
+        return res.json({ success: true, found: false, housekeepingNotes, structureBeds, structureAlertKeys });
       }
 
       const driverId = Number(row.driver_id);
@@ -2075,6 +2226,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         driverId,
         driverBadge: `${driverLabel} - ${vehicleName}`,
         sequence: row.sequence ?? null,
+        housekeepingNotes,
+        structureBeds,
+        structureAlertKeys,
       });
     } catch (error: any) {
       console.error("GET /api/logistics-task-driver-details:", error);

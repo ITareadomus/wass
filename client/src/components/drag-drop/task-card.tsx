@@ -215,7 +215,7 @@ export default function TaskCard({
   "h-9 border-transparent bg-transparent shadow-none focus-visible:ring-0 px-0 pointer-events-none select-none";
 
 const displayClickableInputClass =
-  "h-9 border-transparent bg-transparent shadow-none focus-visible:ring-0 px-0";
+  "h-9 border-transparent bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus:border-transparent px-0";
 
   const isOfficeScope = (() => {
     if (operationsScope === "office") return true;
@@ -375,11 +375,20 @@ const displayClickableInputClass =
   const [logisticsHousekeepingCleanerLabel, setLogisticsHousekeepingCleanerLabel] = useState<string | null>(null);
   const [logisticsHousekeepingSequence, setLogisticsHousekeepingSequence] = useState<number | null>(null);
   const [logisticsTimelineSequence, setLogisticsTimelineSequence] = useState<number | null>(null);
+  const [logisticsHousekeepingNotes, setLogisticsHousekeepingNotes] = useState<string | null>(null);
+  const [logisticsStructureBeds, setLogisticsStructureBeds] = useState<{
+    single_beds: number | null;
+    double_beds: number | null;
+    single_sofabeds: number | null;
+    double_sofabeds: number | null;
+  } | null>(null);
+  const [logisticsStructureAlertKeys, setLogisticsStructureAlertKeys] = useState<number | null>(null);
   const [isLoadingHousekeepingCleanerDetails, setIsLoadingHousekeepingCleanerDetails] = useState(false);
   const [hasResolvedHousekeepingCleanerDetails, setHasResolvedHousekeepingCleanerDetails] = useState(false);
   const [resolvedHousekeepingTaskKey, setResolvedHousekeepingTaskKey] = useState<string>("");
   const isLogisticsTimelineDetails = operationsScope === "logistics" && isInTimeline;
-  const isTimelineDetailsDialog = isInTimeline && !isOfficeScope;
+  // Dialog completo in tutte le pagine non-office (timeline + containers).
+  const isTimelineDetailsDialog = !isOfficeScope;
   const { toast } = useToast();
 
   // Handler per toggle blocco task
@@ -774,6 +783,16 @@ const displayClickableInputClass =
     }
   }, [effectiveCurrentId, isModalOpen, displayTask]);
 
+  // Evita autofocus automatico quando si apre il dialog dettagli.
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const rafId = window.requestAnimationFrame(() => {
+      const active = document.activeElement as HTMLElement | null;
+      active?.blur();
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [isModalOpen]);
+
   // Normalizza confirmed_operation da boolean/number/string a boolean sicuro
   // CRITICAL: Se l'utente ha modificato operation_id tramite pending edits, considera confermato
   // Questo distingue tra operation_id=2 di default (sistema) e operation_id=2 scelto manualmente
@@ -833,13 +852,11 @@ const displayClickableInputClass =
   useEffect(() => {
     const calculateAssignmentTimes = () => {
       const taskObj = displayTask as any;
-      if (taskObj.startTime || taskObj.start_time) {
-        setAssignmentTimes({
-          start_time: taskObj.start_time || taskObj.startTime,
-          end_time: taskObj.end_time || taskObj.endTime,
-          travel_time: taskObj.travel_time || taskObj.travelTime
-        });
-      }
+      setAssignmentTimes({
+        start_time: taskObj.start_time ?? taskObj.startTime,
+        end_time: taskObj.end_time ?? taskObj.endTime,
+        travel_time: taskObj.travel_time ?? taskObj.travelTime,
+      });
     };
 
     // Aggiorna assignmentTimes solo quando il modale è aperto (contenuto dialog).
@@ -860,6 +877,9 @@ const displayClickableInputClass =
           setResolvedLogisticsDriverTaskKey("");
           setLogisticsDriverBadge(null);
           setLogisticsTimelineSequence(null);
+          setLogisticsHousekeepingNotes(null);
+          setLogisticsStructureBeds(null);
+          setLogisticsStructureAlertKeys(null);
         }
         return;
       }
@@ -877,12 +897,21 @@ const displayClickableInputClass =
           setResolvedLogisticsDriverTaskKey("");
           setLogisticsDriverBadge(null);
           setLogisticsTimelineSequence(null);
+          setLogisticsHousekeepingNotes(null);
+          setLogisticsStructureBeds(null);
+          setLogisticsStructureAlertKeys(null);
         }
         return;
       }
 
       const dateStr =
         localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
+      const structureIdRaw =
+        (displayTask as any).structure_id ??
+        (displayTask as any).structureId ??
+        (task as any).structure_id ??
+        (task as any).structureId ??
+        "";
 
       try {
         if (!cancelled) {
@@ -890,10 +919,13 @@ const displayClickableInputClass =
           setHasResolvedLogisticsDriverBadge(false);
           setLogisticsDriverBadge(null);
           setLogisticsTimelineSequence(null);
+          setLogisticsHousekeepingNotes(null);
+          setLogisticsStructureBeds(null);
+          setLogisticsStructureAlertKeys(null);
         }
 
         const res = await fetch(
-          `/api/logistics-task-driver-details?date=${encodeURIComponent(dateStr)}&taskId=${encodeURIComponent(String(taskId))}&driverId=${encodeURIComponent(String(cleanerId ?? ""))}`,
+          `/api/logistics-task-driver-details?date=${encodeURIComponent(dateStr)}&taskId=${encodeURIComponent(String(taskId))}&driverId=${encodeURIComponent(String(cleanerId ?? ""))}&structureId=${encodeURIComponent(String(structureIdRaw))}`,
           { cache: "no-store" }
         );
         if (cancelled) return;
@@ -901,11 +933,26 @@ const displayClickableInputClass =
         const json = res.ok ? await res.json().catch(() => ({})) : {};
         const badge = String(json?.driverBadge ?? "").trim();
         const logisticsSeqNum = Number(json?.sequence);
+        const housekeepingNotesText = String(json?.housekeepingNotes ?? "").trim();
+        const bedsRaw = json?.structureBeds;
+        const alertKeysRaw = Number(json?.structureAlertKeys);
         setIsLoadingLogisticsDriverBadge(false);
         setHasResolvedLogisticsDriverBadge(true);
         setResolvedLogisticsDriverTaskKey(String(taskId));
         setLogisticsDriverBadge(badge || null);
         setLogisticsTimelineSequence(Number.isFinite(logisticsSeqNum) ? logisticsSeqNum : null);
+        setLogisticsHousekeepingNotes(housekeepingNotesText || null);
+        setLogisticsStructureBeds(
+          bedsRaw && typeof bedsRaw === "object"
+            ? {
+                single_beds: Number.isFinite(Number(bedsRaw.single_beds)) ? Number(bedsRaw.single_beds) : null,
+                double_beds: Number.isFinite(Number(bedsRaw.double_beds)) ? Number(bedsRaw.double_beds) : null,
+                single_sofabeds: Number.isFinite(Number(bedsRaw.single_sofabeds)) ? Number(bedsRaw.single_sofabeds) : null,
+                double_sofabeds: Number.isFinite(Number(bedsRaw.double_sofabeds)) ? Number(bedsRaw.double_sofabeds) : null,
+              }
+            : null
+        );
+        setLogisticsStructureAlertKeys(Number.isFinite(alertKeysRaw) ? alertKeysRaw : null);
       } catch {
         if (!cancelled) {
           setIsLoadingLogisticsDriverBadge(false);
@@ -913,6 +960,9 @@ const displayClickableInputClass =
           setResolvedLogisticsDriverTaskKey(String(taskId));
           setLogisticsDriverBadge(null);
           setLogisticsTimelineSequence(null);
+          setLogisticsHousekeepingNotes(null);
+          setLogisticsStructureBeds(null);
+          setLogisticsStructureAlertKeys(null);
         }
       }
     };
@@ -1679,49 +1729,83 @@ const displayClickableInputClass =
     : "";
   const taskAny = task as any;
   const displayTaskAny = displayTask as any;
-  const logisticsAlertMessage =
-    taskAny.alert_message ??
-    taskAny.alert_messages ??
-    taskAny.warning_message ??
-    displayTaskAny.alert_message ??
-    displayTaskAny.alert_messages ??
-    displayTaskAny.warning_message ??
-    "—";
-  const logisticsNotes =
-    taskAny.notes ??
-    taskAny.note ??
-    taskAny.internal_notes ??
-    displayTaskAny.notes ??
-    displayTaskAny.note ??
-    displayTaskAny.internal_notes ??
-    "—";
-  const logisticsSofaBeds =
-    taskAny.sofa_beds ??
-    taskAny.sofaBeds ??
-    taskAny.divani_letto ??
-    displayTaskAny.sofa_beds ??
-    displayTaskAny.sofaBeds ??
-    displayTaskAny.divani_letto ??
-    "—";
-  // "Schedulato alle" nel box logistica deve usare solo dati logistici dedicati
-  // (non l'orario di start housekeeping).
+  const bedsInfo =
+    resolvedLogisticsDriverTaskKey === currentDetailsTaskKey ? logisticsStructureBeds : null;
+  const effectiveStructureAlertKeys =
+    resolvedLogisticsDriverTaskKey === currentDetailsTaskKey ? logisticsStructureAlertKeys : null;
+  const bedsSummaryParts: string[] = [];
+  const singleSofabeds = Number(bedsInfo?.single_sofabeds ?? 0);
+  const doubleSofabeds = Number(bedsInfo?.double_sofabeds ?? 0);
+  if (Number.isFinite(singleSofabeds) && singleSofabeds > 0) {
+    bedsSummaryParts.push(
+      `${singleSofabeds} ${singleSofabeds === 1 ? "divano letto singolo" : "divani letto singoli"}`
+    );
+  }
+  if (Number.isFinite(doubleSofabeds) && doubleSofabeds > 0) {
+    bedsSummaryParts.push(
+      `${doubleSofabeds} ${doubleSofabeds === 1 ? "divano letto matrimoniale" : "divani letto matrimoniali"}`
+    );
+  }
+  const bedsSummaryText = bedsSummaryParts.join(" • ");
+  const parseTravelMinutes = (value: unknown): number | null => {
+    if (value === null || value === undefined || value === "") return null;
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+  };
+
+  const logisticsTravelTimeRaw =
+    taskAny.logistics_travel_time ??
+    taskAny.logisticsTravelTime ??
+    taskAny.driver_travel_time ??
+    taskAny.driverTravelTime ??
+    (isLogisticsTimelineDetails ? (taskAny.travel_time ?? taskAny.travelTime) : null) ??
+    displayTaskAny.logistics_travel_time ??
+    displayTaskAny.logisticsTravelTime ??
+    displayTaskAny.driver_travel_time ??
+    displayTaskAny.driverTravelTime ??
+    (isLogisticsTimelineDetails ? (displayTaskAny.travel_time ?? displayTaskAny.travelTime) : null) ??
+    null;
+  const logisticsTravelMinutes = parseTravelMinutes(logisticsTravelTimeRaw);
+
+  // "Schedulato alle" nel box logistica deve usare solo dati logistici dedicati.
+  // Evita fallback su driver_start_time (orario turno) e su start_time housekeeping.
   const logisticsScheduledAtRaw =
     taskAny.logistics_start_time ??
     taskAny.logisticsStartTime ??
     taskAny.logistics_scheduled_time ??
     taskAny.logisticsScheduledTime ??
-    taskAny.driver_start_time ??
-    taskAny.driverStartTime ??
+    (isLogisticsTimelineDetails ? (taskAny.start_time ?? taskAny.startTime) : null) ??
     displayTaskAny.logistics_start_time ??
     displayTaskAny.logisticsStartTime ??
     displayTaskAny.logistics_scheduled_time ??
     displayTaskAny.logisticsScheduledTime ??
-    displayTaskAny.driver_start_time ??
-    displayTaskAny.driverStartTime ??
+    (isLogisticsTimelineDetails ? (displayTaskAny.start_time ?? displayTaskAny.startTime) : null) ??
     null;
   const logisticsScheduledAt = String(logisticsScheduledAtRaw ?? "").trim();
-  const alertText = String(logisticsAlertMessage ?? "").trim();
-  const notesText = String(logisticsNotes ?? "").trim();
+  const fallbackTimelineSequence =
+    (isLogisticsTimelineDetails
+      ? (taskAny.sequence ??
+        taskAny.logistics_sequence ??
+        taskAny.logisticsSequence ??
+        displayTaskAny.sequence ??
+        displayTaskAny.logistics_sequence ??
+        displayTaskAny.logisticsSequence)
+      : null) ?? null;
+  const effectiveLogisticsSequence = Number(logisticsTimelineSequence ?? fallbackTimelineSequence);
+  const isSingleKeyStructure = Number(effectiveStructureAlertKeys) === 1;
+  const isFirstSequenceLogistics = Number.isFinite(effectiveLogisticsSequence) && effectiveLogisticsSequence === 1;
+  const logisticsAlertParts: string[] = [];
+  if (isSingleKeyStructure) {
+    logisticsAlertParts.push("Consegnare chiave al cleaner.");
+  }
+  if (isFirstSequenceLogistics) {
+    logisticsAlertParts.push("Solo ritiro dello sporco, no borsone.");
+  }
+  const alertText = logisticsAlertParts.join(" ");
+  const notesText =
+    resolvedLogisticsDriverTaskKey === currentDetailsTaskKey
+      ? String(logisticsHousekeepingNotes ?? "").trim()
+      : "";
   const logisticsHousekeepingAlias =
     taskAny.cleaner_alias ??
     taskAny.assigned_cleaner_alias ??
@@ -1736,6 +1820,16 @@ const displayClickableInputClass =
     resolvedHousekeepingTaskKey === currentDetailsTaskKey &&
     hasResolvedHousekeepingCleanerDetails &&
     !isLoadingHousekeepingCleanerDetails;
+  const hasResolvedDriverDetailsForCurrentTask =
+    resolvedLogisticsDriverTaskKey === currentDetailsTaskKey &&
+    hasResolvedLogisticsDriverBadge;
+  const hasResolvedHousekeepingDetailsForCurrentTask =
+    resolvedHousekeepingTaskKey === currentDetailsTaskKey &&
+    hasResolvedHousekeepingCleanerDetails;
+  const shouldDeferLogisticsFallbacks =
+    isTimelineDetailsDialog && isInTimeline && !hasResolvedDriverDetailsForCurrentTask;
+  const shouldDeferCleanerFallbacks =
+    isTimelineDetailsDialog && isInTimeline && !hasResolvedHousekeepingDetailsForCurrentTask;
   const effectiveDriverBadge =
     resolvedLogisticsDriverTaskKey === currentDetailsTaskKey ? logisticsDriverBadge : null;
   const effectiveHousekeepingLabel =
@@ -1747,14 +1841,33 @@ const displayClickableInputClass =
       ? logisticsHousekeepingSequence
       : null;
 
+  const isContainerDetails = !isInTimeline && !isOfficeScope;
+  const effectiveHousekeepingLabelText = String(effectiveHousekeepingLabel ?? "").trim();
+  const logisticsHousekeepingAliasText = String(logisticsHousekeepingAlias || "").trim();
   const logisticsAssignedTo =
-    (shouldShowResolvedHousekeepingFallback
-      ? String(effectiveHousekeepingLabel ?? "").trim()
-      : "") ||
-    (shouldShowResolvedHousekeepingFallback
-      ? String(logisticsHousekeepingAlias || "").trim()
-      : "") ||
+    logisticsHousekeepingAliasText ||
+    (shouldShowResolvedHousekeepingFallback ? effectiveHousekeepingLabelText : "") ||
     "non assegnato";
+  const logisticsDriverDisplayValue = shouldDeferLogisticsFallbacks
+    ? ""
+    : String(effectiveDriverBadge ?? "non assegnato");
+  const logisticsSequenceDisplayValue = shouldDeferLogisticsFallbacks
+    ? ""
+    : String(logisticsTimelineSequence ?? fallbackTimelineSequence ?? "—");
+  const logisticsTravelDisplayValue = shouldDeferLogisticsFallbacks
+    ? ""
+    : logisticsTravelMinutes !== null
+      ? `${logisticsTravelMinutes} minuti`
+      : "non assegnato";
+  const logisticsScheduledDisplayValue = shouldDeferLogisticsFallbacks
+    ? ""
+    : logisticsScheduledAt || "non assegnato";
+  const logisticsAlertDisplayValue = shouldDeferLogisticsFallbacks
+    ? ""
+    : alertText || "—";
+  const logisticsBedsDisplayValue = shouldDeferLogisticsFallbacks
+    ? ""
+    : bedsSummaryText || "—";
   const hasCollaboration = Number((displayTask as any).collaborator_count || 0) > 1;
   const primaryCollaboratorLabel = (() => {
     const primary = taskCollaborators.find((c: any) => Boolean(c?.isPrimary));
@@ -1762,9 +1875,336 @@ const displayClickableInputClass =
     return String(primary.alias ?? primary.name ?? (primary.id != null ? `Cleaner ${primary.id}` : "")).trim();
   })();
   const cleanerDetailsAssignedTo =
-    hasCollaboration && primaryCollaboratorLabel
-      ? primaryCollaboratorLabel
-      : logisticsAssignedTo;
+    isContainerDetails
+      ? "non assegnato"
+      : shouldDeferCleanerFallbacks
+        ? ""
+      : primaryCollaboratorLabel
+        ? primaryCollaboratorLabel
+        : logisticsAssignedTo;
+  const cleanerDetailsSequenceValue =
+    isContainerDetails
+      ? "non assegnato"
+      : shouldDeferCleanerFallbacks
+        ? ""
+        : String(effectiveHousekeepingSequence ?? fallbackTimelineSequence ?? "non assegnato");
+
+  const alignLogisticsHousekeepingRows = false;
+
+  const housekeepingTimelineDetailRows = () => (
+    <>
+            {/* Prima riga: Codice ADAM | Cliente */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+              <div className="self-start">
+                <p className="text-sm font-semibold text-muted-foreground">Codice ADAM</p>
+                <Input
+                  value={String(displayTask.name ?? "")}
+                  readOnly
+                  className={displayInputClass}
+                  tabIndex={-1}
+                  onFocus={(e) => e.currentTarget.blur()}
+                />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Cliente</p>
+                <Input
+                  value={String(displayTask.customer_name ?? "non migrato")}
+                  readOnly
+                  className={displayInputClass}
+                  tabIndex={-1}
+                  onFocus={(e) => e.currentTarget.blur()}
+                />
+              </div>
+            </div>
+
+            {/* Seconda riga: Indirizzo | Durata pulizia */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Indirizzo</p>
+                <Input
+                  value={String(displayTask.address?.toUpperCase() ?? "NON MIGRATO")}
+                  readOnly
+                  className={displayInputClass}
+                  tabIndex={-1}
+                  onFocus={(e) => e.currentTarget.blur()}
+                />
+              </div>
+              <div className="self-start">
+                <p className={cn("text-sm font-semibold text-muted-foreground", !isLogisticsTimelineDetails && "mb-1")}>Durata pulizia</p>
+                <Input
+                  value={`${(displayTask.duration || "0.0").replace(".", ":")} ore`}
+                  readOnly
+                  className={displayInputClass}
+                  tabIndex={-1}
+                  onFocus={(e) => e.currentTarget.blur()}
+                />
+              </div>
+            </div>
+
+            {/* Terza riga: Check-out - Check-in (click apre dialog come Pax-In) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <p className={cn("text-sm font-semibold text-muted-foreground flex items-center gap-1", !isLogisticsTimelineDetails && "mb-1")}>
+                  Check-out
+                  {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                </p>
+                <Input
+                  readOnly
+                  value={
+                    (displayTask as any).checkout_date
+                      ? `${new Date((displayTask as any).checkout_date).toLocaleDateString("it-IT", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}${
+                          (displayTask as any).checkout_time
+                            ? ` - ${(displayTask as any).checkout_time}`
+                            : " - orario non migrato"
+                        }`
+                      : "non migrato"
+                  }
+                  className={
+                    isReadOnly
+                      ? displayInputClass
+                      : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
+                  }
+                  tabIndex={isReadOnly ? -1 : 0}
+                  onFocus={(e) => {
+                    if (isReadOnly) e.currentTarget.blur();
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isReadOnly) handleOpenCheckoutDialog();
+                  }}
+                />
+              </div>
+
+              <div>
+                <p className={cn("text-sm font-semibold text-muted-foreground flex items-center gap-1", !isLogisticsTimelineDetails && "mb-1")}>
+                  Check-in
+                  {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                </p>
+                <Input
+                  readOnly
+                  value={
+                    (displayTask as any).checkin_date
+                      ? `${new Date((displayTask as any).checkin_date).toLocaleDateString("it-IT", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}${
+                          (displayTask as any).checkin_time
+                            ? ` - ${(displayTask as any).checkin_time}`
+                            : " - orario non migrato"
+                        }`
+                      : "non migrato"
+                  }
+                  className={
+                    isReadOnly
+                      ? displayInputClass
+                      : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
+                  }
+                  tabIndex={isReadOnly ? -1 : 0}
+                  onFocus={(e) => {
+                    if (isReadOnly) e.currentTarget.blur();
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isReadOnly) handleOpenCheckinDialog();
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Quarta riga: Tipologia appartamento - Tipologia intervento */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Tipologia appartamento</p>
+                <Input value={String((displayTask as any).type_apt ?? "non migrato")} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                  Tipologia intervento
+                  {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                </p>
+                <Input
+                  readOnly
+                  value={(() => {
+                    const taskKeyDisplay = getTaskKey(displayTask);
+                    const pendingEditsDisplay = getPendingEdits()[taskKeyDisplay];
+                    const userChoseNone =
+                      pendingEditsDisplay?.operationIdModified === true && pendingEditsDisplay?.operationId === null;
+
+                    if (userChoseNone) return "— Nessuna operazione —";
+                    if (!isConfirmedOperation) return "non migrato";
+                    const opId = (displayTask as any).operation_id;
+                    if (opId) return operationNames[opId] || `Operazione ${opId}`;
+                    return "-";
+                  })()}
+                  className={
+                    isReadOnly
+                      ? displayInputClass
+                      : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
+                  }
+                  tabIndex={isReadOnly ? -1 : 0}
+                  onFocus={(e) => {
+                    if (isReadOnly) e.currentTarget.blur();
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isReadOnly) handleOpenOperationDialog();
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Quinta riga: Pax-In - Pax-Out */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                  Pax-In
+                  {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                </p>
+                <Input
+                  readOnly
+                  value={String((displayTask as any).pax_in ?? "non migrato")}
+                  className={
+                    isReadOnly
+                      ? displayInputClass
+                      : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
+                  }
+                  tabIndex={isReadOnly ? -1 : 0}
+                  onFocus={(e) => {
+                    if (isReadOnly) e.currentTarget.blur();
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isReadOnly) handleOpenPaxInDialog();
+                  }}
+                />
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Pax-Out</p>
+                <Input value={String((displayTask as any).pax_out ?? "non migrato")} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
+              </div>
+            </div>
+
+            {/* Sesta riga: Travel Time - Start Time - End Time (Start/End nella colonna destra) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Travel Time</p>
+                <Input
+                  value={assignmentTimes.travel_time !== undefined ? `${assignmentTimes.travel_time} minuti` : "non assegnato"}
+                  readOnly
+                  className={displayInputClass}
+                  tabIndex={-1}
+                  onFocus={(e) => e.currentTarget.blur()}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">Start Time</p>
+                  <Input value={String(assignmentTimes.start_time ?? "non assegnato")} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">End Time</p>
+                  <Input value={String(assignmentTimes.end_time ?? "non assegnato")} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
+                </div>
+              </div>
+            </div>
+    </>
+  );
+
+  const logisticsTimelineDetailFields = () => (
+    <>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 items-start min-h-[56px]">
+        <div>
+          <p className="text-sm font-semibold text-muted-foreground">Autista - Veicolo</p>
+          <p className="mt-[8px] text-sm font-normal min-w-0 max-w-full whitespace-normal break-words">
+            {logisticsDriverDisplayValue}
+          </p>
+        </div>
+        <div className="shrink-0 min-w-[56px]">
+          <p className="text-sm font-semibold text-muted-foreground">Sequenza</p>
+          <p className="mt-[8px] text-sm font-semibold text-center whitespace-nowrap">
+            {logisticsSequenceDisplayValue}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-h-[56px]">
+        <div>
+          <p className="text-sm font-semibold text-muted-foreground">Travel Time</p>
+          <Input
+            value={logisticsTravelDisplayValue}
+            readOnly
+            className={displayInputClass}
+            tabIndex={-1}
+            onFocus={(e) => e.currentTarget.blur()}
+          />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-muted-foreground">Schedulato alle</p>
+          <Input
+            value={logisticsScheduledDisplayValue}
+            readOnly
+            className={displayInputClass}
+            tabIndex={-1}
+            onFocus={(e) => e.currentTarget.blur()}
+          />
+        </div>
+      </div>
+
+      <div className="grid min-h-[56px] grid-cols-1 gap-2">
+        <div className="-mt-0.5">
+          <p className="text-sm font-semibold text-muted-foreground">Messaggi di allerta</p>
+          <Input
+            value={logisticsAlertDisplayValue}
+            readOnly
+            className={displayInputClass}
+            tabIndex={-1}
+            onFocus={(e) => e.currentTarget.blur()}
+          />
+        </div>
+
+        <div className="-mt-0.5">
+          <p className="text-sm font-semibold text-muted-foreground">Notes</p>
+          <div
+            className="min-h-9 w-full rounded-md border-transparent bg-transparent px-0 py-1 text-sm text-foreground shadow-none select-none whitespace-pre-wrap break-words"
+            tabIndex={-1}
+          >
+            {notesText || (shouldDeferLogisticsFallbacks ? "" : "—")}
+          </div>
+        </div>
+      </div>
+
+      <div className="min-h-[56px]">
+        <p className="text-sm font-semibold text-muted-foreground">Divani letto</p>
+        <div
+          className="min-h-9 w-full rounded-md border-transparent bg-transparent px-0 py-1 text-sm text-foreground shadow-none select-none whitespace-normal break-words"
+          tabIndex={-1}
+        >
+          {logisticsBedsDisplayValue}
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <>
@@ -2010,7 +2450,7 @@ const displayClickableInputClass =
           className={cn(
             "overflow-y-auto overflow-x-hidden",
             isTimelineDetailsDialog
-              ? "w-[min(96vw,1100px)] max-w-[1100px] max-h-[85vh]"
+              ? "w-[min(96vw,1280px)] max-w-[1280px] max-h-[85vh]"
               : "sm:max-w-xl max-h-[75vh]"
           )}
           onOpenAutoFocus={(e) => e.preventDefault()}
@@ -2088,105 +2528,27 @@ const displayClickableInputClass =
             </div>
           </DialogHeader>
 
-          <div className={cn(isTimelineDetailsDialog && "mt-3 grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-4 items-stretch")}>
+          <div
+            className={cn(
+              "mt-3",
+              isTimelineDetailsDialog &&
+                "grid grid-cols-1 xl:grid-cols-[3fr_minmax(0,5fr)] gap-4 items-start"
+            )}
+          >
             {isTimelineDetailsDialog && (
-              <div className="flex h-full flex-col gap-3">
+              <div className="flex h-full min-h-0 flex-col gap-6 self-stretch">
                 {isTimelineDetailsDialog && (
-                  <div className="relative h-full min-h-0 rounded-md border border-border bg-muted/20 p-3">
+                  <div className="relative flex-1 rounded-md border border-border bg-muted/20 p-3">
                     <div className="absolute -top-3 left-3 inline-flex items-center gap-1.5 rounded-t-md rounded-b-sm border border-border bg-background px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-foreground shadow-sm">
                       <Truck className="h-3.5 w-3.5 shrink-0" />
                       <span>Dettagli Logistica</span>
                     </div>
 
-                    <div className="grid gap-3 pt-2">
-                      <div className="grid min-h-[56px] grid-cols-[1fr_auto] gap-3 items-start">
-                        <div>
-                          <p className="text-sm font-semibold text-muted-foreground">Autista - Veicolo</p>
-                          <Badge variant="outline" className="mt-[8px] text-xs min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap">
-                            {String(
-                              effectiveDriverBadge ??
-                                (!shouldShowResolvedDriverFallback
-                                  ? ""
-                                  : "non assegnato")
-                            )}
-                          </Badge>
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-muted-foreground">Sequenza</p>
-                          <div className="flex justify-center">
-                            <Badge variant="outline" className="mt-[8px] text-xs shrink-0">
-                              {String(logisticsTimelineSequence ?? "—")}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="grid min-h-[56px] grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-muted-foreground">Travel Time</p>
-                          <Input
-                            value={
-                              assignmentTimes.travel_time !== undefined
-                                ? `${assignmentTimes.travel_time} minuti`
-                                : "non assegnato"
-                            }
-                            readOnly
-                            className={displayInputClass}
-                            tabIndex={-1}
-                            onFocus={(e) => e.currentTarget.blur()}
-                          />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-muted-foreground">Schedulato alle</p>
-                          <Input
-                          value={logisticsScheduledAt || "non assegnato"}
-                            readOnly
-                            className={displayInputClass}
-                            tabIndex={-1}
-                            onFocus={(e) => e.currentTarget.blur()}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid min-h-[56px] grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-muted-foreground">Messaggi di allerta</p>
-                          <Input
-                            value={alertText || "—"}
-                            readOnly
-                            className={displayInputClass}
-                            tabIndex={-1}
-                            onFocus={(e) => e.currentTarget.blur()}
-                          />
-                        </div>
-
-                        <div>
-                          <p className="text-sm font-semibold text-muted-foreground">Notes</p>
-                          <Input
-                            value={notesText || "—"}
-                            readOnly
-                            className={displayInputClass}
-                            tabIndex={-1}
-                            onFocus={(e) => e.currentTarget.blur()}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="min-h-[56px]">
-                        <p className="text-sm font-semibold text-muted-foreground">Divani letto</p>
-                        <Input
-                          value={String(logisticsSofaBeds)}
-                          readOnly
-                          className={displayInputClass}
-                          tabIndex={-1}
-                          onFocus={(e) => e.currentTarget.blur()}
-                        />
-                      </div>
-                    </div>
+                    <div className="grid gap-3 pt-2">{logisticsTimelineDetailFields()}</div>
                   </div>
                 )}
 
-                <div className={cn("relative rounded-md border border-border bg-muted/20 p-3 flex-none", isTimelineDetailsDialog && "mt-2")}>
+                <div className="relative rounded-md border border-border bg-muted/20 p-3 flex-none mt-auto">
                   <div className="absolute -top-3 left-3 inline-flex items-center gap-1.5 rounded-t-md rounded-b-sm border border-border bg-background px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-foreground shadow-sm">
                     <User className="h-3.5 w-3.5 shrink-0" />
                     <span>Dettagli Cleaner</span>
@@ -2205,12 +2567,7 @@ const displayClickableInputClass =
                     <div>
                       <p className="text-sm font-semibold text-muted-foreground">Sequenza</p>
                       <Input
-                        value={String(
-                          effectiveHousekeepingSequence ??
-                            (!shouldShowResolvedHousekeepingFallback
-                              ? ""
-                              : "non assegnato")
-                        )}
+                        value={cleanerDetailsSequenceValue}
                         readOnly
                         className={displayInputClass}
                         tabIndex={-1}
@@ -2222,7 +2579,11 @@ const displayClickableInputClass =
               </div>
             )}
 
-            <div className={cn(isTimelineDetailsDialog ? "relative h-full min-h-0 min-w-0 rounded-md border border-border bg-muted/20 p-3" : "space-y-3")}>
+            <div
+              className={cn(
+                isTimelineDetailsDialog ? "relative min-h-0 min-w-0 rounded-md border border-border bg-muted/20 p-3" : "space-y-3"
+              )}
+            >
             {isTimelineDetailsDialog && (
               <div className="absolute -top-3 left-3 inline-flex items-center gap-1.5 rounded-t-md rounded-b-sm border border-border bg-background px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-foreground shadow-sm">
                 <Building2 className="h-3.5 w-3.5 shrink-0" />
@@ -2230,197 +2591,7 @@ const displayClickableInputClass =
               </div>
             )}
             <div className={cn(isTimelineDetailsDialog ? "grid gap-3 pt-2" : "space-y-3")}>
-            {/* Prima riga: Codice ADAM | Cliente */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
-              <div className="self-start">
-                <p className="text-sm font-semibold text-muted-foreground">Codice ADAM</p>
-                <Input
-                  value={String(displayTask.name ?? "")}
-                  readOnly
-                  className={displayInputClass}
-                  tabIndex={-1}
-                  onFocus={(e) => e.currentTarget.blur()}
-                />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">Cliente</p>
-                <Input
-                  value={String(displayTask.customer_name ?? "non migrato")}
-                  readOnly
-                  className={displayInputClass}
-                  tabIndex={-1}
-                  onFocus={(e) => e.currentTarget.blur()}
-                />
-              </div>
-            </div>
-
-            {/* Seconda riga: Indirizzo | Durata pulizia */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">Indirizzo</p>
-                <Input
-                  value={String(displayTask.address?.toUpperCase() ?? "NON MIGRATO")}
-                  readOnly
-                  className={displayInputClass}
-                  tabIndex={-1}
-                  onFocus={(e) => e.currentTarget.blur()}
-                />
-              </div>
-              <div className="self-start">
-                <p className={cn("text-sm font-semibold text-muted-foreground", !isLogisticsTimelineDetails && "mb-1")}>Durata pulizia</p>
-                <Input
-                  value={`${(displayTask.duration || "0.0").replace(".", ":")} ore`}
-                  readOnly
-                  className={displayInputClass}
-                  tabIndex={-1}
-                  onFocus={(e) => e.currentTarget.blur()}
-                />
-              </div>
-            </div>
-
-            {/* Terza riga: Check-out - Check-in (click apre dialog come Pax-In) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <p className={cn("text-sm font-semibold text-muted-foreground flex items-center gap-1", !isLogisticsTimelineDetails && "mb-1")}>
-                  Check-out
-                  {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
-                </p>
-                <Input
-                  readOnly
-                  value={
-                    (displayTask as any).checkout_date
-                      ? `${new Date((displayTask as any).checkout_date).toLocaleDateString("it-IT", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                        })}${
-                          (displayTask as any).checkout_time
-                            ? ` - ${(displayTask as any).checkout_time}`
-                            : " - orario non migrato"
-                        }`
-                      : "non migrato"
-                  }
-                  className={cn(displayClickableInputClass, !isReadOnly && "cursor-pointer hover:bg-muted/50")}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!isReadOnly) handleOpenCheckoutDialog();
-                  }}
-                />
-              </div>
-
-              <div>
-                <p className={cn("text-sm font-semibold text-muted-foreground flex items-center gap-1", !isLogisticsTimelineDetails && "mb-1")}>
-                  Check-in
-                  {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
-                </p>
-                <Input
-                  readOnly
-                  value={
-                    (displayTask as any).checkin_date
-                      ? `${new Date((displayTask as any).checkin_date).toLocaleDateString("it-IT", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                        })}${
-                          (displayTask as any).checkin_time
-                            ? ` - ${(displayTask as any).checkin_time}`
-                            : " - orario non migrato"
-                        }`
-                      : "non migrato"
-                  }
-                  className={cn(displayClickableInputClass, !isReadOnly && "cursor-pointer hover:bg-muted/50")}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!isReadOnly) handleOpenCheckinDialog();
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Quarta riga: Tipologia appartamento - Tipologia intervento */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">Tipologia appartamento</p>
-                <Input value={String((displayTask as any).type_apt ?? "non migrato")} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
-              </div>
-
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
-                  Tipologia intervento
-                  {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
-                </p>
-                <Input
-                  readOnly
-                  value={(() => {
-                    const taskKeyDisplay = getTaskKey(displayTask);
-                    const pendingEditsDisplay = getPendingEdits()[taskKeyDisplay];
-                    const userChoseNone =
-                      pendingEditsDisplay?.operationIdModified === true && pendingEditsDisplay?.operationId === null;
-
-                    if (userChoseNone) return "— Nessuna operazione —";
-                    if (!isConfirmedOperation) return "non migrato";
-                    const opId = (displayTask as any).operation_id;
-                    if (opId) return operationNames[opId] || `Operazione ${opId}`;
-                    return "-";
-                  })()}
-                  className={cn(displayClickableInputClass, !isReadOnly && "cursor-pointer hover:bg-muted/50")}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!isReadOnly) handleOpenOperationDialog();
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Quinta riga: Pax-In - Pax-Out */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
-                  Pax-In
-                  {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
-                </p>
-                <Input
-                  readOnly
-                  value={String((displayTask as any).pax_in ?? "non migrato")}
-                  className={cn(displayClickableInputClass, !isReadOnly && "cursor-pointer hover:bg-muted/50")}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!isReadOnly) handleOpenPaxInDialog();
-                  }}
-                />
-              </div>
-
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">Pax-Out</p>
-                <Input value={String((displayTask as any).pax_out ?? "non migrato")} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
-              </div>
-            </div>
-
-            {/* Sesta riga: Travel Time - Start Time - End Time (Start/End nella colonna destra) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">Travel Time</p>
-                <Input
-                  value={assignmentTimes.travel_time !== undefined ? `${assignmentTimes.travel_time} minuti` : "non assegnato"}
-                  readOnly
-                  className={displayInputClass}
-                  tabIndex={-1}
-                  onFocus={(e) => e.currentTarget.blur()}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground">Start Time</p>
-                  <Input value={String(assignmentTimes.start_time ?? "non assegnato")} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground">End Time</p>
-                  <Input value={String(assignmentTimes.end_time ?? "non assegnato")} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
-                </div>
-              </div>
-            </div>
+            {housekeepingTimelineDetailRows()}
             </div>
 
             {/* Settima riga: Gestione Collaboratori - solo timeline housekeeping (nascosta in logistics) */}
@@ -2567,6 +2738,7 @@ const displayClickableInputClass =
             )}
 
             </div>
+
           </div>
         </DialogContent>
       </Dialog>
