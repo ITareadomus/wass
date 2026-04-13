@@ -6,6 +6,7 @@
   "optimizerPhase2": "Requires Python 3.8+ and pip install ortools (server/services/optimizer/phase2_ortools.py)",
   "optimizerPhase4": "Phase 4 repair batch uses phase4_ortools.py (same Python/ortools as Phase 2)",
   "optimizerPhase5": "Optional neighborhood optimization via phase5_ortools.py (same Python/ortools as Phase 2/4); enable with params.useOrToolsNeighborhood",
+  "logisticsOptimizerPhase3": "Requires Python 3.8+ and pip install ortools (server/services/logistics-optimizer/lg_phase3_ortools.py); copied to dist by scripts/copy-optimizer-python.js",
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && node scripts/copy-optimizer-python.js",

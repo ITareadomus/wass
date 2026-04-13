@@ -1941,11 +1941,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/logistics-task-housekeeping-cleaner", async (req, res) => {
     try {
       const workDate = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
-      const taskIdRaw = req.query.taskId as string;
-      const taskId = Number(taskIdRaw);
-
-      if (!Number.isFinite(taskId)) {
-        return res.status(400).json({ success: false, error: "taskId must be numeric" });
+      const taskIdRaw = req.query.taskId as string | undefined;
+      const logisticCodeRaw = req.query.logisticCode as string | undefined;
+      const normalizedTaskId = String(taskIdRaw ?? "").trim();
+      const normalizedLogisticCode = String(logisticCodeRaw ?? "").trim();
+      const matchCandidates = Array.from(
+        new Set([normalizedTaskId, normalizedLogisticCode].filter((v) => v.length > 0))
+      );
+      if (matchCandidates.length === 0) {
+        return res.status(400).json({ success: false, error: "taskId or logisticCode required" });
       }
 
       const { query } = await import("../shared/pg-db");
@@ -1957,6 +1961,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               dac.cleaner_name,
               dac.cleaner_lastname,
               dac.sequence,
+              dac.start_time::text AS start_time,
+              dac.end_time::text AS end_time,
+              dac.travel_time,
               a.alias,
               COALESCE(
                 NULLIF(TRIM(a.alias), ''),
@@ -1966,22 +1973,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
             FROM daily_assignments_current dac
             LEFT JOIN aliases a ON a.cleaner_id = dac.cleaner_id
             WHERE dac.work_date = $1
-              AND dac.task_id = $2
-            ORDER BY dac.sequence ASC, dac.id ASC
+              AND (dac.scope = 'housekeeping' OR dac.scope IS NULL)
+              AND (dac.task_id::text = ANY($2::text[]) OR dac.logistic_code::text = ANY($2::text[]))
+            ORDER BY
+              EXISTS (
+                SELECT 1 FROM task_collaborators tc
+                WHERE tc.work_date = dac.work_date
+                  AND tc.task_id = dac.task_id
+                  AND tc.cleaner_id = dac.cleaner_id
+                  AND tc.is_primary IS TRUE
+              ) DESC,
+              dac.sequence ASC NULLS LAST,
+              dac.id ASC
             LIMIT 1
           `,
-          [workDate, taskId]
+          [workDate, matchCandidates]
         ),
         query(
           `
             SELECT lt.sequence
             FROM lg_timeline lt
             WHERE lt.work_date = $1
-              AND (lt.task_id = $2 OR lt.logistic_code = $2)
+              AND (lt.task_id::text = ANY($2::text[]) OR lt.logistic_code::text = ANY($2::text[]))
             ORDER BY lt.sequence ASC, lt.id ASC
             LIMIT 1
           `,
-          [workDate, taskId]
+          [workDate, matchCandidates]
         ),
       ]);
 
@@ -2000,6 +2017,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cleanerName: hkRow?.cleaner_name || null,
         cleanerLastname: hkRow?.cleaner_lastname || null,
         sequence: hkRow?.sequence ?? null,
+        startTime: hkRow?.start_time ?? null,
+        endTime: hkRow?.end_time ?? null,
+        travelTime: hkRow?.travel_time ?? null,
         logisticsSequence: lgRow?.sequence ?? null,
         cleanerLabel: hkRow?.cleaner_label || null,
       });
@@ -3055,6 +3075,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   registerLogisticsTimelineMutationRoutes(app, { getCurrentUsername, getRomeTimestamp });
+
+  app.get("/api/logistics-optimizer/prerequisites", async (req, res) => {
+    try {
+      const workDate = (req.query.workDate as string) || format(new Date(), "yyyy-MM-dd");
+      const { getLogisticsOptimizerPrerequisites } = await import(
+        "./services/logistics-optimizer/runAllPhasesLogistics"
+      );
+      const pre = await getLogisticsOptimizerPrerequisites(workDate);
+      res.json({ success: true, ...pre });
+    } catch (error: any) {
+      console.error("GET /api/logistics-optimizer/prerequisites:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/logistics-optimizer/run-all", async (req, res) => {
+    try {
+      const workDate = req.body?.date || req.body?.workDate || format(new Date(), "yyyy-MM-dd");
+      const dryRun = Boolean(req.body?.dryRun);
+      const modifiedBy = req.body?.modified_by || getCurrentUsername(req);
+      const { runAllPhasesLogistics } = await import("./services/logistics-optimizer/runAllPhasesLogistics");
+      const out = await runAllPhasesLogistics(workDate, { dryRun, modifiedBy });
+      res.json({ success: out.status !== "failed", ...out });
+    } catch (error: any) {
+      console.error("POST /api/logistics-optimizer/run-all:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/logistics-optimizer/apply", async (req, res) => {
+    try {
+      const workDate = req.body?.date || req.body?.workDate || format(new Date(), "yyyy-MM-dd");
+      const dryRun = Boolean(req.body?.dryRun);
+      const modifiedBy = req.body?.modified_by || getCurrentUsername(req);
+      const { runAllPhasesLogistics } = await import("./services/logistics-optimizer/runAllPhasesLogistics");
+      const out = await runAllPhasesLogistics(workDate, { dryRun, modifiedBy });
+      if (out.status === "failed" || !out.timelinePayload) {
+        return res.status(400).json({
+          success: false,
+          error: out.error || "Pipeline failed or no timeline",
+          ...out,
+        });
+      }
+      const saved = await workspaceFiles.saveLogisticsTimeline(
+        workDate,
+        out.timelinePayload as any,
+        false,
+        modifiedBy,
+        "logistics_optimizer_apply"
+      );
+      if (!saved) {
+        return res.status(500).json({ success: false, error: "saveLogisticsTimeline failed", ...out });
+      }
+      res.json({ success: true, ...out, saved: true });
+    } catch (error: any) {
+      console.error("POST /api/logistics-optimizer/apply:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
 
   // POST /api/selected-cleaners - Salva selected cleaners (per script Python)
   app.post("/api/selected-cleaners", async (req, res) => {

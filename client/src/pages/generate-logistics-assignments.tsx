@@ -7,6 +7,7 @@ import LogisticsTimelineView from "@/components/timeline/logistics-timeline-view
 import type { TaskType } from "@shared/schema";
 import {
   CalendarIcon,
+  Loader2,
   RefreshCw,
   Search,
 } from "lucide-react";
@@ -253,9 +254,17 @@ function timelineRowToTaskType(t: any, fallbackPriority: TaskType["priority"]): 
   const mins = cleaning % 60;
   const pr = String(t.priority || "").toLowerCase();
   let priorityUi: TaskType["priority"] = fallbackPriority;
-  if (pr === "early_out" || pr === "early-out") priorityUi = "early-out";
-  else if (pr === "high_priority" || pr === "high") priorityUi = "high";
-  else if (pr === "low_priority" || pr === "low") priorityUi = "low";
+  if (["early_out", "early-out", "earlyout", "early_out_assignment", "eo"].includes(pr)) {
+    priorityUi = "early-out";
+  } else if (
+    ["high_priority", "high-priority", "highpriority", "high", "high_priority_assignment", "hp"].includes(pr)
+  ) {
+    priorityUi = "high";
+  } else if (
+    ["low_priority", "low-priority", "lowpriority", "low", "low_priority_assignment", "lp"].includes(pr)
+  ) {
+    priorityUi = "low";
+  }
   return {
     id: String(t.task_id),
     name: String(t.logistic_code ?? t.task_id),
@@ -273,6 +282,9 @@ function timelineRowToTaskType(t: any, fallbackPriority: TaskType["priority"]): 
     customer_name: t.customer_name != null ? String(t.customer_name) : undefined,
     customer_reference: t.customer_reference != null ? String(t.customer_reference) : undefined,
     alias: t.alias != null ? String(t.alias) : undefined,
+    start_time: t.start_time != null ? String(t.start_time) : undefined,
+    end_time: t.end_time != null ? String(t.end_time) : undefined,
+    travel_time: t.travel_time != null ? Number(t.travel_time) : undefined,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -302,6 +314,7 @@ export default function GenerateLogisticsAssignments() {
   const [searchTask, setSearchTask] = useState("");
   /** Solo sul pulsante refresh (come generate-assignments), nessun overlay pagina */
   const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
+  const [isRunningLogisticsOptimizer, setIsRunningLogisticsOptimizer] = useState(false);
   const [logisticsSummary, setLogisticsSummary] = useState<LogisticsSummaryState | null>(null);
   const [logisticsTaskLists, setLogisticsTaskLists] = useState<LogisticsTaskLists>(EMPTY_LOGISTICS_TASK_LISTS);
   const [logisticsDrivers, setLogisticsDrivers] = useState<
@@ -477,6 +490,52 @@ export default function GenerateLogisticsAssignments() {
     await loadLogisticsContainers(selectedDate);
     await loadLogisticsTimelineState(selectedDate);
   }, [selectedDate, loadLogisticsContainers, loadLogisticsTimelineState]);
+
+  const runLogisticsOptimizerAssign = useCallback(async () => {
+    if (isTimelineReadOnly) return;
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    setIsRunningLogisticsOptimizer(true);
+    try {
+      const res = await fetch("/api/logistics-optimizer/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: dateStr,
+          modified_by: getCurrentUsername(),
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        error?: string;
+        status?: string;
+        unassigned?: Array<{ reasonCode?: string }>;
+      };
+      if (!res.ok || !data.success) {
+        toast({
+          title: "Assegnazione automatica fallita",
+          description: data.error || `HTTP ${res.status}`,
+          variant: "destructive",
+        });
+        return;
+      }
+      await reloadLogisticsPage();
+      const nonLockedUnassigned =
+        (data.unassigned || []).filter((u) => u.reasonCode !== "LOCKED_SKIP").length;
+      const partial = data.status === "partial" || nonLockedUnassigned > 0;
+      toast({
+        title: partial ? "Assegnazione completata con avvisi" : "Task assegnate",
+        description: partial
+          ? `Alcuni task non sono stati assegnati (${nonLockedUnassigned}). Verifica finestre HK e vincoli.`
+          : "Timeline logistica aggiornata.",
+        variant: partial ? "default" : "success",
+      });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Errore sconosciuto";
+      toast({ title: "Errore di rete", description: msg, variant: "destructive" });
+    } finally {
+      setIsRunningLogisticsOptimizer(false);
+    }
+  }, [selectedDate, isTimelineReadOnly, reloadLogisticsPage, toast]);
 
   /**
    * Allineato a generate-assignments: data passata → solo PG; data oggi/futura → se la timeline ha già task
@@ -968,11 +1027,22 @@ export default function GenerateLogisticsAssignments() {
               <Button
                 variant="ghost"
                 size="sm"
-                disabled
-                title="In arrivo"
+                disabled={
+                  isTimelineReadOnly ||
+                  isExtractingLogistics ||
+                  isRefreshingContainers ||
+                  isRunningLogisticsOptimizer
+                }
+                title="Esegue l'ottimizzatore e salva le assegnazioni sulla timeline"
+                onClick={() => void runLogisticsOptimizerAssign()}
                 className="flex items-center gap-2 rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
+                data-testid="button-logistics-optimizer-assign"
               >
-                <CalendarIcon className="h-4 w-4" />
+                {isRunningLogisticsOptimizer ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CalendarIcon className="h-4 w-4" />
+                )}
                 Assegna
               </Button>
             </div>

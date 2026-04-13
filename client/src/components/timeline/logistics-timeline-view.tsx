@@ -85,8 +85,8 @@ interface LogisticsTimelineViewProps {
 
 function priorityUiFromTask(t: any): "early-out" | "high" | "low" {
   const p = String(t?.priority || "").toLowerCase();
-  if (p === "early_out" || p === "early-out") return "early-out";
-  if (p === "high_priority" || p === "high") return "high";
+  if (["early_out", "early-out", "earlyout", "early_out_assignment", "eo"].includes(p)) return "early-out";
+  if (["high_priority", "high-priority", "highpriority", "high", "high_priority_assignment", "hp"].includes(p)) return "high";
   return "low";
 }
 
@@ -124,6 +124,9 @@ function timelineTaskToTask(t: any, driverId: number): Task {
     customer_name: t.customer_name != null ? String(t.customer_name) : undefined,
     customer_reference: t.customer_reference != null ? String(t.customer_reference) : undefined,
     type_apt: t.type_apt != null ? String(t.type_apt) : undefined,
+    start_time: t.start_time != null ? String(t.start_time) : undefined,
+    end_time: t.end_time != null ? String(t.end_time) : undefined,
+    travel_time: t.travel_time != null ? Number(t.travel_time) : undefined,
     locked: Boolean(t.locked),
     locked_reason: t.locked_reason != null ? String(t.locked_reason) : undefined,
     createdAt: new Date().toISOString(),

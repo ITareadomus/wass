@@ -1,6 +1,5 @@
-import path from "path";
-import { format } from "date-fns";
 import * as workspaceFiles from "./workspace-files";
+import { estimateCarTravelMinutes } from "./logistics-optimizer/carTravelEstimator";
 
 export async function getDriverStartTime(driverId: number, workDate: string): Promise<string | null> {
   try {
@@ -63,62 +62,71 @@ export async function hydrateTasksFromLogisticsContainers(driverData: any, workD
   return driverData;
 }
 
-/** Stesso script Python di HK; payload con chiave `cleaner` per compatibilità */
+function parseTimeToMinutes(value: unknown, fallback: number): number {
+  const raw = String(value ?? "").trim();
+  const match = raw.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return fallback;
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return fallback;
+  return h * 60 + m;
+}
+
+function minutesToHHMM(totalMinutes: number): string {
+  const bounded = Math.max(0, Math.min(24 * 60 - 1, Math.round(totalMinutes)));
+  const h = Math.floor(bounded / 60);
+  const m = bounded % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Logistics-only recalc: route travel + fixed 15m service window */
 export async function recalculateLogisticsDriverTimes(entry: any, workDate?: string): Promise<any> {
-  try {
-    const { spawn } = await import("child_process");
-    const dateToUse = workDate || format(new Date(), "yyyy-MM-dd");
-    const driver = entry.driver || {};
-    const startTime = await getDriverStartTime(driver.id, dateToUse);
-    if (startTime) {
-      entry.driver.start_time = startTime;
-    }
-    const cleanerData = {
-      tasks: entry.tasks,
-      cleaner: entry.driver,
-      work_date: dateToUse,
-      priority_windows: entry.priority_windows,
-    };
-    return new Promise((resolve, reject) => {
-      const scriptPath = path.join(process.cwd(), "client/public/scripts/recalculate_times.py");
-      const cleanerDataJson = JSON.stringify(cleanerData);
-      const pythonProcess = spawn("python3", [scriptPath], { stdio: ["pipe", "pipe", "pipe"] });
-      let stdout = "";
-      let stderr = "";
-      pythonProcess.stdout.on("data", (data) => {
-        stdout += data.toString();
-      });
-      pythonProcess.stderr.on("data", (data) => {
-        stderr += data.toString();
-      });
-      pythonProcess.on("close", (code) => {
-        if (code !== 0) {
-          reject(new Error(`Python exited ${code}: ${stderr}`));
-          return;
-        }
-        try {
-          const result = JSON.parse(stdout);
-          if (!result.success) {
-            reject(new Error(result.error || "recalculate_times error"));
-            return;
-          }
-          const updated = result.cleaner_data;
-          entry.tasks = updated.tasks;
-          resolve(entry);
-        } catch (e: any) {
-          reject(new Error(`Parse python output: ${e.message}`));
-        }
-      });
-      pythonProcess.on("error", (error) => reject(error));
-      try {
-        pythonProcess.stdin.write(cleanerDataJson);
-        pythonProcess.stdin.end();
-      } catch (e: any) {
-        reject(e);
-      }
-    });
-  } catch (error: any) {
-    console.error("Error in recalculateLogisticsDriverTimes:", error);
-    throw error;
+  const dateToUse = workDate || new Date().toISOString().slice(0, 10);
+  const driver = entry.driver || {};
+  const startTime = await getDriverStartTime(driver.id, dateToUse);
+  if (startTime) {
+    entry.driver.start_time = startTime;
   }
+
+  const tasks: any[] = Array.isArray(entry.tasks) ? entry.tasks : [];
+  if (tasks.length === 0) {
+    entry.tasks = [];
+    return entry;
+  }
+
+  const driverStartMin = parseTimeToMinutes(entry.driver?.start_time, 10 * 60);
+  let clockMin = driverStartMin;
+  let prevLat: number | null = null;
+  let prevLng: number | null = null;
+
+  for (let i = 0; i < tasks.length; i++) {
+    const task = tasks[i];
+    const lat = toFiniteNumber(task?.lat);
+    const lng = toFiniteNumber(task?.lng);
+    let travel = 0;
+    if (i > 0 && prevLat !== null && prevLng !== null && lat !== null && lng !== null) {
+      travel = estimateCarTravelMinutes({ lat: prevLat, lng: prevLng }, { lat, lng });
+    }
+    const startMin = clockMin + travel;
+    const endMin = startMin + 15;
+
+    task.travel_time = travel;
+    task.start_time = minutesToHHMM(startMin);
+    task.end_time = minutesToHHMM(endMin);
+    task.sequence = i + 1;
+    task.followup = i > 0;
+
+    clockMin = endMin;
+    prevLat = lat;
+    prevLng = lng;
+  }
+
+  entry.tasks = tasks;
+  return entry;
 }

@@ -1798,10 +1798,22 @@ export class PgDailyAssignmentsService {
       // Map DB priority names to frontend names
       const priorityMap: { [key: string]: string } = {
         'early_out': 'early_out',
+        'early-out': 'early_out',
+        'earlyout': 'early_out',
+        'early_out_assignment': 'early_out',
+        'eo': 'early_out',
         'high': 'high_priority',
         'high_priority': 'high_priority',
+        'high-priority': 'high_priority',
+        'highpriority': 'high_priority',
+        'high_priority_assignment': 'high_priority',
+        'hp': 'high_priority',
         'low': 'low_priority',
-        'low_priority': 'low_priority'
+        'low_priority': 'low_priority',
+        'low-priority': 'low_priority',
+        'lowpriority': 'low_priority',
+        'low_priority_assignment': 'low_priority',
+        'lp': 'low_priority'
       };
 
       for (const row of result.rows) {
@@ -1845,7 +1857,7 @@ export class PgDailyAssignmentsService {
         }
 
         // Add to appropriate priority bucket (map DB names to frontend names)
-        const dbPriority = row.priority || 'low';
+        const dbPriority = String(row.priority || 'low').toLowerCase();
         const frontendPriority = priorityMap[dbPriority] || 'low_priority';
         tasksByPriority[frontendPriority].push(task);
       }
@@ -1948,10 +1960,22 @@ export class PgDailyAssignmentsService {
 
       const priorityMap: { [key: string]: string } = {
         'early_out': 'early_out',
+        'early-out': 'early_out',
+        'earlyout': 'early_out',
+        'early_out_assignment': 'early_out',
+        'eo': 'early_out',
         'high': 'high_priority',
         'high_priority': 'high_priority',
+        'high-priority': 'high_priority',
+        'highpriority': 'high_priority',
+        'high_priority_assignment': 'high_priority',
+        'hp': 'high_priority',
         'low': 'low_priority',
-        'low_priority': 'low_priority'
+        'low_priority': 'low_priority',
+        'low-priority': 'low_priority',
+        'lowpriority': 'low_priority',
+        'low_priority_assignment': 'low_priority',
+        'lp': 'low_priority'
       };
 
       for (const row of result.rows) {
@@ -1992,7 +2016,7 @@ export class PgDailyAssignmentsService {
           task.locked_reason = row.locked_reason || undefined;
         }
 
-        const dbPriority = row.priority || 'low';
+        const dbPriority = String(row.priority || 'low').toLowerCase();
         const frontendPriority = priorityMap[dbPriority] || 'low_priority';
         tasksByPriority[frontendPriority].push(task);
       }
