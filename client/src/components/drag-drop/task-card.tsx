@@ -1261,7 +1261,7 @@ const displayClickableInputClass =
 
       // Salva in sessionStorage per UI ottimistica
       const existingEdits = JSON.parse(sessionStorage.getItem('pending_task_edits') || '{}');
-      existingEdits[taskKey] = pendingEdits;
+      existingEdits[taskKey] = { ...(existingEdits[taskKey] || {}), ...pendingEdits };
       sessionStorage.setItem('pending_task_edits', JSON.stringify(existingEdits));
 
       // CRITICAL: Salva anche su PostgreSQL (ma NON su ADAM) 
@@ -1329,11 +1329,70 @@ const displayClickableInputClass =
     setIsSavingCustomerNote(true);
     try {
       const normalized = editingCustomerNoteInDialog.trim();
+      const taskIdRaw =
+        (displayTask as any).task_id ??
+        (displayTask as any).id ??
+        (task as any).task_id ??
+        (task as any).id;
+      const numericTaskId = Number(taskIdRaw);
+      if (!Number.isFinite(numericTaskId)) {
+        throw new Error("Task ID non valido");
+      }
+      const logisticCodeRaw =
+        (displayTask as any).logistic_code ??
+        (displayTask as any).name ??
+        (task as any).logistic_code ??
+        (task as any).name ??
+        null;
+      const dateStr =
+        localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
+      const taskKey = getTaskKey(displayTask);
+      const duration = displayTask.duration || "0.0";
+      const [hours, mins] = duration.split(".").map(Number);
+      const cleaningTime = (hours || 0) * 60 + (mins || 0);
+      const operationIdValue = (displayTask as any).operation_id != null
+        ? (displayTask as any).operation_id
+        : (editedOperationId === "none" ? null : (parseInt(editedOperationId, 10) || null));
+      const pendingEdits = {
+        taskId: taskKey,
+        logisticCode: displayTask.name,
+        checkoutDate: (displayTask as any).checkout_date ?? null,
+        checkoutTime: (displayTask as any).checkout_time ?? null,
+        checkinDate: (displayTask as any).checkin_date ?? null,
+        checkinTime: (displayTask as any).checkin_time ?? null,
+        cleaningTime,
+        paxIn: (displayTask as any).pax_in,
+        paxOut: (displayTask as any).pax_out,
+        operationId: operationIdValue,
+        operationIdModified: editingFields.has("operation"),
+        customerNote: normalized,
+      };
+      const existingEdits = JSON.parse(sessionStorage.getItem("pending_task_edits") || "{}");
+      existingEdits[taskKey] = { ...(existingEdits[taskKey] || {}), ...pendingEdits };
+      sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
+
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const response = await fetch("/api/update-task-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: numericTaskId,
+          logisticCode: logisticCodeRaw,
+          customerNote: normalized,
+          date: dateStr,
+          modified_by: currentUser.username || "unknown",
+          skipAdam: true,
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData?.error || "Impossibile salvare la nota del cliente");
+      }
       setCustomerNotesByTaskKey((prev) => ({ ...prev, [currentDetailsTaskKey]: normalized }));
       setLogisticsHousekeepingNotes(normalized);
       toast({
         title: "Note del cliente aggiornate",
-        description: "Valore salvato nel dettaglio task corrente.",
+        description: "Valore salvato. Premi 'Trasferisci su ADAM' per sincronizzare.",
       });
       setCustomerNoteDialogOpen(false);
     } catch (error: any) {
@@ -1381,7 +1440,7 @@ const displayClickableInputClass =
         operationIdModified: editingFields.has("operation"),
       };
       const existingEdits = JSON.parse(sessionStorage.getItem("pending_task_edits") || "{}");
-      existingEdits[taskKey] = pendingEdits;
+      existingEdits[taskKey] = { ...(existingEdits[taskKey] || {}), ...pendingEdits };
       sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
 
       const workDate = localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
@@ -1486,7 +1545,7 @@ const displayClickableInputClass =
         operationIdModified: editingFields.has("operation"),
       };
       const existingEdits = JSON.parse(sessionStorage.getItem("pending_task_edits") || "{}");
-      existingEdits[payload.taskKey] = pendingEdits;
+      existingEdits[payload.taskKey] = { ...(existingEdits[payload.taskKey] || {}), ...pendingEdits };
       sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
 
       const workDate = localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
@@ -1581,7 +1640,7 @@ const displayClickableInputClass =
         operationIdModified: editingFields.has("operation"),
       };
       const existingEdits = JSON.parse(sessionStorage.getItem("pending_task_edits") || "{}");
-      existingEdits[payload.taskKey] = pendingEdits;
+      existingEdits[payload.taskKey] = { ...(existingEdits[payload.taskKey] || {}), ...pendingEdits };
       sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
 
       const workDate = localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
@@ -1652,7 +1711,7 @@ const displayClickableInputClass =
         operationIdModified: true,
       };
       const existingEdits = JSON.parse(sessionStorage.getItem("pending_task_edits") || "{}");
-      existingEdits[payload.taskKey] = pendingEdits;
+      existingEdits[payload.taskKey] = { ...(existingEdits[payload.taskKey] || {}), ...pendingEdits };
       sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
 
       const workDate = localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
