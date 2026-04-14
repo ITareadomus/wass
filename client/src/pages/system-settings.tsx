@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Home, Settings } from "lucide-react";
+import { Save, Home, Settings, Loader2 } from "lucide-react";
+import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -215,9 +216,12 @@ export default function SystemSettings() {
 
   if (isLoading || !settings) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Caricamento...</p>
-      </div>
+      <PageViewportCentered layout="viewport" className="bg-background py-8">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Caricamento...</p>
+        </div>
+      </PageViewportCentered>
     );
   }
 

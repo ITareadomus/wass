@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
+import { PageViewportCentered } from "@/components/page-viewport-centered";
 import GenerateAssignments from "./generate-assignments";
 
 interface UnconfirmedSummary {
@@ -45,11 +46,15 @@ export default function HomeGate() {
   }, [hasRedirected, setLocation, selectedDate]);
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background" data-testid="home-gate-loading">
+    <PageViewportCentered
+      layout="viewport"
+      className="bg-background py-8"
+      data-testid="home-gate-loading"
+    >
       <div className="flex flex-col items-center gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="text-muted-foreground">Caricamento task...</p>
       </div>
-    </div>
+    </PageViewportCentered>
   );
 }

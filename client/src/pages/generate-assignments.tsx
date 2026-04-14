@@ -17,6 +17,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { useToast } from "@/hooks/use-toast";
 import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
 
@@ -1981,8 +1982,8 @@ export default function GenerateAssignments() {
   };
 
   return (
-    <div className="bg-background text-foreground min-h-screen">
-      <div className="w-full px-4 pt-3 pb-6">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <div className="mx-auto flex w-full min-h-0 max-w-[1920px] flex-1 flex-col px-4 pb-6 pt-3">
         {!(isExtracting || isLoadingTasks || isLoading) && (
           <div className="mx-auto mb-3 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-4">
@@ -2018,8 +2019,8 @@ export default function GenerateAssignments() {
         )}
 
         {isExtracting || isLoadingTasks || isLoading ? (
-          <div className="mx-auto flex w-full max-w-[1920px] items-center justify-center p-12">
-            <div className="space-y-4 text-center">
+          <PageViewportCentered layout="fill" className="py-4">
+            <div className="max-w-lg space-y-4 text-center">
               <div className="flex justify-center">
                 <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
               </div>
@@ -2031,7 +2032,7 @@ export default function GenerateAssignments() {
                     : "Caricamento Dati"}
               </h2>
               <p className="text-muted-foreground">{extractionStep}</p>
-              <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                 {isExtracting && (
                   <>
                     <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
@@ -2052,7 +2053,7 @@ export default function GenerateAssignments() {
                 )}
               </div>
             </div>
-          </div>
+          </PageViewportCentered>
         ) : (
         <MultiSelectContext.Provider value={multiSelectContextValue}>
           <DragDropContext

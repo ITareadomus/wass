@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Draggable } from "react-beautiful-dnd";
 import { useQuery } from "@tanstack/react-query";
 import { TaskType as Task } from "@shared/schema";
@@ -177,6 +177,8 @@ interface TaskCardProps {
   isPriorityWindowViolation?: boolean;
   /** housekeeping → /api/operations (enable_wass); logistics → enable_route_drivers */
   operationsScope?: "housekeeping" | "office" | "logistics";
+  /** Solo timeline logistica: nome driver (colonna sinistra). Non usare per HK — lì sarebbe il cleaner. */
+  timelineRowStaffDisplayLabel?: string | null;
 }
 
 interface AssignedTask {
@@ -207,6 +209,7 @@ export default function TaskCard({
   cleanerId = null,
   isPriorityWindowViolation = false,
   operationsScope = "housekeeping",
+  timelineRowStaffDisplayLabel = null,
 }: TaskCardProps) {
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -374,8 +377,6 @@ const displayClickableInputClass =
   const [currentTaskId, setCurrentTaskId] = useState(getTaskNavigationKey(task, index));
   const [assignmentTimes, setAssignmentTimes] = useState<{ start_time?: string; end_time?: string; travel_time?: number }>({});
   const [logisticsDriverBadge, setLogisticsDriverBadge] = useState<string | null>(null);
-  const [isLoadingLogisticsDriverBadge, setIsLoadingLogisticsDriverBadge] = useState(false);
-  const [hasResolvedLogisticsDriverBadge, setHasResolvedLogisticsDriverBadge] = useState(false);
   const [resolvedLogisticsDriverTaskKey, setResolvedLogisticsDriverTaskKey] = useState<string>("");
   const [logisticsHousekeepingCleanerLabel, setLogisticsHousekeepingCleanerLabel] = useState<string | null>(null);
   const [logisticsHousekeepingSequence, setLogisticsHousekeepingSequence] = useState<number | null>(null);
@@ -392,9 +393,10 @@ const displayClickableInputClass =
     double_sofabeds: number | null;
   } | null>(null);
   const [logisticsStructureAlertKeys, setLogisticsStructureAlertKeys] = useState<number | null>(null);
-  const [isLoadingHousekeepingCleanerDetails, setIsLoadingHousekeepingCleanerDetails] = useState(false);
-  const [hasResolvedHousekeepingCleanerDetails, setHasResolvedHousekeepingCleanerDetails] = useState(false);
   const [resolvedHousekeepingTaskKey, setResolvedHousekeepingTaskKey] = useState<string>("");
+  /** Evita reset API ad ogni re-render se la chiave task è la stessa (displayTask spesso nuovo per riferimento). */
+  const lastLogisticsDriverFetchTaskKeyRef = useRef<string>("");
+  const lastHousekeepingDetailsFetchTaskKeyRef = useRef<string>("");
   const isLogisticsTimelineDetails = operationsScope === "logistics" && isInTimeline;
   // Dialog completo in tutte le pagine non-office (timeline + containers).
   const isTimelineDetailsDialog = !isOfficeScope;
@@ -930,8 +932,7 @@ const displayClickableInputClass =
     const loadLogisticsDriverBadge = async () => {
       if (!isTimelineDetailsDialog || !isModalOpen) {
         if (!cancelled) {
-          setIsLoadingLogisticsDriverBadge(false);
-          setHasResolvedLogisticsDriverBadge(false);
+          lastLogisticsDriverFetchTaskKeyRef.current = "";
           setResolvedLogisticsDriverTaskKey("");
           setLogisticsDriverBadge(null);
           setLogisticsTimelineSequence(null);
@@ -951,8 +952,7 @@ const displayClickableInputClass =
       const taskId = Number(taskIdRaw);
       if (!Number.isFinite(taskId)) {
         if (!cancelled) {
-          setIsLoadingLogisticsDriverBadge(false);
-          setHasResolvedLogisticsDriverBadge(false);
+          lastLogisticsDriverFetchTaskKeyRef.current = detailsTaskKey;
           setResolvedLogisticsDriverTaskKey(detailsTaskKey);
           setLogisticsDriverBadge(null);
           setLogisticsTimelineSequence(null);
@@ -980,13 +980,15 @@ const displayClickableInputClass =
 
       try {
         if (!cancelled) {
-          setIsLoadingLogisticsDriverBadge(true);
-          setHasResolvedLogisticsDriverBadge(false);
-          setLogisticsDriverBadge(null);
-          setLogisticsTimelineSequence(null);
-          setLogisticsHousekeepingNotes(null);
-          setLogisticsStructureBeds(null);
-          setLogisticsStructureAlertKeys(null);
+          const taskKeyChanged = lastLogisticsDriverFetchTaskKeyRef.current !== detailsTaskKey;
+          lastLogisticsDriverFetchTaskKeyRef.current = detailsTaskKey;
+          if (taskKeyChanged) {
+            setLogisticsDriverBadge(null);
+            setLogisticsTimelineSequence(null);
+            setLogisticsHousekeepingNotes(null);
+            setLogisticsStructureBeds(null);
+            setLogisticsStructureAlertKeys(null);
+          }
         }
 
         const res = await fetch(
@@ -1001,8 +1003,6 @@ const displayClickableInputClass =
         const housekeepingNotesText = String(json?.housekeepingNotes ?? "").trim();
         const bedsRaw = json?.structureBeds;
         const alertKeysRaw = Number(json?.structureAlertKeys);
-        setIsLoadingLogisticsDriverBadge(false);
-        setHasResolvedLogisticsDriverBadge(true);
         setResolvedLogisticsDriverTaskKey(detailsTaskKey);
         setLogisticsDriverBadge(badge || null);
         setLogisticsTimelineSequence(Number.isFinite(logisticsSeqNum) ? logisticsSeqNum : null);
@@ -1020,8 +1020,6 @@ const displayClickableInputClass =
         setLogisticsStructureAlertKeys(Number.isFinite(alertKeysRaw) ? alertKeysRaw : null);
       } catch {
         if (!cancelled) {
-          setIsLoadingLogisticsDriverBadge(false);
-          setHasResolvedLogisticsDriverBadge(true);
           setResolvedLogisticsDriverTaskKey(detailsTaskKey);
           setLogisticsDriverBadge(null);
           setLogisticsTimelineSequence(null);
@@ -1044,8 +1042,7 @@ const displayClickableInputClass =
     const loadHousekeepingCleanerLabel = async () => {
       if (!isTimelineDetailsDialog || !isModalOpen) {
         if (!cancelled) {
-          setIsLoadingHousekeepingCleanerDetails(false);
-          setHasResolvedHousekeepingCleanerDetails(false);
+          lastHousekeepingDetailsFetchTaskKeyRef.current = "";
           setResolvedHousekeepingTaskKey("");
           setLogisticsHousekeepingCleanerLabel(null);
           setLogisticsHousekeepingSequence(null);
@@ -1074,8 +1071,7 @@ const displayClickableInputClass =
 
       if (!hasTaskId && !hasLogisticCode) {
         if (!cancelled) {
-          setIsLoadingHousekeepingCleanerDetails(false);
-          setHasResolvedHousekeepingCleanerDetails(false);
+          lastHousekeepingDetailsFetchTaskKeyRef.current = detailsTaskKey;
           setResolvedHousekeepingTaskKey(detailsTaskKey);
           setLogisticsHousekeepingCleanerLabel(null);
           setLogisticsHousekeepingSequence(null);
@@ -1089,15 +1085,16 @@ const displayClickableInputClass =
       const dateStr =
         localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
 
-      // Evita di mostrare dati stale mentre si naviga tra task con le frecce.
       if (!cancelled) {
-        setIsLoadingHousekeepingCleanerDetails(true);
-        setHasResolvedHousekeepingCleanerDetails(false);
-        setLogisticsHousekeepingCleanerLabel(null);
-        setLogisticsHousekeepingSequence(null);
-        setLogisticsHousekeepingStartTime(null);
-        setLogisticsHousekeepingEndTime(null);
-        setLogisticsHousekeepingTravelTime(null);
+        const taskKeyChanged = lastHousekeepingDetailsFetchTaskKeyRef.current !== detailsTaskKey;
+        lastHousekeepingDetailsFetchTaskKeyRef.current = detailsTaskKey;
+        if (taskKeyChanged) {
+          setLogisticsHousekeepingCleanerLabel(null);
+          setLogisticsHousekeepingSequence(null);
+          setLogisticsHousekeepingStartTime(null);
+          setLogisticsHousekeepingEndTime(null);
+          setLogisticsHousekeepingTravelTime(null);
+        }
       }
 
       try {
@@ -1109,8 +1106,6 @@ const displayClickableInputClass =
         if (cancelled) return;
 
         const label = String(json?.cleanerLabel ?? "").trim();
-        setIsLoadingHousekeepingCleanerDetails(false);
-        setHasResolvedHousekeepingCleanerDetails(true);
         setResolvedHousekeepingTaskKey(detailsTaskKey);
         setLogisticsHousekeepingCleanerLabel(label || null);
         const rawSeq = json?.sequence;
@@ -1126,8 +1121,6 @@ const displayClickableInputClass =
         setLogisticsHousekeepingTravelTime(Number.isFinite(travelNum) ? travelNum : null);
       } catch {
         if (!cancelled) {
-          setIsLoadingHousekeepingCleanerDetails(false);
-          setHasResolvedHousekeepingCleanerDetails(true);
           setResolvedHousekeepingTaskKey(detailsTaskKey);
           setLogisticsHousekeepingCleanerLabel(null);
           setLogisticsHousekeepingSequence(null);
@@ -2002,24 +1995,7 @@ const displayClickableInputClass =
     displayTaskAny.cleaner_alias ??
     displayTaskAny.assigned_cleaner_alias ??
     "";
-  const shouldShowResolvedDriverFallback =
-    resolvedLogisticsDriverTaskKey === currentDetailsTaskKey &&
-    hasResolvedLogisticsDriverBadge &&
-    !isLoadingLogisticsDriverBadge;
-  const shouldShowResolvedHousekeepingFallback =
-    resolvedHousekeepingTaskKey === currentDetailsTaskKey &&
-    hasResolvedHousekeepingCleanerDetails &&
-    !isLoadingHousekeepingCleanerDetails;
-  const hasResolvedDriverDetailsForCurrentTask =
-    resolvedLogisticsDriverTaskKey === currentDetailsTaskKey &&
-    hasResolvedLogisticsDriverBadge;
-  const hasResolvedHousekeepingDetailsForCurrentTask =
-    resolvedHousekeepingTaskKey === currentDetailsTaskKey &&
-    hasResolvedHousekeepingCleanerDetails;
-  const shouldDeferLogisticsFallbacks =
-    isTimelineDetailsDialog && isInTimeline && !hasResolvedDriverDetailsForCurrentTask;
-  const shouldDeferCleanerFallbacks =
-    isTimelineDetailsDialog && isInTimeline && !hasResolvedHousekeepingDetailsForCurrentTask;
+  const syncTimelineRowStaffLabel = String(timelineRowStaffDisplayLabel ?? "").trim();
   const effectiveDriverBadge =
     resolvedLogisticsDriverTaskKey === currentDetailsTaskKey ? logisticsDriverBadge : null;
   const effectiveHousekeepingLabel =
@@ -2048,32 +2024,26 @@ const displayClickableInputClass =
   const logisticsHousekeepingAliasText = String(logisticsHousekeepingAlias || "").trim();
   const logisticsAssignedTo =
     logisticsHousekeepingAliasText ||
-    (shouldShowResolvedHousekeepingFallback ? effectiveHousekeepingLabelText : "") ||
+    effectiveHousekeepingLabelText ||
     "non assegnato";
-  const logisticsDriverDisplayValue = shouldDeferLogisticsFallbacks
-    ? ""
-    : String(effectiveDriverBadge ?? "non assegnato");
-  const logisticsSequenceDisplayValue = shouldDeferLogisticsFallbacks
-    ? ""
-    : String(logisticsTimelineSequence ?? fallbackTimelineSequence ?? "—");
+  // Su timeline housekeeping `timelineRowStaffDisplayLabel` è il cleaner: non va mai come "Autista - Veicolo".
+  const logisticsDriverDisplayValue =
+    String(effectiveDriverBadge ?? "").trim() ||
+    (isLogisticsTimelineDetails ? syncTimelineRowStaffLabel : "") ||
+    "non assegnato";
+  const logisticsSequenceDisplayValue = String(
+    logisticsTimelineSequence ?? fallbackTimelineSequence ?? "—"
+  );
   const logisticsTravelDisplayValue = !isInTimeline
     ? "non assegnato"
-    : shouldDeferLogisticsFallbacks
-      ? ""
-      : logisticsTravelMinutes !== null
-        ? `${logisticsTravelMinutes} minuti`
-        : "non assegnato";
+    : logisticsTravelMinutes !== null
+      ? `${logisticsTravelMinutes} minuti`
+      : "non assegnato";
   const logisticsScheduledDisplayValue = !isInTimeline
     ? "non assegnato"
-    : shouldDeferLogisticsFallbacks
-      ? ""
-      : logisticsScheduledAt || "non assegnato";
-  const logisticsAlertDisplayValue = shouldDeferLogisticsFallbacks
-    ? ""
-    : alertText || "—";
-  const logisticsBedsDisplayValue = shouldDeferLogisticsFallbacks
-    ? ""
-    : bedsSummaryText || "—";
+    : logisticsScheduledAt || "non assegnato";
+  const logisticsAlertDisplayValue = alertText || "—";
+  const logisticsBedsDisplayValue = bedsSummaryText || "—";
   const hasCollaboration = Number((displayTask as any).collaborator_count || 0) > 1;
   const displayPriorityRaw = String((displayTask as any).priority ?? "").toLowerCase();
   const isDisplayPriorityEarlyOut = ["early_out", "early-out", "earlyout", "eo"].includes(displayPriorityRaw);
@@ -2095,16 +2065,13 @@ const displayClickableInputClass =
   const allCollaboratorsLabel = collaboratorLabels.join(", ");
   const isLogisticsScope = operationsScope === "logistics";
   const cleanerDetailsAssignedTo = (() => {
-    if (shouldDeferCleanerFallbacks) return "";
     if (isLogisticsScope) {
       if (allCollaboratorsLabel) return allCollaboratorsLabel;
-      const hkLabel = shouldShowResolvedHousekeepingFallback ? effectiveHousekeepingLabelText : "";
-      return hkLabel || "non assegnato";
+      return effectiveHousekeepingLabelText || logisticsHousekeepingAliasText || "non assegnato";
     }
     return primaryCollaboratorLabel ? primaryCollaboratorLabel : logisticsAssignedTo;
   })();
   const cleanerDetailsSequenceValue = (() => {
-    if (shouldDeferCleanerFallbacks) return "";
     if (isLogisticsScope) {
       return effectiveHousekeepingSequence != null && Number.isFinite(effectiveHousekeepingSequence)
         ? String(effectiveHousekeepingSequence)
@@ -2116,17 +2083,23 @@ const displayClickableInputClass =
     isLogisticsScope
       ? effectiveHousekeepingTravelTime != null && Number.isFinite(effectiveHousekeepingTravelTime)
         ? `${effectiveHousekeepingTravelTime} minuti`
-        : ""
+        : assignmentTimes.travel_time !== undefined && assignmentTimes.travel_time !== null
+          ? `${assignmentTimes.travel_time} minuti`
+          : "non assegnato"
       : assignmentTimes.travel_time !== undefined
         ? `${assignmentTimes.travel_time} minuti`
         : "non assegnato";
   const housekeepingStartDisplayValue =
     isLogisticsScope
-      ? String(effectiveHousekeepingStartTime ?? "")
+      ? String(effectiveHousekeepingStartTime ?? "").trim() ||
+        String(assignmentTimes.start_time ?? "").trim() ||
+        "non assegnato"
       : String(assignmentTimes.start_time ?? "non assegnato");
   const housekeepingEndDisplayValue =
     isLogisticsScope
-      ? String(effectiveHousekeepingEndTime ?? "")
+      ? String(effectiveHousekeepingEndTime ?? "").trim() ||
+        String(assignmentTimes.end_time ?? "").trim() ||
+        "non assegnato"
       : String(assignmentTimes.end_time ?? "non assegnato");
 
   const alignLogisticsHousekeepingRows = false;
@@ -2443,7 +2416,7 @@ const displayClickableInputClass =
               if (!isReadOnly) handleOpenCustomerNoteDialog();
             }}
           >
-            {customerNoteDisplayText || (shouldDeferLogisticsFallbacks ? "" : "—")}
+            {customerNoteDisplayText || "—"}
           </div>
         </div>
       </div>
@@ -2481,7 +2454,7 @@ const displayClickableInputClass =
               className={isInTimeline ? "flex items-center" : ""}
             >
           {/* Task card con drag handle */}
-          <div {...provided.dragHandleProps}>
+          <div {...provided.dragHandleProps} className="focus-visible:outline-none">
             {/* Task card effettiva */}
             <TooltipProvider delayDuration={300}>
               <Tooltip>
@@ -2489,12 +2462,16 @@ const displayClickableInputClass =
                   <div
                     className={`
                       ${cardColorClass}
-                      rounded-sm px-2 py-1 shadow-sm transition-all duration-200 border
-                      ${snapshot.isDragging ? "shadow-lg" : ""}
+                      rounded-sm border px-2 py-1 transition-all duration-200
+                      ${snapshot.isDragging ? "shadow-lg" : "shadow-sm"}
+                      ${
+                        isSelected && isMultiSelectMode && !isInTimeline
+                          ? "z-[1] ring-2 ring-sky-500 ring-inset"
+                          : ""
+                      }
                       ${isOverdue && isInTimeline ? "animate-blink" : ""}
                       ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
                       ${isPriorityWindowViolation && isInTimeline ? "animate-blink-orange" : ""}
-                      ${isSelected && isMultiSelectMode && !isInTimeline ? "ring-2 ring-sky-500" : ""}
                       hover:shadow-md cursor-pointer
                       flex-shrink-0 relative group
                     `}
@@ -2504,14 +2481,11 @@ const displayClickableInputClass =
                       maxWidth: cardWidth,
                       minHeight: "40px",
                       zIndex: isMapFiltered ? 10 : 'auto',
-                      ...(isHighlighted && !snapshot.isDragging ? {
-                        boxShadow: '0 0 0 3px #FBBF24, 0 0 15px 3px rgba(251, 191, 36, 0.6)',
-                        transform: 'scale(1.02)',
-                      } : {}),
-                      ...(isMapFiltered && !snapshot.isDragging ? {
-                        boxShadow: '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)',
-                        transform: 'scale(1.05)',
-                      } : {})
+                      ...(!snapshot.isDragging && isMapFiltered
+                        ? { boxShadow: "inset 0 0 0 2px #3b82f6" }
+                        : !snapshot.isDragging && isHighlighted
+                          ? { boxShadow: "inset 0 0 0 2px #fbbf24" }
+                          : {}),
                     }}
                     data-testid={`task-card-${getTaskKey(task)}`}
                     onClick={(e) => {

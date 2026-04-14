@@ -250,9 +250,9 @@ export function CleanerSelectorDialog({
         {/* Lista cleaners scrollabile */}
         <div className="flex-1 overflow-y-auto min-h-0 space-y-4 mt-4">
           {isLoadingCleaners ? (
-            <div className="flex items-center justify-center py-8">
-              <RefreshCw className="h-6 w-6 animate-spin text-purple-600 mr-2" />
-              <p className="text-muted-foreground">Caricamento cleaners...</p>
+            <div className="flex min-h-[min(45vh,240px)] flex-col items-center justify-center gap-3 py-8">
+              <RefreshCw className="h-6 w-6 animate-spin text-purple-600" />
+              <p className="text-muted-foreground text-center">Caricamento cleaners...</p>
             </div>
           ) : convocatiCleaners.length === 0 && nonConvocatiCleaners.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">

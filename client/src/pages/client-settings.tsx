@@ -4,7 +4,8 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Save } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
+import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -160,9 +161,12 @@ export default function ClientSettings() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <p>Caricamento...</p>
-      </div>
+      <PageViewportCentered layout="viewport" className="bg-background py-8">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Caricamento...</p>
+        </div>
+      </PageViewportCentered>
     );
   }
 

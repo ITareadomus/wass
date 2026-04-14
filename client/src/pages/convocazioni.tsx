@@ -10,6 +10,7 @@ import { Users, CalendarIcon, ArrowLeft, Save, UserPlus, Search, RefreshCw, Aler
 import { format, differenceInCalendarDays } from "date-fns";
 import { it } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from 'wouter';
@@ -823,80 +824,79 @@ export default function Convocazioni() {
   };
 
   return (
-    <div className="bg-background text-foreground h-[calc(100vh-64px)] overflow-hidden">
-      <div className="w-full h-full flex flex-col px-4 pt-3 pb-6">
-        <div className="mb-3 space-y-3 shrink-0">
+    <div className="h-[calc(100dvh-3.5rem-1px)] overflow-hidden bg-background text-foreground md:h-[calc(100dvh-3.75rem-1px)]">
+      <div className="flex h-full w-full flex-col px-4 pb-6 pt-3">
+        {isLoading ? (
+          <PageViewportCentered layout="fill" className="py-4">
+            <div className="max-w-lg space-y-4 text-center">
+              <div className="flex justify-center">
+                <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
+              </div>
+              <h2 className="text-xl font-bold text-foreground">Caricamento Convocazioni</h2>
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
+                <span>{loadingMessage}</span>
+              </div>
+            </div>
+          </PageViewportCentered>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col">
+        <div className="mb-3 shrink-0 space-y-3">
           {/* Header con titolo e selettore data */}
-          {!isLoading && (
-            <div className="flex justify-between items-center flex-wrap gap-4">
-              <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold text-foreground flex items-center gap-2 flex-wrap">
-                  <Users className="w-8 h-8 text-custom-blue" />
-                  {isDrivers ? "CONVOCAZIONI DRIVER del" : isOffice ? "CONVOCAZIONI UFFICIO del" : "CONVOCAZIONI HOUSEKEEPING del" }
-                </h1>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "justify-start text-left font-normal",
-                        !selectedDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: it }) : <span>Seleziona data</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={handleDateSelect}
-                      initialFocus
-                      locale={it}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="flex flex-wrap items-center gap-2 text-3xl font-bold text-foreground">
+                <Users className="h-8 w-8 shrink-0 text-custom-blue" />
+                {isDrivers ? "CONVOCAZIONI DRIVER del" : isOffice ? "CONVOCAZIONI UFFICIO del" : "CONVOCAZIONI HOUSEKEEPING del" }
+              </h1>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "justify-start text-left font-normal",
+                      !selectedDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: it }) : <span>Seleziona data</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDateSelect}
+                    initialFocus
+                    locale={it}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
-          )}
+          </div>
 
-          {isLoading ? (
-            <div className="flex items-center justify-center p-12">
-              <div className="space-y-4 text-center">
-                <div className="flex justify-center">
-                  <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
-                </div>
-                <h2 className="text-xl font-bold text-foreground">Caricamento Convocazioni</h2>
-                <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
-                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
-                  <span>{loadingMessage}</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Barra Contatore */
-            <div className="bg-custom-blue-light rounded-xl border-2 border-custom-blue shadow-lg p-4">
-              <div className="flex items-center gap-4 w-full">
-                <div className="flex items-center gap-4 shrink-0">
+            {/* Barra Contatore */}
+            <div className="rounded-xl border-2 border-custom-blue bg-custom-blue-light p-4 shadow-lg">
+              <div className="flex w-full items-center gap-4">
+                <div className="flex shrink-0 items-center gap-4">
                   <div className="text-lg font-semibold text-foreground">
                     {isDrivers ? "DRIVERS SELEZIONATI" : isOffice ? "CLEANERS UFFICIO SELEZIONATI" : "CLEANERS SELEZIONATI"}
                   </div>
                   <div className="text-lg font-bold">
                     <span className="text-primary">{isDrivers ? selectedDrivers.length : selectedCleaners.size}</span>
-                    <span className="text-muted-foreground mx-1">/</span>
+                    <span className="mx-1 text-muted-foreground">/</span>
                     <span className="text-foreground">{driversRoster.length}</span>
                   </div>
                 </div>
-                <div className="flex-1 min-w-0" aria-hidden />
+                <div className="min-w-0 flex-1" aria-hidden />
                 <button
                   type="button"
                   onClick={() => setShowOnlyNotConvocatiDaDueGiorni((prev) => !prev)}
                   className={cn(
-                    "text-sm shrink-0 text-right rounded px-2 py-1 -mx-2 -my-1 transition-colors",
+                    "-mx-2 -my-1 shrink-0 rounded px-2 py-1 text-right text-sm transition-colors",
                     showOnlyNotConvocatiDaDueGiorni
-                      ? "text-yellow-600 dark:text-yellow-400 bg-amber-500/20 underline"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      ? "bg-amber-500/20 text-yellow-600 underline dark:text-yellow-400"
+                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                   )}
                 >
                   {isDrivers ? "Driver" : isOffice ? "Cleaners ufficio" : "Cleaners"} non convocati da due giorni o più:{" "}
@@ -905,11 +905,9 @@ export default function Convocazioni() {
                 </button>
               </div>
             </div>
-          )}
         </div>
 
         {/* Grid con lista cleaners e statistiche affiancate */}
-        {!isLoading && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
           {/* Lista Cleaners - 2/3 dello spazio */}
           <Card className="p-4 lg:col-span-2 flex flex-col h-full min-h-0 overflow-hidden border-2 border-custom-blue bg-custom-blue-light dark:bg-custom-blue">
@@ -1610,8 +1608,10 @@ export default function Convocazioni() {
           )}
         </Card>
       </div>
+
+          </div>
         )}
+      </div>
     </div>
-  </div>
   );
 }

@@ -2807,13 +2807,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           </DialogHeader>
           <div className="space-y-2 mt-4">
             {isLoadingAvailableCleaners ? (
-              <div className="flex items-center justify-center py-8">
-                <RefreshCw className="h-6 w-6 animate-spin text-custom-blue mr-2" />
-                <p className="text-muted-foreground">Caricamento cleaners disponibili...</p>
+              <div className="flex min-h-[min(50vh,280px)] flex-col items-center justify-center gap-3 py-8">
+                <RefreshCw className="h-6 w-6 animate-spin text-custom-blue" />
+                <p className="text-muted-foreground text-center">Caricamento cleaners disponibili...</p>
               </div>
             ) : availableCleaners.length === 0 ? (
-              <div className="flex items-center justify-center py-8">
-                <p className="text-muted-foreground">Nessun cleaner disponibile per questo scope.</p>
+              <div className="flex min-h-[min(50vh,280px)] flex-col items-center justify-center py-8 px-2">
+                <p className="text-muted-foreground text-center">Nessun cleaner disponibile per questo scope.</p>
               </div>
             ) : (
               availableCleaners.map((cleaner) => {

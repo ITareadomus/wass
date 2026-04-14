@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
 
 function getCurrentUsername(): string {
@@ -910,10 +911,10 @@ export default function GenerateLogisticsAssignments() {
   };
 
   return (
-    <div className="bg-background text-foreground min-h-screen">
-      <div className="w-full px-4 pt-3 pb-6">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <div className="mx-auto flex w-full min-h-0 max-w-[1920px] flex-1 flex-col px-4 pb-6 pt-3">
         {!isExtractingLogistics && (
-          <div className="mx-auto mb-6 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-4">
+          <div className="mb-6 flex w-full flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-4">
               <h1 className="flex items-center gap-2 text-[25px] font-bold text-foreground">
                 Assegnazioni Logistica del
@@ -948,8 +949,8 @@ export default function GenerateLogisticsAssignments() {
         )}
 
         {isExtractingLogistics ? (
-          <div className="mx-auto flex w-full max-w-[1920px] items-center justify-center p-12">
-            <div className="space-y-4 text-center">
+          <PageViewportCentered layout="fill" className="py-4">
+            <div className="max-w-lg space-y-4 text-center">
               <div className="flex justify-center">
                 <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
               </div>
@@ -961,7 +962,7 @@ export default function GenerateLogisticsAssignments() {
                     : "Caricamento Dati"}
               </h2>
               <p className="text-muted-foreground">{extractionStep}</p>
-              <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                 {logisticsLoaderKind === "extract" && (
                   <>
                     <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
@@ -982,7 +983,7 @@ export default function GenerateLogisticsAssignments() {
                 )}
               </div>
             </div>
-          </div>
+          </PageViewportCentered>
         ) : (
         <>
         <div className="mx-auto mb-4 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-3">

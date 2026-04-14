@@ -1072,6 +1072,11 @@ export default function LogisticsTimelineView({
                     return sa - sb;
                   });
                 const hi = highlightedIdsForDriverTasks(tasks, searchTask);
+                const driverRowDisplayLabel =
+                  driversAliases[driver.id]?.alias ||
+                  driver.alias ||
+                  `${(driver.name || "").toUpperCase()} ${(driver.lastname || "").toUpperCase()}`.trim() ||
+                  `ID ${driver.id}`;
                 return (
                   <div key={driver.id} className="flex mb-0.5">
                     <div
@@ -1173,6 +1178,7 @@ export default function LogisticsTimelineView({
                                 timelineWidthPx={timelineWidthPx}
                                 operationsScope="logistics"
                                 isHighlighted={hi.has(String(task.id))}
+                                timelineRowStaffDisplayLabel={driverRowDisplayLabel}
                               />
                             ))}
                             {provided.placeholder}
@@ -1355,9 +1361,9 @@ export default function LogisticsTimelineView({
           </DialogHeader>
           <div className="space-y-2 mt-4">
             {availableDrivers.length === 0 ? (
-              <div className="flex items-center justify-center py-8">
-                <RefreshCw className="h-6 w-6 animate-spin text-custom-blue mr-2" />
-                <p className="text-muted-foreground">Caricamento driver disponibili…</p>
+              <div className="flex min-h-[min(50vh,280px)] flex-col items-center justify-center gap-3 py-8">
+                <RefreshCw className="h-6 w-6 animate-spin text-custom-blue" />
+                <p className="text-muted-foreground text-center">Caricamento driver disponibili…</p>
               </div>
             ) : (
               availableDrivers.map((d: any) => {

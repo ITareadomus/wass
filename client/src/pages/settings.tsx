@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Plus, Eye, EyeOff, Save, X, Home } from "lucide-react";
+import { Trash2, Plus, Eye, EyeOff, Save, X, Home, Loader2 } from "lucide-react";
+import { PageViewportCentered } from "@/components/page-viewport-centered";
 import {
   Select,
   SelectContent,
@@ -298,9 +299,12 @@ export default function Settings() {
 
   if (isLoading) { // systemSettings check is removed as it's not loaded anymore
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Caricamento...</p>
-      </div>
+      <PageViewportCentered layout="viewport" className="bg-background py-8">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Caricamento...</p>
+        </div>
+      </PageViewportCentered>
     );
   }
 

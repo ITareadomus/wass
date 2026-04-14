@@ -582,13 +582,13 @@ export default function MapSection({ tasks }: MapSectionProps) {
       <div className="p-4 relative">
         <div 
           ref={mapRef} 
-          className="w-full h-[400px] rounded-lg bg-muted"
+          className="relative w-full h-[400px] rounded-lg bg-muted"
           style={{ minHeight: '400px' }}
         >
           {!isMapLoaded && (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <div className="absolute inset-0 z-[1] flex items-center justify-center rounded-lg bg-muted">
+              <div className="flex flex-col items-center gap-4 text-center px-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
                 <p className="text-muted-foreground">Caricamento mappa...</p>
               </div>
             </div>

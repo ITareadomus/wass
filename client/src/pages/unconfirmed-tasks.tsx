@@ -4,10 +4,11 @@ import { format, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { Home, RefreshCw } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -329,12 +330,34 @@ export default function UnconfirmedTasks() {
     return operationNames[opId] || `Operazione ${opId}`;
   };
 
+  /** Area sotto header: altezza fissa + overflow hidden — niente scroll pagina (scroll solo nelle colonne lista/dettaglio). */
+  const lockPageToViewport = !isLoading;
+
   return (
-    <div className="min-h-screen bg-background">
-      <main className="w-full min-h-[calc(100vh-72px)] px-4 py-6">
-        <div className="flex flex-col gap-6">
+    <div
+      className={cn(
+        "bg-background",
+        lockPageToViewport
+          ? "flex h-[calc(100dvh-3.5rem-1px)] max-h-[calc(100dvh-3.5rem-1px)] flex-col overflow-hidden md:h-[calc(100dvh-3.75rem-1px)] md:max-h-[calc(100dvh-3.75rem-1px)]"
+          : "min-h-screen"
+      )}
+    >
+      <main
+        className={cn(
+          "w-full px-4",
+          lockPageToViewport
+            ? "flex min-h-0 flex-1 flex-col py-2 md:py-3"
+            : "min-h-[calc(100vh-72px)] py-6"
+        )}
+      >
+        <div
+          className={cn(
+            "flex flex-col gap-3 md:gap-4",
+            lockPageToViewport && "min-h-0 flex-1"
+          )}
+        >
           {!isLoading && (
-            <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
@@ -348,7 +371,10 @@ export default function UnconfirmedTasks() {
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      className="flex items-center gap-2 px-4 py-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg bg-muted transition-colors hover:bg-muted/80",
+                        lockPageToViewport ? "px-3 py-1.5 text-sm" : "px-4 py-2"
+                      )}
                       data-testid="workdate-picker-trigger"
                     >
                       <CalendarIcon className="h-4 w-4" />
@@ -385,40 +411,54 @@ export default function UnconfirmedTasks() {
           )}
 
           {isRefreshError ? (
-            <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            <div className="mb-4 shrink-0 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
               Errore durante l&apos;aggiornamento dei containers per la data selezionata:{" "}
               {(refreshError as Error)?.message || "errore sconosciuto"}
             </div>
           ) : null}
 
           {isLoading ? (
-            <div className="flex items-center justify-center p-12">
-              <div className="text-center space-y-4">
+            <PageViewportCentered layout="viewport" className="py-8">
+              <div className="max-w-lg space-y-4 text-center">
                 <div className="flex justify-center">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+                  <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
                 </div>
-                <h2 className="text-xl font-bold text-foreground">
-                  {loadingTitle}
-                </h2>
-                <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
-                  <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+                <h2 className="text-xl font-bold text-foreground">{loadingTitle}</h2>
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
                   <span>{loadingStepLabel}</span>
                 </div>
               </div>
-            </div>
+            </PageViewportCentered>
           ) : unconfirmedTasks.length === 0 ? (
-            <>
-              <Card className="border-2 border-custom-blue bg-green-50 dark:bg-green-950/30">
-              <CardContent className="flex flex-col items-center justify-center p-12 text-center">
-                <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
-                <h3 className="text-lg font-semibold mb-2 text-green-800 dark:text-green-200">
-                  Tutti i task per questa data hanno la tipologia d'intervento correttamente impostata.
-                </h3>
-              </CardContent>
-            </Card>
+            <div className="flex min-h-0 flex-1 flex-col gap-2 md:gap-3">
+              <div className="flex min-h-0 flex-1 gap-2 md:gap-3">
+                <div className="flex min-h-0 w-1/3 min-w-0 flex-col overflow-hidden rounded-lg border-2 border-custom-blue p-2 md:p-3">
+                  <div className="relative mb-2 w-full shrink-0">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-custom-blue" />
+                    <Input
+                      placeholder="Cerca per ID, code, indirizzo, cliente, alias o customer ID..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="border-2 border-custom-blue pl-10 text-xs"
+                      data-testid="input-search"
+                    />
+                  </div>
+                  <div className="custom-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden md:gap-3" />
+                </div>
 
-              <div className="flex justify-center pt-0.5">
-              <Button
+                <div className="flex min-h-0 w-2/3 min-w-0 flex-col overflow-hidden rounded-lg border-2 border-custom-blue bg-green-50 dark:bg-green-950/30">
+                  <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center sm:p-12">
+                    <CheckCircle className="h-12 w-12 shrink-0 text-green-500 sm:h-16 sm:w-16" />
+                    <h3 className="max-w-2xl text-base font-semibold text-green-800 dark:text-green-200 sm:text-lg">
+                      Tutti i task per questa data hanno la tipologia d&apos;intervento correttamente impostata.
+                    </h3>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex shrink-0 justify-center pb-1 pt-0.5">
+                <Button
                   type="button"
                   variant="outline"
                   onClick={() => navigate(assignmentsHomeHref)}
@@ -426,28 +466,28 @@ export default function UnconfirmedTasks() {
                   data-testid="button-go-home"
                   className="border-2 border-custom-blue"
                 >
-                  <Home className="h-4 w-4 mr-2" />
+                  <Home className="mr-2 h-4 w-4" />
                   Torna alla Home
                 </Button>
               </div>
-            </>
+            </div>
           ) : (
-            <>
-              <div className="flex items-center gap-4 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
-                <AlertTriangle className="h-8 w-8 text-amber-500 flex-shrink-0" />
-                <div>
-                  <h2 className="font-semibold text-amber-800 dark:text-amber-200">
+            <div className="flex min-h-0 flex-1 flex-col gap-2 md:gap-3">
+              <div className="flex shrink-0 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2 dark:border-amber-800 dark:bg-amber-950/30 md:gap-3 md:p-3">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500 md:h-6 md:w-6" />
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold text-amber-800 dark:text-amber-200 md:text-base">
                     {unconfirmedTasks.length} Task con tipologia d'intervento non impostata
                   </h2>
-                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                  <p className="text-xs text-amber-700 dark:text-amber-300 md:text-sm">
                     Imposta la tipologia d'intervento per ogni task prima di procedere con le assegnazioni.
                   </p>
                 </div>
               </div>
 
-              <div className="flex gap-4 items-stretch">
-                <div className="w-1/3 border-2 border-custom-blue rounded-lg p-4 h-[70vh] overflow-y-auto custom-scrollbar">
-                  <div className="relative w-full mb-3">
+              <div className="flex min-h-0 flex-1 gap-2 md:gap-3">
+                <div className="flex min-h-0 w-1/3 min-w-0 flex-col overflow-hidden rounded-lg border-2 border-custom-blue p-2 md:p-3">
+                  <div className="relative mb-2 w-full shrink-0">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-custom-blue" />
                     <Input
                       placeholder="Cerca per ID, code, indirizzo, cliente, alias o customer ID..."
@@ -457,7 +497,7 @@ export default function UnconfirmedTasks() {
                       data-testid="input-search"
                     />
                   </div>
-                  <div className="flex flex-col gap-3">
+                  <div className="custom-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden md:gap-3">
                     {filteredTasks.length === 0 && searchTerm ? (
                       <div className="flex flex-col items-center justify-center p-6 text-center text-muted-foreground">
                         <Search className="h-8 w-8 mb-2 opacity-50" />
@@ -476,9 +516,9 @@ export default function UnconfirmedTasks() {
                       filteredTasks.map((task) => (
                         <div
                           key={`${task.task_id}-${task.logistic_code}`}
-                          className={`flex items-center justify-between gap-4 p-3 rounded cursor-pointer hover:opacity-80 transition-all ${
+                          className={`flex cursor-pointer items-center justify-between gap-2 rounded p-2 transition-all hover:opacity-80 md:gap-3 md:p-3 ${
                             selectedTask?.task_id === task.task_id
-                              ? "bg-custom-blue-light border-2 border-l-4 border-custom-blue ring-2 ring-[color:var(--priority-border-color)]/50 shadow-lg scale-[1.02]"
+                              ? "bg-custom-blue-light border-2 border-custom-blue ring-2 ring-[color:var(--priority-border-color)]/50 shadow-lg"
                               : "bg-custom-blue-light border border-custom-blue"
                           }`}
                           onClick={() => setSelectedTask(task)}
@@ -511,204 +551,210 @@ export default function UnconfirmedTasks() {
                   </div>
                 </div>
 
-                <div className="w-2/3 border-2 border-custom-blue rounded-lg p-4 h-[70vh] overflow-y-auto bg-custom-blue-light">
+                <div className="flex min-h-0 w-2/3 min-w-0 flex-col overflow-hidden rounded-lg border-2 border-custom-blue bg-custom-blue-light p-2 md:p-3">
                   {!selectedTask ? (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                    <div className="flex flex-1 items-center justify-center px-2 text-center text-sm text-muted-foreground">
                       Seleziona una task per vedere i dettagli
                     </div>
                   ) : (
-                    <div className="space-y-3 h-full flex flex-col justify-between">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => navigateTask(-1)}
-                            disabled={currentTaskIndex <= 0}
-                            data-testid="button-prev-task"
-                          >
-                            <ChevronLeft className="h-4 w-4" />
-                          </Button>
-                          <h3 className="text-lg font-semibold flex items-center gap-2">
-                            Task {currentTaskIndex + 1}/{filteredTasks.length}
-                            <Badge
+                    <div className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto">
+                      <div className="flex min-h-full flex-col">
+                        <div className="flex shrink-0 items-center justify-between pb-2">
+                          <div className="flex items-center gap-2 md:gap-3">
+                            <Button
                               variant="outline"
-                              className={`text-xs shrink-0 px-2 py-0.5 rounded border font-medium ${
-                                selectedTask.straordinaria
-                                  ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
-                                  : selectedTask.premium
-                                    ? "bg-yellow-500/30 text-yellow-800 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
-                                    : "bg-green-500/30 text-green-800 dark:text-green-200 border-green-600 dark:border-green-400"
-                              }`}
+                              size="icon"
+                              className="h-8 w-8 shrink-0 md:h-9 md:w-9"
+                              onClick={() => navigateTask(-1)}
+                              disabled={currentTaskIndex <= 0}
+                              data-testid="button-prev-task"
                             >
-                              {selectedTask.straordinaria
-                                ? "STRAORDINARIA"
-                                : selectedTask.premium
-                                  ? "PREMIUM"
-                                  : "STANDARD"}
-                            </Badge>
-                            {selectedTask.priority && (
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <h3 className="flex items-center gap-1.5 text-base font-semibold md:gap-2 md:text-lg">
+                              Task {currentTaskIndex + 1}/{filteredTasks.length}
                               <Badge
-                                className={
-                                  selectedTask.priority === "early_out"
-                                    ? "bg-blue-500 text-white border-blue-700"
-                                    : selectedTask.priority === "high_priority"
-                                      ? "bg-orange-500 text-white border-orange-700"
-                                      : "bg-gray-500 text-white border-gray-700"
-                                }
+                                variant="outline"
+                                className={`text-xs shrink-0 px-2 py-0.5 rounded border font-medium ${
+                                  selectedTask.straordinaria
+                                    ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
+                                    : selectedTask.premium
+                                      ? "bg-yellow-500/30 text-yellow-800 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
+                                      : "bg-green-500/30 text-green-800 dark:text-green-200 border-green-600 dark:border-green-400"
+                                }`}
                               >
-                                {selectedTask.priority === "early_out"
-                                  ? "EO"
-                                  : selectedTask.priority === "high_priority"
-                                    ? "HP"
-                                    : "LP"}
+                                {selectedTask.straordinaria
+                                  ? "STRAORDINARIA"
+                                  : selectedTask.premium
+                                    ? "PREMIUM"
+                                    : "STANDARD"}
                               </Badge>
-                            )}
-                          </h3>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => navigateTask(1)}
-                            disabled={currentTaskIndex >= filteredTasks.length - 1}
-                            data-testid="button-next-task"
-                          >
-                            <ChevronRight className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 px-4">
-                        <div>
-                          <p className="text-sm font-semibold text-muted-foreground">Codice ADAM</p>
-                          <p className="text-sm">{selectedTask.logistic_code}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-muted-foreground">Cliente</p>
-                          <p className="text-sm">{selectedTask.customer_name || selectedTask.alias || "non migrato"}</p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 px-4">
-                        <div>
-                          <p className="text-sm font-semibold text-muted-foreground">Indirizzo</p>
-                          <p className="text-sm uppercase">{selectedTask.address || "NON MIGRATO"}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-muted-foreground">Durata pulizia</p>
-                          <p className="text-sm">
-                            {selectedTask.cleaning_time
-                              ? `${selectedTask.cleaning_time} minuti`
-                              : selectedTask.duration
-                                ? `${selectedTask.duration.replace(".", ":")} ore`
-                                : "non migrato"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 px-4">
-                        <div>
-                          <p className="text-sm font-semibold text-muted-foreground">Check-out</p>
-                          <p className="text-sm">
-                            {selectedTask.checkout_date
-                              ? new Date(selectedTask.checkout_date).toLocaleDateString("it-IT", {
-                                  day: "2-digit",
-                                  month: "2-digit",
-                                  year: "numeric",
-                                })
-                              : "non migrato"}
-                            {selectedTask.checkout_date && selectedTask.checkout_time
-                              ? ` - ${selectedTask.checkout_time}`
-                              : selectedTask.checkout_date
-                                ? " - orario non migrato"
-                                : ""}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-muted-foreground">Check-in</p>
-                          <p className="text-sm">
-                            {selectedTask.checkin_date
-                              ? new Date(selectedTask.checkin_date).toLocaleDateString("it-IT", {
-                                  day: "2-digit",
-                                  month: "2-digit",
-                                  year: "numeric",
-                                })
-                              : "non migrato"}
-                            {selectedTask.checkin_date && selectedTask.checkin_time
-                              ? ` - ${selectedTask.checkin_time}`
-                              : selectedTask.checkin_date
-                                ? " - orario non migrato"
-                                : ""}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 px-4">
-                        <div>
-                          <p className="text-sm font-semibold text-muted-foreground">Tipologia appartamento</p>
-                          <p className="text-sm">{selectedTask.type_apt || "non migrato"}</p>
-                        </div>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <div 
-                              className="bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-200 dark:border-amber-800 rounded-lg p-3 -m-1 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
-                              data-testid="trigger-operation-type"
-                            >
-                              <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Tipologia intervento</p>
-                              <p className="text-sm font-bold text-amber-700 dark:text-amber-300">
-                                {(() => {
-                                  const selectedOp = selectedOperations.get(selectedTask.task_id);
-                                  if (selectedOp === undefined) {
-                                    return "non migrato";
+                              {selectedTask.priority && (
+                                <Badge
+                                  className={
+                                    selectedTask.priority === "early_out"
+                                      ? "bg-blue-500 text-white border-blue-700"
+                                      : selectedTask.priority === "high_priority"
+                                        ? "bg-orange-500 text-white border-orange-700"
+                                        : "bg-gray-500 text-white border-gray-700"
                                   }
-                                  return operationNames[selectedOp] || `Operazione ${selectedOp}`;
-                                })()}
+                                >
+                                  {selectedTask.priority === "early_out"
+                                    ? "EO"
+                                    : selectedTask.priority === "high_priority"
+                                      ? "HP"
+                                      : "LP"}
+                                </Badge>
+                              )}
+                            </h3>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 md:h-9 md:w-9"
+                              onClick={() => navigateTask(1)}
+                              disabled={currentTaskIndex >= filteredTasks.length - 1}
+                              data-testid="button-next-task"
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="flex min-h-0 flex-1 flex-col justify-between gap-3 px-1 py-1 md:gap-4 md:px-4 md:py-2">
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                            <div>
+                              <p className="text-sm font-semibold text-muted-foreground">Codice ADAM</p>
+                              <p className="text-sm">{selectedTask.logistic_code}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-muted-foreground">Cliente</p>
+                              <p className="text-sm">{selectedTask.customer_name || selectedTask.alias || "non migrato"}</p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                            <div>
+                              <p className="text-sm font-semibold text-muted-foreground">Indirizzo</p>
+                              <p className="text-sm uppercase">{selectedTask.address || "NON MIGRATO"}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-muted-foreground">Durata pulizia</p>
+                              <p className="text-sm">
+                                {selectedTask.cleaning_time
+                                  ? `${selectedTask.cleaning_time} minuti`
+                                  : selectedTask.duration
+                                    ? `${selectedTask.duration.replace(".", ":")} ore`
+                                    : "non migrato"}
                               </p>
                             </div>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-48 p-1" align="start">
-                            <div className="flex flex-col">
-                              <button
-                                onClick={() => {
-                                  const newOps = new Map(selectedOperations);
-                                  newOps.delete(selectedTask.task_id);
-                                  setSelectedOperations(newOps);
-                                }}
-                                className={`text-left text-sm px-2 py-1.5 rounded hover:bg-muted transition-colors ${
-                                  !selectedOperations.has(selectedTask.task_id) ? "bg-amber-100 dark:bg-amber-900/50 font-semibold" : ""
-                                }`}
-                                data-testid="option-operation-0"
-                              >
-                                Nessuna
-                              </button>
-                              {allowedOperations.map((op) => (
-                                <button
-                                  key={op.id}
-                                  onClick={() => {
-                                    const newOps = new Map(selectedOperations);
-                                    newOps.set(selectedTask.task_id, op.id);
-                                    setSelectedOperations(newOps);
-                                  }}
-                                  className={`text-left text-sm px-2 py-1.5 rounded hover:bg-muted transition-colors ${
-                                    selectedOperations.get(selectedTask.task_id) === op.id ? "bg-amber-100 dark:bg-amber-900/50 font-semibold" : ""
-                                  }`}
-                                  data-testid={`option-operation-${op.id}`}
-                                >
-                                  {op.name}
-                                </button>
-                              ))}
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      </div>
+                          </div>
 
-                      <div className="grid grid-cols-2 gap-2 px-4">
-                        <div>
-                          <p className="text-sm font-semibold text-muted-foreground">Pax-In</p>
-                          <p className="text-sm">{selectedTask.pax_in ?? "non migrato"}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-muted-foreground">Pax-Out</p>
-                          <p className="text-sm">{selectedTask.pax_out ?? "non migrato"}</p>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                            <div>
+                              <p className="text-sm font-semibold text-muted-foreground">Check-out</p>
+                              <p className="text-sm">
+                                {selectedTask.checkout_date
+                                  ? new Date(selectedTask.checkout_date).toLocaleDateString("it-IT", {
+                                      day: "2-digit",
+                                      month: "2-digit",
+                                      year: "numeric",
+                                    })
+                                  : "non migrato"}
+                                {selectedTask.checkout_date && selectedTask.checkout_time
+                                  ? ` - ${selectedTask.checkout_time}`
+                                  : selectedTask.checkout_date
+                                    ? " - orario non migrato"
+                                    : ""}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-muted-foreground">Check-in</p>
+                              <p className="text-sm">
+                                {selectedTask.checkin_date
+                                  ? new Date(selectedTask.checkin_date).toLocaleDateString("it-IT", {
+                                      day: "2-digit",
+                                      month: "2-digit",
+                                      year: "numeric",
+                                    })
+                                  : "non migrato"}
+                                {selectedTask.checkin_date && selectedTask.checkin_time
+                                  ? ` - ${selectedTask.checkin_time}`
+                                  : selectedTask.checkin_date
+                                    ? " - orario non migrato"
+                                    : ""}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                            <div>
+                              <p className="text-sm font-semibold text-muted-foreground">Tipologia appartamento</p>
+                              <p className="text-sm">{selectedTask.type_apt || "non migrato"}</p>
+                            </div>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <div
+                                  className="-m-1 cursor-pointer rounded-lg border-2 border-amber-200 bg-amber-50 p-3 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/30 dark:hover:bg-amber-900/40"
+                                  data-testid="trigger-operation-type"
+                                >
+                                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Tipologia intervento</p>
+                                  <p className="text-sm font-bold text-amber-700 dark:text-amber-300">
+                                    {(() => {
+                                      const selectedOp = selectedOperations.get(selectedTask.task_id);
+                                      if (selectedOp === undefined) {
+                                        return "non migrato";
+                                      }
+                                      return operationNames[selectedOp] || `Operazione ${selectedOp}`;
+                                    })()}
+                                  </p>
+                                </div>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-48 p-1" align="start">
+                                <div className="flex flex-col">
+                                  <button
+                                    onClick={() => {
+                                      const newOps = new Map(selectedOperations);
+                                      newOps.delete(selectedTask.task_id);
+                                      setSelectedOperations(newOps);
+                                    }}
+                                    className={`text-left text-sm px-2 py-1.5 rounded hover:bg-muted transition-colors ${
+                                      !selectedOperations.has(selectedTask.task_id) ? "bg-amber-100 dark:bg-amber-900/50 font-semibold" : ""
+                                    }`}
+                                    data-testid="option-operation-0"
+                                  >
+                                    Nessuna
+                                  </button>
+                                  {allowedOperations.map((op) => (
+                                    <button
+                                      key={op.id}
+                                      onClick={() => {
+                                        const newOps = new Map(selectedOperations);
+                                        newOps.set(selectedTask.task_id, op.id);
+                                        setSelectedOperations(newOps);
+                                      }}
+                                      className={`text-left text-sm px-2 py-1.5 rounded hover:bg-muted transition-colors ${
+                                        selectedOperations.get(selectedTask.task_id) === op.id ? "bg-amber-100 dark:bg-amber-900/50 font-semibold" : ""
+                                      }`}
+                                      data-testid={`option-operation-${op.id}`}
+                                    >
+                                      {op.name}
+                                    </button>
+                                  ))}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                            <div>
+                              <p className="text-sm font-semibold text-muted-foreground">Pax-In</p>
+                              <p className="text-sm">{selectedTask.pax_in ?? "non migrato"}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-muted-foreground">Pax-Out</p>
+                              <p className="text-sm">{selectedTask.pax_out ?? "non migrato"}</p>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -717,11 +763,10 @@ export default function UnconfirmedTasks() {
               </div>
 
               <div
-                className={
-                  hasTasksToSet
-                    ? "flex justify-center gap-3 pt-0.5 -mt-4"
-                    : "flex justify-center pt-0.5 -mt-4"
-                }
+                className={cn(
+                  "flex shrink-0 justify-center gap-2 pt-1 md:gap-3",
+                  hasTasksToSet ? "flex-wrap" : ""
+                )}
               >
                 {hasTasksToSet && (
                   <Button
@@ -828,7 +873,7 @@ export default function UnconfirmedTasks() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-            </>
+            </div>
           )}
         </div>
       </main>
