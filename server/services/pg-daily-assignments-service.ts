@@ -57,6 +57,14 @@ function normalizeDateToYmd(value: any): string | null {
   return null;
 }
 
+function normalizeCustomerNoteHistory(value: unknown): any[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function toCustomerNoteHistoryJson(value: unknown): string {
+  return JSON.stringify(normalizeCustomerNoteHistory(value));
+}
+
 export interface PgDailyAssignmentRow {
   id?: number;
   work_date: string;
@@ -89,6 +97,8 @@ export interface PgDailyAssignmentRow {
   alias?: string | null;
   customer_name?: string | null;
   customer_reference?: string | number | null;
+  customer_note?: string | null;
+  customer_note_history?: any[] | null;
   reasons: string[];
   priority?: string | null;
   start_time?: string | null;
@@ -133,6 +143,8 @@ export interface PgLogisticsAssignmentRow {
   alias?: string | null;
   customer_name?: string | null;
   customer_reference?: string | number | null;
+  customer_note?: string | null;
+  customer_note_history?: any[] | null;
   reasons: string[];
   priority?: string | null;
   start_time?: string | null;
@@ -206,6 +218,33 @@ export class PgDailyAssignmentsService {
       console.log('✅ PG: Colonne locked e locked_reason aggiunte a daily_containers e daily_containers_history');
     } catch (error) {
       console.warn('⚠️ PG: Errore (ignorabile) nella migrazione locked columns:', error);
+    }
+  }
+
+  /**
+   * Ensure customer note columns exist on all task tables (current + history)
+   */
+  async ensureCustomerNoteColumns(): Promise<void> {
+    try {
+      await query(`ALTER TABLE IF EXISTS daily_containers ADD COLUMN IF NOT EXISTS customer_note TEXT`);
+      await query(`ALTER TABLE IF EXISTS daily_containers_history ADD COLUMN IF NOT EXISTS customer_note TEXT`);
+      await query(`ALTER TABLE IF EXISTS daily_assignments_current ADD COLUMN IF NOT EXISTS customer_note TEXT`);
+      await query(`ALTER TABLE IF EXISTS daily_assignments_history ADD COLUMN IF NOT EXISTS customer_note TEXT`);
+      await query(`ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS customer_note TEXT`);
+      await query(`ALTER TABLE IF EXISTS lg_containers_history ADD COLUMN IF NOT EXISTS customer_note TEXT`);
+      await query(`ALTER TABLE IF EXISTS lg_timeline ADD COLUMN IF NOT EXISTS customer_note TEXT`);
+      await query(`ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS customer_note TEXT`);
+      await query(`ALTER TABLE IF EXISTS daily_containers ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await query(`ALTER TABLE IF EXISTS daily_containers_history ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await query(`ALTER TABLE IF EXISTS daily_assignments_current ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await query(`ALTER TABLE IF EXISTS daily_assignments_history ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await query(`ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await query(`ALTER TABLE IF EXISTS lg_containers_history ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await query(`ALTER TABLE IF EXISTS lg_timeline ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await query(`ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      console.log('✅ PG: Colonna customer_note verificata su current/history HK+LG');
+    } catch (error) {
+      console.warn('⚠️ PG: ensureCustomerNoteColumns:', error);
     }
   }
 
@@ -497,6 +536,8 @@ export class PgDailyAssignmentsService {
           alias VARCHAR(255),
           customer_name VARCHAR(255),
           customer_reference TEXT,
+          customer_note TEXT,
+          customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb,
           reasons TEXT[] NOT NULL DEFAULT '{}',
           manually_moved BOOLEAN NOT NULL DEFAULT FALSE,
           priority VARCHAR(50),
@@ -547,6 +588,8 @@ export class PgDailyAssignmentsService {
           alias VARCHAR(255),
           customer_name VARCHAR(255),
           customer_reference TEXT,
+          customer_note TEXT,
+          customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb,
           reasons TEXT[] NOT NULL DEFAULT '{}',
           manually_moved BOOLEAN NOT NULL DEFAULT FALSE,
           priority VARCHAR(50),
@@ -563,6 +606,14 @@ export class PgDailyAssignmentsService {
         CREATE INDEX IF NOT EXISTS idx_lg_timeline_history_work_rev
         ON lg_timeline_history(work_date, revision DESC)
       `);
+      await query(`ALTER TABLE IF EXISTS lg_timeline ADD COLUMN IF NOT EXISTS customer_note TEXT`);
+      await query(`ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS customer_note TEXT`);
+      await query(`ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS customer_note TEXT`);
+      await query(`ALTER TABLE IF EXISTS lg_containers_history ADD COLUMN IF NOT EXISTS customer_note TEXT`);
+      await query(`ALTER TABLE IF EXISTS lg_timeline ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await query(`ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await query(`ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await query(`ALTER TABLE IF EXISTS lg_containers_history ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
 
       await query(`
         CREATE TABLE IF NOT EXISTS lg_drivers (
@@ -768,6 +819,8 @@ export class PgDailyAssignmentsService {
           alias: task.alias || null,
           customer_name: task.customer_name || null,
           customer_reference: task.customer_reference ? String(task.customer_reference) : null,
+          customer_note: task.customer_note != null ? String(task.customer_note) : null,
+          customer_note_history: normalizeCustomerNoteHistory(task.customer_note_history),
           reasons: Array.isArray(task.reasons) ? task.reasons : [],
           priority: task.priority || null,
           start_time: task.start_time || null,
@@ -828,7 +881,7 @@ export class PgDailyAssignmentsService {
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
-            type_apt, alias, customer_name, customer_reference, reasons, manually_moved, priority,
+            type_apt, alias, customer_name, customer_reference, customer_note, customer_note_history, reasons, manually_moved, priority,
             start_time, end_time, followup, sequence, travel_time
           ) VALUES (
             $1,
@@ -837,8 +890,8 @@ export class PgDailyAssignmentsService {
             $12, $13, $14, $15, $16, $17,
             $18, $19, $20, $21,
             $22, $23, $24, $25, $26, $27,
-            $28, $29, $30, $31, $32, $33, $34,
-            $35, $36, $37, $38, $39
+            $28, $29, $30, $31, $32, $33, $34, $35, $36,
+            $37, $38, $39, $40, $41
           )
         `, [
           normalizedScope,
@@ -872,6 +925,8 @@ export class PgDailyAssignmentsService {
           row.alias,
           row.customer_name,
           row.customer_reference,
+          row.customer_note,
+          toCustomerNoteHistoryJson(row.customer_note_history),
           row.reasons,
           row.manually_moved === true,
           row.priority,
@@ -1037,6 +1092,10 @@ export class PgDailyAssignmentsService {
         if (row.alias) task.alias = row.alias;
         if (row.customer_name) task.customer_name = row.customer_name;
         if (row.customer_reference) task.customer_reference = row.customer_reference;
+        if (row.customer_note) task.customer_note = row.customer_note;
+        if (Array.isArray(row.customer_note_history) && row.customer_note_history.length > 0) {
+          task.customer_note_history = row.customer_note_history;
+        }
         if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
         task.manually_moved = row.manually_moved === true;
         if (row.priority) task.priority = row.priority;
@@ -1196,7 +1255,7 @@ export class PgDailyAssignmentsService {
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
-            type_apt, alias, customer_name, customer_reference, reasons, manually_moved, priority,
+            type_apt, alias, customer_name, customer_reference, customer_note, customer_note_history, reasons, manually_moved, priority,
             start_time, end_time, followup, sequence, travel_time, created_by
           ) VALUES (
             $1,
@@ -1205,8 +1264,8 @@ export class PgDailyAssignmentsService {
             $13, $14, $15, $16, $17, $18,
             $19, $20, $21, $22,
             $23, $24, $25, $26, $27, $28,
-            $29, $30, $31, $32, $33, $34, $35,
-            $36, $37, $38, $39, $40, $41
+            $29, $30, $31, $32, $33, $34, $35, $36, $37,
+            $38, $39, $40, $41, $42, $43
           )
         `, [
           normalizedScope,
@@ -1241,6 +1300,8 @@ export class PgDailyAssignmentsService {
           row.alias,
           row.customer_name,
           row.customer_reference,
+          row.customer_note,
+          toCustomerNoteHistoryJson(row.customer_note_history),
           row.reasons,
           row.manually_moved === true,
           row.priority,
@@ -1468,6 +1529,8 @@ export class PgDailyAssignmentsService {
           alias: task.alias || null,
           customer_name: task.customer_name || null,
           customer_reference: task.customer_reference ? String(task.customer_reference) : null,
+          customer_note: task.customer_note != null ? String(task.customer_note) : null,
+          customer_note_history: normalizeCustomerNoteHistory(task.customer_note_history),
           reasons: Array.isArray(task.reasons) ? task.reasons : [],
           priority: task.priority || null,
           start_time: task.start_time || null,
@@ -1500,7 +1563,7 @@ export class PgDailyAssignmentsService {
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
-            type_apt, alias, customer_name, customer_reference, reasons, manually_moved, priority,
+            type_apt, alias, customer_name, customer_reference, customer_note, customer_note_history, reasons, manually_moved, priority,
             start_time, end_time, followup, sequence, travel_time
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7,
@@ -1508,8 +1571,8 @@ export class PgDailyAssignmentsService {
             $11, $12, $13, $14, $15, $16,
             $17, $18, $19, $20,
             $21, $22, $23, $24, $25, $26,
-            $27, $28, $29, $30, $31, $32, $33,
-            $34, $35, $36, $37, $38
+            $27, $28, $29, $30, $31, $32, $33, $34, $35,
+            $36, $37, $38, $39, $40
           )
         `, [
           row.work_date,
@@ -1542,6 +1605,8 @@ export class PgDailyAssignmentsService {
           row.alias,
           row.customer_name,
           row.customer_reference,
+          row.customer_note,
+          toCustomerNoteHistoryJson(row.customer_note_history),
           row.reasons,
           row.manually_moved === true,
           row.priority,
@@ -1620,6 +1685,10 @@ export class PgDailyAssignmentsService {
         if (row.alias) task.alias = row.alias;
         if (row.customer_name) task.customer_name = row.customer_name;
         if (row.customer_reference) task.customer_reference = row.customer_reference;
+        if (row.customer_note) task.customer_note = row.customer_note;
+        if (Array.isArray(row.customer_note_history) && row.customer_note_history.length > 0) {
+          task.customer_note_history = row.customer_note_history;
+        }
         if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
         task.manually_moved = row.manually_moved === true;
         if (row.priority) task.priority = row.priority;
@@ -1692,7 +1761,7 @@ export class PgDailyAssignmentsService {
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
-            type_apt, alias, customer_name, customer_reference, reasons, manually_moved, priority,
+            type_apt, alias, customer_name, customer_reference, customer_note, customer_note_history, reasons, manually_moved, priority,
             start_time, end_time, followup, sequence, travel_time, created_by
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8,
@@ -1700,8 +1769,8 @@ export class PgDailyAssignmentsService {
             $12, $13, $14, $15, $16, $17,
             $18, $19, $20, $21,
             $22, $23, $24, $25, $26, $27,
-            $28, $29, $30, $31, $32, $33, $34,
-            $35, $36, $37, $38, $39, $40
+            $28, $29, $30, $31, $32, $33, $34, $35, $36,
+            $37, $38, $39, $40, $41, $42
           )
         `,
           [
@@ -1736,6 +1805,8 @@ export class PgDailyAssignmentsService {
             row.alias,
             row.customer_name,
             row.customer_reference,
+            row.customer_note,
+            toCustomerNoteHistoryJson(row.customer_note_history),
             row.reasons,
             row.manually_moved === true,
             row.priority,
@@ -1843,6 +1914,10 @@ export class PgDailyAssignmentsService {
         if (row.type_apt) task.type_apt = row.type_apt;
         if (row.alias) task.alias = row.alias;
         if (row.customer_name) task.customer_name = row.customer_name;
+        if (row.customer_note) task.customer_note = row.customer_note;
+        if (Array.isArray(row.customer_note_history) && row.customer_note_history.length > 0) {
+          task.customer_note_history = row.customer_note_history;
+        }
         if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
         if (row.customer_reference) task.customer_reference = row.customer_reference;
 
@@ -2003,6 +2078,10 @@ export class PgDailyAssignmentsService {
         if (row.type_apt) task.type_apt = row.type_apt;
         if (row.alias) task.alias = row.alias;
         if (row.customer_name) task.customer_name = row.customer_name;
+        if (row.customer_note) task.customer_note = row.customer_note;
+        if (Array.isArray(row.customer_note_history) && row.customer_note_history.length > 0) {
+          task.customer_note_history = row.customer_note_history;
+        }
         if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
         if (row.customer_reference) task.customer_reference = row.customer_reference;
 
@@ -2132,13 +2211,13 @@ export class PgDailyAssignmentsService {
               task_id, logistic_code, client_id, premium, address, lat, lng,
               cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
               pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
-              straordinaria, type_apt, alias, customer_name, reasons, customer_reference,
+              straordinaria, type_apt, alias, customer_name, customer_note, customer_note_history, reasons, customer_reference,
               locked, locked_reason
             ) VALUES (
               $1,
               $2, $3, $4, $5, $6, $7, $8, $9, $10,
               $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-              $21, $22, $23, $24, $25, $26, $27, $28
+              $21, $22, $23, $24, $25, $26, $27, $28, $29, $30
             )
           `, [
             normalizedScope,
@@ -2166,6 +2245,8 @@ export class PgDailyAssignmentsService {
             task.type_apt || null,
             task.alias || null,
             task.customer_name || null,
+            task.customer_note != null ? String(task.customer_note) : null,
+            toCustomerNoteHistoryJson(task.customer_note_history),
             task.reasons || [],
             task.customer_reference || null,
             task.locked || false,
@@ -2387,12 +2468,12 @@ export class PgDailyAssignmentsService {
               task_id, logistic_code, client_id, premium, address, lat, lng,
               cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
               pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
-              straordinaria, type_apt, alias, customer_name, reasons, customer_reference,
+              straordinaria, type_apt, alias, customer_name, customer_note, customer_note_history, reasons, customer_reference,
               locked, locked_reason
             ) VALUES (
               $1, $2, $3, $4, $5, $6, $7, $8, $9,
               $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-              $20, $21, $22, $23, $24, $25, $26, $27
+              $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
             )
           `, [
             workDate,
@@ -2418,6 +2499,8 @@ export class PgDailyAssignmentsService {
             task.type_apt || null,
             task.alias || null,
             task.customer_name || null,
+            task.customer_note != null ? String(task.customer_note) : null,
+            toCustomerNoteHistoryJson(task.customer_note_history),
             task.reasons || [],
             task.customer_reference || null,
             task.locked || false,
@@ -2555,12 +2638,12 @@ export class PgDailyAssignmentsService {
           task_id, logistic_code, client_id, premium, address, lat, lng,
           cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
           pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
-          straordinaria, type_apt, alias, customer_name, reasons, customer_reference,
+          straordinaria, type_apt, alias, customer_name, customer_note, customer_note_history, reasons, customer_reference,
           locked, locked_reason
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9,
           $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-          $20, $21, $22, $23, $24, $25, $26, $27
+          $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
         )
         ON CONFLICT (work_date, task_id) DO NOTHING
       `, [
@@ -2587,6 +2670,8 @@ export class PgDailyAssignmentsService {
         task.type_apt || null,
         task.alias || null,
         task.customer_name || null,
+        task.customer_note != null ? String(task.customer_note) : null,
+        toCustomerNoteHistoryJson(task.customer_note_history),
         task.reasons || [],
         task.customer_reference || null,
         task.locked || false,
@@ -2796,12 +2881,12 @@ export class PgDailyAssignmentsService {
             task_id, logistic_code, client_id, premium, address, lat, lng,
             cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
-            straordinaria, type_apt, alias, customer_name, reasons, created_by,
+            straordinaria, type_apt, alias, customer_name, customer_note, customer_note_history, reasons, created_by,
             locked, locked_reason
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
             $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-            $21, $22, $23, $24, $25, $26, $27, $28
+            $21, $22, $23, $24, $25, $26, $27, $28, $29, $30
           )
         `, [
           workDate,
@@ -2828,6 +2913,8 @@ export class PgDailyAssignmentsService {
           row.type_apt,
           row.alias,
           row.customer_name,
+          row.customer_note ?? null,
+          toCustomerNoteHistoryJson(row.customer_note_history),
           row.reasons || [],
           createdBy,
           row.locked || false,
@@ -2912,6 +2999,8 @@ export class PgDailyAssignmentsService {
           type_apt: row.type_apt,
           alias: row.alias,
           customer_name: row.customer_name,
+          customer_note: row.customer_note,
+          customer_note_history: normalizeCustomerNoteHistory(row.customer_note_history),
           reasons: row.reasons || [],
           locked: row.locked || false,
           locked_reason: row.locked_reason || null
@@ -2965,12 +3054,12 @@ export class PgDailyAssignmentsService {
             task_id, logistic_code, client_id, premium, address, lat, lng,
             cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
-            straordinaria, type_apt, alias, customer_name, reasons,
+            straordinaria, type_apt, alias, customer_name, customer_note, customer_note_history, reasons,
             locked, locked_reason
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9,
             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-            $20, $21, $22, $23, $24, $25, $26
+            $20, $21, $22, $23, $24, $25, $26, $27, $28
           )
         `, [
           workDate,
@@ -2996,6 +3085,8 @@ export class PgDailyAssignmentsService {
           row.type_apt,
           row.alias,
           row.customer_name,
+          row.customer_note ?? null,
+          toCustomerNoteHistoryJson(row.customer_note_history),
           row.reasons || [],
           row.locked || false,
           row.locked_reason || null
@@ -3051,12 +3142,12 @@ export class PgDailyAssignmentsService {
             task_id, logistic_code, client_id, premium, address, lat, lng,
             cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
-            straordinaria, type_apt, alias, customer_name, reasons, customer_reference, created_by,
+            straordinaria, type_apt, alias, customer_name, customer_note, customer_note_history, reasons, customer_reference, created_by,
             locked, locked_reason
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
             $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-            $21, $22, $23, $24, $25, $26, $27, $28, $29
+            $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31
           )
         `, [
           workDate,
@@ -3083,6 +3174,8 @@ export class PgDailyAssignmentsService {
           row.type_apt,
           row.alias,
           row.customer_name,
+          row.customer_note ?? null,
+          toCustomerNoteHistoryJson(row.customer_note_history),
           row.reasons || [],
           row.customer_reference ?? null,
           createdBy,
@@ -3149,6 +3242,8 @@ export class PgDailyAssignmentsService {
           type_apt: row.type_apt,
           alias: row.alias,
           customer_name: row.customer_name,
+          customer_note: row.customer_note,
+          customer_note_history: normalizeCustomerNoteHistory(row.customer_note_history),
           reasons: row.reasons || [],
           locked: row.locked || false,
           locked_reason: row.locked_reason || null
@@ -3190,12 +3285,12 @@ export class PgDailyAssignmentsService {
             task_id, logistic_code, client_id, premium, address, lat, lng,
             cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
-            straordinaria, type_apt, alias, customer_name, reasons, customer_reference,
+            straordinaria, type_apt, alias, customer_name, customer_note, customer_note_history, reasons, customer_reference,
             locked, locked_reason
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9,
             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-            $20, $21, $22, $23, $24, $25, $26, $27
+            $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
           )
         `, [
           workDate,
@@ -3221,6 +3316,8 @@ export class PgDailyAssignmentsService {
           row.type_apt,
           row.alias,
           row.customer_name,
+          row.customer_note ?? null,
+          toCustomerNoteHistoryJson(row.customer_note_history),
           row.reasons || [],
           row.customer_reference ?? null,
           row.locked || false,

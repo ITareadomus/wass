@@ -464,6 +464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await pgUsersService.ensureTable();
     await pgDailyAssignmentsService.ensureCleanerAliasesAndRevisionsTables();
     await pgDailyAssignmentsService.ensureLockedColumns();
+    await pgDailyAssignmentsService.ensureCustomerNoteColumns();
     await pgDailyAssignmentsService.ensureTaskLocksTable();
     await pgDailyAssignmentsService.ensureDailyAssignmentsRevisionsScopeUnique();
     await pgDailyAssignmentsService.ensureDailyContainersScopeUnique();
@@ -2056,6 +2057,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .replace(/\n{3,}/g, "\n\n")
           .replace(/[ \t]{2,}/g, " ")
           .trim();
+      const extractLatestNoteFromHistory = (history: unknown): string | null => {
+        if (!Array.isArray(history) || history.length === 0) return null;
+        for (let idx = history.length - 1; idx >= 0; idx--) {
+          const entry = history[idx];
+          if (!entry || typeof entry !== "object") continue;
+          const textValue = (entry as any).text;
+          const normalized = sanitizeHousekeepingNotes(textValue);
+          if (normalized) return normalized;
+        }
+        return null;
+      };
       const toNullableInt = (value: unknown): number | null => {
         if (value === null || value === undefined || value === "") return null;
         const num = Number(value);
@@ -2126,6 +2138,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Fallback robusto: logistic_code del record timeline.
       pushLogisticCodeCandidate(row?.logistic_code);
 
+      // Prefer persisted PG note if available (covers containers/timeline HK+LG).
+      if (noteLookupCandidates.length > 0) {
+        try {
+          const pgNoteResult = await query(
+            `
+              WITH candidates(task_id) AS (
+                SELECT UNNEST($2::int[])
+              ),
+              notes AS (
+                SELECT dac.task_id, dac.customer_note, dac.customer_note_history, 1 AS src_order
+                FROM daily_assignments_current dac
+                INNER JOIN candidates c ON c.task_id = dac.task_id
+                WHERE dac.work_date = $1
+                  AND (dac.scope = 'housekeeping' OR dac.scope IS NULL)
+                  AND (
+                    (dac.customer_note IS NOT NULL AND LENGTH(TRIM(dac.customer_note)) > 0)
+                    OR (
+                      jsonb_typeof(COALESCE(dac.customer_note_history, '[]'::jsonb)) = 'array'
+                      AND jsonb_array_length(COALESCE(dac.customer_note_history, '[]'::jsonb)) > 0
+                    )
+                  )
+                UNION ALL
+                SELECT dc.task_id, dc.customer_note, dc.customer_note_history, 2 AS src_order
+                FROM daily_containers dc
+                INNER JOIN candidates c ON c.task_id = dc.task_id
+                WHERE dc.work_date = $1
+                  AND (dc.scope = 'housekeeping' OR dc.scope IS NULL)
+                  AND (
+                    (dc.customer_note IS NOT NULL AND LENGTH(TRIM(dc.customer_note)) > 0)
+                    OR (
+                      jsonb_typeof(COALESCE(dc.customer_note_history, '[]'::jsonb)) = 'array'
+                      AND jsonb_array_length(COALESCE(dc.customer_note_history, '[]'::jsonb)) > 0
+                    )
+                  )
+                UNION ALL
+                SELECT lt.task_id, lt.customer_note, lt.customer_note_history, 3 AS src_order
+                FROM lg_timeline lt
+                INNER JOIN candidates c ON c.task_id = lt.task_id
+                WHERE lt.work_date = $1
+                  AND (
+                    (lt.customer_note IS NOT NULL AND LENGTH(TRIM(lt.customer_note)) > 0)
+                    OR (
+                      jsonb_typeof(COALESCE(lt.customer_note_history, '[]'::jsonb)) = 'array'
+                      AND jsonb_array_length(COALESCE(lt.customer_note_history, '[]'::jsonb)) > 0
+                    )
+                  )
+                UNION ALL
+                SELECT lc.task_id, lc.customer_note, lc.customer_note_history, 4 AS src_order
+                FROM lg_containers lc
+                INNER JOIN candidates c ON c.task_id = lc.task_id
+                WHERE lc.work_date = $1
+                  AND (
+                    (lc.customer_note IS NOT NULL AND LENGTH(TRIM(lc.customer_note)) > 0)
+                    OR (
+                      jsonb_typeof(COALESCE(lc.customer_note_history, '[]'::jsonb)) = 'array'
+                      AND jsonb_array_length(COALESCE(lc.customer_note_history, '[]'::jsonb)) > 0
+                    )
+                  )
+              )
+              SELECT customer_note, customer_note_history
+              FROM notes
+              ORDER BY src_order ASC
+              LIMIT 1
+            `,
+            [workDate, noteLookupCandidates]
+          );
+          const pgRow = pgNoteResult.rows?.[0] ?? null;
+          const pgHistoryNote = extractLatestNoteFromHistory(pgRow?.customer_note_history);
+          const pgRawNote = pgRow?.customer_note;
+          const pgNote = pgHistoryNote || sanitizeHousekeepingNotes(pgRawNote);
+          if (pgNote) {
+            housekeepingNotes = pgNote;
+          }
+        } catch (pgNoteError: any) {
+          console.warn(
+            "GET /api/logistics-task-driver-details: unable to read PG customer_note:",
+            pgNoteError?.message || pgNoteError
+          );
+        }
+      }
+
       if (noteLookupCandidates.length > 0 || structureLookupCandidates.length > 0) {
         try {
           const adamConnection = await mysql.createConnection({
@@ -2153,7 +2246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const noteRaw = rowRaw.notes;
               const noteText = sanitizeHousekeepingNotes(noteRaw);
               pushStructureCandidate(rowRaw.structure_id);
-              if (noteText) {
+              if (!housekeepingNotes && noteText) {
                 housekeepingNotes = noteText;
               }
               break;
@@ -6001,7 +6094,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Singolo update (comportamento originale)
-      const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime, paxIn, paxOut, operationId, date, modified_by, skipAdam } = req.body;
+      const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime, paxIn, paxOut, operationId, customerNote, date, modified_by, skipAdam } = req.body;
+      const normalizedCustomerNote =
+        customerNote === undefined || customerNote === null ? undefined : String(customerNote).trim();
 
       if (!taskId && !logisticCode) {
         return res.status(400).json({ success: false, error: "taskId o logisticCode richiesto" });
@@ -6009,6 +6104,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
+      const noteEventAt = new Date().toISOString();
+      let previousAdamCustomerNote: string | null = null;
+      const appendCustomerNoteHistory = (
+        historyRaw: unknown,
+        nextText: string,
+        by: string,
+        at: string,
+        source: "ui" | "adam" | "system",
+        fallbackOriginal: string | null = null
+      ) => {
+        const history = Array.isArray(historyRaw) ? [...historyRaw] : [];
+        const normalizedNext = String(nextText ?? "").trim();
+        if (!normalizedNext) return history;
+        const normalizeEntryText = (entry: any): string =>
+          String(entry?.text ?? "")
+            .replace(/<\s*\/?\s*br\s*\/?\s*>/gi, "\n")
+            .replace(/<[^>]*>/g, " ")
+            .replace(/\r\n/g, "\n")
+            .replace(/\n{3,}/g, "\n\n")
+            .replace(/[ \t]{2,}/g, " ")
+            .trim();
+        if (history.length === 0) {
+          const fallbackText = String(fallbackOriginal ?? "").trim();
+          if (fallbackText && fallbackText !== normalizedNext) {
+            history.push({
+              text: fallbackText,
+              by: "system",
+              at,
+              source: "adam",
+            });
+          }
+        }
+        const last = history[history.length - 1] as any;
+        const lastText = normalizeEntryText(last);
+        if (lastText === normalizedNext) return history;
+        history.push({
+          text: normalizedNext,
+          by,
+          at,
+          source,
+        });
+        return history;
+      };
+
+      if (taskId && normalizedCustomerNote !== undefined && !skipAdam) {
+        try {
+          const mysql = await import('mysql2/promise');
+          const connection = await mysql.createConnection({
+            host: databaseConfig.mysql.host,
+            port: databaseConfig.mysql.port,
+            user: databaseConfig.mysql.user,
+            password: databaseConfig.mysql.password,
+            database: databaseConfig.mysql.database,
+          });
+          try {
+            const [rows]: any = await connection.execute(
+              `SELECT notes FROM app_housekeeping WHERE id = ? LIMIT 1`,
+              [taskId]
+            );
+            const existing = rows?.[0]?.notes;
+            previousAdamCustomerNote = existing == null ? null : String(existing).trim();
+          } finally {
+            await connection.end();
+          }
+        } catch (noteSeedError: any) {
+          console.warn('⚠️ Impossibile leggere note correnti da ADAM:', noteSeedError?.message || noteSeedError);
+        }
+      }
 
       // Carica entrambi da PostgreSQL
       const [containersData, timelineData] = await Promise.all([
@@ -6017,6 +6180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ]);
 
       let taskUpdated = false;
+      let customerNoteChanged = false;
       let editedFields: string[] = [];
       let oldValues: string[] = [];
       let newValues: string[] = [];
@@ -6074,6 +6238,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             newValues.push(String(operationId));
             task.operation_id = operationId;
             task.straordinaria = operationId === CONTINUAZIONE_PS_OPERATION_ID || Boolean(task.straordinaria);
+          }
+          if (normalizedCustomerNote !== undefined && String(task.customer_note ?? '').trim() !== normalizedCustomerNote) {
+            const previousTaskNote = String(task.customer_note ?? '').trim();
+            editedFields.push('customer_note');
+            oldValues.push(previousTaskNote);
+            newValues.push(normalizedCustomerNote);
+            task.customer_note_history = appendCustomerNoteHistory(
+              task.customer_note_history,
+              normalizedCustomerNote,
+              String(currentUsername || 'system'),
+              noteEventAt,
+              'ui',
+              previousTaskNote || previousAdamCustomerNote || null
+            );
+            task.customer_note = normalizedCustomerNote;
+            customerNoteChanged = true;
           }
           taskUpdated = true;
           return true;
@@ -6157,6 +6337,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (operationId !== undefined) {
             updates.push('operation_id = ?');
             values.push(operationId);
+          }
+          if (customerNoteChanged) {
+            updates.push('notes = ?');
+            values.push(normalizedCustomerNote);
           }
 
           if (updates.length > 0) {

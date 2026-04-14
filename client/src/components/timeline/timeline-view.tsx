@@ -1766,6 +1766,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 paxIn: taskEdit.paxIn,
                 paxOut: taskEdit.paxOut,
                 operationId: taskEdit.operationId,
+                customerNote: taskEdit.customerNote,
                 date: workDate,
                 modified_by: currentUser.username || 'system',
                 scope: scopeValue,
