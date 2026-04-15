@@ -140,6 +140,11 @@ export default function TimelineView({
   const displayClickableInputClass =
    "h-9 border-transparent bg-transparent shadow-none focus-visible:ring-0 px-0";
 
+  // Cleaner name box variants:
+  // - left-bar: thin colored stripe
+  // - left-tag: colored left block
+  const CLEANER_BOX_VARIANT: "left-bar" | "left-tag" = "left-bar";
+
   // Calcola gli highlightedTaskIds per la ricerca
   const highlightedTaskIds = (() => {
     if (!searchTask.trim()) return new Set<string>();
@@ -944,9 +949,20 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               const taskType = task.straordinaria ? 'Straordinaria' : task.premium ? 'Premium' : 'Standard';
               const aptType = (task as any).apt_type || (task as any).aptType || (task as any).type_apt || '';
 
-              // Determina priorità
-              const isEarlyOut = Boolean((task as any).early_out || (task as any).earlyOut || (task as any).is_early_out);
-              const isHighPriority = Boolean((task as any).high_priority || (task as any).highPriority || (task as any).is_high_priority);
+              // Determina priorità dai campi canonici (priority/task_priority) con fallback ai flag legacy
+              const rawPriority = String((task as any).priority || (task as any).task_priority || '').toLowerCase().trim();
+              const isEarlyOut =
+                rawPriority === 'early_out' ||
+                rawPriority === 'early-out' ||
+                rawPriority === 'eo' ||
+                rawPriority.includes('early') ||
+                Boolean((task as any).early_out || (task as any).earlyOut || (task as any).is_early_out);
+              const isHighPriority =
+                rawPriority === 'high_priority' ||
+                rawPriority === 'high-priority' ||
+                rawPriority === 'high' ||
+                rawPriority === 'hp' ||
+                Boolean((task as any).high_priority || (task as any).highPriority || (task as any).is_high_priority);
               const priority = isEarlyOut ? 'EO' : isHighPriority ? 'HP' : 'LP';
 
               let fullType = taskType;
@@ -1378,11 +1394,12 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
   // Calcola la larghezza dinamica della colonna cleaners in base all'alias più lungo
   const calculateCleanerColumnWidth = () => {
-    if (cleaners.length === 0) return 96; // default 24 (w-24 = 96px)
+    // Mantieni una colonna stabile anche quando non ci sono cleaner selezionati,
+    // così la griglia oraria non si "sposta" visivamente.
+    if (allCleanersToShow.length === 0) return 128;
 
-    const maxLength = cleaners.reduce((max, cleaner) => {
-      const alias = cleanersAliases[cleaner.id]?.alias ||
-                    `${cleaner.name} ${cleaner.lastname}`;
+    const maxLength = allCleanersToShow.reduce((max, cleaner) => {
+      const alias = cleanersAliases[cleaner.id]?.alias || `${cleaner.name ?? ""} ${cleaner.lastname ?? ""}`.trim();
       return Math.max(max, alias.length);
     }, 0);
 
@@ -1392,7 +1409,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     const charWidth = 7.5; // circa 7.5px per carattere con font bold 13px
     const badgeSpace = 30; // spazio per il badge P/F
 
-    return Math.max(96, baseWidth + (maxLength * charWidth) + badgeSpace);
+    return Math.max(128, baseWidth + (maxLength * charWidth) + badgeSpace);
   };
 
   const cleanerColumnWidth = calculateCleanerColumnWidth();
@@ -1900,7 +1917,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
         <div className="px-4 pt-4 pb-4 overflow-x-auto">
 
 {/* Graffe fasce orarie (EO / HP / LP) sopra gli orari */}
-<div className="flex items-stretch mb-1 px-4 h-[26px]">
+<div className="flex items-stretch mb-0 px-4 h-[26px]">
   {/* colonna pulsante / nome cleaner (vuota per allineamento) */}
   <div
     className="flex-shrink-0 h-full print:hidden"
@@ -1923,12 +1940,16 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
         // Due piani:
         // - LP più su (top più piccolo)
         // - EO + HP più giù (top più grande)
-        const TOP_LP = -6;   // più su (LP)
-        const TOP_MAIN = 12; // EO/HP un filo più giù
+        const TOP_LP = -2;   // LP abbassato leggermente per pareggiare il gap superiore/inferiore
+        const TOP_MAIN = 16; // EO/HP abbassati leggermente per allineamento visivo con gli orari
+
+        // EO deve seguire sempre l'inizio visibile della timeline:
+        // se la timeline si estende verso sinistra, anche il bracket EO si estende.
+        const eoLeft = 0;
 
         const windows = [
           { key: "LP", left: lp1, right: lp2, top: TOP_LP, opacity: 0.65 },
-          { key: "EO", left: eo1, right: eo2, top: TOP_MAIN, opacity: 0.85 },
+          { key: "EO", left: eoLeft, right: eo2, top: TOP_MAIN, opacity: 0.85 },
           { key: "HP", left: hp1, right: hp2, top: TOP_MAIN, opacity: 0.75 },
         ];
 
@@ -1987,11 +2008,22 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 </div>
 
           {/* Header con orari - unico per tutti i cleaner */}
-          <div className="flex items-stretch mb-2 px-4 h-[44px]">
+          <div className="flex items-stretch my-0.5 px-4 h-[40px]">
             <div
-              className="flex-shrink-0 p-1 flex items-center justify-center h-full print:hidden"
+              className="relative flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden"
               style={{ width: `${cleanerColumnWidth}px` }}
             >
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-[38px] z-0"
+              >
+                <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
+                  <path
+                    d="M0,38 C16,38 30,34 44,26 C54,20 60,14 68,10 C72,8 76,7 80,7 C84,7 88,8 92,10 C100,14 106,20 116,26 C130,34 144,38 160,38 Z"
+                    fill="rgba(239,68,68,0.14)"
+                  />
+                </svg>
+              </div>
               <Button
                 onClick={() => setShowClearAllSelectedCleanersDialog(true)}
                 variant="ghost"
@@ -2003,10 +2035,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   clearAllSelectedCleanersMutation.isPending
                 }
                 className={cn(
-                  "w-full h-full border-2",
-                  "border-red-600 dark:border-red-500",
-                  "text-red-700 dark:text-red-200",
-                  "hover:bg-red-50 dark:hover:bg-red-950/30"
+                  "absolute inset-x-0 bottom-0 z-10 h-[38px] w-full rounded-none border-0 bg-transparent p-0",
+                  "text-red-700 dark:text-red-400 hover:bg-transparent hover:text-red-700 dark:hover:text-red-400"
                 )}
                 aria-label="Rimuovi tutti i cleaners convocati"
                 title={
@@ -2019,30 +2049,42 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                         : `Rimuovi tutti i convocati (${cleaners.length})`
                 }
               >
-                <UserMinus className="w-5 h-5" />
+                <UserMinus className="w-4 h-4" />
               </Button>
             </div>
             <div
               ref={timelineRowRef}
-              className="flex-1 h-full"
+              className="flex-1 h-full relative overflow-visible"
               style={{ display: 'grid', gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
             >
               {globalTimeSlots.map((slot, idx) => (
                 <div
                   key={idx}
-                  className="h-full flex items-center justify-center text-center text-xs font-semibold text-foreground border-r border-border px-1"
+                  className="relative h-full"
                 >
-                  {slot}
+                  <span
+                    className="absolute top-[14px] inline-flex flex-col items-center gap-0.5 text-[13px] font-medium tabular-nums leading-none text-foreground whitespace-nowrap"
+                    style={{
+                      left: "0px",
+                      transform: "translateX(-50%)",
+                    }}
+                  >
+                    <span>{slot}</span>
+                  </span>
+                  <div
+                    className="absolute top-[30px] h-[8px] border-l border-slate-500/60 dark:border-white/60 z-10"
+                    style={{ left: "0px" }}
+                  />
                 </div>
               ))}
             </div>
-            <div className="flex-shrink-0 w-20 h-full text-center text-xs font-semibold text-foreground border-l border-border px-1 flex items-center justify-center">
+            <div className="flex-shrink-0 w-20 h-full text-center text-[13px] font-medium text-foreground border-l border-border/70 px-1 flex items-center justify-center">
               Ore lavorate
             </div>
           </div>
 
           {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
-          <div className="flex-1 overflow-auto px-4 pb-4 pt-1">
+          <div className="flex-1 overflow-auto px-4 pb-4 pt-0">
             {allCleanersToShow.length === 0 && !isReadOnly ? (
               <div className="flex items-center justify-center h-64 bg-yellow-100 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
                 <div className="text-center p-6">
@@ -2100,17 +2142,18 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   <div key={cleaner.id} className="flex mb-0.5">
                     {/* Info cleaner */}
                     <div
-                      className="flex-shrink-0 p-1 flex items-center border-2 border-custom-blue bg-custom-blue/10 cursor-pointer hover:opacity-90 transition-opacity"
+                      className="flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-background/95 cursor-pointer hover:bg-muted/35 transition-colors"
                       style={{
                         width: `${cleanerColumnWidth}px`,
                         boxShadow: hasIncompatibleTasks && !isRemoved
-                          ? '0 0 0 3px #EAB308, 0 0 20px 5px rgba(234, 179, 8, 0.6), inset 0 0 15px rgba(234, 179, 8, 0.3)'
-                          : filteredCleanerId === cleaner.id ? '0 0 0 3px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)' : 'none',
-                        transform: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 'scale(1.05)' : 'none',
-                        zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 20 : 'auto',
+                          ? 'inset 0 0 0 2px #EAB308, 0 0 10px 2px rgba(234, 179, 8, 0.35)'
+                          : filteredCleanerId === cleaner.id ? 'inset 0 0 0 2px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)' : 'none',
+                        transform: filteredCleanerId === cleaner.id ? 'scale(1.03)' : hasIncompatibleTasks && !isRemoved ? 'scale(1.01)' : 'none',
+                        zIndex: filteredCleanerId === cleaner.id ? 20 : hasIncompatibleTasks && !isRemoved ? 16 : 'auto',
                         position: 'relative',
                         userSelect: 'none',
                         opacity: isRemoved ? 0.7 : 1,
+                        borderColor: hasIncompatibleTasks && !isRemoved ? '#EAB308' : filteredCleanerId === cleaner.id ? '#3B82F6' : undefined,
                         animation: hasIncompatibleTasks && !isRemoved ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none'
                       }}
                       onClick={(e) => {
@@ -2127,15 +2170,17 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                       }}
                       title={isRemoved ? "Cleaner rimosso - Click per sostituire" : hasIncompatibleTasks ? "⚠️ Cleaner con task incompatibili" : "Click: dettagli | Doppio click: filtra mappa"}
                     >
-                      <div className="w-full flex items-center gap-2">
-                        {/* Pallino colorato identificativo */}
-                        {!isRemoved && (
-                          <div
-                            className="flex-shrink-0 w-3 h-3 rounded-full"
-                            style={{ backgroundColor: getCleanerHexColor(cleaner.id) }}
-                          />
-                        )}
-                        <div className="break-words font-bold text-[13px] flex-1">
+                      {!isRemoved && (
+                        <div
+                          className={cn(
+                            "flex-shrink-0 self-center my-[2px] ml-[2px] h-[calc(100%-4px)] rounded-sm",
+                            CLEANER_BOX_VARIANT === "left-bar" ? "w-1.5" : "w-7"
+                          )}
+                          style={{ backgroundColor: getCleanerHexColor(cleaner.id) }}
+                        />
+                      )}
+                      <div className="min-w-0 w-full flex items-center gap-2 px-2">
+                        <div className="truncate font-semibold text-[13px] leading-none flex-1">
                           {getCleanerDisplayData(cleaner).primaryLabel.toUpperCase()}
                         </div>
                         {isRemoved && (
@@ -2447,7 +2492,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                         const hours = Math.floor(totalMinutes / 60);
                         const minutes = totalMinutes % 60;
                         return (
-                          <span className="text-xs font-semibold text-foreground">
+                          <span className="text-[13px] font-medium tabular-nums text-foreground">
                             {hours}:{String(minutes).padStart(2, '0')}
                           </span>
                         );
@@ -2459,13 +2504,24 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             )}
 
             {/* Riga finale con pulsanti */}
-            <div className="pt-2"></div>
-              <div className="flex items-stretch mb-2 h-[44px]">
+            <div className="pt-0"></div>
+              <div className="relative flex items-stretch mb-0 h-[40px]">
                 {/* Pulsante + sotto il nome dell'ultimo cleaner */}
                 <div
-                  className="flex-shrink-0 p-1 flex items-center justify-center h-full"
+                  className="relative flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible"
                   style={{ width: `${cleanerColumnWidth}px` }}
                 >
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-0 top-0 h-[38px] z-0"
+                  >
+                    <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
+                      <path
+                        d="M0,0 C16,0 30,4 44,12 C54,18 60,24 68,28 C72,30 76,31 80,31 C84,31 88,30 92,28 C100,24 106,18 116,12 C130,4 144,0 160,0 Z"
+                        fill="rgba(59,130,246,0.12)"
+                      />
+                    </svg>
+                  </div>
                   <Button
                     onClick={() => {
                       setCleanerToReplace(null);
@@ -2473,37 +2529,19 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     }}
                     variant="ghost"
                     size="sm"
-                    className="w-full h-full border-2 border-custom-blue"
+                    className="absolute inset-x-0 top-0 z-10 h-[38px] w-full rounded-none border-0 bg-transparent p-0 text-custom-blue hover:bg-transparent hover:text-custom-blue dark:hover:text-custom-blue"
                     disabled={isReadOnly}
                   >
-                    <UserPlus className="w-5 h-5" />
+                    <UserPlus className="w-4 h-4" />
                   </Button>
                 </div>
-                {/* Pulsanti nella riga finale */}
-                <div className="flex-1 p-1 flex gap-2 h-full">
-                  {!isReadOnly && (
-                    <div
-                      className="flex-1 h-full flex items-center justify-center gap-2 px-4 py-2 rounded-md border-2 border-custom-blue bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
-                      data-testid="indicator-autosave"
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                      <span className="text-sm font-medium">Salvataggio automatico attivo</span>
-                    </div>
-                  )}
-                  {isReadOnly && (
-                    <Button
-                      disabled
-                      variant="outline"
-                      className="flex-1 h-full border-2 border-custom-blue bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 cursor-default"
-                    >
-                      📜 Sei in modalità storico
-                    </Button>
-                  )}
+                {/* Colonna timeline: azione a destra */}
+                <div className="flex-1 pl-2 pr-0 h-full grid grid-cols-[1fr_auto] items-center">
                   <Button
                     onClick={() => setShowAdamTransferDialog(true)}
                     size="sm"
                     variant="outline"
-                    className="h-full px-3 border-2 border-custom-blue"
+                    className="col-start-2 justify-self-end h-[38px] px-3 border-2 border-custom-blue"
                     disabled={isReadOnly || !hasTasksInTimeline || isTransferringToAdam}
                     title={
                       isReadOnly
@@ -2524,22 +2562,25 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     {isTransferringToAdam ? "Trasferimento..." : "Trasferisci su ADAM"}
                   </Button>
                 </div>
+                {/* Stato centrato rispetto all'intera riga (inclusa colonna blob sinistra) */}
+                <div
+                  className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 text-sm leading-none font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap"
+                  data-testid="indicator-adam-last-save"
+                >
+                  <CheckCircle className="h-4 w-4 text-custom-blue" />
+                  <span>
+                    {lastAdamTransfer ? `Salvato il ${(() => {
+                      const d = new Date(lastAdamTransfer);
+                      const day = String(d.getDate()).padStart(2, '0');
+                      const month = String(d.getMonth() + 1).padStart(2, '0');
+                      const year = d.getFullYear();
+                      const hours = String(d.getHours()).padStart(2, '0');
+                      const minutes = String(d.getMinutes()).padStart(2, '0');
+                      return `${day}/${month}/${year} alle ${hours}:${minutes}`;
+                    })()}` : "Nessun salvataggio su ADAM"}
+                  </span>
+                </div>
               </div>
-            {lastAdamTransfer && (
-              <div className="flex justify-center px-1 pb-1">
-                <span className="text-xs text-muted-foreground">
-                  Ultimo salvataggio su ADAM: {(() => {
-                    const d = new Date(lastAdamTransfer);
-                    const day = String(d.getDate()).padStart(2, '0');
-                    const month = String(d.getMonth() + 1).padStart(2, '0');
-                    const year = d.getFullYear();
-                    const hours = String(d.getHours()).padStart(2, '0');
-                    const minutes = String(d.getMinutes()).padStart(2, '0');
-                    return `${day}/${month}/${year} - ${hours}:${minutes}`;
-                  })()}
-                </span>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -3537,3 +3578,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     </>
   );
 }
+
+
+
+

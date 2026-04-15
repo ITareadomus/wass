@@ -1136,12 +1136,12 @@ export default function GenerateLogisticsAssignments() {
                     {s?.total ?? 0}
                   </div>
                 </div>
-                <div className="bg-yellow-100 dark:bg-yellow-950/50 rounded-lg p-3 border-2 border-yellow-300 dark:border-yellow-700">
-                  <div className="text-xs text-yellow-700 dark:text-yellow-300 font-medium mb-1">
-                    Premium
+                <div className="bg-gray-100 dark:bg-gray-950/50 rounded-lg p-3 border-2 border-gray-300 dark:border-gray-700">
+                  <div className="text-xs text-gray-700 dark:text-gray-300 font-medium mb-1">
+                    Non Assegnate
                   </div>
-                  <div className="text-2xl font-bold text-yellow-800 dark:text-yellow-200">
-                    {s?.premium ?? 0}
+                  <div className="text-2xl font-bold text-gray-800 dark:text-gray-200">
+                    {s?.total ?? 0}
                   </div>
                 </div>
                 <div className="bg-green-100 dark:bg-green-950/50 rounded-lg p-3 border-2 border-green-300 dark:border-green-700">
@@ -1152,6 +1152,14 @@ export default function GenerateLogisticsAssignments() {
                     {s?.standard ?? 0}
                   </div>
                 </div>
+                <div className="bg-yellow-100 dark:bg-yellow-950/50 rounded-lg p-3 border-2 border-yellow-300 dark:border-yellow-700">
+                  <div className="text-xs text-yellow-700 dark:text-yellow-300 font-medium mb-1">
+                    Premium
+                  </div>
+                  <div className="text-2xl font-bold text-yellow-800 dark:text-yellow-200">
+                    {s?.premium ?? 0}
+                  </div>
+                </div>
                 <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-3 border-2 border-red-300 dark:border-red-700">
                   <div className="text-xs text-red-700 dark:text-red-300 font-medium mb-1">
                     Straordinarie
@@ -1160,11 +1168,11 @@ export default function GenerateLogisticsAssignments() {
                     {s?.straordinarie ?? 0}
                   </div>
                 </div>
-                <div className="bg-gray-100 dark:bg-gray-950/50 rounded-lg p-3 border-2 border-gray-300 dark:border-gray-700 col-span-2 text-center">
-                  <div className="text-xs text-gray-700 dark:text-gray-300 font-medium mb-1">
-                    Non Assegnate
+                <div className="bg-sky-100 dark:bg-sky-950/50 rounded-lg p-3 border-2 border-sky-300 dark:border-sky-700">
+                  <div className="text-xs text-sky-700 dark:text-sky-300 font-medium mb-1">
+                    Logistica
                   </div>
-                  <div className="text-2xl font-bold text-gray-800 dark:text-gray-200">
+                  <div className="text-2xl font-bold text-sky-800 dark:text-sky-200">
                     {s?.total ?? 0}
                   </div>
                 </div>

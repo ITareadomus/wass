@@ -1954,6 +1954,25 @@ export default function GenerateAssignments() {
 
   // Filtra le task non assegnate
   const unassignedTasks = allTasksWithAssignments.filter(task => !(task as any).assignedCleaner);
+  const straordinarieCount = allTasksWithAssignments.filter((t) => isEquivalentStraordinariaTask(t)).length;
+  const standardCount = allTasksWithAssignments.filter(
+    (t) => !isEquivalentStraordinariaTask(t) && !t.premium
+  ).length;
+  const premiumCount = allTasksWithAssignments.filter(
+    (t) => !isEquivalentStraordinariaTask(t) && t.premium
+  ).length;
+  const puliziaUfficioCount = Math.max(0, allTasksWithAssignments.length - straordinarieCount);
+  const puliziaUfficioInternaCount = allTasksWithAssignments.filter((task) => {
+    const taskAny = task as any;
+    const operationId = Number(taskAny.operation_id ?? taskAny.operationId);
+    const operationName = String(
+      taskAny.operation_name ?? taskAny.operationName ?? taskAny.operation_label ?? ""
+    )
+      .toLowerCase()
+      .trim();
+
+    return operationId === 15 || operationName.includes("uffic");
+  }).length;
   const hasAssignedTasks = allTasksWithAssignments.some(task => Boolean((task as any).assignedCleaner));
   const timelinePriorityState = useMemo(() => {
     let hasEoOnTimeline = false;
@@ -2272,7 +2291,7 @@ export default function GenerateAssignments() {
               );
             })()}
 
-          <div className="mt-0 grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="mt-0 grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-2">
               {/* Timeline View */}
               <div data-print-timeline>
@@ -2299,7 +2318,7 @@ export default function GenerateAssignments() {
               <MapSection tasks={allTasksWithAssignments} />
 
               {/* Pannello Statistiche Task */}
-              <div className="bg-card rounded-lg border shadow-sm">
+              <div className="bg-card rounded-lg border-2 border-border shadow-sm box-border overflow-hidden">
                 <div className="p-4 border-b border-border">
                   <h3 className="font-semibold text-foreground flex items-center">
                     <svg
@@ -2319,45 +2338,91 @@ export default function GenerateAssignments() {
                   </h3>
                 </div>
                 <div className="p-4 grid grid-cols-2 gap-3">
-                  {/* Totale Task */}
-                  <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-3 border-2 border-blue-300 dark:border-blue-700">
-                    <div className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">Totale</div>
-                    <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-                      {allTasksWithAssignments.length}
-                    </div>
-                  </div>
+                  {isOfficeScope ? (
+                    <>
+                      {/* Totale Task */}
+                      <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-3 border-2 border-blue-300 dark:border-blue-700">
+                        <div className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">Totale</div>
+                        <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
+                          {allTasksWithAssignments.length}
+                        </div>
+                      </div>
 
-                  {/* Premium */}
-                  <div className="bg-yellow-100 dark:bg-yellow-950/50 rounded-lg p-3 border-2 border-yellow-300 dark:border-yellow-700">
-                    <div className="text-xs text-yellow-700 dark:text-yellow-300 font-medium mb-1">Premium</div>
-                    <div className="text-2xl font-bold text-yellow-800 dark:text-yellow-200">
-                      {allTasksWithAssignments.filter(t => !isEquivalentStraordinariaTask(t) && t.premium).length}
-                    </div>
-                  </div>
+                      {/* Non Assegnate */}
+                      <div className="bg-gray-100 dark:bg-gray-950/50 rounded-lg p-3 border-2 border-gray-300 dark:border-gray-700">
+                        <div className="text-xs text-gray-700 dark:text-gray-300 font-medium mb-1">Non Assegnate</div>
+                        <div className="text-2xl font-bold text-gray-800 dark:text-gray-200">
+                          {unassignedTasks.length}
+                        </div>
+                      </div>
 
-                  {/* Standard */}
-                  <div className="bg-green-100 dark:bg-green-950/50 rounded-lg p-3 border-2 border-green-300 dark:border-green-700">
-                    <div className="text-xs text-green-700 dark:text-green-300 font-medium mb-1">Standard</div>
-                    <div className="text-2xl font-bold text-green-800 dark:text-green-200">
-                      {allTasksWithAssignments.filter(t => !isEquivalentStraordinariaTask(t) && !t.premium).length}
-                    </div>
-                  </div>
+                      {/* Pulizia Ufficio */}
+                      <div className="bg-sky-100 dark:bg-sky-950/50 rounded-lg p-3 border-2 border-sky-300 dark:border-sky-700">
+                        <div className="text-xs text-sky-700 dark:text-sky-300 font-medium mb-1">Pulizia Ufficio</div>
+                        <div className="text-2xl font-bold text-sky-800 dark:text-sky-200">
+                          {puliziaUfficioCount}
+                        </div>
+                      </div>
 
-                  {/* Straordinarie */}
-                  <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-3 border-2 border-red-300 dark:border-red-700">
-                    <div className="text-xs text-red-700 dark:text-red-300 font-medium mb-1">Straordinarie</div>
-                    <div className="text-2xl font-bold text-red-800 dark:text-red-200">
-                      {allTasksWithAssignments.filter(t => isEquivalentStraordinariaTask(t)).length}
-                    </div>
-                  </div>
+                      {/* Pulizia Ufficio Straordinaria */}
+                      <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-3 border-2 border-red-300 dark:border-red-700">
+                        <div className="text-xs text-red-700 dark:text-red-300 font-medium mb-1">Pulizia Ufficio Straordinaria</div>
+                        <div className="text-2xl font-bold text-red-800 dark:text-red-200">
+                          {straordinarieCount}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Totale Task */}
+                      <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-3 border-2 border-blue-300 dark:border-blue-700">
+                        <div className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">Totale</div>
+                        <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
+                          {allTasksWithAssignments.length}
+                        </div>
+                      </div>
 
-                  {/* Non Assegnate */}
-                  <div className="bg-gray-100 dark:bg-gray-950/50 rounded-lg p-3 border-2 border-gray-300 dark:border-gray-700 col-span-2 text-center">
-                    <div className="text-xs text-gray-700 dark:text-gray-300 font-medium mb-1">Non Assegnate</div>
-                    <div className="text-2xl font-bold text-gray-800 dark:text-gray-200">
-                      {unassignedTasks.length}
-                    </div>
-                  </div>
+                      {/* Non Assegnate */}
+                      <div className="bg-gray-100 dark:bg-gray-950/50 rounded-lg p-3 border-2 border-gray-300 dark:border-gray-700">
+                        <div className="text-xs text-gray-700 dark:text-gray-300 font-medium mb-1">Non Assegnate</div>
+                        <div className="text-2xl font-bold text-gray-800 dark:text-gray-200">
+                          {unassignedTasks.length}
+                        </div>
+                      </div>
+
+                      {/* Standard */}
+                      <div className="bg-green-100 dark:bg-green-950/50 rounded-lg p-3 border-2 border-green-300 dark:border-green-700">
+                        <div className="text-xs text-green-700 dark:text-green-300 font-medium mb-1">Standard</div>
+                        <div className="text-2xl font-bold text-green-800 dark:text-green-200">
+                          {standardCount}
+                        </div>
+                      </div>
+
+                      {/* Premium */}
+                      <div className="bg-yellow-100 dark:bg-yellow-950/50 rounded-lg p-3 border-2 border-yellow-300 dark:border-yellow-700">
+                        <div className="text-xs text-yellow-700 dark:text-yellow-300 font-medium mb-1">Premium</div>
+                        <div className="text-2xl font-bold text-yellow-800 dark:text-yellow-200">
+                          {premiumCount}
+                        </div>
+                      </div>
+
+                      {/* Straordinarie */}
+                      <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-3 border-2 border-red-300 dark:border-red-700">
+                        <div className="text-xs text-red-700 dark:text-red-300 font-medium mb-1">Straordinarie</div>
+                        <div className="text-2xl font-bold text-red-800 dark:text-red-200">
+                          {straordinarieCount}
+                        </div>
+                      </div>
+
+                      {/* Pulizia Ufficio Interna */}
+                      <div className="bg-sky-100 dark:bg-sky-950/50 rounded-lg p-3 border-2 border-sky-300 dark:border-sky-700">
+                        <div className="text-xs text-sky-700 dark:text-sky-300 font-medium mb-1">Pulizia Ufficio Interna</div>
+                        <div className="text-2xl font-bold text-sky-800 dark:text-sky-200">
+                          {puliziaUfficioInternaCount}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

@@ -122,6 +122,37 @@ function normalizeCleanerRole(role: string): string {
   return normalized;
 }
 
+function normalizeApartmentValue(value: unknown): string {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return "";
+
+  // Accept labels like "Tipo B" and extract the canonical code.
+  const match = normalized.match(/^tipo\s*([a-z])$/i);
+  if (match?.[1]) return match[1].toUpperCase();
+
+  // Canonical apartment type is a single uppercase letter (A, B, C, ...).
+  return normalized.toUpperCase();
+}
+
+function normalizeTaskPriority(value: unknown): "early_out" | "high_priority" | "low_priority" | null {
+  const priority = String(value ?? "").trim().toLowerCase();
+  if (!priority) return null;
+
+  if (priority === "early_out" || priority === "early-out" || priority === "eo" || priority.includes("early")) {
+    return "early_out";
+  }
+
+  if (priority === "high_priority" || priority === "high-priority" || priority === "high" || priority === "hp") {
+    return "high_priority";
+  }
+
+  if (priority === "low_priority" || priority === "low-priority" || priority === "low" || priority === "lp") {
+    return "low_priority";
+  }
+
+  return null;
+}
+
 function isOfficeTask(task: any): boolean {
   if (typeof task !== "object" || task === null) return false;
 
@@ -187,7 +218,7 @@ function canHandleApartment(cleanerRole: string, task: any): boolean {
   if (!cachedApartmentTypes) return true;
 
   // Extract apartment type from task, checking for common naming conventions.
-  const aptType = task.apt_type || task.aptType;
+  const aptType = normalizeApartmentValue(task.apt_type || task.aptType || task.type_apt);
 
   // If no apartment type is specified in the task, assume it's allowed.
   if (!aptType) return true;
@@ -209,7 +240,8 @@ function canHandleApartment(cleanerRole: string, task: any): boolean {
   }
 
   // Check if the task's apartment type is included in the allowed list for the cleaner's role.
-  return allowedApts.includes(aptType);
+  const normalizedAllowedApts = allowedApts.map(normalizeApartmentValue).filter(Boolean);
+  return normalizedAllowedApts.includes(aptType);
 }
 
 export function canCleanerHandleTaskSync(
@@ -248,7 +280,7 @@ export function canCleanerHandleTaskSync(
 
   // CRITICAL: Check apartment type compatibility FIRST (before priority)
   // Extract apt_type from task (checking common field names)
-  const aptType = task.apt_type || task.aptType || task.type_apt;
+  const aptType = normalizeApartmentValue(task.apt_type || task.aptType || task.type_apt);
   
   if (aptType && cachedApartmentTypes) {
     let allowedApts: string[] = [];
@@ -262,9 +294,10 @@ export function canCleanerHandleTaskSync(
     } else if (roleKey === 'formatore_cleaner') {
       allowedApts = cachedApartmentTypes.formatore_apt || [];
     }
-    
+
+    const normalizedAllowedApts = allowedApts.map(normalizeApartmentValue).filter(Boolean);
     // If the apartment type is NOT in the allowed list, return false
-    if (allowedApts.length > 0 && !allowedApts.includes(aptType)) {
+    if (normalizedAllowedApts.length > 0 && !normalizedAllowedApts.includes(aptType)) {
       return false;
     }
   }
@@ -276,16 +309,16 @@ export function canCleanerHandleTaskSync(
     if (priorityRules) {
       // CRITICAL: Determina la priorità della task dal campo "priority" (stringa)
       // Le task in timeline.json hanno "priority": "early_out" | "high_priority" | "low_priority"
-      const taskPriority = task.priority || task.task_priority;
-      
+      const taskPriority = normalizeTaskPriority(task.priority || task.task_priority);
+
       if (taskPriority === 'early_out' && !priorityRules.early_out) {
         return false;
       }
-      
+
       if (taskPriority === 'high_priority' && !priorityRules.high_priority) {
         return false;
       }
-      
+
       if (taskPriority === 'low_priority' && !priorityRules.low_priority) {
         return false;
       }

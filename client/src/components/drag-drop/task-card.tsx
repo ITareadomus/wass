@@ -2479,7 +2479,10 @@ const displayClickableInputClass =
                       width: cardWidth,
                       minWidth: cardWidth,
                       maxWidth: cardWidth,
+                      height: isInTimeline ? "40px" : undefined,
                       minHeight: "40px",
+                      maxHeight: isInTimeline ? "40px" : undefined,
+                      overflow: isInTimeline ? "visible" : undefined,
                       zIndex: isMapFiltered ? 10 : 'auto',
                       ...(!snapshot.isDragging && isMapFiltered
                         ? { boxShadow: "inset 0 0 0 2px #3b82f6" }
@@ -2615,28 +2618,28 @@ const displayClickableInputClass =
                       })()}
 
                     <div
-                      className="flex flex-col items-start justify-start h-full gap-0 p-[0.5px] pl-0"
+                      className="flex flex-col items-start justify-start h-full gap-0 p-[0.5px] pl-0 overflow-visible"
                     >
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 w-full min-w-0 overflow-visible">
                         <span
-                          className="text-[#ff0000] font-extrabold text-[13px]"
+                          className="text-[#ff0000] font-extrabold text-[13px] shrink-0"
                           data-testid={`task-name-${getTaskKey(task)}`}
                         >
                           {task.name}
                         </span>
                         {(task as any).customer_reference && (
-                          <span className="text-[#ff0000] font-bold text-[11px]">
+                          <span className="text-[#ff0000] font-bold text-[11px] whitespace-nowrap">
                             ({(task as any).customer_reference})
                           </span>
                         )}
                         {(task as any).collaborator_count > 1 && (
-                          <Badge className="bg-purple-500 hover:bg-purple-600 px-0.5 py-0 h-3.5 flex items-center">
+                          <Badge className="bg-purple-500 hover:bg-purple-600 px-0.5 py-0 h-3.5 flex items-center shrink-0">
                             <span className="text-[10px]">👥</span>
                           </Badge>
                         )}
                       </div>
                       {task.alias && (
-                        <span className="opacity-70 leading-none mt-0.5 text-[#000000] font-bold text-[9px]">
+                        <span className="opacity-70 leading-none mt-0.5 text-[#000000] font-bold text-[9px] whitespace-nowrap">
                           {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                         </span>
                       )}

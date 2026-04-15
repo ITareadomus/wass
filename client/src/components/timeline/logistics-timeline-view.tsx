@@ -3,8 +3,8 @@ import {
   RotateCcw,
   Users,
   Loader2,
-  UserMinus,
   UserPlus,
+  UserMinus,
   Truck,
   RefreshCw,
   CheckCircle,
@@ -196,6 +196,11 @@ export default function LogisticsTimelineView({
 
   const displayInputClass =
     "h-9 border-transparent bg-transparent shadow-none focus-visible:ring-0 px-0 pointer-events-none select-none";
+
+  // Driver name box variants:
+  // - left-bar: thin colored stripe
+  // - left-tag: colored left block
+  const DRIVER_BOX_VARIANT: "left-bar" | "left-tag" = "left-bar";
 
   const [driverDetailsOpen, setDriverDetailsOpen] = useState(false);
   const [selectedDriverForDetails, setSelectedDriverForDetails] = useState<LogisticsDriverRow | null>(null);
@@ -418,7 +423,9 @@ export default function LogisticsTimelineView({
   const hasTasksInTimeline = driversAssignments.some((r) => (r.tasks?.length || 0) > 0);
 
   const calculateDriverColumnWidth = () => {
-    if (drivers.length === 0) return 96;
+    // Mantieni una colonna stabile anche senza driver selezionati,
+    // evitando lo shift della griglia oraria.
+    if (drivers.length === 0) return 128;
     const maxLength = drivers.reduce((max, d) => {
       const label =
         driversAliases[d.id]?.alias ||
@@ -430,7 +437,7 @@ export default function LogisticsTimelineView({
     const baseWidth = 60;
     const charWidth = 7.5;
     const badgeSpace = 30;
-    return Math.max(96, baseWidth + maxLength * charWidth + badgeSpace);
+    return Math.max(128, baseWidth + maxLength * charWidth + badgeSpace);
   };
   const driverColumnWidth = calculateDriverColumnWidth();
 
@@ -919,7 +926,7 @@ export default function LogisticsTimelineView({
         </div>
 
         <div className="px-4 pt-4 pb-4 overflow-x-auto">
-          <div className="flex items-stretch mb-1 px-4 h-[26px]">
+          <div className="flex items-stretch mb-0 px-4 h-[26px]">
             <div className="flex-shrink-0 h-full print:hidden" style={{ width: `${driverColumnWidth}px` }} />
             <div className="flex-1 h-full relative">
               {priorityWindows && (
@@ -931,11 +938,15 @@ export default function LogisticsTimelineView({
                     const hp2 = clamp(minutesToPct(timeToMinutes(priorityWindows.HP.end)), 0, 100);
                     const lp1 = clamp(minutesToPct(timeToMinutes(priorityWindows.LP.start)), 0, 100);
                     const lp2 = 100;
-                    const TOP_LP = -6;
-                    const TOP_MAIN = 12;
+                    const TOP_LP = -2;
+                    const TOP_MAIN = 16;
+                    // EO deve seguire sempre l'inizio visibile della timeline:
+                    // se la timeline si estende verso sinistra, anche il bracket EO si estende.
+                    const eoLeft = 0;
+
                     const windows = [
                       { key: "LP" as const, left: lp1, right: lp2, top: TOP_LP, opacity: 0.65 },
-                      { key: "EO" as const, left: eo1, right: eo2, top: TOP_MAIN, opacity: 0.85 },
+                      { key: "EO" as const, left: eoLeft, right: eo2, top: TOP_MAIN, opacity: 0.85 },
                       { key: "HP" as const, left: hp1, right: hp2, top: TOP_MAIN, opacity: 0.75 },
                     ];
                     return windows.map((w) => {
@@ -983,11 +994,22 @@ export default function LogisticsTimelineView({
             <div className="flex-shrink-0 w-20 h-full" />
           </div>
 
-          <div className="flex items-stretch mb-2 px-4 h-[44px]">
+          <div className="flex items-stretch my-0.5 px-4 h-[40px]">
             <div
-              className="flex-shrink-0 p-1 flex items-center justify-center h-full print:hidden"
+              className="relative flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden"
               style={{ width: `${driverColumnWidth}px` }}
             >
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-[38px] z-0"
+              >
+                <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
+                  <path
+                    d="M0,38 C16,38 30,34 44,26 C54,20 60,14 68,10 C72,8 76,7 80,7 C84,7 88,8 92,10 C100,14 106,20 116,26 C130,34 144,38 160,38 Z"
+                    fill="rgba(239,68,68,0.14)"
+                  />
+                </svg>
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -999,10 +1021,8 @@ export default function LogisticsTimelineView({
                 }
                 onClick={() => setShowClearDriversDialog(true)}
                 className={cn(
-                  "w-full h-full border-2",
-                  "border-red-600 dark:border-red-500",
-                  "text-red-700 dark:text-red-200",
-                  "hover:bg-red-50 dark:hover:bg-red-950/30"
+                  "absolute inset-x-0 bottom-0 z-10 h-[38px] w-full rounded-none border-0 bg-transparent p-0",
+                  "text-red-700 dark:text-red-400 hover:bg-transparent hover:text-red-700 dark:hover:text-red-400"
                 )}
                 title={
                   isReadOnly
@@ -1014,29 +1034,41 @@ export default function LogisticsTimelineView({
                         : "Rimuovi tutti i convocati"
                 }
               >
-                <UserMinus className="w-5 h-5" />
+                <UserMinus className="w-4 h-4" />
               </Button>
             </div>
             <div
               ref={timelineRowRef}
-              className="flex-1 h-full grid"
+              className="flex-1 h-full grid relative overflow-visible"
               style={{ gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
             >
               {globalTimeSlots.map((slot, idx) => (
                 <div
                   key={`${slot}-${idx}`}
-                  className="h-full flex items-center justify-center text-center text-xs font-semibold text-foreground border-r border-border px-1"
+                  className="relative h-full"
                 >
-                  {slot}
+                  <span
+                    className="absolute top-[14px] inline-flex flex-col items-center gap-0.5 text-[13px] font-medium tabular-nums leading-none text-foreground whitespace-nowrap"
+                    style={{
+                      left: "0px",
+                      transform: "translateX(-50%)",
+                    }}
+                  >
+                    <span>{slot}</span>
+                  </span>
+                  <div
+                    className="absolute top-[30px] h-[8px] border-l border-slate-500/60 dark:border-white/60 z-10"
+                    style={{ left: "0px" }}
+                  />
                 </div>
               ))}
             </div>
-            <div className="flex-shrink-0 w-20 h-full text-center text-xs font-semibold text-foreground border-l border-border px-1 flex items-center justify-center">
+            <div className="flex-shrink-0 w-20 h-full text-center text-[13px] font-medium text-foreground border-l border-border/70 px-1 flex items-center justify-center">
               Ore lavorate
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto px-4 pb-4 pt-1">
+          <div className="flex-1 overflow-auto px-4 pb-4 pt-0">
             {drivers.length === 0 && !isReadOnly ? (
               <div className="flex items-center justify-center h-64 bg-yellow-100 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
                 <div className="text-center p-6">
@@ -1081,8 +1113,8 @@ export default function LogisticsTimelineView({
                   <div key={driver.id} className="flex mb-0.5">
                     <div
                       className={cn(
-                        "flex-shrink-0 p-1 flex items-center border-2 border-custom-blue bg-custom-blue/10",
-                        "cursor-pointer hover:opacity-90 transition-opacity",
+                        "flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-background/95",
+                        "cursor-pointer hover:bg-muted/35 transition-colors",
                         driver.isRemoved && "opacity-70"
                       )}
                       style={{ width: `${driverColumnWidth}px` }}
@@ -1096,14 +1128,17 @@ export default function LogisticsTimelineView({
                           : "Dettagli driver"
                       }
                     >
-                      <div className="w-full flex items-center gap-2">
-                        {!driver.isRemoved && (
-                          <div
-                            className="flex-shrink-0 w-3 h-3 rounded-full"
-                            style={{ backgroundColor: getCleanerHexColor(driver.id) }}
-                          />
-                        )}
-                        <div className="break-words font-bold text-[13px] flex-1">
+                      {!driver.isRemoved && (
+                        <div
+                          className={cn(
+                            "flex-shrink-0 self-center my-[2px] ml-[2px] h-[calc(100%-4px)] rounded-sm",
+                            DRIVER_BOX_VARIANT === "left-bar" ? "w-1.5" : "w-7"
+                          )}
+                          style={{ backgroundColor: getCleanerHexColor(driver.id) }}
+                        />
+                      )}
+                      <div className="min-w-0 w-full flex items-center gap-2 px-2">
+                        <div className="truncate font-semibold text-[13px] leading-none flex-1">
                           {driversAliases[driver.id]?.alias ||
                             driver.alias ||
                             `${(driver.name || "").toUpperCase()} ${(driver.lastname || "").toUpperCase()}`.trim() ||
@@ -1186,7 +1221,7 @@ export default function LogisticsTimelineView({
                         </div>
                       )}
                     </Droppable>
-                    <div className="flex-shrink-0 w-20 min-h-[45px] border-l border-border flex items-center justify-center text-xs text-muted-foreground">
+                    <div className="flex-shrink-0 w-20 min-h-[45px] border-l border-border flex items-center justify-center text-[13px] font-medium text-foreground">
                       —
                     </div>
                   </div>
@@ -1195,18 +1230,29 @@ export default function LogisticsTimelineView({
             )}
 
             {/* Riga finale: +, indicatore salvataggio / storico, trasferimento ADAM */}
-            <div className="pt-2" />
-            <div className="flex items-stretch mb-2 h-[44px]">
+            <div className="pt-0" />
+            <div className="relative flex items-stretch mb-0 h-[40px]">
               <div
-                className="flex-shrink-0 p-1 flex items-center justify-center h-full print:hidden"
+                className="relative flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden"
                 style={{ width: `${driverColumnWidth}px` }}
               >
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 top-0 h-[38px] z-0"
+                >
+                  <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
+                    <path
+                        d="M0,0 C16,0 30,4 44,12 C54,18 60,24 68,28 C72,30 76,31 80,31 C84,31 88,30 92,28 C100,24 106,18 116,12 C130,4 144,0 160,0 Z"
+                      fill="rgba(59,130,246,0.12)"
+                    />
+                  </svg>
+                </div>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   disabled={isReadOnly}
-                  className="w-full h-full border-2 border-custom-blue"
+                  className="absolute inset-x-0 top-0 z-10 h-[38px] w-full rounded-none border-0 bg-transparent p-0 text-custom-blue hover:bg-transparent hover:text-custom-blue dark:hover:text-custom-blue"
                   aria-label="Aggiungi driver"
                   title="Aggiungi driver"
                   onClick={() => {
@@ -1215,46 +1261,53 @@ export default function LogisticsTimelineView({
                     void loadAvailableDrivers();
                   }}
                 >
-                  <UserPlus className="w-5 h-5" />
+                  <UserPlus className="w-4 h-4" />
                 </Button>
               </div>
-              <div className="flex-1 p-1 flex gap-2 h-full min-h-[44px]">
-                {!isReadOnly && (
-                  <div
-                    className="flex-1 h-full flex items-center justify-center gap-2 px-4 py-2 rounded-md border-2 border-custom-blue bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
-                    data-testid="indicator-logistics-autosave"
-                  >
-                    <CheckCircle className="w-4 h-4 shrink-0" />
-                    <span className="text-sm font-medium">Salvataggio automatico attivo</span>
-                  </div>
-                )}
-                {isReadOnly && (
-                  <Button
-                    disabled
-                    variant="outline"
-                    className="flex-1 h-full border-2 border-custom-blue bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 cursor-default"
-                  >
-                    📜 Sei in modalità storico
-                  </Button>
-                )}
+              <div className="flex-1 pl-2 pr-0 h-full min-h-[44px] grid grid-cols-[1fr_auto] items-center">
+                <Button
+                  onClick={() => setShowAdamTransferDialog(true)}
+                  size="sm"
+                  variant="outline"
+                  className="col-start-2 justify-self-end h-[38px] px-3 border-2 border-custom-blue"
+                  disabled={isReadOnly || !hasTasksInTimeline || isTransferringToAdam}
+                  title={
+                    isReadOnly
+                      ? "Non puoi trasferire in modalità storico"
+                      : !hasTasksInTimeline
+                        ? "Nessuna task assegnata nella timeline"
+                        : "Trasferisci le assegnazioni sul database ADAM"
+                  }
+                  data-testid="button-transfer-logistics-adam"
+                >
+                  {isTransferringToAdam ? (
+                    <RefreshCw className="mr-1 h-4 w-4 animate-spin" />
+                  ) : (
+                    <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                  )}
+                  {isTransferringToAdam ? "Trasferimento..." : "Trasferisci su ADAM"}
+                </Button>
               </div>
-            </div>
-            {lastAdamTransfer && (
-              <div className="flex justify-center px-1 pb-1">
-                <span className="text-xs text-muted-foreground">
-                  Ultimo salvataggio su ADAM:{" "}
-                  {(() => {
+              <div
+                className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 text-sm leading-none font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap"
+                data-testid="indicator-logistics-adam-last-save"
+              >
+                <CheckCircle className="h-4 w-4 text-custom-blue" />
+                <span>
+                  {lastAdamTransfer ? `Salvato il ${(() => {
                     const d = new Date(lastAdamTransfer);
                     const day = String(d.getDate()).padStart(2, "0");
                     const month = String(d.getMonth() + 1).padStart(2, "0");
                     const year = d.getFullYear();
                     const hours = String(d.getHours()).padStart(2, "0");
                     const minutes = String(d.getMinutes()).padStart(2, "0");
-                    return `${day}/${month}/${year} - ${hours}:${minutes}`;
-                  })()}
+                    return `${day}/${month}/${year} alle ${hours}:${minutes}`;
+                  })()}` : "Nessun salvataggio su ADAM"}
                 </span>
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
@@ -1289,37 +1342,70 @@ export default function LogisticsTimelineView({
       </AlertDialog>
 
       <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="sm:max-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Reset assegnazioni logistics?</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <RotateCcw className="w-5 h-5" />
+              Conferma Reset Assegnazioni
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Svuota la timeline per questa data e rigenera i containers da ADAM. I convocati non vengono modificati.
+              <p className="text-base text-foreground font-semibold mb-3">
+                Tutte le task assegnate nella timeline verranno riportate nei containers originali.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Sei sicuro di voler procedere? Questa azione è irreversibile.
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void handleReset()}>Conferma</AlertDialogAction>
+            <AlertDialogCancel
+              onClick={() => setShowResetDialog(false)}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleReset()}
+              className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+            >
+              Ho capito
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <AlertDialog open={showClearDriversDialog} onOpenChange={setShowClearDriversDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="sm:max-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Rimuovere tutti i driver convocati?</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <UserMinus className="w-5 h-5" />
+              Rimuovere tutti i driver convocati?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Svuota la selezione convocati per questa data. Non disponibile se ci sono task in timeline.
+              <p className="text-base text-foreground font-semibold mb-3">
+                Questa azione svuota la selezione convocati per questa data.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Non disponibile se ci sono task in timeline.
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogCancel
+              onClick={() => setShowClearDriversDialog(false)}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setShowClearDriversDialog(false);
                 clearDriversMutation.mutate();
               }}
+              disabled={clearDriversMutation.isPending}
+              className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
             >
-              Conferma
+              Conferma rimozione
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -2000,29 +2086,37 @@ export default function LogisticsTimelineView({
       </Dialog>
 
       <AlertDialog open={confirmRemoveDriverId != null} onOpenChange={(open) => !open && setConfirmRemoveDriverId(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="sm:max-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Rimuovere il driver dalla selezione?</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <UserMinus className="w-5 h-5" />
+              Rimuovere il driver dalla selezione?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmRemoveDriverId != null
-                ? (() => {
-                    const d = drivers.find((x) => x.id === confirmRemoveDriverId);
-                    const label = d
-                      ? `${d.name ?? ""} ${d.lastname ?? ""}`.trim() || `ID ${confirmRemoveDriverId}`
-                      : `ID ${confirmRemoveDriverId}`;
-                    return (
-                      <>
-                        Confermi la rimozione di <strong>{label}</strong> dai convocati per questa data?
-                      </>
-                    );
-                  })()
-                : null}
+              <p className="text-base text-foreground font-semibold mb-3">
+                {confirmRemoveDriverId != null
+                  ? (() => {
+                      const d = drivers.find((x) => x.id === confirmRemoveDriverId);
+                      const label = d
+                        ? `${d.name ?? ""} ${d.lastname ?? ""}`.trim() || `ID ${confirmRemoveDriverId}`
+                        : `ID ${confirmRemoveDriverId}`;
+                      return (
+                        <>
+                          Confermi la rimozione di <strong>{label}</strong> dai convocati per questa data?
+                        </>
+                      );
+                    })()
+                  : null}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Le sue task rimarranno in timeline finché non verrà sostituito.
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="border-2 border-custom-blue">Annulla</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => {
                 if (confirmRemoveDriverId != null) removeDriverMutation.mutate(confirmRemoveDriverId);
               }}
@@ -2036,3 +2130,8 @@ export default function LogisticsTimelineView({
     </>
   );
 }
+
+
+
+
+

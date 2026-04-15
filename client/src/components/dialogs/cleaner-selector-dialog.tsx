@@ -269,9 +269,6 @@ export function CleanerSelectorDialog({
                   <div className="space-y-2">
                     {convocatiCleaners.map((cleaner) => {
                       const isSelected = selectedIds.includes(cleaner.id);
-                      const isPrimary = primaryCleanerId != null
-                        ? cleaner.id === primaryCleanerId
-                        : selectedIds.length > 0 && selectedIds[0] === cleaner.id;
                       const isPreselected = preselectedSet.has(cleaner.id);
                       const displayName = cleaner.lastname
                         ? `${cleaner.name} ${cleaner.lastname}`
@@ -298,9 +295,6 @@ export function CleanerSelectorDialog({
                             <div>
                               <p className="font-semibold">
                                 {displayName}
-                                {isPrimary && (
-                                  <span className="ml-2 text-xs font-bold text-blue-600 dark:text-blue-400">(P)</span>
-                                )}
                                 {isPreselected && (
                                   <span className="ml-2 text-xs font-semibold text-purple-600 dark:text-purple-400">(già selezionato)</span>
                                 )}
@@ -359,9 +353,6 @@ export function CleanerSelectorDialog({
                   <div className="space-y-2">
                     {nonConvocatiCleaners.map((cleaner) => {
                       const isSelected = selectedIds.includes(cleaner.id);
-                      const isPrimary = primaryCleanerId != null
-                        ? cleaner.id === primaryCleanerId
-                        : selectedIds.length > 0 && selectedIds[0] === cleaner.id;
                       const isPreselected = preselectedSet.has(cleaner.id);
                       const displayName = cleaner.lastname
                         ? `${cleaner.name} ${cleaner.lastname}`
@@ -388,9 +379,6 @@ export function CleanerSelectorDialog({
                             <div>
                               <p className="font-semibold">
                                 {displayName}
-                                {isPrimary && (
-                                  <span className="ml-2 text-xs font-bold text-blue-600 dark:text-blue-400">(P)</span>
-                                )}
                                 {isPreselected && (
                                   <span className="ml-2 text-xs font-semibold text-purple-600 dark:text-purple-400">(già selezionato)</span>
                                 )}
