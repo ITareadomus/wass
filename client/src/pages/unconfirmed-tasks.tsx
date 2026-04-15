@@ -433,7 +433,7 @@ export default function UnconfirmedTasks() {
           ) : unconfirmedTasks.length === 0 ? (
             <div className="flex min-h-0 flex-1 flex-col gap-2 md:gap-3">
               <div className="flex min-h-0 flex-1 gap-2 md:gap-3">
-                <div className="flex min-h-0 w-1/3 min-w-0 flex-col overflow-hidden rounded-lg border-2 border-custom-blue p-2 md:p-3">
+                <div className="flex min-h-0 w-[32%] min-w-0 flex-col overflow-hidden rounded-lg border-2 border-custom-blue p-2 md:w-[31%] md:p-3">
                   <div className="relative mb-2 w-full shrink-0">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-custom-blue" />
                     <Input
@@ -447,7 +447,7 @@ export default function UnconfirmedTasks() {
                   <div className="custom-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden md:gap-3" />
                 </div>
 
-                <div className="flex min-h-0 w-2/3 min-w-0 flex-col overflow-hidden rounded-lg border-2 border-custom-blue bg-green-50 dark:bg-green-950/30">
+                <div className="flex min-h-0 w-[68%] min-w-0 flex-col overflow-hidden rounded-lg border-2 border-custom-blue bg-green-50 dark:bg-green-950/30 md:w-[69%]">
                   <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center sm:p-12">
                     <CheckCircle className="h-12 w-12 shrink-0 text-green-500 sm:h-16 sm:w-16" />
                     <h3 className="max-w-2xl text-base font-semibold text-green-800 dark:text-green-200 sm:text-lg">
@@ -486,7 +486,7 @@ export default function UnconfirmedTasks() {
               </div>
 
               <div className="flex min-h-0 flex-1 gap-2 md:gap-3">
-                <div className="flex min-h-0 w-1/3 min-w-0 flex-col overflow-hidden rounded-lg border-2 border-custom-blue p-2 md:p-3">
+                <div className="flex min-h-0 w-[32%] min-w-0 flex-col overflow-hidden rounded-lg border-2 border-custom-blue p-2 md:w-[31%] md:p-3">
                   <div className="relative mb-2 w-full shrink-0">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-custom-blue" />
                     <Input
@@ -518,7 +518,7 @@ export default function UnconfirmedTasks() {
                           key={`${task.task_id}-${task.logistic_code}`}
                           className={`flex cursor-pointer items-center justify-between gap-2 rounded p-2 transition-all hover:opacity-80 md:gap-3 md:p-3 ${
                             selectedTask?.task_id === task.task_id
-                              ? "bg-custom-blue-light border-2 border-custom-blue ring-2 ring-[color:var(--priority-border-color)]/50 shadow-lg"
+                              ? "bg-custom-blue-light border-[3px] border-custom-blue ring-[3px] ring-inset ring-[color:var(--priority-border-color)]/60 shadow-lg"
                               : "bg-custom-blue-light border border-custom-blue"
                           }`}
                           onClick={() => setSelectedTask(task)}
@@ -551,77 +551,75 @@ export default function UnconfirmedTasks() {
                   </div>
                 </div>
 
-                <div className="flex min-h-0 w-2/3 min-w-0 flex-col overflow-hidden rounded-lg border-2 border-custom-blue bg-custom-blue-light p-2 md:p-3">
+                <div className="flex min-h-0 w-[68%] min-w-0 flex-col overflow-hidden rounded-lg border-2 border-custom-blue bg-custom-blue-light p-2 md:w-[69%] md:p-3">
                   {!selectedTask ? (
                     <div className="flex flex-1 items-center justify-center px-2 text-center text-sm text-muted-foreground">
                       Seleziona una task per vedere i dettagli
                     </div>
                   ) : (
                     <div className="custom-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto">
-                      <div className="flex min-h-full flex-col">
-                        <div className="flex shrink-0 items-center justify-between pb-2">
-                          <div className="flex items-center gap-2 md:gap-3">
-                            <Button
+                      <div className="mx-auto flex min-h-full w-full max-w-[36rem] flex-col">
+                        <div className="grid shrink-0 grid-cols-[2rem_1fr_2rem] items-center pb-2 md:grid-cols-[2.25rem_1fr_2.25rem]">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 justify-self-start md:h-9 md:w-9"
+                            onClick={() => navigateTask(-1)}
+                            disabled={currentTaskIndex <= 0}
+                            data-testid="button-prev-task"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <h3 className="flex items-center justify-center gap-1.5 text-base font-semibold md:gap-2 md:text-lg">
+                            Task {String(selectedTask.task_id).padStart(5, "0")}
+                            <Badge
                               variant="outline"
-                              size="icon"
-                              className="h-8 w-8 shrink-0 md:h-9 md:w-9"
-                              onClick={() => navigateTask(-1)}
-                              disabled={currentTaskIndex <= 0}
-                              data-testid="button-prev-task"
-                            >
-                              <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                            <h3 className="flex items-center gap-1.5 text-base font-semibold md:gap-2 md:text-lg">
-                              Task {currentTaskIndex + 1}/{filteredTasks.length}
-                              <Badge
-                                variant="outline"
-                                className={`text-xs shrink-0 px-2 py-0.5 rounded border font-medium ${
-                                  selectedTask.straordinaria
-                                    ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
-                                    : selectedTask.premium
-                                      ? "bg-yellow-500/30 text-yellow-800 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
-                                      : "bg-green-500/30 text-green-800 dark:text-green-200 border-green-600 dark:border-green-400"
-                                }`}
-                              >
-                                {selectedTask.straordinaria
-                                  ? "STRAORDINARIA"
+                              className={`text-xs shrink-0 px-2 py-0.5 rounded border font-medium ${
+                                selectedTask.straordinaria
+                                  ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
                                   : selectedTask.premium
-                                    ? "PREMIUM"
-                                    : "STANDARD"}
-                              </Badge>
-                              {selectedTask.priority && (
-                                <Badge
-                                  className={
-                                    selectedTask.priority === "early_out"
-                                      ? "bg-blue-500 text-white border-blue-700"
-                                      : selectedTask.priority === "high_priority"
-                                        ? "bg-orange-500 text-white border-orange-700"
-                                        : "bg-gray-500 text-white border-gray-700"
-                                  }
-                                >
-                                  {selectedTask.priority === "early_out"
-                                    ? "EO"
-                                    : selectedTask.priority === "high_priority"
-                                      ? "HP"
-                                      : "LP"}
-                                </Badge>
-                              )}
-                            </h3>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8 shrink-0 md:h-9 md:w-9"
-                              onClick={() => navigateTask(1)}
-                              disabled={currentTaskIndex >= filteredTasks.length - 1}
-                              data-testid="button-next-task"
+                                    ? "bg-yellow-500/30 text-yellow-800 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
+                                    : "bg-green-500/30 text-green-800 dark:text-green-200 border-green-600 dark:border-green-400"
+                              }`}
                             >
-                              <ChevronRight className="h-4 w-4" />
-                            </Button>
-                          </div>
+                              {selectedTask.straordinaria
+                                ? "STRAORDINARIA"
+                                : selectedTask.premium
+                                  ? "PREMIUM"
+                                  : "STANDARD"}
+                            </Badge>
+                            {selectedTask.priority && (
+                              <Badge
+                                className={
+                                  selectedTask.priority === "early_out"
+                                    ? "bg-blue-500 text-white border-blue-700"
+                                    : selectedTask.priority === "high_priority"
+                                      ? "bg-orange-500 text-white border-orange-700"
+                                      : "bg-gray-500 text-white border-gray-700"
+                                }
+                              >
+                                {selectedTask.priority === "early_out"
+                                  ? "EO"
+                                  : selectedTask.priority === "high_priority"
+                                    ? "HP"
+                                    : "LP"}
+                              </Badge>
+                            )}
+                          </h3>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 justify-self-end md:h-9 md:w-9"
+                            onClick={() => navigateTask(1)}
+                            disabled={currentTaskIndex >= filteredTasks.length - 1}
+                            data-testid="button-next-task"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
                         </div>
 
-                        <div className="flex min-h-0 flex-1 flex-col justify-between gap-3 px-1 py-1 md:gap-4 md:px-4 md:py-2">
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                        <div className="mx-auto grid h-full min-h-0 w-[calc(100%-4rem)] flex-1 auto-rows-fr content-start gap-2 px-0.5 pt-1 pb-0.5 md:w-[calc(100%-4.5rem)] md:gap-2.5 md:pt-1.5 md:pb-1">
+                          <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] content-start items-start gap-x-3 gap-y-1.5 md:gap-y-2">
                             <div>
                               <p className="text-sm font-semibold text-muted-foreground">Codice ADAM</p>
                               <p className="text-sm">{selectedTask.logistic_code}</p>
@@ -632,7 +630,7 @@ export default function UnconfirmedTasks() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                          <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] content-start items-start gap-x-3 gap-y-1.5 md:gap-y-2">
                             <div>
                               <p className="text-sm font-semibold text-muted-foreground">Indirizzo</p>
                               <p className="text-sm uppercase">{selectedTask.address || "NON MIGRATO"}</p>
@@ -649,7 +647,7 @@ export default function UnconfirmedTasks() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                          <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] content-start items-start gap-x-3 gap-y-1.5 md:gap-y-2">
                             <div>
                               <p className="text-sm font-semibold text-muted-foreground">Check-out</p>
                               <p className="text-sm">
@@ -686,7 +684,7 @@ export default function UnconfirmedTasks() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                          <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] content-start items-start gap-x-3 gap-y-1.5 md:gap-y-2">
                             <div>
                               <p className="text-sm font-semibold text-muted-foreground">Tipologia appartamento</p>
                               <p className="text-sm">{selectedTask.type_apt || "non migrato"}</p>
@@ -745,7 +743,7 @@ export default function UnconfirmedTasks() {
                             </Popover>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                          <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] content-start items-start gap-x-3 gap-y-1.5 md:gap-y-2">
                             <div>
                               <p className="text-sm font-semibold text-muted-foreground">Pax-In</p>
                               <p className="text-sm">{selectedTask.pax_in ?? "non migrato"}</p>

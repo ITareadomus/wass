@@ -2397,27 +2397,35 @@ const displayClickableInputClass =
         </div>
 
         <div className="-mt-0.5">
+          {/** In containers la nota cliente resta solo lettura; in timeline e' modificabile. */}
+          {(() => {
+            const canEditCustomerNote = !isReadOnly && isInTimeline;
+            return (
+              <>
           <p className="text-sm font-semibold text-muted-foreground flex items-center gap-1">
             Note del cliente
-            {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+            {canEditCustomerNote && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
           </p>
           <div
             className={
-              isReadOnly
+              !canEditCustomerNote
                 ? "min-h-9 w-full rounded-md border-transparent bg-transparent px-0 py-1 text-sm text-foreground shadow-none select-none whitespace-pre-wrap break-words"
                 : "min-h-9 w-full rounded-md border-transparent bg-transparent px-0 py-1 text-sm text-foreground shadow-none whitespace-pre-wrap break-words cursor-pointer hover:bg-muted/50"
             }
-            tabIndex={isReadOnly ? -1 : 0}
+            tabIndex={canEditCustomerNote ? 0 : -1}
             onFocus={(e) => {
-              if (isReadOnly) e.currentTarget.blur();
+              if (!canEditCustomerNote) e.currentTarget.blur();
             }}
             onClick={(e) => {
               e.stopPropagation();
-              if (!isReadOnly) handleOpenCustomerNoteDialog();
+              if (canEditCustomerNote) handleOpenCustomerNoteDialog();
             }}
           >
             {customerNoteDisplayText || "—"}
           </div>
+              </>
+            );
+          })()}
         </div>
       </div>
 
