@@ -6104,7 +6104,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
+      const scopeValue = resolveScopeFromReq(req);
       const noteEventAt = new Date().toISOString();
+      const normalizeDateYmd = (value: unknown): string | null => {
+        if (value == null) return null;
+        const raw = String(value).trim();
+        if (!raw) return null;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+        if (raw.includes('T')) {
+          const datePart = raw.split('T')[0];
+          if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart;
+        }
+        const parsed = new Date(raw);
+        if (Number.isNaN(parsed.getTime())) return null;
+        const y = parsed.getFullYear();
+        const m = String(parsed.getMonth() + 1).padStart(2, '0');
+        const d = String(parsed.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      };
+      const parseMinutesFromHm = (value: unknown): number | null => {
+        const raw = String(value ?? '').trim();
+        if (!raw) return null;
+        const match = raw.match(/^(\d{1,2}):(\d{2})/);
+        if (!match) return null;
+        const h = Number(match[1]);
+        const m = Number(match[2]);
+        if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+        if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+        return h * 60 + m;
+      };
+      const isTimeWithinWindow = (minutes: number, start: number, end: number): boolean => {
+        if (start <= end) return minutes >= start && minutes <= end;
+        return minutes >= start || minutes <= end;
+      };
+      const toIntSet = (values: unknown): Set<number> => {
+        if (!Array.isArray(values)) return new Set<number>();
+        return new Set(
+          values
+            .map((v) => Number(v))
+            .filter((n) => Number.isFinite(n))
+        );
+      };
+      const ensureContainersShape = (payload: any, effectiveDate: string) => {
+        const data = payload || {};
+        data.metadata = data.metadata || {};
+        data.metadata.date = effectiveDate;
+        data.containers = data.containers || {};
+        for (const bucket of ['early_out', 'high_priority', 'low_priority']) {
+          const current = data.containers[bucket];
+          if (!current || !Array.isArray(current.tasks)) {
+            data.containers[bucket] = { tasks: [], count: 0 };
+          } else if (typeof current.count !== 'number') {
+            data.containers[bucket].count = current.tasks.length;
+          }
+        }
+        return data;
+      };
+      const recalculateContainersSummary = (payload: any) => {
+        const eo = payload?.containers?.early_out?.tasks?.length || 0;
+        const hp = payload?.containers?.high_priority?.tasks?.length || 0;
+        const lp = payload?.containers?.low_priority?.tasks?.length || 0;
+        payload.containers.early_out.count = eo;
+        payload.containers.high_priority.count = hp;
+        payload.containers.low_priority.count = lp;
+        payload.summary = {
+          ...(payload.summary || {}),
+          total_tasks: eo + hp + lp,
+          early_out: eo,
+          high_priority: hp,
+          low_priority: lp,
+        };
+      };
+      const classifyContainerPriority = (
+        task: any,
+        appSettings: any
+      ): 'early_out' | 'high_priority' | 'low_priority' => {
+        const earlyOutConfig = appSettings?.['early-out'] || {};
+        const highPriorityConfig = appSettings?.['high-priority'] || {};
+
+        const eoStart = parseMinutesFromHm(earlyOutConfig?.eo_start_time) ?? (10 * 60);
+        const eoEnd = parseMinutesFromHm(earlyOutConfig?.eo_end_time) ?? (10 * 60 + 59);
+        const hpStart = parseMinutesFromHm(highPriorityConfig?.hp_start_time) ?? (11 * 60);
+        const hpEnd =
+          parseMinutesFromHm(highPriorityConfig?.hp_end_time) ??
+          parseMinutesFromHm(highPriorityConfig?.hp_time) ??
+          (15 * 60 + 30);
+
+        const clientIdNum = Number(task?.client_id);
+        const isPremium = Boolean(task?.premium);
+        const eoClients = toIntSet(earlyOutConfig?.eo_clients);
+        const hpClients = toIntSet(highPriorityConfig?.hp_clients);
+
+        const checkoutMinutes = parseMinutesFromHm(task?.checkout_time);
+        const checkinMinutes = parseMinutesFromHm(task?.checkin_time);
+        const checkinYmd = normalizeDateYmd(task?.checkin_date);
+        const checkoutYmd = normalizeDateYmd(task?.checkout_date);
+        const sameDayTurnover =
+          Boolean(checkinYmd) &&
+          Boolean(checkoutYmd) &&
+          checkinYmd === checkoutYmd;
+
+        const eoByTime =
+          checkoutMinutes != null &&
+          (isTimeWithinWindow(checkoutMinutes, eoStart, eoEnd) || checkoutMinutes < eoStart);
+        const eoByClient = Number.isFinite(clientIdNum) && eoClients.has(clientIdNum);
+        if (eoByTime || eoByClient) return 'early_out';
+
+        const hpByTime =
+          sameDayTurnover &&
+          checkinMinutes != null &&
+          isTimeWithinWindow(checkinMinutes, hpStart, hpEnd);
+        const hpByClient = Number.isFinite(clientIdNum) && hpClients.has(clientIdNum);
+        if (hpByTime || isPremium || hpByClient) return 'high_priority';
+
+        return 'low_priority';
+      };
       let previousAdamCustomerNote: string | null = null;
       const appendCustomerNoteHistory = (
         historyRaw: unknown,
@@ -6174,16 +6288,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Carica entrambi da PostgreSQL
-      const [containersData, timelineData] = await Promise.all([
-        workspaceFiles.loadContainers(workDate, resolveScopeFromReq(req)).then(d => d || { containers: {} }),
-        workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req)).then(d => d || { cleaners_assignments: [] })
+      const [containersDataRaw, timelineData] = await Promise.all([
+        workspaceFiles.loadContainers(workDate, scopeValue).then(d => d || { containers: {} }),
+        workspaceFiles.loadTimeline(workDate, scopeValue).then(d => d || { cleaners_assignments: [] })
       ]);
+      const containersData = ensureContainersShape(containersDataRaw, workDate);
+      const { pgSettingsService } = await import("./services/pg-settings-service");
+      const appSettings = await pgSettingsService.getSettings('app_settings').catch(() => ({}));
 
       let taskUpdated = false;
       let customerNoteChanged = false;
       let editedFields: string[] = [];
       let oldValues: string[] = [];
       let newValues: string[] = [];
+      let updatedContainerTask: any | null = null;
+      let updatedContainerSourceType: 'early_out' | 'high_priority' | 'low_priority' | null = null;
 
       // Funzione helper per aggiornare una task - SOLO i campi forniti
       // Traccia anche le modifiche per la history
@@ -6263,12 +6382,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Aggiorna nei containers
       if (containersData.containers) {
-        for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
+        for (const containerType of ['early_out', 'high_priority', 'low_priority'] as const) {
           const container = containersData.containers[containerType];
-          if (container?.tasks) {
-            container.tasks.forEach(updateTask);
+          if (!container?.tasks) continue;
+          for (const candidateTask of container.tasks) {
+            if (updateTask(candidateTask)) {
+              updatedContainerTask = candidateTask;
+              updatedContainerSourceType = containerType;
+            }
           }
         }
+      }
+
+      if (updatedContainerTask && updatedContainerSourceType) {
+        const destinationPriority = classifyContainerPriority(updatedContainerTask, appSettings || {});
+        const destinationDate = normalizeDateYmd(updatedContainerTask.checkout_date) || workDate;
+        const sourceBuckets = ['early_out', 'high_priority', 'low_priority'] as const;
+
+        for (const bucket of sourceBuckets) {
+          const currentTasks = containersData.containers?.[bucket]?.tasks;
+          if (!Array.isArray(currentTasks)) continue;
+          containersData.containers[bucket].tasks = currentTasks.filter(
+            (t: any) => String(t?.task_id) !== String(updatedContainerTask?.task_id)
+          );
+        }
+
+        if (destinationDate === workDate) {
+          updatedContainerTask.priority = destinationPriority;
+          containersData.containers[destinationPriority].tasks.push(updatedContainerTask);
+        } else {
+          let targetContainersData = await workspaceFiles.loadContainers(destinationDate, scopeValue);
+          targetContainersData = ensureContainersShape(targetContainersData || { containers: {} }, destinationDate);
+
+          for (const bucket of sourceBuckets) {
+            const currentTasks = targetContainersData.containers?.[bucket]?.tasks;
+            if (!Array.isArray(currentTasks)) continue;
+            targetContainersData.containers[bucket].tasks = currentTasks.filter(
+              (t: any) => String(t?.task_id) !== String(updatedContainerTask?.task_id)
+            );
+          }
+
+          const taskForDestination = {
+            ...updatedContainerTask,
+            priority: destinationPriority,
+          };
+          targetContainersData.containers[destinationPriority].tasks.push(taskForDestination);
+          recalculateContainersSummary(targetContainersData);
+          await workspaceFiles.saveContainers(destinationDate, targetContainersData, 'system', 'manual', scopeValue);
+        }
+        recalculateContainersSummary(containersData);
       }
 
       // Aggiorna in timeline
@@ -6292,10 +6454,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } : undefined;
 
       // Salva containers (PostgreSQL)
-      await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', resolveScopeFromReq(req));
+      await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', scopeValue);
       
       // Salva timeline con tracking delle modifiche (skipRevision=false per creare revision in PostgreSQL)
-      await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'task_edit', editOptions, resolveScopeFromReq(req));
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'task_edit', editOptions, scopeValue);
 
       // CRITICAL: Propaga le modifiche al database ADAM (app_housekeeping)
       // SOLO se skipAdam non è true

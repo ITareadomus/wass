@@ -160,6 +160,43 @@ export class PgDailyAssignmentsService {
     return String(scope || '').toLowerCase() === 'office' ? 'office' : 'housekeeping';
   }
 
+  private getDuplicateGroupId(logisticCode: unknown): string | null {
+    if (logisticCode == null) return null;
+    const rawCode = String(logisticCode).trim();
+    if (!rawCode) return null;
+    const numericCode = Number(rawCode);
+    if (Number.isFinite(numericCode)) {
+      return String(numericCode);
+    }
+    return rawCode;
+  }
+
+  private annotateActiveDuplicateMetadata(tasksByPriority: { [key: string]: any[] }): void {
+    const allTasks = [
+      ...(tasksByPriority.early_out || []),
+      ...(tasksByPriority.high_priority || []),
+      ...(tasksByPriority.low_priority || []),
+    ];
+    const activeGroupCounts = new Map<string, number>();
+
+    for (const task of allTasks) {
+      const duplicateGroupId = this.getDuplicateGroupId(task?.logistic_code);
+      if (!duplicateGroupId) continue;
+      if (task?.locked) continue;
+      activeGroupCounts.set(duplicateGroupId, (activeGroupCounts.get(duplicateGroupId) || 0) + 1);
+    }
+
+    for (const task of allTasks) {
+      const duplicateGroupId = this.getDuplicateGroupId(task?.logistic_code);
+      const duplicateGroupSizeActive = duplicateGroupId
+        ? (activeGroupCounts.get(duplicateGroupId) || 0)
+        : 0;
+      task.duplicate_group_id = duplicateGroupId ?? undefined;
+      task.duplicate_group_size_active = duplicateGroupSizeActive;
+      task.is_duplicate_active = !task?.locked && duplicateGroupSizeActive > 1;
+    }
+  }
+
   /**
    * Ensure aliases and selected_cleaners_revisions tables exist
    */
@@ -1978,6 +2015,8 @@ export class PgDailyAssignmentsService {
       }
 
       // Build structure matching create_containers.py format
+      this.annotateActiveDuplicateMetadata(tasksByPriority);
+
       const containers = {
         early_out: {
           tasks: tasksByPriority.early_out,
@@ -2134,6 +2173,8 @@ export class PgDailyAssignmentsService {
         }
       }
 
+      this.annotateActiveDuplicateMetadata(tasksByPriority);
+
       const containers = {
         early_out: { tasks: tasksByPriority.early_out, count: tasksByPriority.early_out.length },
         high_priority: { tasks: tasksByPriority.high_priority, count: tasksByPriority.high_priority.length },
@@ -2179,8 +2220,6 @@ export class PgDailyAssignmentsService {
 
       const containers = containersData?.containers || {};
       let totalInserted = 0;
-      const autoDuplicateLockReason = 'task doppio (bloccato automaticamente)';
-      const autoDuplicateLockedBy = 'system:auto_duplicate_adam';
 
       // Define priority mappings (support both naming conventions)
       const priorityConfigs = [
@@ -2257,169 +2296,6 @@ export class PgDailyAssignmentsService {
         }
       }
 
-      // ==================== AUTO-LOCK DUPLICATI ADAM (logistic_code) ====================
-      // Regola: per ogni logistic_code duplicato (escludi 0/null), tieni:
-      // - PRIMA: il task con confirmed_operation=true E operation_id valorizzato
-      // - ALTRIMENTI: il task_id più alto (proxy "più recente")
-      // blocca automaticamente tutti gli altri con locked_reason specifico.
-      // Questo evita che l'optimizer assegni più task con lo stesso codice ADAM.
-      const lockDupesUpdate = await client.query(`
-        WITH ranked AS (
-          SELECT
-            work_date,
-            logistic_code,
-            task_id,
-            ROW_NUMBER() OVER (
-              PARTITION BY work_date, logistic_code
-              ORDER BY
-                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
-                task_id DESC
-            ) AS rn
-          FROM daily_containers
-          WHERE work_date = $1
-            AND logistic_code IS NOT NULL
-            AND logistic_code <> 0
-            AND COALESCE(scope, 'housekeeping') = $3
-        ),
-        to_lock AS (
-          SELECT DISTINCT work_date, task_id
-          FROM ranked
-          WHERE rn > 1
-        ),
-        winners AS (
-          SELECT work_date, task_id
-          FROM ranked
-          WHERE rn = 1
-        )
-        UPDATE daily_containers dc
-        SET locked = TRUE,
-            locked_reason = $2
-        FROM to_lock tl
-        WHERE dc.work_date = tl.work_date
-          AND dc.task_id = tl.task_id
-          AND COALESCE(dc.locked, FALSE) = FALSE
-      `, [workDate, autoDuplicateLockReason, normalizedScope]);
-
-      const lockDupesUpsert = await client.query(`
-        WITH ranked AS (
-          SELECT
-            work_date,
-            logistic_code,
-            task_id,
-            ROW_NUMBER() OVER (
-              PARTITION BY work_date, logistic_code
-              ORDER BY
-                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
-                task_id DESC
-            ) AS rn
-          FROM daily_containers
-          WHERE work_date = $1
-            AND logistic_code IS NOT NULL
-            AND logistic_code <> 0
-            AND COALESCE(scope, 'housekeeping') = $4
-        ),
-        to_lock AS (
-          SELECT DISTINCT work_date, task_id
-          FROM ranked
-          WHERE rn > 1
-        )
-        INSERT INTO daily_task_locks (work_date, task_id, locked, locked_reason, locked_by)
-        SELECT
-          work_date,
-          task_id,
-          TRUE,
-          $2,
-          $3
-        FROM to_lock
-        ON CONFLICT (work_date, task_id) DO UPDATE
-        SET
-          locked = TRUE,
-          locked_reason = CASE
-            WHEN daily_task_locks.locked_reason IS NULL OR daily_task_locks.locked_reason = ''
-              THEN EXCLUDED.locked_reason
-            ELSE daily_task_locks.locked_reason
-          END,
-          locked_by = COALESCE(daily_task_locks.locked_by, EXCLUDED.locked_by),
-          updated_at = NOW()
-      `, [workDate, autoDuplicateLockReason, autoDuplicateLockedBy, normalizedScope]);
-
-      // Se un task era stato auto-lockato in passato ma ora è il "winner",
-      // sbloccalo (solo se il lock era quello automatico da doppione).
-      await client.query(`
-        WITH ranked AS (
-          SELECT
-            work_date,
-            logistic_code,
-            task_id,
-            ROW_NUMBER() OVER (
-              PARTITION BY work_date, logistic_code
-              ORDER BY
-                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
-                task_id DESC
-            ) AS rn
-          FROM daily_containers
-          WHERE work_date = $1
-            AND logistic_code IS NOT NULL
-            AND logistic_code <> 0
-            AND COALESCE(scope, 'housekeeping') = $3
-        ),
-        winners AS (
-          SELECT DISTINCT work_date, task_id
-          FROM ranked
-          WHERE rn = 1
-        )
-        UPDATE daily_containers dc
-        SET locked = FALSE,
-            locked_reason = NULL
-        FROM winners w
-        WHERE dc.work_date = w.work_date
-          AND dc.task_id = w.task_id
-          AND dc.locked = TRUE
-          AND dc.locked_reason = $2
-      `, [workDate, autoDuplicateLockReason, normalizedScope]);
-
-      await client.query(`
-        WITH ranked AS (
-          SELECT
-            work_date,
-            logistic_code,
-            task_id,
-            ROW_NUMBER() OVER (
-              PARTITION BY work_date, logistic_code
-              ORDER BY
-                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
-                task_id DESC
-            ) AS rn
-          FROM daily_containers
-          WHERE work_date = $1
-            AND logistic_code IS NOT NULL
-            AND logistic_code <> 0
-            AND COALESCE(scope, 'housekeeping') = $4
-        ),
-        winners AS (
-          SELECT DISTINCT work_date, task_id
-          FROM ranked
-          WHERE rn = 1
-        )
-        UPDATE daily_task_locks l
-        SET locked = FALSE,
-            locked_reason = NULL,
-            locked_by = $3,
-            updated_at = NOW()
-        FROM winners w
-        WHERE l.work_date = w.work_date
-          AND l.task_id = w.task_id
-          AND l.locked = TRUE
-          AND l.locked_reason = $2
-          AND l.locked_by = $3
-      `, [workDate, autoDuplicateLockReason, autoDuplicateLockedBy, normalizedScope]);
-
-      if ((lockDupesUpdate.rowCount || 0) > 0 || (lockDupesUpsert.rowCount || 0) > 0) {
-        console.log(
-          `🔒 PG: Auto-lock duplicati ADAM per ${workDate} -> containers_locked=${lockDupesUpdate.rowCount || 0}, locks_upserted=${lockDupesUpsert.rowCount || 0}`
-        );
-      }
-
       await client.query('COMMIT');
       console.log(`✅ PG: Containers salvati per ${workDate} (${totalInserted} task)`);
       return true;
@@ -2434,14 +2310,12 @@ export class PgDailyAssignmentsService {
 
   async saveLogisticsContainers(workDate: string, containersData: any): Promise<boolean> {
     const client = await pool.connect();
-    const autoDuplicateLockedBy = 'system:auto_duplicate_adam_logistics';
     try {
       await client.query('BEGIN');
       await client.query('DELETE FROM lg_containers WHERE work_date = $1', [workDate]);
 
       const containers = containersData?.containers || {};
       let totalInserted = 0;
-      const autoDuplicateLockReason = 'task doppio (bloccato automaticamente)';
 
       const priorityConfigs = [
         { dbName: 'early_out', keys: ['early_out'] },
@@ -2508,97 +2382,6 @@ export class PgDailyAssignmentsService {
           ]);
           totalInserted++;
         }
-      }
-
-      const lockDupesUpdate = await client.query(`
-        WITH ranked AS (
-          SELECT work_date, logistic_code, task_id,
-            ROW_NUMBER() OVER (
-              PARTITION BY work_date, logistic_code
-              ORDER BY
-                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
-                task_id DESC
-            ) AS rn
-          FROM lg_containers
-          WHERE work_date = $1 AND logistic_code IS NOT NULL AND logistic_code <> 0
-        ),
-        to_lock AS (SELECT work_date, task_id FROM ranked WHERE rn > 1)
-        UPDATE lg_containers dc
-        SET locked = TRUE, locked_reason = $2
-        FROM to_lock tl
-        WHERE dc.work_date = tl.work_date AND dc.task_id = tl.task_id
-          AND COALESCE(dc.locked, FALSE) = FALSE
-      `, [workDate, autoDuplicateLockReason]);
-
-      const lockDupesUpsert = await client.query(`
-        WITH ranked AS (
-          SELECT work_date, logistic_code, task_id,
-            ROW_NUMBER() OVER (
-              PARTITION BY work_date, logistic_code
-              ORDER BY
-                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
-                task_id DESC
-            ) AS rn
-          FROM lg_containers
-          WHERE work_date = $1 AND logistic_code IS NOT NULL AND logistic_code <> 0
-        ),
-        to_lock AS (SELECT work_date, task_id FROM ranked WHERE rn > 1)
-        INSERT INTO daily_task_locks (work_date, task_id, locked, locked_reason, locked_by)
-        SELECT work_date, task_id, TRUE, $2, $3 FROM to_lock
-        ON CONFLICT (work_date, task_id) DO UPDATE SET
-          locked = TRUE,
-          locked_reason = CASE
-            WHEN daily_task_locks.locked_reason IS NULL OR daily_task_locks.locked_reason = ''
-              THEN EXCLUDED.locked_reason
-            ELSE daily_task_locks.locked_reason END,
-          locked_by = COALESCE(daily_task_locks.locked_by, EXCLUDED.locked_by),
-          updated_at = NOW()
-      `, [workDate, autoDuplicateLockReason, autoDuplicateLockedBy]);
-
-      await client.query(`
-        WITH ranked AS (
-          SELECT work_date, logistic_code, task_id,
-            ROW_NUMBER() OVER (
-              PARTITION BY work_date, logistic_code
-              ORDER BY
-                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
-                task_id DESC
-            ) AS rn
-          FROM lg_containers
-          WHERE work_date = $1 AND logistic_code IS NOT NULL AND logistic_code <> 0
-        ),
-        winners AS (SELECT work_date, task_id FROM ranked WHERE rn = 1)
-        UPDATE lg_containers dc
-        SET locked = FALSE, locked_reason = NULL
-        FROM winners w
-        WHERE dc.work_date = w.work_date AND dc.task_id = w.task_id
-          AND dc.locked = TRUE AND dc.locked_reason = $2
-      `, [workDate, autoDuplicateLockReason]);
-
-      await client.query(`
-        WITH ranked AS (
-          SELECT work_date, logistic_code, task_id,
-            ROW_NUMBER() OVER (
-              PARTITION BY work_date, logistic_code
-              ORDER BY
-                CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
-                task_id DESC
-            ) AS rn
-          FROM lg_containers
-          WHERE work_date = $1 AND logistic_code IS NOT NULL AND logistic_code <> 0
-        ),
-        winners AS (SELECT work_date, task_id FROM ranked WHERE rn = 1)
-        UPDATE daily_task_locks l
-        SET locked = FALSE, locked_reason = NULL, locked_by = $3, updated_at = NOW()
-        FROM winners w
-        WHERE l.work_date = w.work_date AND l.task_id = w.task_id
-          AND l.locked = TRUE AND l.locked_reason = $2 AND l.locked_by = $3
-      `, [workDate, autoDuplicateLockReason, autoDuplicateLockedBy]);
-
-      if ((lockDupesUpdate.rowCount || 0) > 0 || (lockDupesUpsert.rowCount || 0) > 0) {
-        console.log(
-          `🔒 PG: Auto-lock duplicati logistics ${workDate} -> rows=${lockDupesUpdate.rowCount || 0}, locks=${lockDupesUpsert.rowCount || 0}`
-        );
       }
 
       await client.query('COMMIT');
@@ -2677,150 +2460,6 @@ export class PgDailyAssignmentsService {
         task.locked || false,
         task.locked_reason || null
       ]);
-
-      // Se reinseriamo una task nei containers e crea un doppione per logistic_code,
-      // blocca automaticamente tutti i doppioni (tenendo il task_id più alto).
-      const autoDuplicateLockReason = 'task doppio (bloccato automaticamente)';
-      const autoDuplicateLockedBy = 'system:auto_duplicate_adam';
-      const lc = Number(task.logistic_code || 0);
-      if (Number.isFinite(lc) && lc !== 0) {
-        await query(`
-          WITH ranked AS (
-            SELECT
-              work_date,
-              logistic_code,
-              task_id,
-              ROW_NUMBER() OVER (
-                PARTITION BY work_date, logistic_code
-                ORDER BY
-                  CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
-                  task_id DESC
-              ) AS rn
-            FROM daily_containers
-            WHERE work_date = $1
-              AND logistic_code = $2
-          ),
-          to_lock AS (
-            SELECT work_date, task_id
-            FROM ranked
-            WHERE rn > 1
-          )
-          UPDATE daily_containers dc
-          SET locked = TRUE,
-              locked_reason = $3
-          FROM to_lock tl
-          WHERE dc.work_date = tl.work_date
-            AND dc.task_id = tl.task_id
-            AND COALESCE(dc.locked, FALSE) = FALSE
-        `, [workDate, lc, autoDuplicateLockReason]);
-
-        await query(`
-          WITH ranked AS (
-            SELECT
-              work_date,
-              logistic_code,
-              task_id,
-              ROW_NUMBER() OVER (
-                PARTITION BY work_date, logistic_code
-                ORDER BY
-                  CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
-                  task_id DESC
-              ) AS rn
-            FROM daily_containers
-            WHERE work_date = $1
-              AND logistic_code = $2
-          ),
-          to_lock AS (
-            SELECT work_date, task_id
-            FROM ranked
-            WHERE rn > 1
-          )
-          INSERT INTO daily_task_locks (work_date, task_id, locked, locked_reason, locked_by)
-          SELECT
-            work_date,
-            task_id,
-            TRUE,
-            $3,
-            $4
-          FROM to_lock
-          ON CONFLICT (work_date, task_id) DO UPDATE
-          SET
-            locked = TRUE,
-            locked_reason = CASE
-              WHEN daily_task_locks.locked_reason IS NULL OR daily_task_locks.locked_reason = ''
-                THEN EXCLUDED.locked_reason
-              ELSE daily_task_locks.locked_reason
-            END,
-            locked_by = COALESCE(daily_task_locks.locked_by, EXCLUDED.locked_by),
-            updated_at = NOW()
-        `, [workDate, lc, autoDuplicateLockReason, autoDuplicateLockedBy]);
-
-        // Reconcile: se il "winner" per questo logistic_code era auto-lockato, sbloccalo.
-        await query(`
-          WITH ranked AS (
-            SELECT
-              work_date,
-              logistic_code,
-              task_id,
-              ROW_NUMBER() OVER (
-                PARTITION BY work_date, logistic_code
-                ORDER BY
-                  CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
-                  task_id DESC
-              ) AS rn
-            FROM daily_containers
-            WHERE work_date = $1
-              AND logistic_code = $2
-          ),
-          winner AS (
-            SELECT work_date, task_id
-            FROM ranked
-            WHERE rn = 1
-          )
-          UPDATE daily_containers dc
-          SET locked = FALSE,
-              locked_reason = NULL
-          FROM winner w
-          WHERE dc.work_date = w.work_date
-            AND dc.task_id = w.task_id
-            AND dc.locked = TRUE
-            AND dc.locked_reason = $3
-        `, [workDate, lc, autoDuplicateLockReason]);
-
-        await query(`
-          WITH ranked AS (
-            SELECT
-              work_date,
-              logistic_code,
-              task_id,
-              ROW_NUMBER() OVER (
-                PARTITION BY work_date, logistic_code
-                ORDER BY
-                  CASE WHEN confirmed_operation = true AND operation_id IS NOT NULL THEN 1 ELSE 0 END DESC,
-                  task_id DESC
-              ) AS rn
-            FROM daily_containers
-            WHERE work_date = $1
-              AND logistic_code = $2
-          ),
-          winner AS (
-            SELECT work_date, task_id
-            FROM ranked
-            WHERE rn = 1
-          )
-          UPDATE daily_task_locks l
-          SET locked = FALSE,
-              locked_reason = NULL,
-              locked_by = $4,
-              updated_at = NOW()
-          FROM winner w
-          WHERE l.work_date = w.work_date
-            AND l.task_id = w.task_id
-            AND l.locked = TRUE
-            AND l.locked_reason = $3
-            AND l.locked_by = $4
-        `, [workDate, lc, autoDuplicateLockReason, autoDuplicateLockedBy]);
-      }
 
       console.log(`✅ PG: Task ${task.task_id} aggiunto ai containers (${priority}) per ${workDate}`);
       return true;

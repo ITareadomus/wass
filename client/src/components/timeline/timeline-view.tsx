@@ -2785,7 +2785,15 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       </Dialog>
 
       {/* Confirmation Dialog for Cleaner Removal */}
-      <Dialog open={confirmRemovalDialog.open} onOpenChange={(open) => setConfirmRemovalDialog({ open, cleanerId: null })}>
+      <Dialog
+        open={confirmRemovalDialog.open}
+        onOpenChange={(open) =>
+          setConfirmRemovalDialog((prev) => ({
+            open,
+            cleanerId: open ? prev.cleanerId : null,
+          }))
+        }
+      >
         <DialogContent className="sm:max-md">
           <DialogHeader>
             <DialogTitle>Conferma Rimozione Cleaner</DialogTitle>
@@ -2807,6 +2815,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             <Button
               onClick={handleConfirmRemoveCleaner}
               variant="outline"
+              disabled={!confirmRemovalDialog.cleanerId || removeCleanerMutation.isPending}
               className="border-2 border-custom-blue hover:bg-accent hover:text-accent-foreground"
             >
               Conferma Rimozione
