@@ -59,6 +59,9 @@ interface LogisticsTask {
   confirmed_operation?: boolean | number | null;
   locked?: boolean | null;
   locked_reason?: string | null;
+  duplicate_group_id?: string | null;
+  duplicate_group_size_active?: number | null;
+  is_duplicate_active?: boolean | null;
   checkout_date?: string | null;
   checkout_time?: string | null;
   checkin_date?: string | null;
@@ -121,7 +124,11 @@ function convertLogisticsRawToTask(
   const confirmed_operation =
     typeof co === "boolean" ? co : typeof co === "number" ? co !== 0 : undefined;
 
-  return {
+  const convertedTask: TaskType & {
+    duplicate_group_id?: string;
+    duplicate_group_size_active?: number;
+    is_duplicate_active?: boolean;
+  } = {
     id,
     name,
     alias: raw.alias ?? undefined,
@@ -153,6 +160,12 @@ function convertLogisticsRawToTask(
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+
+  convertedTask.duplicate_group_id =
+    raw.duplicate_group_id != null ? String(raw.duplicate_group_id) : undefined;
+  convertedTask.duplicate_group_size_active = Number(raw.duplicate_group_size_active || 0);
+  convertedTask.is_duplicate_active = Boolean(raw.is_duplicate_active);
+  return convertedTask as TaskType;
 }
 
 /** Stessa logica di evidenziazione ricerca usata in generate-assignments (PriorityColumn + TaskCard). */

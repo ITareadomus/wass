@@ -55,7 +55,6 @@ export default function PriorityColumn({
   const [isAssigning, setIsAssigning] = useState(false);
   const [isDateInPast, setIsDateInPast] = useState(false);
   const { toast } = useToast();
-  const [hasAssigned, setHasAssigned] = useState(false);
   
   // Usa lo stato passato dal parent
   const isMultiSelectMode = containerMultiSelectState?.isActive ?? false;
@@ -111,16 +110,109 @@ export default function PriorityColumn({
     "arrow-down": <ArrowDown className="w-5 h-5 mr-2 text-muted-foreground" />,
   };
 
-  // Identifica task duplicate basandosi sul logistic_code
-  const logisticCodeCounts = tasks.reduce((acc, task) => {
-    const code = task.name; // name contiene il logistic_code
-    acc[code] = (acc[code] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const isDuplicateTask = (task: Task) => {
-    return logisticCodeCounts[task.name] > 1;
+  const getTaskDuplicateMeta = (task: Task) => {
+    const candidate = task as any;
+    const groupId = candidate.duplicate_group_id ? String(candidate.duplicate_group_id) : "";
+    const groupSizeActive = Number(candidate.duplicate_group_size_active || 0);
+    const taskLocked = Boolean(candidate.locked);
+    const isDuplicateActive = Boolean(candidate.is_duplicate_active) && !taskLocked;
+    return {
+      groupId,
+      groupSizeActive,
+      isDuplicateActive,
+    };
   };
+
+  const duplicatePalette = [
+    "duplicate-zone-color-0",
+    "duplicate-zone-color-1",
+    "duplicate-zone-color-2",
+    "duplicate-zone-color-3",
+    "duplicate-zone-color-4",
+    "duplicate-zone-color-5",
+  ];
+
+  const getColorClassForGroup = (groupId: string) => {
+    if (!groupId) return duplicatePalette[0];
+    let hash = 0;
+    for (let i = 0; i < groupId.length; i++) {
+      hash = ((hash << 5) - hash) + groupId.charCodeAt(i);
+      hash |= 0;
+    }
+    return duplicatePalette[Math.abs(hash) % duplicatePalette.length];
+  };
+
+  const orderedEntries = useMemo(() => {
+    const indexed = tasks.map((task, originalIndex) => {
+      const duplicateMeta = getTaskDuplicateMeta(task);
+      return { task, originalIndex, duplicateMeta };
+    });
+
+    const duplicateItems = indexed.filter((entry) => entry.duplicateMeta.isDuplicateActive);
+    const nonDuplicateItems = indexed.filter((entry) => !entry.duplicateMeta.isDuplicateActive);
+
+    const localGroupCounts = new Map<string, number>();
+    for (const entry of duplicateItems) {
+      const groupId = entry.duplicateMeta.groupId;
+      if (!groupId) continue;
+      localGroupCounts.set(groupId, (localGroupCounts.get(groupId) || 0) + 1);
+    }
+
+    duplicateItems.sort((a, b) => {
+      const aGroup = a.duplicateMeta.groupId;
+      const bGroup = b.duplicateMeta.groupId;
+      const aLocalCount = localGroupCounts.get(aGroup) || 0;
+      const bLocalCount = localGroupCounts.get(bGroup) || 0;
+      if (aLocalCount !== bLocalCount) return bLocalCount - aLocalCount;
+      if (aGroup !== bGroup) return aGroup.localeCompare(bGroup);
+      return a.originalIndex - b.originalIndex;
+    });
+
+    return [...duplicateItems, ...nonDuplicateItems];
+  }, [tasks]);
+
+  const orderedTasks = useMemo(
+    () => orderedEntries.map((entry) => entry.task),
+    [orderedEntries]
+  );
+
+  const groupedDuplicateEntries = useMemo(() => {
+    const duplicatesByGroup = new Map<string, typeof orderedEntries>();
+    for (const entry of orderedEntries) {
+      if (!entry.duplicateMeta.isDuplicateActive) continue;
+      const groupKey = entry.duplicateMeta.groupId || `single-${String(entry.task.id)}`;
+      const existing = duplicatesByGroup.get(groupKey) || [];
+      existing.push(entry);
+      duplicatesByGroup.set(groupKey, existing);
+    }
+
+    const duplicateBlocks: Array<{
+      key: string;
+      groupId: string;
+      colorClass: string;
+      entries: typeof orderedEntries;
+      isGroup: boolean;
+    }> = [];
+
+    const seenKeys = new Set<string>();
+    for (const entry of orderedEntries) {
+      if (!entry.duplicateMeta.isDuplicateActive) continue;
+      const key = entry.duplicateMeta.groupId || `single-${String(entry.task.id)}`;
+      if (seenKeys.has(key)) continue;
+      seenKeys.add(key);
+      const entries = duplicatesByGroup.get(key) || [entry];
+      duplicateBlocks.push({
+        key,
+        groupId: entry.duplicateMeta.groupId,
+        colorClass: getColorClassForGroup(entry.duplicateMeta.groupId),
+        entries,
+        isGroup: Boolean(entry.duplicateMeta.groupId) && entries.length > 1,
+      });
+    }
+
+    const nonDuplicateEntries = orderedEntries.filter((entry) => !entry.duplicateMeta.isDuplicateActive);
+    return { duplicateBlocks, nonDuplicateEntries };
+  }, [orderedEntries]);
 
   // Funzione modificata per usare hasAssigned e stato di loading
   const handleAssign = async () => {
@@ -129,7 +221,6 @@ export default function PriorityColumn({
     try {
       setIsAssigning(true);
       await assignAction();
-      setHasAssigned(true); // Imposta hasAssigned a true dopo l'assegnazione
     } catch (error) {
       console.error("Errore durante l'assegnazione:", error);
       // I toast di errore vengono gestiti all'interno di assignAction
@@ -314,30 +405,97 @@ export default function PriorityColumn({
             `}
             data-testid={`priority-column-${droppableId}`}
           >
-            {tasks.map((task, index) => {
-              // Verifica se è duplicata (stesso logistic_code ma id diverso)
-              const isDuplicate = hasAssigned && tasks.some(
-                t => t.name === task.name && t.id !== task.id
-              );
-              const isHighlighted = highlightedTaskIds.has(String(task.id));
-              
-              return (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  index={index}
-                  isInTimeline={false}
-                  allTasks={tasks}
-                  currentContainer={droppableId}
-                  isDuplicate={isDuplicate}
-                  isDragDisabled={isDragDisabled || isDateInPast}
-                  isReadOnly={isDateInPast}
-                  multiSelectContext={multiSelectCtx}
-                  isHighlighted={isHighlighted}
-                  operationsScope={operationsScope}
-                />
-              );
-            })}
+            {(() => {
+              let draggableIndex = 0;
+              const rendered: React.ReactNode[] = [];
+
+              for (const block of groupedDuplicateEntries.duplicateBlocks) {
+                if (block.isGroup) {
+                  rendered.push(
+                    <div
+                      key={`group-${block.key}`}
+                      className={`duplicate-group-zone ${block.colorClass}`}
+                      data-duplicate-group-id={block.groupId || undefined}
+                    >
+                      {block.entries.map((entry) => {
+                        const task = entry.task;
+                        const isHighlighted = highlightedTaskIds.has(String(task.id));
+                        const currentIndex = draggableIndex++;
+                        return (
+                          <div key={`task-${task.id}`} className="duplicate-group-item">
+                            <TaskCard
+                              task={task}
+                              index={currentIndex}
+                              isInTimeline={false}
+                              allTasks={orderedTasks}
+                              currentContainer={droppableId}
+                              isDuplicate={true}
+                              isDragDisabled={isDragDisabled || isDateInPast}
+                              isReadOnly={isDateInPast}
+                              multiSelectContext={multiSelectCtx}
+                              isHighlighted={isHighlighted}
+                              operationsScope={operationsScope}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                } else {
+                  const entry = block.entries[0];
+                  const task = entry.task;
+                  const isHighlighted = highlightedTaskIds.has(String(task.id));
+                  const currentIndex = draggableIndex++;
+                  rendered.push(
+                    <div key={`single-row-${block.key}`} className="duplicate-single-row">
+                      <div
+                        key={`single-${block.key}`}
+                        className={`duplicate-single-block duplicate-zone duplicate-zone-pulse ${block.colorClass}`}
+                        data-duplicate-group-id={block.groupId || undefined}
+                      >
+                        <TaskCard
+                          task={task}
+                          index={currentIndex}
+                          isInTimeline={false}
+                          allTasks={orderedTasks}
+                          currentContainer={droppableId}
+                          isDuplicate={true}
+                          isDragDisabled={isDragDisabled || isDateInPast}
+                          isReadOnly={isDateInPast}
+                          multiSelectContext={multiSelectCtx}
+                          isHighlighted={isHighlighted}
+                          operationsScope={operationsScope}
+                        />
+                      </div>
+                    </div>
+                  );
+                }
+              }
+
+              for (const entry of groupedDuplicateEntries.nonDuplicateEntries) {
+                const task = entry.task;
+                const isHighlighted = highlightedTaskIds.has(String(task.id));
+                const currentIndex = draggableIndex++;
+                rendered.push(
+                  <TaskCard
+                    key={`plain-${task.id}`}
+                    task={task}
+                    index={currentIndex}
+                    isInTimeline={false}
+                    allTasks={orderedTasks}
+                    currentContainer={droppableId}
+                    isDuplicate={false}
+                    isDragDisabled={isDragDisabled || isDateInPast}
+                    isReadOnly={isDateInPast}
+                    multiSelectContext={multiSelectCtx}
+                    isHighlighted={isHighlighted}
+                    operationsScope={operationsScope}
+                  />
+                );
+              }
+
+              return rendered;
+            })()}
             {provided.placeholder}
           </div>
         )}

@@ -397,6 +397,8 @@ const displayClickableInputClass =
   /** Evita reset API ad ogni re-render se la chiave task è la stessa (displayTask spesso nuovo per riferimento). */
   const lastLogisticsDriverFetchTaskKeyRef = useRef<string>("");
   const lastHousekeepingDetailsFetchTaskKeyRef = useRef<string>("");
+  const lastCollaboratorsTaskIdRef = useRef<number | null>(null);
+  const initializedEditFieldsTaskKeyRef = useRef<string>("");
   const isLogisticsTimelineDetails = operationsScope === "logistics" && isInTimeline;
   // Dialog completo in tutte le pagine non-office (timeline + containers).
   const isTimelineDetailsDialog = !isOfficeScope;
@@ -676,6 +678,26 @@ const displayClickableInputClass =
     };
   }, [navigableTasks, currentTaskId, task, index, pendingEditsVersion]);
 
+  const dialogTaskKey = getTaskKey(displayTask) || getTaskKey(task);
+  const dialogTaskIdRaw =
+    (displayTask as any).task_id ??
+    (displayTask as any).id ??
+    (task as any).task_id ??
+    (task as any).id;
+  const dialogTaskId = Number(dialogTaskIdRaw);
+  const dialogLogisticCodeRaw =
+    (displayTask as any).logistic_code ??
+    (displayTask as any).name ??
+    (task as any).logistic_code ??
+    (task as any).name ??
+    "";
+  const dialogStructureIdRaw =
+    (displayTask as any).structure_id ??
+    (displayTask as any).structureId ??
+    (task as any).structure_id ??
+    (task as any).structureId ??
+    "";
+
   // Carica i dettagli della collaborazione per la task attualmente mostrata nel dialog.
   useEffect(() => {
     let cancelled = false;
@@ -683,20 +705,16 @@ const displayClickableInputClass =
     const fetchCollaborators = async () => {
       if (!isModalOpen) {
         if (!cancelled) {
+          lastCollaboratorsTaskIdRef.current = null;
           setTaskCollaborators([]);
           setIsLoadingCollabs(false);
         }
         return;
       }
 
-      const taskIdRaw =
-        (displayTask as any).task_id ??
-        (displayTask as any).id ??
-        (task as any).task_id ??
-        (task as any).id;
-      const taskId = Number(taskIdRaw);
-      if (!Number.isFinite(taskId)) {
+      if (!Number.isFinite(dialogTaskId)) {
         if (!cancelled) {
+          lastCollaboratorsTaskIdRef.current = null;
           setTaskCollaborators([]);
           setIsLoadingCollabs(false);
         }
@@ -704,13 +722,17 @@ const displayClickableInputClass =
       }
 
       if (!cancelled) {
+        const taskChanged = lastCollaboratorsTaskIdRef.current !== dialogTaskId;
+        lastCollaboratorsTaskIdRef.current = dialogTaskId;
         setIsLoadingCollabs(true);
-        setTaskCollaborators([]);
+        if (taskChanged) {
+          setTaskCollaborators([]);
+        }
       }
 
       try {
         const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
-        const response = await fetch(`/api/tasks/${taskId}/collaborators?date=${workDate}`);
+        const response = await fetch(`/api/tasks/${dialogTaskId}/collaborators?date=${workDate}`);
         const data = await response.json().catch(() => ({}));
         if (cancelled) return;
         if (data.success) {
@@ -734,7 +756,7 @@ const displayClickableInputClass =
     return () => {
       cancelled = true;
     };
-  }, [isModalOpen, displayTask, task]);
+  }, [isModalOpen, dialogTaskId]);
 
   console.log('🔍 Stato navigazione:', {
     currentTaskId,
@@ -791,6 +813,13 @@ const displayClickableInputClass =
   // MA NON se l'utente sta già modificando campi o se è readonly
   useEffect(() => {
     if (isModalOpen && editingFields.size === 0 && !isReadOnly) {
+      const shouldInit =
+        initializedEditFieldsTaskKeyRef.current !== dialogTaskKey ||
+        initializedEditFieldsTaskKeyRef.current === "";
+      if (!shouldInit) {
+        return;
+      }
+      initializedEditFieldsTaskKeyRef.current = dialogTaskKey;
       console.log('🔓 Modale aperto per task:', {
         taskId: task.id,
         allTasksCount: allTasks?.length || 0,
@@ -817,7 +846,13 @@ const displayClickableInputClass =
       // Inizializza operation_id
       setEditedOperationId(String((displayTask as any).operation_id || ""));
     }
-  }, [isModalOpen, task.id, displayTask, allTasks, isInTimeline, currentContainer, editingFields.size]);
+  }, [isModalOpen, dialogTaskKey, editingFields.size, isReadOnly]);
+
+  useEffect(() => {
+    if (!isModalOpen) {
+      initializedEditFieldsTaskKeyRef.current = "";
+    }
+  }, [isModalOpen]);
 
   // DEBUG: verifica se displayTask è corretto
   useEffect(() => {
@@ -910,21 +945,26 @@ const displayClickableInputClass =
   const cardColorClass = isLocked && !isInTimeline ? "bg-gray-100 opacity-70 dark:bg-gray-500 dark:opacity-90" : resolvedCardTypeColor;
 
   useEffect(() => {
-    const calculateAssignmentTimes = () => {
-      const taskObj = displayTask as any;
-      setAssignmentTimes({
-        start_time: taskObj.start_time ?? taskObj.startTime,
-        end_time: taskObj.end_time ?? taskObj.endTime,
-        travel_time: taskObj.travel_time ?? taskObj.travelTime,
-      });
-    };
-
-    // Aggiorna assignmentTimes solo quando il modale è aperto (contenuto dialog).
-    // In timeline layout/barra usiamo sempre task (Fix timeline shift bug).
-    if (isModalOpen) {
-      calculateAssignmentTimes();
-    }
-  }, [isModalOpen, displayTask]);
+    if (!isModalOpen) return;
+    const taskObj = displayTask as any;
+    const nextStart = taskObj.start_time ?? taskObj.startTime;
+    const nextEnd = taskObj.end_time ?? taskObj.endTime;
+    const nextTravel = taskObj.travel_time ?? taskObj.travelTime;
+    setAssignmentTimes((prev) => {
+      if (
+        prev.start_time === nextStart &&
+        prev.end_time === nextEnd &&
+        prev.travel_time === nextTravel
+      ) {
+        return prev;
+      }
+      return {
+        start_time: nextStart,
+        end_time: nextEnd,
+        travel_time: nextTravel,
+      };
+    });
+  }, [isModalOpen, dialogTaskKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -943,14 +983,8 @@ const displayClickableInputClass =
         return;
       }
 
-      const taskIdRaw =
-        (displayTask as any).task_id ??
-        (displayTask as any).id ??
-        (task as any).task_id ??
-        (task as any).id;
-      const detailsTaskKey = getTaskKey(displayTask) || getTaskKey(task);
-      const taskId = Number(taskIdRaw);
-      if (!Number.isFinite(taskId)) {
+      const detailsTaskKey = dialogTaskKey;
+      if (!Number.isFinite(dialogTaskId)) {
         if (!cancelled) {
           lastLogisticsDriverFetchTaskKeyRef.current = detailsTaskKey;
           setResolvedLogisticsDriverTaskKey(detailsTaskKey);
@@ -965,18 +999,6 @@ const displayClickableInputClass =
 
       const dateStr =
         localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
-      const logisticCodeRaw =
-        (displayTask as any).logistic_code ??
-        (displayTask as any).name ??
-        (task as any).logistic_code ??
-        (task as any).name ??
-        "";
-      const structureIdRaw =
-        (displayTask as any).structure_id ??
-        (displayTask as any).structureId ??
-        (task as any).structure_id ??
-        (task as any).structureId ??
-        "";
 
       try {
         if (!cancelled) {
@@ -992,7 +1014,7 @@ const displayClickableInputClass =
         }
 
         const res = await fetch(
-          `/api/logistics-task-driver-details?date=${encodeURIComponent(dateStr)}&taskId=${encodeURIComponent(String(taskId))}&driverId=${encodeURIComponent(String(cleanerId ?? ""))}&structureId=${encodeURIComponent(String(structureIdRaw))}`,
+          `/api/logistics-task-driver-details?date=${encodeURIComponent(dateStr)}&taskId=${encodeURIComponent(String(dialogTaskId))}&driverId=${encodeURIComponent(String(cleanerId ?? ""))}&structureId=${encodeURIComponent(String(dialogStructureIdRaw))}`,
           { cache: "no-store" }
         );
         if (cancelled) return;
@@ -1034,7 +1056,7 @@ const displayClickableInputClass =
     return () => {
       cancelled = true;
     };
-  }, [isTimelineDetailsDialog, isModalOpen, cleanerId, displayTask, task]);
+  }, [isTimelineDetailsDialog, isModalOpen, cleanerId, dialogTaskId, dialogTaskKey, dialogStructureIdRaw]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1053,21 +1075,9 @@ const displayClickableInputClass =
         return;
       }
 
-      const taskIdRaw =
-        (displayTask as any).task_id ??
-        (displayTask as any).id ??
-        (task as any).task_id ??
-        (task as any).id;
-      const logisticCodeRaw =
-        (displayTask as any).logistic_code ??
-        (displayTask as any).name ??
-        (task as any).logistic_code ??
-        (task as any).name ??
-        "";
-      const detailsTaskKey = getTaskKey(displayTask) || getTaskKey(task);
-      const taskId = Number(taskIdRaw);
-      const hasTaskId = String(taskIdRaw ?? "").trim().length > 0;
-      const hasLogisticCode = String(logisticCodeRaw ?? "").trim().length > 0;
+      const detailsTaskKey = dialogTaskKey;
+      const hasTaskId = String(dialogTaskIdRaw ?? "").trim().length > 0;
+      const hasLogisticCode = String(dialogLogisticCodeRaw ?? "").trim().length > 0;
 
       if (!hasTaskId && !hasLogisticCode) {
         if (!cancelled) {
@@ -1099,7 +1109,7 @@ const displayClickableInputClass =
 
       try {
         const res = await fetch(
-          `/api/logistics-task-housekeeping-cleaner?date=${encodeURIComponent(dateStr)}&taskId=${encodeURIComponent(String(taskIdRaw ?? ""))}&logisticCode=${encodeURIComponent(String(logisticCodeRaw ?? ""))}`,
+          `/api/logistics-task-housekeeping-cleaner?date=${encodeURIComponent(dateStr)}&taskId=${encodeURIComponent(String(dialogTaskIdRaw ?? ""))}&logisticCode=${encodeURIComponent(String(dialogLogisticCodeRaw ?? ""))}`,
           { cache: "no-store" }
         );
         const json = res.ok ? await res.json().catch(() => ({})) : {};
@@ -1135,7 +1145,7 @@ const displayClickableInputClass =
     return () => {
       cancelled = true;
     };
-  }, [isTimelineDetailsDialog, isModalOpen, displayTask, task]);
+  }, [isTimelineDetailsDialog, isModalOpen, dialogTaskKey, dialogTaskIdRaw, dialogLogisticCodeRaw]);
 
   // Supporto navigazione con frecce da tastiera
   useEffect(() => {
@@ -1295,6 +1305,9 @@ const displayClickableInputClass =
       // CRITICAL: Incrementa versione per forzare re-render con i nuovi valori
       setPendingEditsVersion(v => v + 1);
       setIsModalOpen(false);
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
 
     } catch (error: any) {
       console.error("Errore nella preparazione:", error);
@@ -1571,6 +1584,9 @@ const displayClickableInputClass =
       });
       setCheckoutDialogOpen(false);
       setPendingEditsVersion((v) => v + 1);
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
     } catch (error: any) {
       toast({
         title: "Errore",
@@ -1666,6 +1682,9 @@ const displayClickableInputClass =
       });
       setCheckinDialogOpen(false);
       setPendingEditsVersion((v) => v + 1);
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
     } catch (error: any) {
       toast({
         title: "Errore",
@@ -1737,6 +1756,9 @@ const displayClickableInputClass =
       });
       setOperationDialogOpen(false);
       setPendingEditsVersion((v) => v + 1);
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
     } catch (error: any) {
       toast({
         title: "Errore",
@@ -1846,7 +1868,7 @@ const displayClickableInputClass =
   // Verifica se il check-in è per una data futura (rispetto alla data selezionata)
   // Include anche i casi dove l'orario non è migrato ma la data è futura
   const isFutureCheckin = (() => {
-    const taskObj = task as any;
+    const taskObj = taskWithPendingEdits as any;
     const checkinDate = taskObj.checkin_date;
 
     if (!checkinDate) return false;
@@ -1859,7 +1881,9 @@ const displayClickableInputClass =
     const selectedDate = new Date(year, month - 1, day);
     selectedDate.setHours(0, 0, 0, 0);
 
-    const checkin = new Date(checkinDate);
+    const normalizedCheckinDate = normalizeDate(checkinDate);
+    if (!normalizedCheckinDate) return false;
+    const checkin = new Date(normalizedCheckinDate);
     checkin.setHours(0, 0, 0, 0);
 
     return checkin > selectedDate;
@@ -2478,8 +2502,9 @@ const displayClickableInputClass =
                           : ""
                       }
                       ${isOverdue && isInTimeline ? "animate-blink" : ""}
-                      ${isDuplicate && !isInTimeline ? "animate-blink-yellow" : ""}
                       ${isPriorityWindowViolation && isInTimeline ? "animate-blink-orange" : ""}
+                      ${!snapshot.isDragging && isMapFiltered ? "task-border-map-filtered" : ""}
+                      ${!snapshot.isDragging && !isMapFiltered && isHighlighted ? "task-border-search-highlighted" : ""}
                       hover:shadow-md cursor-pointer
                       flex-shrink-0 relative group
                     `}
@@ -2492,11 +2517,6 @@ const displayClickableInputClass =
                       maxHeight: isInTimeline ? "40px" : undefined,
                       overflow: isInTimeline ? "visible" : undefined,
                       zIndex: isMapFiltered ? 10 : 'auto',
-                      ...(!snapshot.isDragging && isMapFiltered
-                        ? { boxShadow: "inset 0 0 0 2px #3b82f6" }
-                        : !snapshot.isDragging && isHighlighted
-                          ? { boxShadow: "inset 0 0 0 2px #fbbf24" }
-                          : {}),
                     }}
                     data-testid={`task-card-${getTaskKey(task)}`}
                     onClick={(e) => {
@@ -2772,9 +2792,7 @@ const displayClickableInputClass =
               "mt-3",
               isTimelineDetailsDialog &&
                 cn(
-                  "grid grid-cols-1 xl:grid-cols-[3fr_minmax(0,5fr)] gap-4",
-                  // Logistica: niente blocco collaboratori → la card HK riempie l’altezza della colonna sinistra.
-                  isLogisticsTimelineDetails ? "items-stretch" : "items-start"
+                  "grid grid-cols-1 xl:grid-cols-[3fr_minmax(0,5fr)] gap-4 items-stretch"
                 )
             )}
           >
@@ -2824,9 +2842,9 @@ const displayClickableInputClass =
 
             <div
               className={cn(
-                isTimelineDetailsDialog ? "relative min-h-0 min-w-0 rounded-md border border-border bg-muted/20 p-3" : "space-y-3",
-                // Solo su xl la colonna HK è affiancata e deve allungarsi in altezza come la sinistra.
-                isLogisticsTimelineDetails && "flex flex-col min-h-0 xl:h-full"
+                isTimelineDetailsDialog
+                  ? "relative min-h-0 min-w-0 rounded-md border border-border bg-muted/20 p-3 flex h-full flex-col self-stretch"
+                  : "space-y-3"
               )}
             >
             {isTimelineDetailsDialog && (
@@ -2837,13 +2855,12 @@ const displayClickableInputClass =
             )}
             <div
               className={cn(
-                isTimelineDetailsDialog && !isLogisticsTimelineDetails && "grid gap-3 pt-2",
-                isTimelineDetailsDialog && isLogisticsTimelineDetails && "flex flex-1 flex-col min-h-0 gap-3 pt-2",
+                isTimelineDetailsDialog && "flex flex-1 flex-col min-h-0 gap-3 pt-2",
                 !isTimelineDetailsDialog && "space-y-3"
               )}
             >
               {housekeepingTimelineDetailRows()}
-              {isLogisticsTimelineDetails && (
+              {isTimelineDetailsDialog && (
                 <div className="flex-1 min-h-[1px] shrink-0" aria-hidden="true" />
               )}
             </div>

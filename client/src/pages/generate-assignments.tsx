@@ -47,6 +47,9 @@ interface RawTask {
   customer_reference?: string | number;
   locked?: boolean;
   locked_reason?: string;
+  duplicate_group_id?: string;
+  duplicate_group_size_active?: number;
+  is_duplicate_active?: boolean;
 }
 
 const isEquivalentStraordinariaTask = (task: any): boolean =>
@@ -888,7 +891,11 @@ export default function GenerateAssignments() {
 
   // Funzione per convertire un task raw in Task
   const convertRawTask = (rawTask: RawTask, priority: string): Task => {
-    return {
+    const convertedTask: Task & {
+      duplicate_group_id?: string;
+      duplicate_group_size_active?: number;
+      is_duplicate_active?: boolean;
+    } = {
       id: rawTask.task_id.toString(),
       name: rawTask.logistic_code?.toString() || 'N/A',
       alias: rawTask.alias,
@@ -922,6 +929,11 @@ export default function GenerateAssignments() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
+
+    convertedTask.duplicate_group_id = rawTask.duplicate_group_id;
+    convertedTask.duplicate_group_size_active = rawTask.duplicate_group_size_active ?? 0;
+    convertedTask.is_duplicate_active = Boolean(rawTask.is_duplicate_active);
+    return convertedTask as Task;
   };
 
   // Carica i task dai file JSON (SENZA rieseguire extract-data)
