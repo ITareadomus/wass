@@ -175,7 +175,7 @@ interface TaskCardProps {
   isHighlighted?: boolean;
   cleanerId?: number | null;
   isPriorityWindowViolation?: boolean;
-  /** housekeeping → /api/operations (enable_wass); logistics → enable_route_drivers */
+  /** housekeeping → /api/operations (enable_wass); logistics → enable_wass_route */
   operationsScope?: "housekeeping" | "office" | "logistics";
   /** Solo timeline logistica: nome driver (colonna sinistra). Non usare per HK — lì sarebbe il cleaner. */
   timelineRowStaffDisplayLabel?: string | null;

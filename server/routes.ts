@@ -155,7 +155,7 @@ async function getCachedActiveAdamOperationIds(connection: any): Promise<number[
   return ids;
 }
 
-/** Operazioni WASS Logistics (coerente con create_containers.py: enable_route_drivers) */
+/** Operazioni WASS Logistics (coerente con create_containers.py: enable_wass_route) */
 async function getCachedActiveAdamRouteDriversOperationIds(connection: any): Promise<number[]> {
   const now = Date.now();
   if (
@@ -169,7 +169,7 @@ async function getCachedActiveAdamRouteDriversOperationIds(connection: any): Pro
     `
       SELECT id
       FROM app_structure_operation
-      WHERE active = 1 AND enable_route_drivers = 1
+      WHERE active = 1 AND enable_wass_route = 1
     `
   );
 
@@ -1493,7 +1493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/operations - Operazioni attive da DB (app_structure_operation + langs)
-  // Query: for=logistics → enable_route_drivers (pagina WASS Logistics); default → enable_wass (housekeeping)
+  // Query: for=logistics → enable_wass_route (pagina WASS Logistics); default → enable_wass (housekeeping)
   app.get("/api/operations", async (req, res) => {
     let connection: mysql.Connection | null = null;
     try {
@@ -1523,7 +1523,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         rows = Array.isArray(officeRows) ? officeRows : [];
       } else {
-        const enableClause = forLogistics ? "o.enable_route_drivers = 1" : "o.enable_wass = 1";
+        const enableClause = forLogistics ? "o.enable_wass_route = 1" : "o.enable_wass = 1";
         const [defaultRows]: any = await connection.execute(
           `SELECT o.id, l.name
            FROM app_structure_operation o
@@ -1789,7 +1789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // --- WASS Logistics containers (daily_logistics_*, enable_route_drivers ADAM) ---
+  // --- WASS Logistics containers (daily_logistics_*, enable_wass_route ADAM) ---
   app.get("/api/logistics-containers", async (req, res) => {
     try {
       const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
@@ -7468,7 +7468,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     }
   });
 
-  // Fingerprint ADAM per logistics (stessi campi housekeeping, filtro enable_route_drivers come create_containers.py)
+  // Fingerprint ADAM per logistics (stessi campi housekeeping, filtro enable_wass_route come create_containers.py)
   // GET /api/adam/logistics/fingerprint?date=YYYY-MM-DD
   app.get("/api/adam/logistics/fingerprint", async (req, res) => {
     let connection: any = null;

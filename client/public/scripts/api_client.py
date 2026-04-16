@@ -191,7 +191,7 @@ class ApiClient:
         return self._post("/api/containers", payload)
 
     def get_logistics_containers(self, date: str) -> Dict:
-        """Carica logistics containers (enable_route_drivers) da PostgreSQL."""
+        """Carica logistics containers (enable_wass_route) da PostgreSQL."""
         return self._get("/api/logistics-containers", {"date": date})
 
     def save_logistics_containers(self, date: str, containers_data: Dict) -> Dict:

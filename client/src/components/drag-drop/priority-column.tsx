@@ -33,7 +33,7 @@ interface PriorityColumnProps {
   disableToolbar?: boolean;
   /** Zona drop senza padding interno (evita l'effetto "riquadro" dentro la colonna). */
   flushDropZone?: boolean;
-  /** Passato a TaskCard per caricare i nomi operazione (enable_wass vs enable_route_drivers). */
+  /** Passato a TaskCard per caricare i nomi operazione (enable_wass vs enable_wass_route). */
   operationsScope?: "housekeeping" | "logistics";
 }
 

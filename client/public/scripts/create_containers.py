@@ -94,7 +94,7 @@ def get_active_operations_logistics():
     cursor.execute("""
         SELECT id
         FROM app_structure_operation
-        WHERE active = 1 AND enable_route_drivers = 1
+        WHERE active = 1 AND enable_wass_route = 1
     """)
     results = cursor.fetchall()
     cursor.close()
@@ -139,7 +139,7 @@ def get_tasks_from_db(selected_date, assigned_task_ids=None, workflow="housekeep
         assigned_task_ids = set()
 
     if workflow == "logistics":
-        print(f"Aggiorno la lista delle operazioni attive (enable_route_drivers) dal DB...")
+        print(f"Aggiorno la lista delle operazioni attive (enable_wass_route) dal DB...")
         ops = get_active_operations_logistics()
     elif workflow == "office":
         print("Workflow office: filtro operation_id consentiti [15, 38]")
@@ -494,7 +494,7 @@ def main():
         type=str,
         choices=['housekeeping', 'office', 'logistics'],
         default='housekeeping',
-        help='housekeeping: enable_wass (default). office: operation_id [15,38]. logistics: enable_route_drivers → /api/logistics-containers',
+        help='housekeeping: enable_wass (default). office: operation_id [15,38]. logistics: enable_wass_route → /api/logistics-containers',
     )
     args = parser.parse_args()
     workflow = getattr(args, 'workflow', 'housekeeping') or 'housekeeping'
