@@ -19,23 +19,16 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { HelpCircle, Home } from "lucide-react";
 
+const OFFICE_SCOPE_ENABLED = false;
+
 function GlobalHeader() {
   const [location] = useLocation();
-  const currentScope =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("scope")
-      : null;
-  const savedScope =
-    typeof window !== "undefined" ? localStorage.getItem("assignments_scope") : null;
-  const isOfficeScope = currentScope === "office" || (!currentScope && savedScope === "office");
-  const assignmentsHomeHref = isOfficeScope
-    ? "/generate-assignments?scope=office"
-    : "/generate-assignments";
+  const assignmentsHomeHref = "/generate-assignments";
   const selectedDate =
     typeof window !== "undefined" ? localStorage.getItem("selected_work_date") : null;
   const unconfirmedHref = selectedDate
-    ? `/unconfirmed-tasks?date=${selectedDate}${isOfficeScope ? "&scope=office" : ""}`
-    : `/unconfirmed-tasks${isOfficeScope ? "?scope=office" : ""}`;
+    ? `/unconfirmed-tasks?date=${selectedDate}`
+    : "/unconfirmed-tasks";
   const isConvocazioniPage =
     location === "/convocazioni" || location.startsWith("/convocazioni?");
   const isUnconfirmedTasksPage =
@@ -43,16 +36,37 @@ function GlobalHeader() {
   const showHomeButton =
     isConvocazioniPage || location === "/settings" || location === "/account-settings";
   const showUnconfirmedButton = !showHomeButton && !isUnconfirmedTasksPage;
+
+  useEffect(() => {
+    if (typeof window === "undefined" || OFFICE_SCOPE_ENABLED) return;
+
+    if (localStorage.getItem("assignments_scope") === "office") {
+      localStorage.setItem("assignments_scope", "housekeeping");
+    }
+
+    const url = new URL(window.location.href);
+    const scope = url.searchParams.get("scope");
+    const kind = url.searchParams.get("kind");
+    if (scope !== "office" && kind !== "office") return;
+
+    if (scope === "office") {
+      url.searchParams.delete("scope");
+    }
+    if (kind === "office") {
+      url.searchParams.delete("kind");
+    }
+
+    const query = url.searchParams.toString();
+    const nextUrl = `${url.pathname}${query ? `?${query}` : ""}${url.hash}`;
+    window.history.replaceState({}, "", nextUrl);
+  }, [location]);
+
   const homeHref =
     isConvocazioniPage &&
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("kind") === "drivers"
       ? "/generate-logistics-assignments"
-      : isConvocazioniPage &&
-          typeof window !== "undefined" &&
-          new URLSearchParams(window.location.search).get("kind") === "office"
-        ? "/generate-assignments?scope=office"
-        : assignmentsHomeHref;
+      : assignmentsHomeHref;
 
   return (
     <WassSiteHeader

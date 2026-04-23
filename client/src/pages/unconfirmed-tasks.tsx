@@ -41,6 +41,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const OFFICE_SCOPE_ENABLED = false;
+
 interface Task {
   task_id: string | number;
   logistic_code: string;
@@ -94,7 +96,9 @@ export default function UnconfirmedTasks() {
       : null;
   const savedScope =
     typeof window !== "undefined" ? localStorage.getItem("assignments_scope") : null;
-  const isOfficeScope = scopeFromUrl === "office" || (!scopeFromUrl && savedScope === "office");
+  const isOfficeScope =
+    OFFICE_SCOPE_ENABLED &&
+    (scopeFromUrl === "office" || (!scopeFromUrl && savedScope === "office"));
   const scopeValue: "housekeeping" | "office" = isOfficeScope ? "office" : "housekeeping";
   const withScope = (url: string) => `${url}${url.includes("?") ? "&" : "?"}scope=${scopeValue}`;
   const assignmentsHomeHref = isOfficeScope

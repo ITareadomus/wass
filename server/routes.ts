@@ -12,6 +12,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { databaseConfig } from "../config/database";
 
 const isTrue = (v: any) => v === true || v === 1 || v === "1" || v === "true";
+const OFFICE_SCOPE_ENABLED = false;
 
 const toRomeDatetime = (d: Date) =>
   formatInTimeZone(d, "Europe/Rome", "yyyy-MM-dd HH:mm:ss");
@@ -28,6 +29,7 @@ function getRomeTimestamp(): string {
 }
 
 function isOfficeScope(scope: unknown): boolean {
+  if (!OFFICE_SCOPE_ENABLED) return false;
   return String(scope || "").toLowerCase() === "office";
 }
 

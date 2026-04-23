@@ -21,6 +21,8 @@ import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { useToast } from "@/hooks/use-toast";
 import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
 
+const OFFICE_SCOPE_ENABLED = false;
+
 interface RawTask {
   task_id: number;
   structure_id: number;
@@ -373,6 +375,7 @@ export default function GenerateAssignments() {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const isOfficeScope = useMemo(() => {
+    if (!OFFICE_SCOPE_ENABLED) return false;
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const scopeParam = params.get("scope");

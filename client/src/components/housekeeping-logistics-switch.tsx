@@ -1,4 +1,4 @@
-import { Building, Building2, Truck } from "lucide-react";
+import { Building2, Truck } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import type { MouseEvent } from "react";
@@ -28,12 +28,6 @@ export function HousekeepingLogisticsSwitch({
     window.location.assign("/generate-assignments");
   };
 
-  const goOffice = (e: MouseEvent) => {
-    e.preventDefault();
-    localStorage.setItem("assignments_scope", "office");
-    window.location.assign("/generate-assignments?scope=office");
-  };
-
   return (
     <div
       className={cn(
@@ -41,7 +35,7 @@ export function HousekeepingLogisticsSwitch({
         className
       )}
       role="tablist"
-      aria-label="Passa tra Housekeeping, Uffici e Logistica"
+      aria-label="Passa tra Housekeeping e Logistica"
     >
       <Link
         href="/generate-assignments"
@@ -55,19 +49,6 @@ export function HousekeepingLogisticsSwitch({
       >
         <Building2 className="h-4 w-4 shrink-0" aria-hidden />
         Housekeeping
-      </Link>
-      <Link
-        href="/generate-assignments?scope=office"
-        className={cn(
-          segmentCommon,
-          active === "office" ? segmentActive : segmentInactive
-        )}
-        aria-current={active === "office" ? "page" : undefined}
-        data-testid="switch-office"
-        onClick={goOffice}
-      >
-        <Building className="h-4 w-4 shrink-0" aria-hidden />
-        Uffici
       </Link>
       <Link
         href="/generate-logistics-assignments"

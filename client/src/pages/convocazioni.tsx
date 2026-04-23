@@ -15,6 +15,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from 'wouter';
 
+const OFFICE_SCOPE_ENABLED = false;
+
 interface LogisticsVehicleOption {
   id: number;
   name: string;
@@ -57,7 +59,7 @@ function convocationKindFromSearch(): "cleaners" | "drivers" | "office" {
   if (typeof window === "undefined") return "cleaners";
   const kind = new URLSearchParams(window.location.search).get("kind");
   if (kind === "drivers") return "drivers";
-  if (kind === "office") return "office";
+  if (kind === "office") return OFFICE_SCOPE_ENABLED ? "office" : "cleaners";
   return "cleaners";
 }
 
