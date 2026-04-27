@@ -58,6 +58,7 @@ interface TimelineViewProps {
   lastValidDragIndex?: number | null; // Indice valido durante il drag (da container verso timeline)
   draggingOverCleanerId?: number | null; // ID del cleaner su cui si sta trascinando
   searchTask?: string; // Ricerca task per ID, logistic code, address o customer reference
+  preassignedAnimatedTaskIds?: Set<string>;
 }
 
 interface Cleaner {
@@ -90,6 +91,7 @@ export default function TimelineView({
   lastValidDragIndex = null,
   draggingOverCleanerId = null,
   searchTask = "",
+  preassignedAnimatedTaskIds = new Set<string>(),
 }: TimelineViewProps) {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
@@ -116,7 +118,7 @@ export default function TimelineView({
   const [selectedSwapCleaner, setSelectedSwapCleaner] = useState<string>("");
   const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
-  const [cleanersAliases, setCleanersAliases] = useState<Record<number, {alias: string}>>({});
+  const [cleanersAliases, setCleanersAliases] = useState<Record<number, { alias: string; name?: string; lastname?: string }>>({});
   const [isAddCleanerDialogOpen, setIsAddCleanerDialogOpen] = useState(false);
   const [availableCleaners, setAvailableCleaners] = useState<Cleaner[]>([]);
   const [cleanerToReplace, setCleanerToReplace] = useState<number | null>(null);
@@ -173,6 +175,13 @@ export default function TimelineView({
       })
       .map(t => String((t as any).id || (t as any).task_id || '')));
   })();
+  const effectiveHighlightedTaskIds = React.useMemo(() => {
+    const merged = new Set<string>(highlightedTaskIds);
+    for (const id of preassignedAnimatedTaskIds) {
+      merged.add(String(id));
+    }
+    return merged;
+  }, [highlightedTaskIds, preassignedAnimatedTaskIds]);
 
   // Stato per tracciare acknowledge per coppie (task, cleaner)
   type IncompatibleKey = string; // chiave del tipo `${taskId}-${cleanerId}`
@@ -1184,7 +1193,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       (window as any).setHasUnsavedChanges(true);
     }
 
-    if (cleanerToReplace) {
+    if (cleanerToReplace !== null) {
       removeCleanerMutation.mutate(cleanerToReplace, {
         onSuccess: () => {
           addCleanerMutation.mutate(cleanerId);
@@ -1202,7 +1211,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
   // Handler per confermare l'aggiunta di un cleaner non disponibile
   const handleConfirmAddUnavailableCleaner = async () => {
-    if (confirmUnavailableDialog.cleanerId) {
+    if (confirmUnavailableDialog.cleanerId !== null) {
       // Prima salva lo start time aggiornato
       try {
         const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -1235,7 +1244,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       if ((window as any).setHasUnsavedChanges) {
         (window as any).setHasUnsavedChanges(true);
       }
-      if (cleanerToReplace) {
+      if (cleanerToReplace !== null) {
         removeCleanerMutation.mutate(cleanerToReplace, {
           onSuccess: () => {
             addCleanerMutation.mutate(confirmUnavailableDialog.cleanerId!);
@@ -1252,7 +1261,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
   // Handler per confermare la rimozione di un cleaner
   const handleConfirmRemoveCleaner = () => {
-    if (confirmRemovalDialog.cleanerId) {
+    if (confirmRemovalDialog.cleanerId !== null) {
       removeCleanerMutation.mutate(confirmRemovalDialog.cleanerId);
       setConfirmRemovalDialog({ open: false, cleanerId: null });
     }
@@ -2463,7 +2472,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           isDragDisabled={isTimelineInteractionDisabled}
                                           isReadOnly={isReadOnly}
                                           timelineWidthPx={timelineWidthPx}
-                                          isHighlighted={highlightedTaskIds.has(String(task.id))}
+                                          isHighlighted={effectiveHighlightedTaskIds.has(String(task.id))}
                                           cleanerId={cleaner.id}
                                           isPriorityWindowViolation={isPriorityWindowViolation(task)}
                                         />
@@ -2798,7 +2807,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           <DialogHeader>
             <DialogTitle>Conferma Rimozione Cleaner</DialogTitle>
             <DialogDescription>
-              Sei sicuro di voler rimuovere "{confirmRemovalDialog.cleanerId ? (() => {
+              Sei sicuro di voler rimuovere "{confirmRemovalDialog.cleanerId !== null ? (() => {
                 const cleaner = allCleanersToShow.find(c => c.id === confirmRemovalDialog.cleanerId);
                 return cleaner ? `${cleaner.name} ${cleaner.lastname}` : 'Unknown';
               })() : ''}" dalla selezione? Le sue task rimarranno in timeline finché non verrà sostituito.
@@ -2815,7 +2824,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             <Button
               onClick={handleConfirmRemoveCleaner}
               variant="outline"
-              disabled={!confirmRemovalDialog.cleanerId || removeCleanerMutation.isPending}
+              disabled={confirmRemovalDialog.cleanerId === null || removeCleanerMutation.isPending}
               className="border-2 border-custom-blue hover:bg-accent hover:text-accent-foreground"
             >
               Conferma Rimozione

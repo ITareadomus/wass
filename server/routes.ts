@@ -131,9 +131,84 @@ type ActiveAdamOpsCache = {
   ids: number[];
 };
 
+type PreassignedMode = "normal" | "readonly";
+
 let activeAdamOpsCache: ActiveAdamOpsCache | null = null;
 let activeAdamRouteDriversOpsCache: ActiveAdamOpsCache | null = null;
 const ACTIVE_ADAM_OPS_CACHE_TTL_MS = 60_000; // 60s: evita query continue durante polling
+const PREASSIGNED_REASON_NORMAL = "preassigned_enable_wass";
+const PREASSIGNED_REASON_READONLY = "preassigned_enable_wass_readonly";
+const PREASSIGNED_REASON_REHYDRATED = "preassigned_auto_loaded";
+
+function normalizeTaskReasons(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of value) {
+    const reason = String(entry ?? "").trim();
+    if (!reason || seen.has(reason)) continue;
+    seen.add(reason);
+    out.push(reason);
+  }
+  return out;
+}
+
+function resolvePreassignedModeFromTask(task: any): PreassignedMode | null {
+  if (!task) return null;
+  const explicitMode = String(task.preAssignedMode ?? "").trim().toLowerCase();
+  if (explicitMode === "readonly") return "readonly";
+  if (explicitMode === "normal") return "normal";
+  const reasons = normalizeTaskReasons(task.reasons);
+  if (reasons.includes(PREASSIGNED_REASON_READONLY)) return "readonly";
+  if (reasons.includes(PREASSIGNED_REASON_NORMAL)) return "normal";
+  return null;
+}
+
+function applyPreassignedModeToTask(task: any, mode: PreassignedMode): any {
+  const reasons = normalizeTaskReasons(task?.reasons);
+  const nextReasons = reasons.filter(
+    (reason) => reason !== PREASSIGNED_REASON_NORMAL && reason !== PREASSIGNED_REASON_READONLY
+  );
+  nextReasons.push(mode === "readonly" ? PREASSIGNED_REASON_READONLY : PREASSIGNED_REASON_NORMAL);
+  task.reasons = normalizeTaskReasons(nextReasons);
+  task.preAssignedMode = mode;
+  return task;
+}
+
+function isReadonlyPreassignedTask(task: any): boolean {
+  return resolvePreassignedModeFromTask(task) === "readonly";
+}
+
+function mapStructureTypeToLetter(structureTypeId: number | null | undefined): string | null {
+  const mapping: Record<number, string> = { 1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F" };
+  if (structureTypeId == null) return null;
+  return mapping[Number(structureTypeId)] || "X";
+}
+
+function findTaskInTimelineByIdentity(
+  timelineData: any,
+  taskId: unknown,
+  logisticCode: unknown
+): any | null {
+  if (!timelineData?.cleaners_assignments || !Array.isArray(timelineData.cleaners_assignments)) {
+    return null;
+  }
+  const normalizedTaskId = String(taskId ?? "").trim();
+  const normalizedLogisticCode = String(logisticCode ?? "").trim();
+  for (const cleanerEntry of timelineData.cleaners_assignments) {
+    for (const task of cleanerEntry?.tasks || []) {
+      const sameTaskId =
+        normalizedTaskId.length > 0 && String(task?.task_id ?? task?.id ?? "").trim() === normalizedTaskId;
+      const sameLogisticCode =
+        normalizedLogisticCode.length > 0 &&
+        String(task?.logistic_code ?? task?.name ?? "").trim() === normalizedLogisticCode;
+      if (sameTaskId || sameLogisticCode) {
+        return task;
+      }
+    }
+  }
+  return null;
+}
 
 async function getCachedActiveAdamOperationIds(connection: any): Promise<number[]> {
   const now = Date.now();
@@ -181,6 +256,415 @@ async function getCachedActiveAdamRouteDriversOperationIds(connection: any): Pro
 
   activeAdamRouteDriversOpsCache = { fetchedAtMs: now, ids };
   return ids;
+}
+
+async function fetchPreassignedTaskSeedsFromAdam(workDate: string): Promise<Array<any>> {
+  let connection: mysql.Connection | null = null;
+  try {
+    connection = await mysql.createConnection({
+      host: databaseConfig.mysql.host,
+      port: databaseConfig.mysql.port,
+      user: databaseConfig.mysql.user,
+      password: databaseConfig.mysql.password,
+      database: databaseConfig.mysql.database,
+    });
+
+    const [rows]: any = await connection.execute(
+      `
+        SELECT
+          h.id AS task_id,
+          s.logistic_code AS logistic_code,
+          s.customer_id AS client_id,
+          s.premium AS premium,
+          s.address1 AS address,
+          s.lat,
+          s.lng,
+          (
+              SELECT duration_minutes
+              FROM app_structure_timings ast
+              WHERE ast.structure_type_id = s.structure_type_id
+                  AND ast.customer_id = s.customer_id
+                  AND ast.structure_operation_id = (
+                      CASE WHEN h.operation_id = 0 THEN 2 ELSE h.operation_id END
+                  )
+                  AND ast.structure_activity_id = h.activity_id
+                  AND ast.data_contratto <= h.checkout
+                  AND ast.deleted_at IS NULL
+              ORDER BY ast.data_contratto DESC
+              LIMIT 1
+          ) AS cleaning_time,
+          h.checkin,
+          h.checkout,
+          h.checkin_time,
+          h.checkout_time,
+          h.checkin_pax AS pax_in,
+          h.checkout_pax AS pax_out,
+          s.structure_type_id,
+          h.operation_id,
+          c.alias AS alias,
+          c.name AS customer_name,
+          s.customer_structure_reference AS customer_reference,
+          h.cleaned_by_us AS cleaner_id,
+          COALESCE(o.enable_wass, 0) AS enable_wass,
+          COALESCE(o.enable_wass_readonly, 0) AS enable_wass_readonly
+        FROM app_housekeeping h
+        JOIN app_structures s ON h.structure_id = s.id
+        LEFT JOIN app_customers c ON s.customer_id = c.id
+        LEFT JOIN app_structure_operation o ON o.id = h.operation_id
+        WHERE h.checkout = ?
+          AND h.cleaned_by_us IS NOT NULL
+          AND h.cleaned_by_us > 0
+          AND h.deleted_at IS NULL
+          AND h.deleted_at_client IS NULL
+          AND s.lat IS NOT NULL AND s.lng IS NOT NULL
+          AND s.lat != '' AND s.lng != ''
+          AND s.lat != '0' AND s.lng != '0'
+          AND (COALESCE(o.enable_wass, 0) = 1 OR COALESCE(o.enable_wass_readonly, 0) = 1)
+        ORDER BY h.cleaned_by_us ASC, h.checkout_time ASC, h.id ASC
+      `,
+      [workDate]
+    );
+
+    const list = Array.isArray(rows) ? rows : [];
+    return list
+      .map((r: any) => {
+        const taskId = Number(r?.task_id);
+        const cleanerId = Number(r?.cleaner_id);
+        if (!Number.isFinite(taskId) || !Number.isFinite(cleanerId) || cleanerId <= 0) {
+          return null;
+        }
+        const operationIdRaw = r?.operation_id;
+        const operationId = operationIdRaw != null ? Number(operationIdRaw) : null;
+        const normalizedOperationId = operationId === 0 ? 2 : operationId;
+        const mode: PreassignedMode = isTrue(r?.enable_wass_readonly) ? "readonly" : "normal";
+        const clientId = r?.client_id != null ? Number(r.client_id) : null;
+        return {
+          task_id: taskId,
+          logistic_code: r?.logistic_code != null ? Number(r.logistic_code) : null,
+          client_id: clientId,
+          premium: isTrue(r?.premium),
+          address: r?.address ? String(r.address) : null,
+          lat: r?.lat != null ? String(r.lat).replace(",", ".").trim() : null,
+          lng: r?.lng != null ? String(r.lng).replace(",", ".").trim() : null,
+          cleaning_time: Number(r?.cleaning_time ?? 0) || 0,
+          checkin_date: r?.checkin ? formatInTimeZone(new Date(r.checkin), "Europe/Rome", "yyyy-MM-dd") : null,
+          checkout_date: r?.checkout ? formatInTimeZone(new Date(r.checkout), "Europe/Rome", "yyyy-MM-dd") : null,
+          checkin_time: r?.checkin_time != null ? String(r.checkin_time).trim() || null : null,
+          checkout_time: r?.checkout_time != null ? String(r.checkout_time).trim() || null : null,
+          pax_in: r?.pax_in != null ? Number(r.pax_in) : 0,
+          pax_out: r?.pax_out != null ? Number(r.pax_out) : 0,
+          small_equipment: Number(r?.structure_type_id) === 1,
+          operation_id: normalizedOperationId,
+          confirmed_operation: operationId !== 0,
+          straordinaria: Number(normalizedOperationId) === 3,
+          type_apt: mapStructureTypeToLetter(Number(r?.structure_type_id)),
+          alias: r?.alias != null ? String(r.alias).trim() || null : null,
+          customer_name: r?.customer_name != null ? String(r.customer_name).trim() || null : null,
+          customer_reference:
+            clientId === 3 && r?.customer_reference != null
+              ? String(r.customer_reference).trim() || null
+              : null,
+          preAssignedMode: mode,
+          assignedCleanerId: cleanerId,
+        };
+      })
+      .filter((row: any) => row !== null);
+  } finally {
+    if (connection) {
+      try {
+        await connection.end();
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+
+async function rehydratePreassignedAssignmentsFromAdam(
+  workDate: string,
+  currentUsername: string,
+  scope: "housekeeping" | "office"
+): Promise<{ rehydrated: number; autoConvokedCleaners: number }> {
+  const preassignedSeeds = await fetchPreassignedTaskSeedsFromAdam(workDate);
+  if (preassignedSeeds.length === 0) {
+    return { rehydrated: 0, autoConvokedCleaners: 0 };
+  }
+
+  const timelineData =
+    (await workspaceFiles.loadTimeline(workDate, scope)) ||
+    {
+      metadata: { date: workDate, last_updated: getRomeTimestamp(), created_by: currentUsername },
+      cleaners_assignments: [],
+      meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0, total_tasks: 0 },
+    };
+  timelineData.cleaners_assignments = Array.isArray(timelineData.cleaners_assignments)
+    ? timelineData.cleaners_assignments
+    : [];
+  timelineData.meta = timelineData.meta || {};
+  timelineData.metadata = timelineData.metadata || {};
+
+  const selectedCleanersData =
+    (await workspaceFiles.loadSelectedCleaners(workDate, scope)) || { cleaners: [] };
+  const selectedById = new Map<number, any>(
+    (selectedCleanersData.cleaners || [])
+      .map((cleaner: any) => [Number(cleaner?.id), cleaner] as const)
+      .filter(([id]: readonly [number, any]) => Number.isFinite(id))
+  );
+  const initiallySelectedCleanerIds = new Set<number>(selectedById.keys());
+
+  const allPreassignedCleanerIds = Array.from(
+    new Set(
+      preassignedSeeds
+        .map((seed: any) => Number(seed?.assignedCleanerId))
+        .filter((id: number) => Number.isFinite(id) && id > 0)
+    )
+  );
+
+  const missingCleanerIds = allPreassignedCleanerIds.filter((id) => !selectedById.has(id));
+  if (missingCleanerIds.length > 0) {
+    try {
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const cleanersFromDb = await pgDailyAssignmentsService.loadCleanersByIds(
+        missingCleanerIds,
+        workDate,
+        scope
+      );
+      for (const cleaner of cleanersFromDb || []) {
+        const id = Number(cleaner?.id);
+        if (Number.isFinite(id) && !selectedById.has(id)) {
+          selectedById.set(id, cleaner);
+        }
+      }
+    } catch (error) {
+      console.warn("⚠️ Impossibile caricare cleaner mancanti da PG:", error);
+    }
+  }
+
+  const containersData = await workspaceFiles.loadContainers(workDate, scope);
+  const containerTaskById = new Map<number, any>();
+  const containerTypes: Array<"early_out" | "high_priority" | "low_priority"> = [
+    "early_out",
+    "high_priority",
+    "low_priority",
+  ];
+
+  for (const containerType of containerTypes) {
+    const tasks = containersData?.containers?.[containerType]?.tasks || [];
+    for (const task of tasks) {
+      const taskId = Number(task?.task_id ?? task?.id);
+      if (Number.isFinite(taskId) && !containerTaskById.has(taskId)) {
+        containerTaskById.set(taskId, { ...task, priority: containerType });
+      }
+    }
+  }
+
+  let containersDirty = false;
+  const removeTaskFromContainers = (taskId: number) => {
+    if (!containersData?.containers) return;
+    const normalizedTaskId = String(taskId);
+    for (const containerType of containerTypes) {
+      const bucket = containersData.containers?.[containerType];
+      const originalTasks = Array.isArray(bucket?.tasks) ? bucket.tasks : [];
+      const filteredTasks = originalTasks.filter(
+        (task: any) => String(task?.task_id ?? task?.id ?? "") !== normalizedTaskId
+      );
+      if (filteredTasks.length !== originalTasks.length) {
+        bucket.tasks = filteredTasks;
+        bucket.count = filteredTasks.length;
+        containersDirty = true;
+      }
+    }
+    if (containersDirty && containersData.summary) {
+      const eo = containersData.containers?.early_out?.tasks?.length || 0;
+      const hp = containersData.containers?.high_priority?.tasks?.length || 0;
+      const lp = containersData.containers?.low_priority?.tasks?.length || 0;
+      containersData.summary.early_out = eo;
+      containersData.summary.high_priority = hp;
+      containersData.summary.low_priority = lp;
+      containersData.summary.total_tasks = eo + hp + lp;
+    }
+  };
+
+  let rehydrated = 0;
+  const touchedCleanerIds = new Set<number>();
+
+  for (const seed of preassignedSeeds) {
+    const cleanerId = Number(seed?.assignedCleanerId);
+    const taskId = Number(seed?.task_id);
+    if (!Number.isFinite(cleanerId) || !Number.isFinite(taskId) || cleanerId <= 0) continue;
+
+    const existingTask = findTaskInTimelineByIdentity(
+      timelineData,
+      taskId,
+      seed?.logistic_code
+    );
+    if (existingTask) {
+      applyPreassignedModeToTask(
+        existingTask,
+        seed.preAssignedMode === "readonly" ? "readonly" : "normal"
+      );
+      continue;
+    }
+
+    const sourceTask = containerTaskById.get(taskId) || seed;
+    const cleanerInfo = selectedById.get(cleanerId);
+    let cleanerEntry = timelineData.cleaners_assignments.find(
+      (entry: any) => Number(entry?.cleaner?.id) === cleanerId
+    );
+    if (!cleanerEntry) {
+      cleanerEntry = {
+        cleaner: {
+          id: cleanerId,
+          name: cleanerInfo?.name || `ID ${cleanerId}`,
+          lastname: cleanerInfo?.lastname || "",
+          role: cleanerInfo?.role || "Standard",
+          premium: Boolean(cleanerInfo?.premium),
+          start_time: cleanerInfo?.start_time || "10:00",
+        },
+        tasks: [],
+      };
+      timelineData.cleaners_assignments.push(cleanerEntry);
+    }
+    if (!selectedById.has(cleanerId)) {
+      selectedById.set(cleanerId, {
+        id: cleanerId,
+        name: cleanerEntry?.cleaner?.name || `ID ${cleanerId}`,
+        lastname: cleanerEntry?.cleaner?.lastname || "",
+        role: cleanerEntry?.cleaner?.role || "Standard",
+        premium: Boolean(cleanerEntry?.cleaner?.premium),
+        start_time: cleanerEntry?.cleaner?.start_time || "10:00",
+      });
+    }
+
+    const preAssignedMode: PreassignedMode = seed.preAssignedMode === "readonly" ? "readonly" : "normal";
+    const taskForTimeline = applyPreassignedModeToTask(
+      {
+        task_id: Number(sourceTask.task_id ?? sourceTask.id ?? taskId),
+        logistic_code: Number(sourceTask.logistic_code ?? sourceTask.name ?? seed.logistic_code ?? 0),
+        client_id: sourceTask.client_id ?? seed.client_id ?? null,
+        premium: Boolean(sourceTask.premium ?? seed.premium),
+        address: sourceTask.address ?? seed.address ?? null,
+        lat: sourceTask.lat ?? seed.lat ?? null,
+        lng: sourceTask.lng ?? seed.lng ?? null,
+        cleaning_time: Number(sourceTask.cleaning_time ?? seed.cleaning_time ?? 0) || 0,
+        checkin_date: sourceTask.checkin_date ?? seed.checkin_date ?? null,
+        checkout_date: sourceTask.checkout_date ?? seed.checkout_date ?? null,
+        checkin_time: sourceTask.checkin_time ?? seed.checkin_time ?? null,
+        checkout_time: sourceTask.checkout_time ?? seed.checkout_time ?? null,
+        pax_in: Number(sourceTask.pax_in ?? seed.pax_in ?? 0) || 0,
+        pax_out: Number(sourceTask.pax_out ?? seed.pax_out ?? 0) || 0,
+        small_equipment: Boolean(sourceTask.small_equipment ?? seed.small_equipment),
+        operation_id:
+          sourceTask.operation_id !== undefined
+            ? sourceTask.operation_id
+            : (seed.operation_id ?? 2),
+        confirmed_operation:
+          sourceTask.confirmed_operation !== undefined
+            ? Boolean(sourceTask.confirmed_operation)
+            : Boolean(seed.confirmed_operation),
+        straordinaria:
+          sourceTask.straordinaria !== undefined
+            ? Boolean(sourceTask.straordinaria)
+            : Boolean(seed.straordinaria),
+        type_apt: sourceTask.type_apt ?? seed.type_apt ?? null,
+        alias: sourceTask.alias ?? seed.alias ?? null,
+        customer_name: sourceTask.customer_name ?? seed.customer_name ?? null,
+        customer_reference: sourceTask.customer_reference ?? seed.customer_reference ?? null,
+        reasons: normalizeTaskReasons([
+          ...(sourceTask.reasons || []),
+          PREASSIGNED_REASON_REHYDRATED,
+        ]),
+        manually_moved: false,
+        priority: sourceTask.priority || "low_priority",
+        start_time: sourceTask.start_time ?? null,
+        end_time: sourceTask.end_time ?? null,
+        followup: false,
+        sequence: 0,
+        travel_time: Number(sourceTask.travel_time ?? 0) || 0,
+      },
+      preAssignedMode
+    );
+
+    cleanerEntry.tasks = (cleanerEntry.tasks || []).filter(
+      (task: any) => String(task?.task_id ?? "") !== String(taskForTimeline.task_id)
+    );
+    cleanerEntry.tasks.push(taskForTimeline);
+    removeTaskFromContainers(taskForTimeline.task_id);
+    rehydrated += 1;
+    touchedCleanerIds.add(cleanerId);
+  }
+
+  for (const cleanerEntry of timelineData.cleaners_assignments) {
+    const cleanerId = Number(cleanerEntry?.cleaner?.id);
+    if (!touchedCleanerIds.has(cleanerId)) continue;
+    if (!Array.isArray(cleanerEntry.tasks) || cleanerEntry.tasks.length === 0) continue;
+    cleanerEntry.tasks.forEach((task: any, index: number) => {
+      task.sequence = index + 1;
+      task.followup = index > 0;
+    });
+    try {
+      await hydrateTasksFromContainers(cleanerEntry, workDate);
+      const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate);
+      cleanerEntry.tasks = updatedCleanerData.tasks || cleanerEntry.tasks;
+    } catch (error: any) {
+      console.warn(
+        `⚠️ Recalc tempi pre-assegnati fallito per cleaner ${cleanerEntry?.cleaner?.id}: ${error?.message || error}`
+      );
+    }
+  }
+
+  timelineData.metadata.last_updated = getRomeTimestamp();
+  timelineData.metadata.date = workDate;
+  timelineData.meta.total_cleaners = timelineData.cleaners_assignments.length;
+  timelineData.meta.used_cleaners = timelineData.cleaners_assignments.filter(
+    (entry: any) => (entry.tasks || []).length > 0
+  ).length;
+  timelineData.meta.assigned_tasks = timelineData.cleaners_assignments.reduce(
+    (sum: number, entry: any) => sum + ((entry.tasks || []).length || 0),
+    0
+  );
+  timelineData.meta.total_tasks = timelineData.meta.assigned_tasks;
+
+  await workspaceFiles.saveTimeline(
+    workDate,
+    timelineData,
+    false,
+    currentUsername,
+    "timeline_rehydrate_preassigned",
+    undefined,
+    scope
+  );
+  if (containersDirty && containersData) {
+    await workspaceFiles.saveContainers(workDate, containersData, currentUsername, "manual", scope);
+  }
+
+  const mergedCleaners = Array.from(selectedById.values()).filter(
+    (cleaner: any) => Number.isFinite(Number(cleaner?.id))
+  );
+  const mergedCleanerIds = new Set<number>(mergedCleaners.map((cleaner: any) => Number(cleaner.id)));
+  const autoConvokedCleanerIds = Array.from(mergedCleanerIds).filter(
+    (id) => !initiallySelectedCleanerIds.has(id)
+  );
+  const usedAutoConvokedCleanerIds = autoConvokedCleanerIds.filter((id) =>
+    mergedCleanerIds.has(id)
+  );
+  if (usedAutoConvokedCleanerIds.length > 0) {
+    const selectedCleanersPayload = {
+      cleaners: mergedCleaners,
+      total_selected: mergedCleaners.length,
+      metadata: { date: workDate },
+    };
+    await workspaceFiles.saveSelectedCleaners(
+      workDate,
+      selectedCleanersPayload,
+      false,
+      currentUsername,
+      "MANUAL",
+      scope
+    );
+  }
+
+  return { rehydrated, autoConvokedCleaners: usedAutoConvokedCleanerIds.length };
 }
 
 function isValidWorkDate(dateStr: string): boolean {
@@ -596,13 +1080,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`✅ Containers rigenerati da ADAM`);
       }
 
+      const rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
+        workDate,
+        currentUsername,
+        resolveScopeFromReq(req)
+      );
+      const rehydratedPreassigned = rehydrateResult.rehydrated;
+
       // === RESET: NON modificare selected_cleaners ===
       console.log(`✅ Reset completato - selected_cleaners NON modificato`);
 
       res.json({ 
         success: true, 
         message: "Timeline resettata e containers rigenerati da ADAM",
-        containersRefreshed: refreshResult.success
+        containersRefreshed: refreshResult.success,
+        preassignedRehydrated: rehydratedPreassigned,
       });
     } catch (error: any) {
       console.error("Errore nel reset della timeline:", error);
@@ -615,6 +1107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { taskId, logisticCode, sourceCleanerId, destCleanerId, destIndex, date } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
+      const resolvedScope = resolveScopeFromReq(req);
 
       // Verifica se la task è bloccata (enforcement)
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
@@ -647,6 +1140,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             locked_reason: lockInfo?.lockedReason
           });
         }
+      }
+
+      // ENFORCEMENT: task pre-assegnate readonly non possono cambiare cleaner
+      const timelineForGuard = await workspaceFiles.loadTimeline(workDate, resolvedScope);
+      const guardTask = findTaskInTimelineByIdentity(timelineForGuard, taskId, logisticCode);
+      if (isReadonlyPreassignedTask(guardTask)) {
+        return res.status(423).json({
+          success: false,
+          error: "PREASSIGNED_READONLY",
+          message: "Task pre-assegnata readonly: spostamento tra cleaner non consentito",
+        });
       }
 
       // --- COLLABORATION-AWARE LOGIC ---
@@ -737,7 +1241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // --- END COLLABORATION-AWARE LOGIC ---
 
       // Carica timeline da PostgreSQL
-      let timelineData: any = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
+      let timelineData: any = await workspaceFiles.loadTimeline(workDate, resolvedScope);
       if (!timelineData) {
         timelineData = { cleaners_assignments: [], metadata: { date: workDate }, meta: { total_cleaners: 0, used_cleaners: 0, assigned_tasks: 0 } };
       }
@@ -1516,7 +2020,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let rows: any[] = [];
       if (forOffice) {
         const [officeRows]: any = await connection.execute(
-          `SELECT o.id, l.name
+          `SELECT o.id, l.name, o.enable_wass, o.enable_wass_readonly
            FROM app_structure_operation o
            LEFT JOIN app_structure_operation_langs l
              ON l.structure_operation_id = o.id AND l.id_lang = 1
@@ -1527,7 +2031,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         const enableClause = forLogistics ? "o.enable_wass_route = 1" : "o.enable_wass = 1";
         const [defaultRows]: any = await connection.execute(
-          `SELECT o.id, l.name
+          `SELECT o.id, l.name, o.enable_wass, o.enable_wass_readonly
            FROM app_structure_operation o
            INNER JOIN app_structure_operation_langs l
              ON l.structure_operation_id = o.id AND l.id_lang = 1
@@ -1546,7 +2050,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const id = Number(r?.id);
           const rawName = r?.name != null ? String(r.name).trim() : "";
           const name = rawName || officeFallbackNames[id] || "";
-          return { id, name };
+          return {
+            id,
+            name,
+            enable_wass: isTrue(r?.enable_wass),
+            enable_wass_readonly: isTrue(r?.enable_wass_readonly),
+          };
         })
         .filter((op: { id: number }) => Number.isFinite(op.id));
 
@@ -1554,7 +2063,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const byId = new Map(active_operations.map((op: { id: number; name: string }) => [op.id, op]));
         for (const id of [15, 38]) {
           if (!byId.has(id)) {
-            active_operations.push({ id, name: officeFallbackNames[id] });
+            active_operations.push({
+              id,
+              name: officeFallbackNames[id],
+              enable_wass: false,
+              enable_wass_readonly: false,
+            });
           }
         }
         active_operations.sort((a: { id: number }, b: { id: number }) => a.id - b.id);
@@ -3409,6 +3923,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
       const modificationType = modification_type || 'task_assigned_manually';
+      const resolvedScope = resolveScopeFromReq(req);
 
       // ENFORCEMENT: blocca assegnazioni manuali verso cleaner locked
       console.log(`🔍 CHECKING: save-timeline-assignment for cleanerId=${cleanerId}, workDate=${workDate}`);
@@ -3445,6 +3960,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      if (isReadonlyPreassignedTask(taskData)) {
+        return res.status(423).json({
+          success: false,
+          error: "PREASSIGNED_READONLY",
+          message: "Task pre-assegnata readonly: assegnazione manuale non consentita",
+        });
+      }
+
       // Carica containers per ottenere i dati completi del task
       let fullTaskData: any = null;
       let sourceContainerType: string | null = null; // To track where the task came from
@@ -3452,7 +3975,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // SEMPRE carica i containers da PostgreSQL - necessario per salvare la history e rimuovere la task
       let containersData = null;
       try {
-        containersData = await workspaceFiles.loadContainers(workDate, resolveScopeFromReq(req));
+        containersData = await workspaceFiles.loadContainers(workDate, resolvedScope);
       } catch (error) {
         console.error(`Failed to load containers:`, error);
         // Continue without containers data
@@ -3521,7 +4044,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
       // Carica timeline esistente o crea nuova struttura usando workspace helper
-      let timelineData = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
+      let timelineData = await workspaceFiles.loadTimeline(workDate, resolvedScope);
 
       if (!timelineData) {
         // Crea nuova struttura se non esiste
@@ -3595,6 +4118,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         String(t.logistic_code) !== normalizedLogisticCode && String(t.task_id) !== normalizedTaskId
       );
 
+      const preAssignedMode =
+        resolvePreassignedModeFromTask(fullTaskData) ||
+        resolvePreassignedModeFromTask(taskData);
+
       // Normalizza la task al formato usato dagli script Python (IDENTICO agli script)
       const taskForTimeline = {
         // Campi identificativi (sempre come numeri)
@@ -3653,6 +4180,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         travel_time: 0
         // Note: modified_by is tracked in timeline.metadata, not per-task
       };
+      if (preAssignedMode) {
+        applyPreassignedModeToTask(taskForTimeline, preAssignedMode);
+      }
 
       console.log('📝 Task salvato in timeline:', {
         task_id: taskForTimeline.task_id,
@@ -3670,7 +4200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // CRITICAL: Carica start_time aggiornato da PostgreSQL PRIMA di ricalcolare
       try {
-        const selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
+        const selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate, resolvedScope);
         const selectedCleaner = selectedCleanersData?.cleaners?.find((c: any) => c.id === normalizedCleanerId);
         
         if (selectedCleaner?.start_time) {
@@ -3735,7 +4265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline usando workspace helper (scrive su filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUserFromRequest, modificationType, undefined, resolveScopeFromReq(req));
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, modifyingUserFromRequest, modificationType, undefined, resolvedScope);
 
       // RIMUOVI SEMPRE la task da containers.json quando salvata in timeline
       if (containersData && containersData.containers) {
@@ -3784,7 +4314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
 
             // Salva containers.json aggiornato usando workspace helper (filesystem + Object Storage)
-            await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', resolveScopeFromReq(req));
+            await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', resolvedScope);
             console.log(`✅ Containers.json aggiornato e sincronizzato con timeline`);
           }
         } catch (containerError) {
@@ -3807,11 +4337,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { taskId, logisticCode, date, modified_by } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
+      const resolvedScope = resolveScopeFromReq(req);
 
       console.log(`Rimozione assegnazione timeline - taskId: ${taskId}, logisticCode: ${logisticCode}, date: ${workDate}`);
 
       // Carica timeline usando workspace helper
-      let assignmentsData = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
+      let assignmentsData = await workspaceFiles.loadTimeline(workDate, resolvedScope);
       if (!assignmentsData) {
         // Crea struttura vuota se non esiste
         assignmentsData = {
@@ -3820,6 +4351,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           meta: { total_cleaners: 0, total_tasks: 0, last_updated: getRomeTimestamp() },
           metadata: { date: workDate, last_updated: getRomeTimestamp() }
         };
+      }
+
+      const readonlyTask = findTaskInTimelineByIdentity(assignmentsData, taskId, logisticCode);
+      if (isReadonlyPreassignedTask(readonlyTask)) {
+        return res.status(423).json({
+          success: false,
+          error: "PREASSIGNED_READONLY",
+          message: "Task pre-assegnata readonly: rimozione dalla timeline non consentita",
+        });
       }
 
       let removedCount = 0;
@@ -3902,7 +4442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Salva timeline usando workspace helper (filesystem + Object Storage)
-      await workspaceFiles.saveTimeline(workDate, assignmentsData, false, modifyingUser, 'task_removed_from_timeline', undefined, resolveScopeFromReq(req));
+      await workspaceFiles.saveTimeline(workDate, assignmentsData, false, modifyingUser, 'task_removed_from_timeline', undefined, resolvedScope);
 
       // RIPORTA la task nel container corretto
       if (removedTask) {
@@ -3916,7 +4456,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.warn(`⚠️ Could not save containers history (non-blocking):`, historyError);
           }
           
-          const containersData = await workspaceFiles.loadContainers(workDate, resolveScopeFromReq(req)) || { containers: { early_out: { tasks: [] }, high_priority: { tasks: [] }, low_priority: { tasks: [] } }, summary: {} };
+          const containersData = await workspaceFiles.loadContainers(workDate, resolvedScope) || { containers: { early_out: { tasks: [] }, high_priority: { tasks: [] }, low_priority: { tasks: [] } }, summary: {} };
 
           // Determina il container corretto in base alla priority della task
           const priority = removedTask.priority || 'low_priority';
@@ -3965,7 +4505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Salva containers.json usando workspace helper (filesystem + Object Storage)
-          await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', resolveScopeFromReq(req));
+          await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', resolvedScope);
           console.log(`✅ Task ${logisticCode} riportata nel container ${containerType}`);
         } catch (containerError) {
           console.warn('Errore nel ripristino del container:', containerError);
@@ -4025,12 +4565,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const workDate = req.body?.date || format(new Date(), "yyyy-MM-dd");
       const officeScope = isOfficeScope(req.body?.scope);
+      const resolvedScope = resolveScopeFromReq(req);
+      const currentUsername = req.body?.modified_by || req.body?.created_by || getCurrentUsername(req);
 
       console.log(`📥 Caricamento assegnazioni dal database per ${workDate}...`);
 
       // Carica timeline, selected_cleaners E CONTAINERS da PostgreSQL via workspace-files
-      const timelineData = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
-      const selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
+      let timelineData = await workspaceFiles.loadTimeline(workDate, resolvedScope);
+      let selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate, resolvedScope);
       let containersData = await workspaceFiles.loadContainers(workDate, resolveScopeFromReq(req));
 
       // CRITICAL: Considera found=true anche se abbiamo solo containers (per date passate)
@@ -4061,7 +4603,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Carica i containers appena rigenerati da PostgreSQL (salvati da Python via API)
-        containersData = await workspaceFiles.loadContainers(workDate, resolveScopeFromReq(req));
+        containersData = await workspaceFiles.loadContainers(workDate, resolvedScope);
         // Guard against null containersData
         if (!containersData) {
           containersData = {
@@ -4071,6 +4613,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         }
         console.log(`✅ Containers rigenerati dal DB ADAM per ${workDate} (caricati da PostgreSQL)`);
+
+        const rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
+          workDate,
+          currentUsername,
+          resolvedScope
+        );
+        if (rehydrateResult.rehydrated > 0 || rehydrateResult.autoConvokedCleaners > 0) {
+          console.log(
+            `✅ Reidratazione pre-assegnati dopo load-saved-assignments: task=${rehydrateResult.rehydrated}, cleaners auto-convocati=${rehydrateResult.autoConvokedCleaners}`
+          );
+          timelineData = await workspaceFiles.loadTimeline(workDate, resolvedScope);
+          selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate, resolvedScope);
+          containersData = await workspaceFiles.loadContainers(workDate, resolvedScope);
+        }
 
         // Sincronizza: rimuovi task già assegnate dai containers
         const assignedTaskIds = new Set<number>();
@@ -4106,7 +4662,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Salva containers sincronizzati su PostgreSQL (e filesystem come cache per Python scripts)
-        await workspaceFiles.saveContainers(workDate, containersData, 'system', 'containers_synced_from_adam', resolveScopeFromReq(req));
+        await workspaceFiles.saveContainers(workDate, containersData, 'system', 'containers_synced_from_adam', resolvedScope);
         console.log(`✅ Containers sincronizzati: rimosse ${removedCount} task già assegnate, salvati su PostgreSQL`);
       } catch (err) {
         console.error('❌ Errore nella rigenerazione containers:', err);
@@ -4132,7 +4688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timelineData.metadata.loaded_at = getRomeTimestamp().replace('T', ' ').slice(0, 19);
 
         // Salva timeline su PostgreSQL (e filesystem come cache per Python scripts)
-        await workspaceFiles.saveTimeline(workDate, timelineData, true, 'system', 'timeline_loaded_from_db', undefined, resolveScopeFromReq(req));
+        await workspaceFiles.saveTimeline(workDate, timelineData, true, 'system', 'timeline_loaded_from_db', undefined, resolvedScope);
         const taskCount = timelineData.cleaners_assignments?.reduce((sum: number, c: any) => sum + (c.tasks?.length || 0), 0) || 0;
         console.log(`✅ Timeline sincronizzata da database per ${workDate} (${taskCount} task)`);
       } else {
@@ -4141,7 +4697,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           metadata: { date: workDate, saved_at: getRomeTimestamp() },
           cleaners_assignments: []
         };
-        await workspaceFiles.saveTimeline(workDate, emptyTimeline, true, 'system', 'timeline_initialized_empty', undefined, resolveScopeFromReq(req));
+        await workspaceFiles.saveTimeline(workDate, emptyTimeline, true, 'system', 'timeline_initialized_empty', undefined, resolvedScope);
         console.log(`✅ Inizializzato timeline vuota per ${workDate} (nessun dato in database)`);
       }
 
@@ -6547,7 +7103,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         database: databaseConfig.mysql.database,
       });
       const [opRows]: any = await connection.execute(
-        `SELECT id FROM app_structure_operation WHERE active = 1 AND enable_wass = 1`
+        `SELECT id
+         FROM app_structure_operation
+         WHERE active = 1 AND (enable_wass = 1 OR enable_wass_readonly = 1)`
       );
       const activeOpIds = (Array.isArray(opRows) ? opRows : [])
         .map((r: any) => Number(r?.id))
@@ -8073,12 +8631,26 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       // Python ha già salvato containers via API - nessuna azione necessaria
       console.log(`✅ Containers già salvati via API da Python per ${date}`);
 
+      // Reidrata task pre-assegnate subito dopo creazione containers (caricamento iniziale pagina)
+      const rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
+        date,
+        createdBy,
+        resolvedScope
+      );
+      if (rehydrateResult.rehydrated > 0 || rehydrateResult.autoConvokedCleaners > 0) {
+        console.log(
+          `✅ Reidratazione pre-assegnati dopo extract: task=${rehydrateResult.rehydrated}, cleaners auto-convocati=${rehydrateResult.autoConvokedCleaners}`
+        );
+      }
+
       res.json({
         success: true,
         message: "Dati estratti con successo dal database",
         outputs: {
           create_containers: containersResult
-        }
+        },
+        preassignedRehydrated: rehydrateResult.rehydrated,
+        autoConvokedCleaners: rehydrateResult.autoConvokedCleaners,
       });
     } catch (error: any) {
       console.error("Errore nell'estrazione dei dati:", error);
@@ -8354,6 +8926,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
       const taskKey = String(typeof taskId !== 'undefined' ? taskId : logisticCode);
       const workDate = req.body.date || format(new Date(), 'yyyy-MM-dd');
+      const resolvedScope = resolveScopeFromReq(req);
 
       // Verifica se la task è bloccata (enforcement) - specialmente se viene da container
       if (fromContainer && taskId) {
@@ -8571,10 +9144,10 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       }
 
       // Save the updated timeline
-      const saved = await workspaceFiles.saveTimeline(workDate, timelineData, false, req.body.currentUser?.username || 'unknown', modificationType, undefined, resolveScopeFromReq(req));
+      const saved = await workspaceFiles.saveTimeline(workDate, timelineData, false, req.body.currentUser?.username || 'unknown', modificationType, undefined, resolvedScope);
 
       if (containersData) {
-        await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', resolveScopeFromReq(req));
+        await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', resolvedScope);
       }
 
       const message = typeof fromCleanerId === 'number'
