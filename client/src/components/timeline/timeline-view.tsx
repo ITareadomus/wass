@@ -2142,7 +2142,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   <div key={cleaner.id} className="flex mb-0.5">
                     {/* Info cleaner */}
                     <div
-                      className="flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-background/95 cursor-pointer hover:bg-muted/35 transition-colors"
+                      className="flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-custom-blue-light cursor-pointer hover:bg-muted/35 transition-colors"
                       style={{
                         width: `${cleanerColumnWidth}px`,
                         boxShadow: hasIncompatibleTasks && !isRemoved

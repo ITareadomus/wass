@@ -1113,7 +1113,7 @@ export default function LogisticsTimelineView({
                   <div key={driver.id} className="flex mb-0.5">
                     <div
                       className={cn(
-                        "flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-background/95",
+                        "flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-custom-blue-light",
                         "cursor-pointer hover:bg-muted/35 transition-colors",
                         driver.isRemoved && "opacity-70"
                       )}
