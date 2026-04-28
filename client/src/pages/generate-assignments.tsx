@@ -2307,7 +2307,7 @@ export default function GenerateAssignments() {
             })()}
 
           <div className="mt-0 grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div className="xl:col-span-2">
+            <div className="xl:col-span-3">
               {/* Timeline View */}
               <div data-print-timeline>
                 <TimelineView
@@ -2329,7 +2329,7 @@ export default function GenerateAssignments() {
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="hidden space-y-4">
               <MapSection tasks={allTasksWithAssignments} />
 
               {/* Pannello Statistiche Task */}
