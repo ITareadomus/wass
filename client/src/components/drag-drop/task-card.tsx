@@ -290,6 +290,15 @@ const displayClickableInputClass =
   const normalizeOperationName = (name: string | null | undefined) =>
     (name || "").toLowerCase().trim();
 
+  const CORE_WASS_OPERATION_IDS = new Set([1, 2, 3, 4, 37]);
+  const CORE_WASS_OPERATION_NAMES = new Set([
+    "fermata",
+    "partenza",
+    "pulizia straordinaria",
+    "ripasso",
+    "continuazione ps",
+  ]);
+
   const getOperationNameFromTask = (taskObj: any) => {
     const opId = taskObj?.operation_id;
     if (opId == null) return "";
@@ -311,12 +320,57 @@ const displayClickableInputClass =
     return n.includes("ripasso");
   };
 
+  const getInterventionLabel = (taskObj: any): string => {
+    const explicitName = String(
+      taskObj?.operation_name ??
+      taskObj?.operationName ??
+      taskObj?.operation_label ??
+      ""
+    ).trim();
+    if (explicitName) return explicitName;
+
+    const fromOperationMap = String(getOperationNameFromTask(taskObj) || "").trim();
+    if (fromOperationMap) return fromOperationMap;
+
+    const opId = Number(taskObj?.operation_id);
+    if (Number.isFinite(opId)) return `Intervento ${opId}`;
+
+    return "Intervento extra";
+  };
+
+  const getExternalInterventionBadgeLabel = (
+    taskObj: any,
+    isStraordinariaTask: boolean,
+    isPremiumTask: boolean
+  ): string | null => {
+    if (isStraordinariaTask || isPremiumTask) return null;
+
+    const normalizedName = normalizeOperationName(
+      String(
+        taskObj?.operation_name ??
+        taskObj?.operationName ??
+        taskObj?.operation_label ??
+        getOperationNameFromTask(taskObj) ??
+        ""
+      )
+    );
+    const opId = Number(taskObj?.operation_id);
+    const hasExternalOperationId = Number.isFinite(opId) && !CORE_WASS_OPERATION_IDS.has(opId);
+    const hasExternalOperationName =
+      normalizedName.length > 0 && !CORE_WASS_OPERATION_NAMES.has(normalizedName);
+
+    if (!hasExternalOperationId && !hasExternalOperationName) return null;
+
+    return getInterventionLabel(taskObj).toUpperCase();
+  };
+
   const [isMapFiltered, setIsMapFiltered] = useState(false);
   
   // Estrai locked e locked_reason dal task per dependency stabili
   const taskLocked = (task as any).locked ?? false;
   const taskLockedReason = (task as any).locked_reason ?? '';
   const preAssignedMode = resolvePreAssignedModeFromTask(task);
+  const isPreAssigned = preAssignedMode === "readonly" || preAssignedMode === "normal";
   const isPreAssignedReadonly = preAssignedMode === "readonly";
   const isTaskReadOnly = isReadOnly || isPreAssignedReadonly;
   
@@ -971,10 +1025,6 @@ const displayClickableInputClass =
 
   // Se la task è bloccata, usa grigio invece del colore normale
   const cardColorClass = isLocked && !isInTimeline ? "bg-gray-100 opacity-70 dark:bg-gray-500 dark:opacity-90" : resolvedCardTypeColor;
-  const preassignedReadonlyCardClass = isPreAssignedReadonly
-    ? "border-amber-500/80 ring-1 ring-amber-400/60 dark:border-amber-400/80 dark:ring-amber-300/50"
-    : "";
-
   useEffect(() => {
     if (!isModalOpen) return;
     const taskObj = displayTask as any;
@@ -2525,7 +2575,6 @@ const displayClickableInputClass =
                   <div
                     className={`
                       ${cardColorClass}
-                      ${preassignedReadonlyCardClass}
                       rounded-sm border px-2 py-1 transition-all duration-200
                       ${snapshot.isDragging ? "shadow-lg" : "shadow-sm"}
                       ${
@@ -2596,10 +2645,14 @@ const displayClickableInputClass =
                         </div>
                       </div>
                     )}
-                    {isPreAssignedReadonly && (
-                      <div className="absolute -top-1.5 -right-1.5 z-20">
+                    {isPreAssigned && (
+                      <div className="absolute -top-1.5 -right-1.5 z-[70]">
                         <div className="w-4 h-4 rounded-full flex items-center justify-center bg-amber-600 text-white border-2 border-amber-700 shadow-md">
-                          <Lock className="w-2.5 h-2.5" strokeWidth={2.5} />
+                          {isPreAssignedReadonly ? (
+                            <Lock className="w-2.5 h-2.5" strokeWidth={2.5} />
+                          ) : (
+                            <LockOpen className="w-2.5 h-2.5" strokeWidth={2.5} />
+                          )}
                         </div>
                       </div>
                     )}
@@ -2768,11 +2821,33 @@ const displayClickableInputClass =
 
               <DialogTitle className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-2 text-center">
                 Dettagli Task #{getTaskKey(displayTask)}
+                {(() => {
+                  const displayIsPremium = Boolean(displayTask.premium);
+                  const displayIsStraordinaria =
+                    Boolean(displayTask.straordinaria) ||
+                    isContinuazioneStraordinariaTask(displayTask) ||
+                    isOfficeStraordinariaOperation(displayTask);
+                  const displayExternalBadgeLabel = getExternalInterventionBadgeLabel(
+                    displayTask,
+                    displayIsStraordinaria,
+                    displayIsPremium
+                  );
+                  const displayTypeLabel = displayExternalBadgeLabel
+                    ? displayExternalBadgeLabel
+                    : isOfficeStraordinariaOperation(displayTask)
+                      ? "PULIZIA UFFICI STRAORDINARIA"
+                      : isOfficeOtherOperation(displayTask)
+                        ? "PULIZIA UFFICI"
+                        : isContinuazioneStraordinariaTask(displayTask)
+                          ? "CONTINUAZIONE PS"
+                          : getTaskTypeStyle(displayIsStraordinaria, displayIsPremium).label;
+
+                  return (
                 <Badge
                   variant="outline"
                   className={cn(
                     "text-xs shrink-0 px-2 py-0.5 rounded border font-medium",
-                    isOfficeOtherOperation(displayTask) || isOfficeStraordinariaOperation(displayTask)
+                    displayExternalBadgeLabel
                       ? "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700"
                     : (Boolean(displayTask.straordinaria) || isContinuazioneStraordinariaTask(displayTask))
                         ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
@@ -2781,17 +2856,10 @@ const displayClickableInputClass =
                           : "bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400"
                   )}
                 >
-                  {isOfficeStraordinariaOperation(displayTask)
-                    ? "PULIZIA UFFICI STRAORDINARIA"
-                    : isOfficeOtherOperation(displayTask)
-                      ? "PULIZIA UFFICI"
-                      : isContinuazioneStraordinariaTask(displayTask)
-                        ? "CONTINUAZIONE PS"
-                        : getTaskTypeStyle(
-                            Boolean(displayTask.straordinaria) || isContinuazioneStraordinariaTask(displayTask),
-                            Boolean(displayTask.premium)
-                          ).label}
+                  {displayTypeLabel}
                 </Badge>
+                  );
+                })()}
                 {(displayTask as any).priority && (
                   <Badge
                     variant="outline"
