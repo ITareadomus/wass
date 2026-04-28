@@ -391,19 +391,26 @@ export default function TimelineView({
   }, [cleaners, timelineCleaners]);
 
   const preassignedTasksSummary = React.useMemo(() => {
-    const cleanerNameById = new Map<number, string>();
+    const getPreassignedCleanerLabel = (cleaner: any, cleanerId: number) => {
+      const aliasEntry = cleanersAliases[cleanerId];
+      const alias = String(aliasEntry?.alias ?? cleaner?.alias ?? "").trim();
+      const fullName = `${String(aliasEntry?.name ?? cleaner?.name ?? "").trim()} ${String(aliasEntry?.lastname ?? cleaner?.lastname ?? "").trim()}`.trim();
+      return alias || fullName || `ID ${cleanerId}`;
+    };
+
+    const cleanerLabelById = new Map<number, string>();
     for (const cleaner of allCleanersToShow) {
       const cleanerId = Number((cleaner as any)?.id);
       if (!Number.isFinite(cleanerId)) continue;
-      const name = `${(cleaner as any)?.name || ""} ${(cleaner as any)?.lastname || ""}`.trim() || `ID ${cleanerId}`;
-      cleanerNameById.set(cleanerId, name);
+      cleanerLabelById.set(cleanerId, getPreassignedCleanerLabel(cleaner, cleanerId));
     }
     for (const entry of timelineCleaners || []) {
       const cleanerId = Number(entry?.cleaner?.id);
       if (!Number.isFinite(cleanerId)) continue;
-      const name = `${entry?.cleaner?.name || ""} ${entry?.cleaner?.lastname || ""}`.trim() || `ID ${cleanerId}`;
-      if (!cleanerNameById.has(cleanerId)) {
-        cleanerNameById.set(cleanerId, name);
+      const label = getPreassignedCleanerLabel(entry?.cleaner, cleanerId);
+      const timelineAlias = String(cleanersAliases[cleanerId]?.alias ?? entry?.cleaner?.alias ?? "").trim();
+      if (!cleanerLabelById.has(cleanerId) || timelineAlias) {
+        cleanerLabelById.set(cleanerId, label);
       }
     }
 
@@ -431,7 +438,7 @@ export default function TimelineView({
         "N/D"
       );
       const cleanerLabel = Number.isFinite(assignedCleanerId)
-        ? (cleanerNameById.get(assignedCleanerId) || `ID ${assignedCleanerId}`)
+        ? (cleanerLabelById.get(assignedCleanerId) || `ID ${assignedCleanerId}`)
         : "Non assegnata";
       const address = String((task as any).address ?? "").trim();
 
@@ -451,7 +458,7 @@ export default function TimelineView({
       readonly: rows.filter((row) => row.mode === "readonly"),
       normal: rows.filter((row) => row.mode === "normal"),
     };
-  }, [tasks, allCleanersToShow, timelineCleaners]);
+  }, [tasks, allCleanersToShow, timelineCleaners, cleanersAliases]);
 
   // Crea Set di ID cleaner rimossi per facile lookup
   const removedCleanerIds = React.useMemo(() => {
