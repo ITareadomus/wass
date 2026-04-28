@@ -440,7 +440,7 @@ export default function TimelineView({
       const cleanerLabel = Number.isFinite(assignedCleanerId)
         ? (cleanerLabelById.get(assignedCleanerId) || `ID ${assignedCleanerId}`)
         : "Non assegnata";
-      const address = String((task as any).address ?? "").trim();
+      const address = String((task as any).address ?? "").trim().toUpperCase();
 
       const key = `${String((task as any).task_id ?? (task as any).id ?? logisticCode)}-${Number.isFinite(assignedCleanerId) ? assignedCleanerId : "na"}`;
       if (seen.has(key)) continue;
@@ -2707,7 +2707,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Lock className="w-5 h-5 text-amber-600" />
-              Task pre-assegnate da ADAM
+              Task pre-assegnati da ADAM
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 text-sm">
