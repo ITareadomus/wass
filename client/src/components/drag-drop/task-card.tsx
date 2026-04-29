@@ -146,6 +146,31 @@ const normalizeTime = (timeStr: any): string => {
   return "";
 };
 
+const PREASSIGNED_REASON_NORMAL = "preassigned_enable_wass";
+const PREASSIGNED_REASON_READONLY = "preassigned_enable_wass_readonly";
+type PreAssignedMode = "normal" | "readonly";
+
+const normalizeReasons = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  const out = new Set<string>();
+  for (const reason of value) {
+    const normalized = String(reason ?? "").trim();
+    if (!normalized) continue;
+    out.add(normalized);
+  }
+  return Array.from(out);
+};
+
+const resolvePreAssignedModeFromTask = (task: any): PreAssignedMode | null => {
+  const explicit = String(task?.preAssignedMode ?? "").trim().toLowerCase();
+  if (explicit === "readonly") return "readonly";
+  if (explicit === "normal") return "normal";
+  const reasons = normalizeReasons(task?.reasons);
+  if (reasons.includes(PREASSIGNED_REASON_READONLY)) return "readonly";
+  if (reasons.includes(PREASSIGNED_REASON_NORMAL)) return "normal";
+  return null;
+};
+
 interface MultiSelectContextType {
   isMultiSelectMode: boolean;
   selectedTasks: Array<{ taskId: string; order: number; container?: string }>;
@@ -265,6 +290,15 @@ const displayClickableInputClass =
   const normalizeOperationName = (name: string | null | undefined) =>
     (name || "").toLowerCase().trim();
 
+  const CORE_WASS_OPERATION_IDS = new Set([1, 2, 3, 4, 37]);
+  const CORE_WASS_OPERATION_NAMES = new Set([
+    "fermata",
+    "partenza",
+    "pulizia straordinaria",
+    "ripasso",
+    "continuazione ps",
+  ]);
+
   const getOperationNameFromTask = (taskObj: any) => {
     const opId = taskObj?.operation_id;
     if (opId == null) return "";
@@ -286,11 +320,59 @@ const displayClickableInputClass =
     return n.includes("ripasso");
   };
 
+  const getInterventionLabel = (taskObj: any): string => {
+    const explicitName = String(
+      taskObj?.operation_name ??
+      taskObj?.operationName ??
+      taskObj?.operation_label ??
+      ""
+    ).trim();
+    if (explicitName) return explicitName;
+
+    const fromOperationMap = String(getOperationNameFromTask(taskObj) || "").trim();
+    if (fromOperationMap) return fromOperationMap;
+
+    const opId = Number(taskObj?.operation_id);
+    if (Number.isFinite(opId)) return `Intervento ${opId}`;
+
+    return "Intervento extra";
+  };
+
+  const getExternalInterventionBadgeLabel = (
+    taskObj: any,
+    isStraordinariaTask: boolean,
+    isPremiumTask: boolean
+  ): string | null => {
+    if (isStraordinariaTask || isPremiumTask) return null;
+
+    const normalizedName = normalizeOperationName(
+      String(
+        taskObj?.operation_name ??
+        taskObj?.operationName ??
+        taskObj?.operation_label ??
+        getOperationNameFromTask(taskObj) ??
+        ""
+      )
+    );
+    const opId = Number(taskObj?.operation_id);
+    const hasExternalOperationId = Number.isFinite(opId) && !CORE_WASS_OPERATION_IDS.has(opId);
+    const hasExternalOperationName =
+      normalizedName.length > 0 && !CORE_WASS_OPERATION_NAMES.has(normalizedName);
+
+    if (!hasExternalOperationId && !hasExternalOperationName) return null;
+
+    return getInterventionLabel(taskObj).toUpperCase();
+  };
+
   const [isMapFiltered, setIsMapFiltered] = useState(false);
   
   // Estrai locked e locked_reason dal task per dependency stabili
   const taskLocked = (task as any).locked ?? false;
   const taskLockedReason = (task as any).locked_reason ?? '';
+  const preAssignedMode = resolvePreAssignedModeFromTask(task);
+  const isPreAssigned = preAssignedMode === "readonly" || preAssignedMode === "normal";
+  const isPreAssignedReadonly = preAssignedMode === "readonly";
+  const isTaskReadOnly = isReadOnly || isPreAssignedReadonly;
   
   // Stato per blocco task
   const [isLocked, setIsLocked] = useState(taskLocked);
@@ -783,10 +865,10 @@ const displayClickableInputClass =
 
   // Reset editingFields quando il modal si chiude o quando diventa readonly
   useEffect(() => {
-    if (!isModalOpen || isReadOnly) {
+    if (!isModalOpen || isTaskReadOnly) {
       setEditingFields(new Set());
     }
-  }, [isModalOpen, isReadOnly]);
+  }, [isModalOpen, isTaskReadOnly]);
 
   // All'apertura del modal, allinea sempre la task corrente a quella cliccata.
   // Evita che un currentTaskId stale faccia aprire sempre la stessa task.
@@ -812,7 +894,7 @@ const displayClickableInputClass =
   // Inizializza i campi quando il modale si apre o quando displayTask cambia
   // MA NON se l'utente sta già modificando campi o se è readonly
   useEffect(() => {
-    if (isModalOpen && editingFields.size === 0 && !isReadOnly) {
+    if (isModalOpen && editingFields.size === 0 && !isTaskReadOnly) {
       const shouldInit =
         initializedEditFieldsTaskKeyRef.current !== dialogTaskKey ||
         initializedEditFieldsTaskKeyRef.current === "";
@@ -846,7 +928,7 @@ const displayClickableInputClass =
       // Inizializza operation_id
       setEditedOperationId(String((displayTask as any).operation_id || ""));
     }
-  }, [isModalOpen, dialogTaskKey, editingFields.size, isReadOnly]);
+  }, [isModalOpen, dialogTaskKey, editingFields.size, isTaskReadOnly]);
 
   useEffect(() => {
     if (!isModalOpen) {
@@ -943,7 +1025,6 @@ const displayClickableInputClass =
 
   // Se la task è bloccata, usa grigio invece del colore normale
   const cardColorClass = isLocked && !isInTimeline ? "bg-gray-100 opacity-70 dark:bg-gray-500 dark:opacity-90" : resolvedCardTypeColor;
-
   useEffect(() => {
     if (!isModalOpen) return;
     const taskObj = displayTask as any;
@@ -1778,8 +1859,8 @@ const displayClickableInputClass =
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
     const totalMinutes = hours * 60 + minutes;
 
-    // Se 0 minuti, usa almeno 30 minuti
-    const effectiveMinutes = totalMinutes === 0 ? 30 : totalMinutes;
+    // Se 0 minuti, usa fallback di 60 minuti
+    const effectiveMinutes = totalMinutes === 0 ? 60 : totalMinutes;
 
     if (forTimeline) {
       // Usa la larghezza della timeline in pixel (passata da timeline-view via props)
@@ -1911,7 +1992,7 @@ const displayClickableInputClass =
       : "top-[5px]";
 
   // Determina se il drag è disabilitato in base alla data, se la task è già salvata, o se è bloccata
-  const shouldDisableDrag = isDragDisabled || (displayTask as any).checkin_date || isLocked;
+  const shouldDisableDrag = isDragDisabled || (displayTask as any).checkin_date || isLocked || isPreAssignedReadonly;
 
   // Usa sequence per determinare se è la prima task o successive (più robusto di index)
   // CRITICAL: In timeline usare sempre task (la card rappresenta questa task), non displayTask (dialog)
@@ -2183,7 +2264,7 @@ const displayClickableInputClass =
               <div>
                 <p className={cn("text-sm font-semibold text-muted-foreground flex items-center gap-1", !isLogisticsTimelineDetails && "mb-1")}>
                   Check-out
-                  {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  {!isTaskReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
                 <Input
                   readOnly
@@ -2201,20 +2282,20 @@ const displayClickableInputClass =
                       : "non migrato"
                   }
                   className={
-                    isReadOnly
+                    isTaskReadOnly
                       ? displayInputClass
                       : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
                   }
-                  tabIndex={isReadOnly ? -1 : 0}
+                  tabIndex={isTaskReadOnly ? -1 : 0}
                   onFocus={(e) => {
-                    if (isReadOnly) e.currentTarget.blur();
+                    if (isTaskReadOnly) e.currentTarget.blur();
                   }}
                   onMouseDown={(e) => {
                     e.preventDefault();
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!isReadOnly) handleOpenCheckoutDialog();
+                    if (!isTaskReadOnly) handleOpenCheckoutDialog();
                   }}
                 />
               </div>
@@ -2222,7 +2303,7 @@ const displayClickableInputClass =
               <div>
                 <p className={cn("text-sm font-semibold text-muted-foreground flex items-center gap-1", !isLogisticsTimelineDetails && "mb-1")}>
                   Check-in
-                  {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  {!isTaskReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
                 <Input
                   readOnly
@@ -2240,20 +2321,20 @@ const displayClickableInputClass =
                       : "non migrato"
                   }
                   className={
-                    isReadOnly
+                    isTaskReadOnly
                       ? displayInputClass
                       : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
                   }
-                  tabIndex={isReadOnly ? -1 : 0}
+                  tabIndex={isTaskReadOnly ? -1 : 0}
                   onFocus={(e) => {
-                    if (isReadOnly) e.currentTarget.blur();
+                    if (isTaskReadOnly) e.currentTarget.blur();
                   }}
                   onMouseDown={(e) => {
                     e.preventDefault();
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!isReadOnly) handleOpenCheckinDialog();
+                    if (!isTaskReadOnly) handleOpenCheckinDialog();
                   }}
                 />
               </div>
@@ -2269,7 +2350,7 @@ const displayClickableInputClass =
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Tipologia intervento
-                  {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  {!isTaskReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
                 <Input
                   readOnly
@@ -2286,20 +2367,20 @@ const displayClickableInputClass =
                     return "-";
                   })()}
                   className={
-                    isReadOnly
+                    isTaskReadOnly
                       ? displayInputClass
                       : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
                   }
-                  tabIndex={isReadOnly ? -1 : 0}
+                  tabIndex={isTaskReadOnly ? -1 : 0}
                   onFocus={(e) => {
-                    if (isReadOnly) e.currentTarget.blur();
+                    if (isTaskReadOnly) e.currentTarget.blur();
                   }}
                   onMouseDown={(e) => {
                     e.preventDefault();
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!isReadOnly) handleOpenOperationDialog();
+                    if (!isTaskReadOnly) handleOpenOperationDialog();
                   }}
                 />
               </div>
@@ -2310,26 +2391,26 @@ const displayClickableInputClass =
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Pax-In
-                  {!isReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  {!isTaskReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
                 <Input
                   readOnly
                   value={String((displayTask as any).pax_in ?? "non migrato")}
                   className={
-                    isReadOnly
+                    isTaskReadOnly
                       ? displayInputClass
                       : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
                   }
-                  tabIndex={isReadOnly ? -1 : 0}
+                  tabIndex={isTaskReadOnly ? -1 : 0}
                   onFocus={(e) => {
-                    if (isReadOnly) e.currentTarget.blur();
+                    if (isTaskReadOnly) e.currentTarget.blur();
                   }}
                   onMouseDown={(e) => {
                     e.preventDefault();
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!isReadOnly) handleOpenPaxInDialog();
+                    if (!isTaskReadOnly) handleOpenPaxInDialog();
                   }}
                 />
               </div>
@@ -2423,7 +2504,7 @@ const displayClickableInputClass =
         <div className="-mt-0.5">
           {/** In containers la nota cliente resta solo lettura; in timeline e' modificabile. */}
           {(() => {
-            const canEditCustomerNote = !isReadOnly && isInTimeline;
+            const canEditCustomerNote = !isTaskReadOnly && isInTimeline;
             return (
               <>
           <p className="text-sm font-semibold text-muted-foreground flex items-center gap-1">
@@ -2561,6 +2642,24 @@ const displayClickableInputClass =
                       <div className="absolute -top-1.5 -right-1.5 z-10">
                         <div className="w-4 h-4 rounded-full flex items-center justify-center bg-gray-900/75 text-white border-2 border-gray-700/80 shadow-md backdrop-blur-sm">
                           <HelpCircle className="w-3 h-3" strokeWidth={2.5} />
+                        </div>
+                      </div>
+                    )}
+                    {isPreAssigned && (
+                      <div className="absolute -top-1.5 -right-1.5 z-[70]">
+                        <div
+                          className={[
+                            "w-4 h-4 rounded-full flex items-center justify-center text-white border-2 shadow-md",
+                            isPreAssignedReadonly
+                              ? "bg-amber-600 border-amber-700"
+                              : "bg-sky-500 border-sky-600",
+                          ].join(" ")}
+                        >
+                          {isPreAssignedReadonly ? (
+                            <Lock className="w-2.5 h-2.5" strokeWidth={2.5} />
+                          ) : (
+                            <LockOpen className="w-2.5 h-2.5" strokeWidth={2.5} />
+                          )}
                         </div>
                       </div>
                     )}
@@ -2729,11 +2828,33 @@ const displayClickableInputClass =
 
               <DialogTitle className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-2 text-center">
                 Dettagli Task #{getTaskKey(displayTask)}
+                {(() => {
+                  const displayIsPremium = Boolean(displayTask.premium);
+                  const displayIsStraordinaria =
+                    Boolean(displayTask.straordinaria) ||
+                    isContinuazioneStraordinariaTask(displayTask) ||
+                    isOfficeStraordinariaOperation(displayTask);
+                  const displayExternalBadgeLabel = getExternalInterventionBadgeLabel(
+                    displayTask,
+                    displayIsStraordinaria,
+                    displayIsPremium
+                  );
+                  const displayTypeLabel = displayExternalBadgeLabel
+                    ? displayExternalBadgeLabel
+                    : isOfficeStraordinariaOperation(displayTask)
+                      ? "PULIZIA UFFICI STRAORDINARIA"
+                      : isOfficeOtherOperation(displayTask)
+                        ? "PULIZIA UFFICI"
+                        : isContinuazioneStraordinariaTask(displayTask)
+                          ? "CONTINUAZIONE PS"
+                          : getTaskTypeStyle(displayIsStraordinaria, displayIsPremium).label;
+
+                  return (
                 <Badge
                   variant="outline"
                   className={cn(
                     "text-xs shrink-0 px-2 py-0.5 rounded border font-medium",
-                    isOfficeOtherOperation(displayTask) || isOfficeStraordinariaOperation(displayTask)
+                    displayExternalBadgeLabel
                       ? "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700"
                     : (Boolean(displayTask.straordinaria) || isContinuazioneStraordinariaTask(displayTask))
                         ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
@@ -2742,17 +2863,10 @@ const displayClickableInputClass =
                           : "bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400"
                   )}
                 >
-                  {isOfficeStraordinariaOperation(displayTask)
-                    ? "PULIZIA UFFICI STRAORDINARIA"
-                    : isOfficeOtherOperation(displayTask)
-                      ? "PULIZIA UFFICI"
-                      : isContinuazioneStraordinariaTask(displayTask)
-                        ? "CONTINUAZIONE PS"
-                        : getTaskTypeStyle(
-                            Boolean(displayTask.straordinaria) || isContinuazioneStraordinariaTask(displayTask),
-                            Boolean(displayTask.premium)
-                          ).label}
+                  {displayTypeLabel}
                 </Badge>
+                  );
+                })()}
                 {(displayTask as any).priority && (
                   <Badge
                     variant="outline"
@@ -2930,7 +3044,7 @@ const displayClickableInputClass =
                           e.stopPropagation();
                           openAddCollaboratorDialog();
                         }}
-                        disabled={isReadOnly}
+                        disabled={isTaskReadOnly}
                         className="flex items-center gap-1 border-2 border-purple-300 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20"
                       >
                         <UserPlus className="w-3 h-3" />
@@ -2980,7 +3094,7 @@ const displayClickableInputClass =
             )}
 
             {/* Pulsante Salva Modifiche */}
-            {editingFields.size > 0 && !isReadOnly && (
+            {editingFields.size > 0 && !isTaskReadOnly && (
               <div className="pt-4 border-t mt-4 flex gap-2">
                 <Button
                   onClick={handleSaveChanges}
@@ -3052,7 +3166,7 @@ const displayClickableInputClass =
               {(displayTask as any).is_primary && (
                 <p className="text-blue-600 font-semibold mt-1">Questo cleaner è il Primary</p>
               )}
-              {!isReadOnly && (
+              {!isTaskReadOnly && (
                 <Button
                   variant="destructive"
                   size="sm"
