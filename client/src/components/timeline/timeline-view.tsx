@@ -465,7 +465,11 @@ export default function TimelineView({
     const selectedIds = new Set(cleaners.map(c => c.id));
     return new Set(
       timelineCleaners
-        .filter(tc => tc.tasks && tc.tasks.length > 0 && !selectedIds.has(tc.cleaner?.id))
+        .filter(tc =>
+          Array.isArray(tc.tasks) &&
+          tc.tasks.some((task: any) => !isReadonlyPreassignedTask(task)) &&
+          !selectedIds.has(tc.cleaner?.id)
+        )
         .map(tc => tc.cleaner?.id)
     );
   }, [cleaners, timelineCleaners]);
@@ -502,8 +506,10 @@ export default function TimelineView({
       await loadCleaners();
 
       const message = data.removedFromTimeline
-        ? `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso completamente (nessuna task).`
-        : `${selectedCleaner?.name} ${selectedCleaner?.lastname} è è stato rimosso dalla selezione. Le sue task rimangono in timeline.`;
+        ? data.readonlyTasksRemoved > 0
+          ? `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso completamente insieme alle task read-only.`
+          : `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso completamente (nessuna task).`
+        : `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso dalla selezione. Le sue task modificabili rimangono in timeline.`;
 
       toast({
         title: "Cleaner rimosso",
@@ -651,6 +657,8 @@ export default function TimelineView({
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
       }
+      await loadTimelineCleaners();
+      await loadCleaners();
       // Aggiorna i dati della timeline per mostrare i metadata aggiornati
       await loadTimelineData();
 
@@ -2972,7 +2980,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               Sei sicuro di voler rimuovere "{confirmRemovalDialog.cleanerId !== null ? (() => {
                 const cleaner = allCleanersToShow.find(c => c.id === confirmRemovalDialog.cleanerId);
                 return cleaner ? `${cleaner.name} ${cleaner.lastname}` : 'Unknown';
-              })() : ''}" dalla selezione? Le sue task rimarranno in timeline finché non verrà sostituito.
+              })() : ''}" dalla selezione? Le task modificabili rimarranno in timeline finché non verrà sostituito; se ha solo task read-only, verranno rimosse insieme al cleaner.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 mt-4">

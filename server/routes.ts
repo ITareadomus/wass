@@ -1564,6 +1564,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateSequence(destEntry.tasks);
       }
 
+      const selectedCleanerIds = new Set(
+        (selectedData?.cleaners || [])
+          .map((cleaner: any) => Number(cleaner?.id ?? cleaner))
+          .filter((id: number) => Number.isFinite(id))
+      );
+      const beforeCleanupCount = timelineData.cleaners_assignments.length;
+      timelineData.cleaners_assignments = timelineData.cleaners_assignments.filter((entry: any) => {
+        const entryCleanerId = Number(entry?.cleaner?.id ?? entry?.cleaner_id);
+        const entryTasks = Array.isArray(entry?.tasks) ? entry.tasks : [];
+        return selectedCleanerIds.has(entryCleanerId) || entryTasks.length > 0;
+      });
+      const removedEmptyEntries = beforeCleanupCount - timelineData.cleaners_assignments.length;
+      if (removedEmptyEntries > 0) {
+        console.log(`✅ Rimossi ${removedEmptyEntries} cleaner non convocati e senza task dopo swap`);
+      }
+
       // Aggiorna metadata (mantieni cleaner anche se vuoti), preservando created_by e aggiornando modified_by
       const modifyingUser = modified_by || getCurrentUsername(req);
 
@@ -4753,17 +4769,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Carica timeline da PostgreSQL per verificare se il cleaner ha task
       let timelineData: any;
-      let hasTasks = false;
+      let hasMovableTasks = false;
+      let taskCount = 0;
+      let readonlyTaskCount = 0;
       try {
         timelineData = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
 
         const cleanerEntry = timelineData?.cleaners_assignments?.find(
-          (c: any) => c.cleaner?.id === cleanerId
+          (c: any) => Number(c.cleaner?.id) === Number(cleanerId)
         );
-        hasTasks = cleanerEntry && cleanerEntry.tasks && cleanerEntry.tasks.length > 0;
+        const cleanerTasks = Array.isArray(cleanerEntry?.tasks) ? cleanerEntry.tasks : [];
+        taskCount = cleanerTasks.length;
+        readonlyTaskCount = cleanerTasks.filter((task: any) => isReadonlyPreassignedTask(task)).length;
+        hasMovableTasks = cleanerTasks.some((task: any) => !isReadonlyPreassignedTask(task));
       } catch (error) {
         // Timeline non esiste, nessuna task
-        hasTasks = false;
+        hasMovableTasks = false;
       }
 
       // Rimuovi il cleaner dai selected cleaners in PostgreSQL
@@ -4793,10 +4814,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let message = "";
 
-      // Se il cleaner NON ha task, rimuovilo anche da timeline.json
-      if (!hasTasks && timelineData) {
+      // Se il cleaner non ha task spostabili, rimuovilo anche dalla timeline.
+      // Le task read-only non vanno sostituite/cambiate assegnatario: spariscono col cleaner.
+      if (!hasMovableTasks && timelineData) {
         timelineData.cleaners_assignments = timelineData.cleaners_assignments.filter(
-          (c: any) => c.cleaner?.id !== cleanerId
+          (c: any) => Number(c.cleaner?.id) !== Number(cleanerId)
         );
 
         // Aggiorna metadata
@@ -4813,20 +4835,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Salva timeline.json (dual-write: filesystem + Object Storage)
         await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'cleaner_removed_from_selection', undefined, resolveScopeFromReq(req));
 
-        console.log(`✅ Cleaner ${cleanerId} rimosso completamente (nessuna task)`);
+        console.log(`✅ Cleaner ${cleanerId} rimosso completamente (nessuna task spostabile)`);
         console.log(`   - Rimosso da PostgreSQL selected_cleaners (${cleanersBefore} -> ${selectedData.cleaners.length})`);
         console.log(`   - Rimosso da timeline`);
-        message = "Cleaner rimosso completamente (nessuna task)";
+        message = readonlyTaskCount > 0
+          ? `Cleaner rimosso completamente (${readonlyTaskCount} task read-only rimossa/e)`
+          : "Cleaner rimosso completamente (nessuna task)";
       } else {
         console.log(`✅ Cleaner ${cleanerId} rimosso da PostgreSQL selected_cleaners (${cleanersBefore} -> ${selectedData.cleaners.length})`);
-        console.log(`   Il cleaner rimane in timeline con le sue task fino a sostituzione`);
+        console.log(`   Il cleaner rimane in timeline con ${taskCount} task fino a sostituzione`);
         message = "Cleaner rimosso dalla selezione (task mantenute)";
       }
 
       res.json({
         success: true,
         message,
-        removedFromTimeline: !hasTasks
+        removedFromTimeline: !hasMovableTasks,
+        readonlyTasksRemoved: !hasMovableTasks ? readonlyTaskCount : 0
       });
     } catch (error: any) {
       console.error("Errore nella rimozione del cleaner:", error);
@@ -4981,7 +5006,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CRITICAL: Cerca un cleaner in timeline CHE NON sia in selected_cleaners
       // Questi sono i cleaners rimossi che hanno ancora task
       const cleanerToReplace = timelineData.cleaners_assignments.find(
-        (c: any) => !selectedCleanerIds.has(c.cleaner?.id || c.cleaner_id)
+        (c: any) => {
+          const candidateCleanerId = Number(c.cleaner?.id || c.cleaner_id);
+          const tasks = Array.isArray(c.tasks) ? c.tasks : [];
+          return Number.isFinite(candidateCleanerId) &&
+            !selectedCleanerIds.has(candidateCleanerId) &&
+            tasks.some((task: any) => !isReadonlyPreassignedTask(task));
+        }
       );
 
       let replacedCleanerId: number | null = null;
