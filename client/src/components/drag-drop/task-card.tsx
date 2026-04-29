@@ -2647,7 +2647,14 @@ const displayClickableInputClass =
                     )}
                     {isPreAssigned && (
                       <div className="absolute -top-1.5 -right-1.5 z-[70]">
-                        <div className="w-4 h-4 rounded-full flex items-center justify-center bg-amber-600 text-white border-2 border-amber-700 shadow-md">
+                        <div
+                          className={[
+                            "w-4 h-4 rounded-full flex items-center justify-center text-white border-2 shadow-md",
+                            isPreAssignedReadonly
+                              ? "bg-amber-600 border-amber-700"
+                              : "bg-sky-500 border-sky-600",
+                          ].join(" ")}
+                        >
                           {isPreAssignedReadonly ? (
                             <Lock className="w-2.5 h-2.5" strokeWidth={2.5} />
                           ) : (
