@@ -383,10 +383,25 @@ async function fetchPreassignedTaskSeedsFromAdam(workDate: string): Promise<Arra
 async function rehydratePreassignedAssignmentsFromAdam(
   workDate: string,
   currentUsername: string,
-  scope: "housekeeping" | "office"
+  scope: "housekeeping" | "office",
+  options: { cleanerIds?: number[] } = {}
 ): Promise<{ rehydrated: number; autoConvokedCleaners: number }> {
   const preassignedSeeds = await fetchPreassignedTaskSeedsFromAdam(workDate);
   if (preassignedSeeds.length === 0) {
+    return { rehydrated: 0, autoConvokedCleaners: 0 };
+  }
+
+  const scopedCleanerIds = Array.isArray(options.cleanerIds)
+    ? new Set(
+        options.cleanerIds
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      )
+    : null;
+  const effectivePreassignedSeeds = scopedCleanerIds
+    ? preassignedSeeds.filter((seed: any) => scopedCleanerIds.has(Number(seed?.assignedCleanerId)))
+    : preassignedSeeds;
+  if (effectivePreassignedSeeds.length === 0) {
     return { rehydrated: 0, autoConvokedCleaners: 0 };
   }
 
@@ -414,7 +429,7 @@ async function rehydratePreassignedAssignmentsFromAdam(
 
   const autoConvokingPreassignedCleanerIds = Array.from(
     new Set(
-      preassignedSeeds
+      effectivePreassignedSeeds
         .filter((seed: any) => seed?.preAssignedMode !== "readonly")
         .map((seed: any) => Number(seed?.assignedCleanerId))
         .filter((id: number) => Number.isFinite(id) && id > 0)
@@ -489,7 +504,7 @@ async function rehydratePreassignedAssignmentsFromAdam(
   let rehydrated = 0;
   const touchedCleanerIds = new Set<number>();
 
-  for (const seed of preassignedSeeds) {
+  for (const seed of effectivePreassignedSeeds) {
     const cleanerId = Number(seed?.assignedCleanerId);
     const taskId = Number(seed?.task_id);
     if (!Number.isFinite(cleanerId) || !Number.isFinite(taskId) || cleanerId <= 0) continue;
@@ -5110,7 +5125,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
           workDate,
           currentUsername,
-          resolveScopeFromReq(req)
+          resolveScopeFromReq(req),
+          { cleanerIds: [Number(cleanerId)] }
         );
         if (rehydrateResult.rehydrated > 0 || rehydrateResult.autoConvokedCleaners > 0) {
           console.log(
