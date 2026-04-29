@@ -648,6 +648,10 @@ export default function Convocazioni() {
           }),
         });
         if (!response.ok) throw new Error("Errore nel salvataggio dei cleaners");
+        sessionStorage.setItem(
+          "refreshAssignmentsAfterConvocations",
+          JSON.stringify({ date: dateStr, scope: scopeValue, savedAt: Date.now() })
+        );
         toast({
           variant: "success",
           title: `${selectedCleanersData.length} cleaner salvati con successo!`,
@@ -793,6 +797,10 @@ export default function Convocazioni() {
           }),
         });
         if (!response.ok) throw new Error("Errore nel salvataggio");
+        sessionStorage.setItem(
+          "refreshAssignmentsAfterConvocations",
+          JSON.stringify({ date: dateStr, scope: scopeValue, savedAt: Date.now() })
+        );
         if (newCleaners.length === 0) {
           toast({
             variant: "success",

@@ -257,7 +257,9 @@ const displayClickableInputClass =
   })();
 
   // Carica le operazioni da API (DB)
-  const { data: operationsData } = useQuery<{ active_operations: { id: number; name: string }[] }>({
+  const { data: operationsData } = useQuery<{
+    active_operations: { id: number; name: string; enable_wass?: boolean; enable_wass_readonly?: boolean }[];
+  }>({
     queryKey: ["/api/operations", operationsScope, isOfficeScope ? "office" : "default"],
     queryFn: async () => {
       const q =
@@ -277,15 +279,23 @@ const displayClickableInputClass =
     15: "PULIZIA UFFICI/ALTRO",
     38: "PULIZIA UFFICI/ALTRO STRAORDINARIA",
   };
+  const defaultOperationNames: Record<number, string> = {
+    1: "FERMATA",
+    2: "PARTENZA",
+    3: "PULIZIA STRAORDINARIA",
+    4: "RIPASSO",
+  };
+
+  const selectableOperations = (operationsData?.active_operations || []).filter(
+    (op) => isOfficeScope || op.enable_wass !== false
+  );
 
   const operationNames: Record<number, string> = operationsData?.active_operations?.reduce(
     (acc, op) => ({ ...acc, [op.id]: op.name }),
-    isOfficeScope
-      ? ({ ...officeOperationNames } as Record<number, string>)
-      : ({ 1: "FERMATA", 2: "PARTENZA", 3: "PULIZIA STRAORDINARIA", 4: "RIPASSO" } as Record<number, string>)
+    isOfficeScope ? ({ ...officeOperationNames } as Record<number, string>) : defaultOperationNames
   ) || (isOfficeScope
     ? { ...officeOperationNames }
-    : { 1: "FERMATA", 2: "PARTENZA", 3: "PULIZIA STRAORDINARIA", 4: "RIPASSO" });
+    : defaultOperationNames);
 
   const normalizeOperationName = (name: string | null | undefined) =>
     (name || "").toLowerCase().trim();
@@ -2362,8 +2372,7 @@ const displayClickableInputClass =
 
                     if (userChoseNone) return "— Nessuna operazione —";
                     if (!isConfirmedOperation) return "non migrato";
-                    const opId = (displayTask as any).operation_id;
-                    if (opId) return operationNames[opId] || `Operazione ${opId}`;
+                    if ((displayTask as any).operation_id) return getInterventionLabel(displayTask);
                     return "-";
                   })()}
                   className={
@@ -3564,7 +3573,7 @@ const displayClickableInputClass =
                 </SelectTrigger>
                 <SelectContent side="bottom" className="max-h-44">
                   <SelectItem value="none">— Nessuna operazione —</SelectItem>
-                  {(operationsData?.active_operations || []).map((op) => (
+                  {selectableOperations.map((op) => (
                     <SelectItem key={op.id} value={String(op.id)}>
                       {op.name}
                     </SelectItem>
