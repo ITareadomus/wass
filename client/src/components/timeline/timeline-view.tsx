@@ -336,6 +336,9 @@ export default function TimelineView({
   // Larghezza della timeline in pixel per calcolo larghezze task
   const [timelineWidthPx, setTimelineWidthPx] = useState<number>(0);
   const timelineRowRef = useRef<HTMLDivElement>(null);
+  const timelineWidthScale = 1.06;
+  const timelineScaledWidth = `${timelineWidthScale * 100}%`;
+  const timelineTaskWidthPx = timelineWidthPx * timelineWidthScale;
 
   // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
   // DEVE essere definito PRIMA di allCleanersToShow che lo usa
@@ -1404,10 +1407,10 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     }, 0);
 
     // Formula: larghezza base + (caratteri * pixel per carattere)
-    // Aggiungi spazio extra per il badge
-    const baseWidth = 60; // padding e margini
-    const charWidth = 7.5; // circa 7.5px per carattere con font bold 13px
-    const badgeSpace = 30; // spazio per il badge P/F
+    // Mantiene la colonna dinamica sul nome più lungo, evitando spazio vuoto eccessivo.
+    const baseWidth = 44; // padding e margini
+    const charWidth = 7; // circa 7px per carattere con font bold 13px
+    const badgeSpace = 20; // spazio per il badge P/F
 
     return Math.max(128, baseWidth + (maxLength * charWidth) + badgeSpace);
   };
@@ -1914,10 +1917,10 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             </div>
           </div>
         </div>
-        <div className="px-4 pt-4 pb-4 overflow-x-auto">
+        <div className="px-1 pt-4 pb-4 overflow-x-auto">
 
 {/* Graffe fasce orarie (EO / HP / LP) sopra gli orari */}
-<div className="flex items-stretch mb-0 px-4 h-[26px]">
+<div className="flex items-stretch mb-0 px-1 h-[26px]">
   {/* colonna pulsante / nome cleaner (vuota per allineamento) */}
   <div
     className="flex-shrink-0 h-full print:hidden"
@@ -1926,7 +1929,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
   {/* area timeline (stessa larghezza della griglia orari) */}
   <div className="flex-1 h-full relative">
     {priorityWindows && (
-    <div className="absolute inset-0">
+    <div className="absolute inset-y-0 left-0" style={{ width: timelineScaledWidth }}>
       {(() => {
         const eo1 = clamp(minutesToPct(timeToMinutes(priorityWindows.EO.start)), 0, 100);
         const eo2 = clamp(minutesToPct(timeToMinutes(priorityWindows.EO.end)), 0, 100);
@@ -2008,7 +2011,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 </div>
 
           {/* Header con orari - unico per tutti i cleaner */}
-          <div className="flex items-stretch my-0.5 px-4 h-[40px]">
+          <div className="flex items-stretch my-0.5 px-1 h-[40px]">
             <div
               className="relative flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden"
               style={{ width: `${cleanerColumnWidth}px` }}
@@ -2055,28 +2058,32 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             <div
               ref={timelineRowRef}
               className="flex-1 h-full relative overflow-visible"
-              style={{ display: 'grid', gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
             >
-              {globalTimeSlots.map((slot, idx) => (
-                <div
-                  key={idx}
-                  className="relative h-full"
-                >
-                  <span
-                    className="absolute top-[14px] inline-flex flex-col items-center gap-0.5 text-[13px] font-medium tabular-nums leading-none text-foreground whitespace-nowrap"
-                    style={{
-                      left: "0px",
-                      transform: "translateX(-50%)",
-                    }}
-                  >
-                    <span>{slot}</span>
-                  </span>
+              <div
+                className="absolute inset-y-0 left-0 grid"
+                style={{ width: timelineScaledWidth, gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
+              >
+                {globalTimeSlots.map((slot, idx) => (
                   <div
-                    className="absolute top-[30px] h-[8px] border-l border-slate-500/60 dark:border-white/60 z-10"
-                    style={{ left: "0px" }}
-                  />
-                </div>
-              ))}
+                    key={idx}
+                    className="relative h-full"
+                  >
+                    <span
+                      className="absolute top-[14px] inline-flex flex-col items-center gap-0.5 text-[13px] font-medium tabular-nums leading-none text-foreground whitespace-nowrap"
+                      style={{
+                        left: "0px",
+                        transform: "translateX(-50%)",
+                      }}
+                    >
+                      <span>{slot}</span>
+                    </span>
+                    <div
+                      className="absolute top-[30px] h-[8px] border-l border-slate-500/60 dark:border-white/60 z-10"
+                      style={{ left: "0px" }}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="flex-shrink-0 w-20 h-full text-center text-[13px] font-medium text-foreground border-l border-border/70 px-1 flex items-center justify-center">
               Ore lavorate
@@ -2084,7 +2091,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           </div>
 
           {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
-          <div className="flex-1 overflow-auto px-4 pb-4 pt-0">
+          <div className="flex-1 overflow-auto px-1 pb-4 pt-0">
             {allCleanersToShow.length === 0 && !isReadOnly ? (
               <div className="flex items-center justify-center h-64 bg-yellow-100 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
                 <div className="text-center p-6">
@@ -2243,7 +2250,10 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           }}
                         >
                           {/* Griglia oraria di sfondo (solo visiva) con alternanza colori */}
-                          <div className="absolute inset-0 pointer-events-none" style={{ display: 'grid', gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}>
+                          <div
+                            className="absolute inset-y-0 left-0 pointer-events-none"
+                            style={{ width: timelineScaledWidth, display: 'grid', gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
+                          >
                             {globalTimeSlots.map((slot, idx) => {
                               const isEvenHour = idx % 2 === 0;
                               return (
@@ -2343,7 +2353,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     // Usa la stessa base di calcolo dei task (slot * 60 minuti virtuali)
                                     const effectiveTravelMinutes = seq >= 2 && travelTime > 0 && !snapshot.isDraggingOver ? travelTime : 0;
                                     const virtualMinutes = globalTimeSlots.length * 60;
-                                    const timelineWidth = timelineWidthPx || 0;
+                                    const timelineWidth = timelineTaskWidthPx || 0;
                                     const travelWidthPx = effectiveTravelMinutes > 0 && virtualMinutes > 0 && timelineWidth > 0
                                       ? (effectiveTravelMinutes / virtualMinutes) * timelineWidth
                                       : 0;
@@ -2462,7 +2472,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           allTasks={cleanerTasks}
                                           isDragDisabled={isTimelineInteractionDisabled}
                                           isReadOnly={isReadOnly}
-                                          timelineWidthPx={timelineWidthPx}
+                                          timelineWidthPx={timelineTaskWidthPx}
                                           isHighlighted={highlightedTaskIds.has(String(task.id))}
                                           cleanerId={cleaner.id}
                                           isPriorityWindowViolation={isPriorityWindowViolation(task)}
