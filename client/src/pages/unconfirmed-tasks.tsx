@@ -73,7 +73,7 @@ interface ContainersData {
 }
 
 interface OperationsData {
-  active_operations: { id: number; name: string }[];
+  active_operations: { id: number; name: string; enable_wass?: boolean; enable_wass_readonly?: boolean }[];
 }
 
 export default function UnconfirmedTasks() {
@@ -131,6 +131,13 @@ export default function UnconfirmedTasks() {
     15: "PULIZIA UFFICI/ALTRO",
     38: "PULIZIA UFFICI/ALTRO STRAORDINARIA",
   };
+  const defaultOperationNames: Record<number, string> = {
+    1: "FERMATA",
+    2: "PARTENZA",
+    3: "PULIZIA STRAORDINARIA",
+    4: "RIPASSO",
+    ...officeOperationNames,
+  };
   const fetchedOperations = operationsData?.active_operations || [];
   const fetchedOpsById = new Map<number, string>(
     fetchedOperations.map((op) => [Number(op.id), String(op.name || "").trim()])
@@ -140,13 +147,11 @@ export default function UnconfirmedTasks() {
         id,
         name: fetchedOpsById.get(id) || officeOperationNames[id],
       }))
-    : fetchedOperations;
+    : fetchedOperations.filter((op) => op.enable_wass !== false);
 
-  const operationNames: Record<number, string> = allowedOperations.reduce(
+  const operationNames: Record<number, string> = fetchedOperations.reduce(
     (acc, op) => ({ ...acc, [op.id]: op.name }),
-    isOfficeScope
-      ? { ...officeOperationNames }
-      : ({ 1: "FERMATA", 2: "PARTENZA", 3: "PULIZIA STRAORDINARIA", 4: "RIPASSO" } as Record<number, string>)
+    isOfficeScope ? { ...officeOperationNames } : defaultOperationNames
   );
 
   

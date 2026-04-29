@@ -412,15 +412,16 @@ async function rehydratePreassignedAssignmentsFromAdam(
   );
   const initiallySelectedCleanerIds = new Set<number>(selectedById.keys());
 
-  const allPreassignedCleanerIds = Array.from(
+  const autoConvokingPreassignedCleanerIds = Array.from(
     new Set(
       preassignedSeeds
+        .filter((seed: any) => seed?.preAssignedMode !== "readonly")
         .map((seed: any) => Number(seed?.assignedCleanerId))
         .filter((id: number) => Number.isFinite(id) && id > 0)
     )
   );
 
-  const missingCleanerIds = allPreassignedCleanerIds.filter((id) => !selectedById.has(id));
+  const missingCleanerIds = autoConvokingPreassignedCleanerIds.filter((id) => !selectedById.has(id));
   if (missingCleanerIds.length > 0) {
     try {
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
@@ -493,6 +494,11 @@ async function rehydratePreassignedAssignmentsFromAdam(
     const taskId = Number(seed?.task_id);
     if (!Number.isFinite(cleanerId) || !Number.isFinite(taskId) || cleanerId <= 0) continue;
 
+    const preAssignedMode: PreassignedMode = seed.preAssignedMode === "readonly" ? "readonly" : "normal";
+    if (preAssignedMode === "readonly" && !selectedById.has(cleanerId)) {
+      continue;
+    }
+
     const existingTask = findTaskInTimelineByIdentity(
       timelineData,
       taskId,
@@ -536,7 +542,6 @@ async function rehydratePreassignedAssignmentsFromAdam(
       });
     }
 
-    const preAssignedMode: PreassignedMode = seed.preAssignedMode === "readonly" ? "readonly" : "normal";
     const taskForTimeline = applyPreassignedModeToTask(
       {
         task_id: Number(sourceTask.task_id ?? sourceTask.id ?? taskId),
@@ -2029,7 +2034,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         rows = Array.isArray(officeRows) ? officeRows : [];
       } else {
-        const enableClause = forLogistics ? "o.enable_wass_route = 1" : "o.enable_wass = 1";
+        const enableClause = forLogistics
+          ? "o.enable_wass_route = 1"
+          : "(o.enable_wass = 1 OR o.enable_wass_readonly = 1)";
         const [defaultRows]: any = await connection.execute(
           `SELECT o.id, l.name, o.enable_wass, o.enable_wass_readonly
            FROM app_structure_operation o
@@ -4889,12 +4896,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Salva anche su filesystem per backward compat
       await workspaceFiles.saveSelectedCleaners(workDate, dataToSave, false, currentUsername, 'MANUAL', resolvedScope);
 
+      let rehydrateResult = { rehydrated: 0, autoConvokedCleaners: 0 };
+      try {
+        rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
+          workDate,
+          currentUsername,
+          resolvedScope
+        );
+        if (rehydrateResult.rehydrated > 0 || rehydrateResult.autoConvokedCleaners > 0) {
+          console.log(
+            `✅ Reidratazione pre-assegnati dopo save-selected-cleaners: task=${rehydrateResult.rehydrated}, cleaners auto-convocati=${rehydrateResult.autoConvokedCleaners}`
+          );
+        }
+      } catch (rehydrateError: any) {
+        console.warn(
+          "⚠️ Reidratazione pre-assegnati dopo save-selected-cleaners fallita:",
+          rehydrateError?.message || rehydrateError
+        );
+      }
+
       console.log(`✅ Salvati ${enrichedCleaners.length} cleaners in PostgreSQL per ${workDate} by ${currentUsername}`);
 
       res.json({
         success: true,
         message: `${selectedCleaners.length} cleaners salvati con successo`,
-        count: selectedCleaners.length
+        count: selectedCleaners.length,
+        preassignedRehydrated: rehydrateResult.rehydrated,
+        autoConvokedCleaners: rehydrateResult.autoConvokedCleaners
       });
     } catch (error: any) {
       console.error("Errore nel salvataggio selected_cleaners su PostgreSQL:", error);
@@ -5046,11 +5074,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Salva selected_cleaners su PostgreSQL
       await workspaceFiles.saveSelectedCleaners(workDate, selectedCleanersData, false, currentUsername, 'MANUAL', resolveScopeFromReq(req));
 
+      let rehydrateResult = { rehydrated: 0, autoConvokedCleaners: 0 };
+      try {
+        rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
+          workDate,
+          currentUsername,
+          resolveScopeFromReq(req)
+        );
+        if (rehydrateResult.rehydrated > 0 || rehydrateResult.autoConvokedCleaners > 0) {
+          console.log(
+            `✅ Reidratazione pre-assegnati dopo add-cleaner-to-timeline: task=${rehydrateResult.rehydrated}, cleaners auto-convocati=${rehydrateResult.autoConvokedCleaners}`
+          );
+        }
+      } catch (rehydrateError: any) {
+        console.warn(
+          "⚠️ Reidratazione pre-assegnati dopo add-cleaner-to-timeline fallita:",
+          rehydrateError?.message || rehydrateError
+        );
+      }
+
       console.log(`✅ Operazione completata: cleaner ${cleanerId} ${replacedCleanerId ? `ha sostituito ${replacedCleanerId}` : 'aggiunto'}`);
 
       res.json({
         success: true,
         replaced: replacedCleanerId,
+        preassignedRehydrated: rehydrateResult.rehydrated,
+        autoConvokedCleaners: rehydrateResult.autoConvokedCleaners,
         message: replacedCleanerId
           ? `Cleaner ${replacedCleanerId} sostituito con ${cleanerId}`
           : `Cleaner ${cleanerId} aggiunto`

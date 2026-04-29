@@ -950,6 +950,21 @@ export default function GenerateAssignments() {
 
   useEffect(() => {
     const currentDateStr = format(selectedDate, 'yyyy-MM-dd');
+    const consumeConvocationsRefreshRequest = () => {
+      try {
+        const raw = sessionStorage.getItem("refreshAssignmentsAfterConvocations");
+        if (!raw) return false;
+
+        const request = JSON.parse(raw);
+        if (request?.date !== currentDateStr || request?.scope !== scopeValue) return false;
+
+        sessionStorage.removeItem("refreshAssignmentsAfterConvocations");
+        return true;
+      } catch {
+        sessionStorage.removeItem("refreshAssignmentsAfterConvocations");
+        return false;
+      }
+    };
 
     // CRITICAL: Se la data è cambiata (non al primo mount), redirect a unconfirmed-tasks
     const isDateChange = prevDateRef.current !== null && prevDateRef.current !== currentDateStr;
@@ -963,8 +978,16 @@ export default function GenerateAssignments() {
 
     // Al primo mount, carica i dati
     if (isInitialMount) {
-      console.log(`📅 Initial mount - trigger: "initial"`);
-      refreshAssignments("initial", selectedDate);
+      const shouldForceRefreshAfterConvocations = consumeConvocationsRefreshRequest();
+      console.log(
+        shouldForceRefreshAfterConvocations
+          ? `📅 Initial mount dopo convocazioni - refresh forzato`
+          : `📅 Initial mount - trigger: "initial"`
+      );
+      refreshAssignments(
+        shouldForceRefreshAfterConvocations ? "manual-refresh" : "initial",
+        selectedDate
+      );
       setIsInitialMount(false);
       prevDateRef.current = currentDateStr;
     }
