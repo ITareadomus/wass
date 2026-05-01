@@ -1276,11 +1276,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let taskToMove: any = null;
 
       // 1. Trova e rimuovi la task dal cleaner di origine
+      // NB: identità per task_id (univoco). Il logistic_code (codice ADAM) NON è
+      // univoco: se il cleaner ha più task con lo stesso codice ADAM, il match per
+      // logistic_code prenderebbe la prima e sposterebbe quella sbagliata.
       const sourceEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === sourceCleanerId);
       if (sourceEntry) {
-        const taskIndex = sourceEntry.tasks.findIndex((t: any) =>
-          String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
-        );
+        const hasTaskIdMove = String(taskId ?? "").trim().length > 0;
+        const hasLogisticCodeMove = String(logisticCode ?? "").trim().length > 0;
+        const taskIndex = sourceEntry.tasks.findIndex((t: any) => {
+          if (hasTaskIdMove) {
+            return String(t?.task_id ?? t?.id ?? "") === String(taskId);
+          }
+          if (hasLogisticCodeMove) {
+            return String(t?.logistic_code ?? "") === String(logisticCode);
+          }
+          return false;
+        });
         if (taskIndex !== -1) {
           taskToMove = sourceEntry.tasks.splice(taskIndex, 1)[0];
           // Ricalcola sequence per il cleaner di origine
@@ -2505,12 +2516,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const logisticCodeRaw = req.query.logisticCode as string | undefined;
       const normalizedTaskId = String(taskIdRaw ?? "").trim();
       const normalizedLogisticCode = String(logisticCodeRaw ?? "").trim();
-      const matchCandidates = Array.from(
-        new Set([normalizedTaskId, normalizedLogisticCode].filter((v) => v.length > 0))
-      );
-      if (matchCandidates.length === 0) {
+      if (normalizedTaskId.length === 0 && normalizedLogisticCode.length === 0) {
         return res.status(400).json({ success: false, error: "taskId or logisticCode required" });
       }
+
+      // Importante: il task_id è l'identificatore univoco. Il logistic_code (codice ADAM)
+      // NON lo è: più task della stessa struttura possono condividerlo nella stessa
+      // giornata. Quando arriva un taskId valido si filtra strettamente per quello,
+      // altrimenti si fa fallback sul logistic_code (callsite legacy che hanno solo il
+      // codice ADAM).
+      const useTaskIdMatch = normalizedTaskId.length > 0;
+      const matchValue = useTaskIdMatch ? normalizedTaskId : normalizedLogisticCode;
 
       const { query } = await import("../shared/pg-db");
       const [housekeepingResult, logisticsResult] = await Promise.all([
@@ -2534,7 +2550,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             LEFT JOIN aliases a ON a.cleaner_id = dac.cleaner_id
             WHERE dac.work_date = $1
               AND (dac.scope = 'housekeeping' OR dac.scope IS NULL)
-              AND (dac.task_id::text = ANY($2::text[]) OR dac.logistic_code::text = ANY($2::text[]))
+              AND (
+                ($3::boolean IS TRUE AND dac.task_id::text = $2)
+                OR ($3::boolean IS FALSE AND dac.logistic_code::text = $2)
+              )
             ORDER BY
               EXISTS (
                 SELECT 1 FROM task_collaborators tc
@@ -2547,18 +2566,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
               dac.id ASC
             LIMIT 1
           `,
-          [workDate, matchCandidates]
+          [workDate, matchValue, useTaskIdMatch]
         ),
         query(
           `
             SELECT lt.sequence
             FROM lg_timeline lt
             WHERE lt.work_date = $1
-              AND (lt.task_id::text = ANY($2::text[]) OR lt.logistic_code::text = ANY($2::text[]))
+              AND (
+                ($3::boolean IS TRUE AND lt.task_id::text = $2)
+                OR ($3::boolean IS FALSE AND lt.logistic_code::text = $2)
+              )
             ORDER BY lt.sequence ASC, lt.id ASC
             LIMIT 1
           `,
-          [workDate, matchCandidates]
+          [workDate, matchValue, useTaskIdMatch]
         ),
       ]);
 
@@ -4025,13 +4047,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Cerca la task nei containers per ottenere tutti i dati
+      // NB: identità per task_id (univoco). Il logistic_code (codice ADAM) NON è
+      // univoco e prenderemmo la prima task con lo stesso codice ADAM, copiando
+      // dati di una task diversa da quella richiesta.
+      const hasTaskIdLookup = String(taskId ?? "").trim().length > 0;
+      const hasLogisticCodeLookup = String(logisticCode ?? "").trim().length > 0;
+      const matchesContainerLookup = (t: any): boolean => {
+        if (hasTaskIdLookup) {
+          return String(t?.task_id ?? t?.id ?? "") === String(taskId);
+        }
+        if (hasLogisticCodeLookup) {
+          return String(t?.logistic_code ?? "") === String(logisticCode);
+        }
+        return false;
+      };
       if (containersData) {
         for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
           const container = containersData.containers?.[containerType];
           if (container && container.tasks) {
-            const foundTask = container.tasks.find((t: any) =>
-              String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
-            );
+            const foundTask = container.tasks.find(matchesContainerLookup);
             if (foundTask) {
               // Crea una copia profonda per evitare modifiche all'originale
               fullTaskData = JSON.parse(JSON.stringify(foundTask));
@@ -4408,17 +4442,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let removedCount = 0;
       let removedTask: any = null;
 
+      // NB: si rimuove solo la task con il task_id richiesto. Il logistic_code
+      // (codice ADAM) non è univoco e usarlo nel filtro farebbe sparire in
+      // blocco tutte le task con lo stesso codice ADAM. Si cade sul logistic_code
+      // solo se il taskId non è disponibile (callsite legacy).
+      const hasTaskIdRemove = String(taskId ?? "").trim().length > 0;
+      const hasLogisticCodeRemove = String(logisticCode ?? "").trim().length > 0;
+      const taskMatchesRemoveTarget = (t: any): boolean => {
+        if (hasTaskIdRemove) {
+          return String(t?.task_id ?? t?.id ?? "") === String(taskId);
+        }
+        if (hasLogisticCodeRemove) {
+          return String(t?.logistic_code ?? "") === String(logisticCode);
+        }
+        return false;
+      };
+
       // Rimuovi l'assegnazione per questo task da tutti i cleaner
       assignmentsData.cleaners_assignments = assignmentsData.cleaners_assignments.map((cleanerEntry: any) => {
         const initialTaskCountForCleaner = cleanerEntry.tasks?.length || 0;
         cleanerEntry.tasks = cleanerEntry.tasks.filter(
           (t: any) => {
-            const matchCode = String(t.logistic_code) === String(logisticCode);
-            const matchId = String(t.task_id) === String(taskId);
-            if (matchCode || matchId) {
-              removedTask = t; // Salva la task rimossa
+            if (taskMatchesRemoveTarget(t)) {
+              removedTask = t;
+              return false;
             }
-            return !matchCode && !matchId;
+            return true;
           }
         );
         const thisCleanerRemovedCount = initialTaskCountForCleaner - (cleanerEntry.tasks?.length || 0);
@@ -6965,8 +7014,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Funzione helper per aggiornare una task - SOLO i campi forniti
       // Traccia anche le modifiche per la history
+      // NB: il match deve essere strettamente per task_id quando disponibile.
+      // Il logistic_code (codice ADAM) NON è univoco: più task della stessa
+      // struttura possono condividerlo nella stessa giornata, e usarlo nel match
+      // farebbe propagare gli edit di una task a tutte le altre con lo stesso
+      // codice ADAM. Si cade sul logistic_code solo se il taskId non è arrivato.
+      const hasTaskIdFilter = String(taskId ?? "").trim().length > 0;
+      const hasLogisticCodeFilter = String(logisticCode ?? "").trim().length > 0;
+      const taskMatchesEditTarget = (task: any): boolean => {
+        if (hasTaskIdFilter) {
+          return String(task?.task_id ?? task?.id ?? "") === String(taskId);
+        }
+        if (hasLogisticCodeFilter) {
+          return String(task?.logistic_code ?? "") === String(logisticCode);
+        }
+        return false;
+      };
       const updateTask = (task: any) => {
-        if (String(task.task_id) === String(taskId) || String(task.logistic_code) === String(logisticCode)) {
+        if (taskMatchesEditTarget(task)) {
           // Traccia le modifiche prima di applicarle
           if (checkoutDate !== undefined && task.checkout_date !== checkoutDate) {
             editedFields.push('checkout_date');
@@ -8958,11 +9023,20 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       }
 
       const initialLength = assignmentsData.early_out_tasks_assigned.length;
+      // NB: filtro per task_id (univoco). Il logistic_code (codice ADAM) NON è
+      // univoco: usarlo nel filter rimuoverebbe in massa tutte le righe con lo
+      // stesso codice ADAM. Si cade sul logistic_code solo se taskId mancante.
+      const hasTaskIdEarlyOut = String(taskId ?? "").trim().length > 0;
+      const hasLogisticCodeEarlyOut = String(logisticCode ?? "").trim().length > 0;
       assignmentsData.early_out_tasks_assigned = assignmentsData.early_out_tasks_assigned.filter(
         (t: any) => {
-          const matchId = String(t.task_id) === String(taskId);
-          const matchCode = String(t.logistic_code) === String(logisticCode);
-          return !matchId && !matchCode;
+          if (hasTaskIdEarlyOut) {
+            return String(t?.task_id ?? "") !== String(taskId);
+          }
+          if (hasLogisticCodeEarlyOut) {
+            return String(t?.logistic_code ?? "") !== String(logisticCode);
+          }
+          return true;
         }
       );
 
@@ -9283,10 +9357,21 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         return res.status(404).json({ success: false, message: "Cleaner non trovato" });
       }
 
-      // CRITICAL: Cerca la task per taskId invece di fidarsi di fromIndex
-      const actualFromIndex = cleanerEntry.tasks.findIndex((t: any) =>
-        String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
-      );
+      // CRITICAL: Cerca la task per taskId invece di fidarsi di fromIndex.
+      // NB: identità per task_id (univoco). Il logistic_code (codice ADAM) NON è
+      // univoco: se il cleaner ha più task con lo stesso codice ADAM si
+      // riordinerebbe la prima incontrata invece della task richiesta.
+      const hasTaskIdReorder = String(taskId ?? "").trim().length > 0;
+      const hasLogisticCodeReorder = String(logisticCode ?? "").trim().length > 0;
+      const actualFromIndex = cleanerEntry.tasks.findIndex((t: any) => {
+        if (hasTaskIdReorder) {
+          return String(t?.task_id ?? t?.id ?? "") === String(taskId);
+        }
+        if (hasLogisticCodeReorder) {
+          return String(t?.logistic_code ?? "") === String(logisticCode);
+        }
+        return false;
+      });
 
       if (actualFromIndex === -1) {
         console.error(`Task ${taskId}/${logisticCode} non trovata nel cleaner ${cleanerId}`);
