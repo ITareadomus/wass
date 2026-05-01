@@ -197,6 +197,19 @@ export function isContinuazioneStraordinariaTask(task: any): boolean {
   return normalizedName === CONTINUAZIONE_PS_OPERATION_NAME;
 }
 
+export function isTaskLocked(task: any): boolean {
+  if (typeof task !== "object" || task === null) return false;
+  const lockedRaw = task.locked ?? task.is_locked ?? task.task_locked;
+  if (lockedRaw === true) return true;
+  if (lockedRaw === false || lockedRaw == null) return false;
+  if (typeof lockedRaw === "number") return lockedRaw === 1;
+  if (typeof lockedRaw === "string") {
+    const normalized = lockedRaw.trim().toLowerCase();
+    return normalized === "1" || normalized === "true";
+  }
+  return Boolean(lockedRaw);
+}
+
 type TaskTypeKey = keyof CleanerTaskRules;
 
 function determineTaskType(task: any): TaskTypeKey | null {

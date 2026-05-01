@@ -19,7 +19,7 @@ import { it } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
-import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
+import { isContinuazioneStraordinariaTask, isTaskLocked } from "@/lib/taskValidation";
 
 function getCurrentUsername(): string {
   try {
@@ -39,6 +39,7 @@ interface LogisticsSummaryState {
   high_priority: number;
   low_priority: number;
   total: number;
+  unassigned: number;
   premium: number;
   standard: number;
   straordinarie: number;
@@ -231,22 +232,26 @@ function parseLogisticsSummary(data: any): LogisticsSummaryState {
   const eo = containerTasks(data?.containers?.early_out);
   const hp = containerTasks(data?.containers?.high_priority);
   const lp = containerTasks(data?.containers?.low_priority);
+  const unlockedEo = eo.filter((task) => !isTaskLocked(task));
+  const unlockedHp = hp.filter((task) => !isTaskLocked(task));
+  const unlockedLp = lp.filter((task) => !isTaskLocked(task));
   const all = [...eo, ...hp, ...lp];
+  const unlocked = [...unlockedEo, ...unlockedHp, ...unlockedLp];
   let premium = 0;
   let standard = 0;
   let straordinarie = 0;
-  for (const t of all) {
+  for (const t of unlocked) {
     if (isEquivalentStraordinariaTask(t)) straordinarie += 1;
     else if (t?.premium) premium += 1;
     else standard += 1;
   }
-  const total = data?.summary?.total_tasks ?? all.length;
+  const total = unlocked.length;
   return {
-    early_out: data?.summary?.early_out ?? data?.containers?.early_out?.count ?? eo.length,
-    high_priority:
-      data?.summary?.high_priority ?? data?.containers?.high_priority?.count ?? hp.length,
-    low_priority: data?.summary?.low_priority ?? data?.containers?.low_priority?.count ?? lp.length,
+    early_out: unlockedEo.length,
+    high_priority: unlockedHp.length,
+    low_priority: unlockedLp.length,
     total,
+    unassigned: all.length,
     premium,
     standard,
     straordinarie,
@@ -1154,7 +1159,7 @@ export default function GenerateLogisticsAssignments() {
                     Non Assegnate
                   </div>
                   <div className="text-2xl font-bold text-gray-800 dark:text-gray-200">
-                    {s?.total ?? 0}
+                    {s?.unassigned ?? 0}
                   </div>
                 </div>
                 <div className="bg-green-100 dark:bg-green-950/50 rounded-lg p-3 border-2 border-green-300 dark:border-green-700">

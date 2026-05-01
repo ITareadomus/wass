@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { useToast } from "@/hooks/use-toast";
-import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
+import { isContinuazioneStraordinariaTask, isTaskLocked } from "@/lib/taskValidation";
 
 const OFFICE_SCOPE_ENABLED = false;
 type PreAssignedMode = "normal" | "readonly";
@@ -2119,17 +2119,22 @@ export default function GenerateAssignments() {
   // Determina se la modalità storica è attiva (data passata)
   const isHistoricalMode = isDateInPast(selectedDate);
 
+  const unlockedTasksForStats = useMemo(
+    () => allTasksWithAssignments.filter((task) => !isTaskLocked(task)),
+    [allTasksWithAssignments]
+  );
+
   // Filtra le task non assegnate
   const unassignedTasks = allTasksWithAssignments.filter(task => !(task as any).assignedCleaner);
-  const straordinarieCount = allTasksWithAssignments.filter((t) => isEquivalentStraordinariaTask(t)).length;
-  const standardCount = allTasksWithAssignments.filter(
+  const straordinarieCount = unlockedTasksForStats.filter((t) => isEquivalentStraordinariaTask(t)).length;
+  const standardCount = unlockedTasksForStats.filter(
     (t) => !isEquivalentStraordinariaTask(t) && !t.premium
   ).length;
-  const premiumCount = allTasksWithAssignments.filter(
+  const premiumCount = unlockedTasksForStats.filter(
     (t) => !isEquivalentStraordinariaTask(t) && t.premium
   ).length;
-  const puliziaUfficioCount = Math.max(0, allTasksWithAssignments.length - straordinarieCount);
-  const puliziaUfficioInternaCount = allTasksWithAssignments.filter((task) => {
+  const puliziaUfficioCount = Math.max(0, unlockedTasksForStats.length - straordinarieCount);
+  const puliziaUfficioInternaCount = unlockedTasksForStats.filter((task) => {
     const taskAny = task as any;
     const operationId = Number(taskAny.operation_id ?? taskAny.operationId);
     const operationName = String(
@@ -2512,7 +2517,7 @@ export default function GenerateAssignments() {
                       <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-3 border-2 border-blue-300 dark:border-blue-700">
                         <div className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">Totale</div>
                         <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-                          {allTasksWithAssignments.length}
+                          {unlockedTasksForStats.length}
                         </div>
                       </div>
 
@@ -2546,7 +2551,7 @@ export default function GenerateAssignments() {
                       <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-3 border-2 border-blue-300 dark:border-blue-700">
                         <div className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">Totale</div>
                         <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-                          {allTasksWithAssignments.length}
+                          {unlockedTasksForStats.length}
                         </div>
                       </div>
 

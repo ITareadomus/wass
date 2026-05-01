@@ -14,6 +14,7 @@ import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from 'wouter';
+import { isTaskLocked } from "@/lib/taskValidation";
 
 const OFFICE_SCOPE_ENABLED = false;
 
@@ -349,18 +350,45 @@ export default function Convocazioni() {
 
   const loadTaskStats = async (dateStr: string, driversMode: boolean) => {
     try {
-      const statsUrl = driversMode
+      const containersUrl = driversMode
         ? `/api/logistics-containers?date=${encodeURIComponent(dateStr)}`
         : withScope(`/api/containers?date=${encodeURIComponent(dateStr)}`);
-      const res = await fetch(statsUrl);
-      if (!res.ok) throw new Error('Errore durante il caricamento dei containers');
-      const data = await res.json();
+      const timelineUrl = driversMode
+        ? `/api/logistics-timeline?date=${encodeURIComponent(dateStr)}`
+        : withScope(`/api/timeline?date=${encodeURIComponent(dateStr)}`);
+
+      const [containersRes, timelineRes] = await Promise.all([
+        fetch(containersUrl),
+        fetch(timelineUrl),
+      ]);
+
+      if (!containersRes.ok) throw new Error('Errore durante il caricamento dei containers');
+      const data = await containersRes.json();
       const c = data.containers || {};
-      const allTasks = [
+      const containerTasks = [
         ...(c.early_out?.tasks || []),
         ...(c.high_priority?.tasks || []),
         ...(c.low_priority?.tasks || []),
       ];
+
+      const timelinePayload = timelineRes.ok ? await timelineRes.json() : {};
+      const timelineRows = driversMode
+        ? (Array.isArray((timelinePayload as any)?.drivers_assignments) ? (timelinePayload as any).drivers_assignments : [])
+        : (Array.isArray((timelinePayload as any)?.cleaners_assignments) ? (timelinePayload as any).cleaners_assignments : []);
+      const timelineTasks = timelineRows.flatMap((row: any) => (Array.isArray(row?.tasks) ? row.tasks : []));
+
+      const assignedTaskIds = new Set<string>(
+        timelineTasks
+          .map((task: any) => String(task?.task_id ?? task?.id ?? "").trim())
+          .filter(Boolean)
+      );
+
+      const unassignedContainerTasks = containerTasks.filter((task: any) => {
+        const taskId = String(task?.task_id ?? task?.id ?? "").trim();
+        return !taskId || !assignedTaskIds.has(taskId);
+      });
+
+      const allTasks = [...unassignedContainerTasks, ...timelineTasks];
       let total = 0, premium = 0, standard = 0, straordinarie = 0, officeInternal = 0, logistics = 0;
       let logisticsOperationIds = new Set<number>();
       if (driversMode) {
@@ -385,6 +413,7 @@ export default function Convocazioni() {
       }
       for (const t of allTasks) {
         const opId = Number((t as any).operation_id);
+        const isLocked = isTaskLocked(t);
         const isStraordinaria =
           t.straordinaria === true ||
           (t as any).is_straordinaria === true ||
@@ -392,12 +421,14 @@ export default function Convocazioni() {
           opId === 37;
         const isPremium = t.premium === true || t.premium === 1 || t.premium === "1";
         const isOfficeInternal = Number((t as any).operation_id) === 15;
-        total += 1;
-        if (isStraordinaria) straordinarie += 1;
-        else if (isPremium) premium += 1;
-        else standard += 1;
-        if (isOfficeInternal) officeInternal += 1;
-        if (driversMode && Number.isFinite(opId) && logisticsOperationIds.has(opId)) logistics += 1;
+        if (!isLocked) {
+          total += 1;
+          if (isStraordinaria) straordinarie += 1;
+          else if (isPremium) premium += 1;
+          else standard += 1;
+          if (isOfficeInternal) officeInternal += 1;
+          if (driversMode && Number.isFinite(opId) && logisticsOperationIds.has(opId)) logistics += 1;
+        }
       }
       setTaskStats({ total, premium, standard, straordinarie, officeInternal, logistics });
     } catch (error) {
