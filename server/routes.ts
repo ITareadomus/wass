@@ -514,10 +514,15 @@ async function rehydratePreassignedAssignmentsFromAdam(
       continue;
     }
 
+    // NB: per il rehydrate dei pre-assegnati il match sull'identità della task DEVE
+    // basarsi solo sul task_id. Il logistic_code (codice ADAM) non è univoco: più task
+    // della stessa struttura possono condividerlo in giornata e scartare via
+    // logistic_code farebbe perdere quelle successive (vedi bug 3 task readonly con
+    // codice ADAM 1741, di cui ne entrava in timeline 1 sola).
     const existingTask = findTaskInTimelineByIdentity(
       timelineData,
       taskId,
-      seed?.logistic_code
+      null
     );
     if (existingTask) {
       applyPreassignedModeToTask(
