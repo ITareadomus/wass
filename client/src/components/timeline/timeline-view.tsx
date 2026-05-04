@@ -80,6 +80,14 @@ interface Cleaner {
   show_plus_one?: boolean;
 }
 
+type CleanerDirectoryEntry = {
+  id: number;
+  name?: string;
+  lastname?: string;
+  alias?: string;
+  role?: string;
+};
+
 const PREASSIGNED_REASON_NORMAL = "preassigned_enable_wass";
 const PREASSIGNED_REASON_READONLY = "preassigned_enable_wass_readonly";
 
@@ -122,6 +130,7 @@ export default function TimelineView({
   const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
   const [cleanersAliases, setCleanersAliases] = useState<Record<number, { alias: string; name?: string; lastname?: string }>>({});
+  const [cleanersDirectory, setCleanersDirectory] = useState<Record<number, CleanerDirectoryEntry>>({});
   const [isAddCleanerDialogOpen, setIsAddCleanerDialogOpen] = useState(false);
   const [availableCleaners, setAvailableCleaners] = useState<Cleaner[]>([]);
   const [cleanerToReplace, setCleanerToReplace] = useState<number | null>(null);
@@ -368,6 +377,54 @@ export default function TimelineView({
   // DEVE essere definito PRIMA di allCleanersToShow che lo usa
   const [timelineCleaners, setTimelineCleaners] = useState<any[]>([]);
 
+  const normalizeCleanerRole = (rawRole: string | undefined | null) => {
+    const role = String(rawRole ?? "").trim();
+    if (!role) return "";
+    const lowered = role.toLowerCase();
+    if (lowered.includes("ufficio") || lowered.includes("office")) {
+      return "Ufficio";
+    }
+    return role;
+  };
+
+  const isOfficeCleanerRole = (rawRole: string | undefined | null) => {
+    return normalizeCleanerRole(rawRole) === "Ufficio";
+  };
+
+  const getCleanerDisplayDataByRaw = (cleanerLike: any, cleanerId: number) => {
+    const isIdLikeName = (value: string | undefined | null) => {
+      const normalized = String(value ?? "").trim();
+      if (!normalized) return false;
+      return normalized.toUpperCase() === `ID ${cleanerId}` || /^ID\s+\d+$/i.test(normalized);
+    };
+
+    const aliasEntry = cleanersAliases[cleanerId];
+    const directoryEntry = cleanersDirectory[cleanerId];
+
+    const cleanerAlias = typeof cleanerLike?.alias === "string" ? cleanerLike.alias.trim() : "";
+    const alias = String(aliasEntry?.alias || cleanerAlias || directoryEntry?.alias || "").trim();
+
+    const rawName = String(cleanerLike?.name ?? "").trim();
+    const rawLastname = String(cleanerLike?.lastname ?? "").trim();
+
+    const name = isIdLikeName(rawName) ? "" : rawName;
+    const lastname = rawLastname || aliasEntry?.lastname || directoryEntry?.lastname || "";
+    const fallbackName = aliasEntry?.name || directoryEntry?.name || "";
+    const resolvedName = name || fallbackName;
+    const fullName = `${resolvedName} ${lastname}`.trim();
+    const role = normalizeCleanerRole(cleanerLike?.role || directoryEntry?.role);
+    const primaryLabel = alias || fullName || `ID ${cleanerId}`;
+
+    return {
+      alias,
+      name: resolvedName,
+      lastname,
+      fullName,
+      role,
+      primaryLabel,
+    };
+  };
+
   // Mostra cleaners da selected_cleaners API + cleaners che hanno task in timeline
   // DEVE essere definito PRIMA di getGlobalStartTime() che lo usa
   const allCleanersToShow = React.useMemo(() => {
@@ -390,12 +447,29 @@ export default function TimelineView({
     return combined;
   }, [cleaners, timelineCleaners]);
 
+  const cleanerDirectoryIds = React.useMemo(() => {
+    const ids = new Set<number>();
+    for (const cleaner of cleaners) {
+      const id = Number((cleaner as any)?.id);
+      if (Number.isFinite(id)) ids.add(id);
+    }
+    for (const entry of timelineCleaners || []) {
+      const id = Number(entry?.cleaner?.id);
+      if (Number.isFinite(id)) ids.add(id);
+    }
+    for (const task of tasks || []) {
+      const assignedRaw = (task as any)?.assignedCleaner ?? (task as any)?.cleanerId;
+      const id = Number(assignedRaw);
+      if (Number.isFinite(id)) ids.add(id);
+    }
+    return Array.from(ids).sort((a, b) => a - b);
+  }, [cleaners, timelineCleaners, tasks]);
+
+  const cleanerDirectoryIdsKey = cleanerDirectoryIds.join(",");
+
   const preassignedTasksSummary = React.useMemo(() => {
     const getPreassignedCleanerLabel = (cleaner: any, cleanerId: number) => {
-      const aliasEntry = cleanersAliases[cleanerId];
-      const alias = String(aliasEntry?.alias ?? cleaner?.alias ?? "").trim();
-      const fullName = `${String(aliasEntry?.name ?? cleaner?.name ?? "").trim()} ${String(aliasEntry?.lastname ?? cleaner?.lastname ?? "").trim()}`.trim();
-      return alias || fullName || `ID ${cleanerId}`;
+      return getCleanerDisplayDataByRaw(cleaner, cleanerId).primaryLabel;
     };
 
     const cleanerLabelById = new Map<number, string>();
@@ -458,7 +532,7 @@ export default function TimelineView({
       readonly: rows.filter((row) => row.mode === "readonly"),
       normal: rows.filter((row) => row.mode === "normal"),
     };
-  }, [tasks, allCleanersToShow, timelineCleaners, cleanersAliases]);
+  }, [tasks, allCleanersToShow, timelineCleaners, cleanersAliases, cleanersDirectory]);
 
   // Crea Set di ID cleaner rimossi per facile lookup
   const removedCleanerIds = React.useMemo(() => {
@@ -846,34 +920,63 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     return colors[cleanerId % colors.length];
   };
 
-  const isIdPlaceholder = (value: string | undefined | null, cleanerId: number) => {
-    const normalized = String(value ?? "").trim();
-    if (!normalized) return false;
-    return normalized.toUpperCase() === `ID ${cleanerId}` || /^ID\s+\d+$/i.test(normalized);
+  const getCleanerDisplayData = (cleaner: Cleaner) => {
+    return getCleanerDisplayDataByRaw(cleaner, cleaner.id);
   };
 
-  const getCleanerDisplayData = (cleaner: Cleaner) => {
-    const aliasEntry = cleanersAliases[cleaner.id];
-    const cleanerAlias = typeof cleaner.alias === "string" ? cleaner.alias.trim() : "";
-    const alias = (aliasEntry?.alias || cleanerAlias || "").trim();
+  const loadCleanersDirectory = async (ids: number[]) => {
+    try {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const baseResponses = await Promise.all([
+        fetch(`/api/cleaners?date=${dateStr}&scope=housekeeping`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        }),
+        fetch(`/api/cleaners?date=${dateStr}&scope=office`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        }),
+      ]);
 
-    const rawName = String(cleaner.name ?? "").trim();
-    const rawLastname = String(cleaner.lastname ?? "").trim();
+      const basePayloads = await Promise.all(
+        baseResponses.map(async (response) => (response.ok ? response.json() : { cleaners: [] }))
+      );
 
-    const name = isIdPlaceholder(rawName, cleaner.id) ? "" : rawName;
-    const lastname = rawLastname || aliasEntry?.lastname || "";
-    const fallbackName = aliasEntry?.name || "";
-    const resolvedName = name || fallbackName;
-    const fullName = `${resolvedName} ${lastname}`.trim();
-    const primaryLabel = alias || fullName || `ID ${cleaner.id}`;
+      let resolvedPayload: any = { cleaners: [] };
+      if (ids.length > 0) {
+        const resolvedResponse = await fetch(`/api/cleaners-resolve?ids=${ids.join(",")}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        });
+        if (resolvedResponse.ok) {
+          resolvedPayload = await resolvedResponse.json();
+        }
+      }
 
-    return {
-      alias,
-      name: resolvedName,
-      lastname,
-      fullName,
-      primaryLabel,
-    };
+      const payloads = [...basePayloads, resolvedPayload];
+
+      const mergedDirectory: Record<number, CleanerDirectoryEntry> = {};
+      for (const payload of payloads) {
+        const cleanersList = Array.isArray(payload?.cleaners) ? payload.cleaners : [];
+        for (const cleaner of cleanersList) {
+          const cleanerId = Number(cleaner?.id);
+          if (!Number.isFinite(cleanerId)) continue;
+          const current = mergedDirectory[cleanerId] || { id: cleanerId };
+          mergedDirectory[cleanerId] = {
+            id: cleanerId,
+            name: current.name || String(cleaner?.name ?? "").trim() || undefined,
+            lastname: current.lastname || String(cleaner?.lastname ?? "").trim() || undefined,
+            alias: current.alias || String(cleaner?.alias ?? "").trim() || undefined,
+            role: current.role || String(cleaner?.role ?? "").trim() || undefined,
+          };
+        }
+      }
+
+      setCleanersDirectory(mergedDirectory);
+    } catch (error) {
+      console.error("Errore nel caricamento directory cleaners:", error);
+      setCleanersDirectory({});
+    }
   };
 
   // Funzione per caricare i cleaner da API (PostgreSQL/MySQL)
@@ -1006,6 +1109,10 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     (window as any).loadSelectedCleaners = loadCleaners;
   }, []);
 
+  useEffect(() => {
+    loadCleanersDirectory(cleanerDirectoryIds);
+  }, [selectedDate, cleanerDirectoryIdsKey]);
+
   const handleCleanerClick = (cleaner: Cleaner, e?: React.MouseEvent) => {
     // Solo click singolo apre il dialog
     if (clickTimer) {
@@ -1033,7 +1140,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       // Primo click: avvia timer
       const timer = setTimeout(() => {
         // Verifica se ci sono task incompatibili NON ancora ackate
-        if (validationRules && cleaner?.role) {
+        const cleanerRole = getCleanerDisplayDataByRaw(cleaner, cleaner.id).role;
+        if (validationRules && cleanerRole && !isOfficeCleanerRole(cleanerRole)) {
           const cleanerTasks = tasks
             .filter(task => (task as any).assignedCleaner === cleaner.id)
             .map(normalizeTask);
@@ -1041,7 +1149,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           const incompatibleTasks = cleanerTasks.filter(task => {
             if (isReadonlyPreassignedTask(task)) return false;
             if (canCleanerHandleTaskSync(
-              cleaner.role,
+              cleanerRole,
               task,
               validationRules,
             )) return false;
@@ -1747,7 +1855,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
     allCleanersToShow.forEach(cleaner => {
       if (removedCleanerIds.has(cleaner.id)) return;
-      if (!cleaner.role) return;
+      const cleanerDisplay = getCleanerDisplayDataByRaw(cleaner, cleaner.id);
+      const cleanerRole = cleanerDisplay.role;
+      if (!cleanerRole || isOfficeCleanerRole(cleanerRole)) return;
 
       const cleanerTasks = tasks
         .filter(task => (task as any).assignedCleaner === cleaner.id)
@@ -1758,7 +1868,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       const incompatibleTasks = cleanerTasks.filter(task => {
         if (isReadonlyPreassignedTask(task)) return false;
         return !canCleanerHandleTaskSync(
-          cleaner.role,
+          cleanerRole,
           task,
           validationRules,
         );
@@ -1767,8 +1877,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       if (incompatibleTasks.length > 0) {
         incompatibleAssignments.push({
           cleanerId: cleaner.id,
-          cleanerName: `${cleaner.name} ${cleaner.lastname}`,
-          role: cleaner.role,
+          cleanerName: cleanerDisplay.fullName || cleanerDisplay.primaryLabel,
+          role: cleanerRole,
           taskNames: incompatibleTasks.map(t => t.name).join(', ')
         });
       }
@@ -2236,6 +2346,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               allCleanersToShow.map((cleaner, index) => {
                 const color = getCleanerColor(cleaner.id);
                 const droppableId = `cleaner-${cleaner.id}`;
+                const cleanerDisplay = getCleanerDisplayData(cleaner as Cleaner);
+                const cleanerRole = cleanerDisplay.role;
 
                 // Trova tutte le task assegnate a questo cleaner
                 const cleanerTasks = tasks.filter(task =>
@@ -2246,11 +2358,11 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
                 // Verifica se ci sono task incompatibili per questo cleaner
                 // Controlla ogni coppia (task, cleaner) invece del solo cleanerId
-                const hasIncompatibleTasks = validationRules && cleaner?.role
+                const hasIncompatibleTasks = validationRules && cleanerRole && !isOfficeCleanerRole(cleanerRole)
                   ? cleanerTasks.some(task => {
                       if (isReadonlyPreassignedTask(task)) return false;
                       if (canCleanerHandleTaskSync(
-                        cleaner.role,
+                        cleanerRole,
                         task,
                         validationRules,
                       )) return false;
@@ -2305,7 +2417,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                       )}
                       <div className="min-w-0 w-full flex items-center gap-2 px-2">
                         <div className="truncate font-semibold text-[13px] leading-none flex-1">
-                          {getCleanerDisplayData(cleaner).primaryLabel.toUpperCase()}
+                          {cleanerDisplay.primaryLabel.toUpperCase()}
                         </div>
                         {isRemoved && (
                           <div className="bg-red-600 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
@@ -2319,24 +2431,24 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           </div>
                         )}
                         {/* Se straordinario, mostra SOLO badge S */}
-                        {!isRemoved && cleaner.role === "Straordinario" ? (
+                        {!isRemoved && cleanerRole === "Straordinario" ? (
                           <div className="bg-red-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                             S
                           </div>
                         ) : (
                           /* Altrimenti mostra badge role normale */
                           <>
-                            {!isRemoved && cleaner.role === "Premium" && (
+                            {!isRemoved && cleanerRole === "Premium" && (
                               <div className="bg-yellow-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                                 P
                               </div>
                             )}
-                            {!isRemoved && cleaner.role === "Formatore" && (
+                            {!isRemoved && cleanerRole === "Formatore" && (
                               <div className="bg-orange-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                                 F
                               </div>
                             )}
-                            {!isRemoved && cleaner.role === "Ufficio" && (
+                            {!isRemoved && cleanerRole === "Ufficio" && (
                               <div className="bg-sky-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                                 U
                               </div>
@@ -2516,9 +2628,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     const uniqueKey = `${taskId}-cleaner-${cleaner.id}`;
 
                                     // Verifica compatibilità task-cleaner
-                                    const isIncompatible = validationRules && cleaner?.role
+                                    const isIncompatible = validationRules && cleanerRole && !isOfficeCleanerRole(cleanerRole)
                                       ? !isReadonlyPreassignedTask(task) && !canCleanerHandleTaskSync(
-                                          cleaner.role,
+                                          cleanerRole,
                                           task,
                                           validationRules,
                                         )
@@ -2775,10 +2887,11 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               <div className="text-base space-y-3">
                 {incompatibleDialog.cleanerId && (() => {
                   const cleaner = allCleanersToShow.find(c => c.id === incompatibleDialog.cleanerId);
+                  const cleanerDisplay = cleaner ? getCleanerDisplayDataByRaw(cleaner, cleaner.id) : null;
                   return cleaner ? (
                     <>
                       <p className="font-semibold text-foreground">
-                        Il cleaner <span className="text-black dark:text-white">{cleaner.name} {cleaner.lastname}</span> ({cleaner.role}) ha delle task non compatibili con il suo ruolo:
+                        Il cleaner <span className="text-black dark:text-white">{cleanerDisplay?.fullName || cleanerDisplay?.primaryLabel}</span> ({cleanerDisplay?.role || cleaner.role}) ha delle task non compatibili con il suo ruolo:
                       </p>
                       <ul className="list-disc list-inside space-y-2 pl-2">
                         {incompatibleDialog.tasks.map((task, idx) => (
@@ -2799,8 +2912,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 if (incompatibleDialog.cleanerId) {
                   const cleanerId = incompatibleDialog.cleanerId;
                   const cleaner = allCleanersToShow.find(c => c.id === incompatibleDialog.cleanerId);
+                  const cleanerRole = cleaner ? getCleanerDisplayDataByRaw(cleaner, cleaner.id).role : "";
 
-                  if (cleaner && validationRules) {
+                  if (cleaner && validationRules && cleanerRole && !isOfficeCleanerRole(cleanerRole)) {
                     // Recupera tutte le task di questo cleaner
                     const cleanerTasks = tasks
                       .filter(task => (task as any).assignedCleaner === cleanerId)
@@ -2812,7 +2926,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
                       cleanerTasks.forEach(task => {
                         if (!canCleanerHandleTaskSync(
-                          cleaner.role,
+                          cleanerRole,
                           task,
                           validationRules,
                         )) {
@@ -3244,22 +3358,22 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 {selectedCleaner && (
                   <>
                     {/* Se straordinario, mostra SOLO badge straordinario (priorità assoluta) */}
-                    {selectedCleaner.role === "Straordinario" ? (
+                    {getCleanerDisplayData(selectedCleaner).role === "Straordinario" ? (
                       <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-600/30 text-gray-900 dark:bg-red-500/40 dark:text-red-200 border-red-700 dark:border-red-400">
                         Straordinario
                       </span>
                     ) : (
                       /* Altrimenti mostra badge role normale */
                       <>
-                        {selectedCleaner.role === "Formatore" ? (
+                        {getCleanerDisplayData(selectedCleaner).role === "Formatore" ? (
                           <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-600/30 text-gray-900 dark:bg-orange-500/40 dark:text-orange-200 border-orange-700 dark:border-orange-400">
                             Formatore
                           </span>
-                        ) : selectedCleaner.role === "Premium" ? (
+                        ) : getCleanerDisplayData(selectedCleaner).role === "Premium" ? (
                           <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-600/30 text-gray-900 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-700 dark:border-yellow-400">
                             Premium
                           </span>
-                        ) : selectedCleaner.role === "Ufficio" ? (
+                        ) : getCleanerDisplayData(selectedCleaner).role === "Ufficio" ? (
                           <span className="px-2 py-0.5 rounded border font-medium text-sm bg-sky-600/30 text-gray-900 dark:bg-sky-500/40 dark:text-sky-200 border-sky-700 dark:border-sky-400">
                             Ufficio
                           </span>

@@ -3522,6 +3522,35 @@ export class PgDailyAssignmentsService {
     }
   }
 
+  /**
+   * Resolve cleaner identities by ID using the latest available roster row.
+   * Useful when a cleaner is referenced in timeline but missing in the current date roster.
+   */
+  async resolveCleanersByIds(cleanerIds: number[]): Promise<any[]> {
+    if (!cleanerIds || cleanerIds.length === 0) return [];
+
+    try {
+      const result = await query(`
+        SELECT DISTINCT ON (c.cleaner_id)
+          c.cleaner_id as id,
+          c.name,
+          c.lastname,
+          c.role,
+          c.start_time,
+          ca.alias
+        FROM cleaners c
+        LEFT JOIN aliases ca ON ca.cleaner_id = c.cleaner_id
+        WHERE c.cleaner_id = ANY($1)
+        ORDER BY c.cleaner_id, c.work_date DESC
+      `, [cleanerIds]);
+
+      return result.rows;
+    } catch (error) {
+      console.error('❌ PG: Errore nella risoluzione cleaner per IDs:', error);
+      return [];
+    }
+  }
+
   // ==================== LOGISTICS DRIVERS ROSTER (lg_drivers, ADAM user_role_id = 9) ====================
 
   async loadLgDriversForDate(workDate: string): Promise<any[] | null> {

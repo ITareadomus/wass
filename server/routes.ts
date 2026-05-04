@@ -2145,6 +2145,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Risoluzione anagrafica cleaner per ID (fallback cross-date)
+  app.get("/api/cleaners-resolve", async (req, res) => {
+    try {
+      const idsParam = String(req.query.ids || "").trim();
+      const cleanerIds = idsParam
+        .split(",")
+        .map((v) => Number(v.trim()))
+        .filter((id) => Number.isFinite(id));
+
+      if (cleanerIds.length === 0) {
+        return res.json({ cleaners: [], total: 0 });
+      }
+
+      const uniqueIds = Array.from(new Set(cleanerIds));
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const cleaners = await pgDailyAssignmentsService.resolveCleanersByIds(uniqueIds);
+
+      res.json({
+        cleaners: Array.isArray(cleaners) ? cleaners : [],
+        total: Array.isArray(cleaners) ? cleaners.length : 0,
+      });
+    } catch (error: any) {
+      console.error("Errore GET /api/cleaners-resolve:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // GET /api/cleaners-aliases - Carica alias cleaners da aliases (permanente)
   app.get("/api/cleaners-aliases", async (req, res) => {
     try {
