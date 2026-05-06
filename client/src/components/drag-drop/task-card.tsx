@@ -168,6 +168,8 @@ interface TaskCardProps {
   multiSelectContext?: MultiSelectContextType | null;
   isIncompatible?: boolean;
   timelineWidthPx?: number;
+  timelinePxPerMinute?: number;
+  minTimelineTaskWidthPx?: number;
   travelTime?: number;
   travelWidthPx?: number;
   waitingGap?: number;
@@ -201,6 +203,8 @@ export default function TaskCard({
   multiSelectContext = null,
   isIncompatible = false,
   timelineWidthPx = 0,
+  timelinePxPerMinute = 0,
+  minTimelineTaskWidthPx = 0,
   travelTime = 0,
   travelWidthPx = 0,
   waitingGap = 0,
@@ -1779,6 +1783,11 @@ const displayClickableInputClass =
     const effectiveMinutes = totalMinutes === 0 ? 30 : totalMinutes;
 
     if (forTimeline) {
+      if (timelinePxPerMinute > 0) {
+        const widthPx = effectiveMinutes * timelinePxPerMinute;
+        return `${Math.max(widthPx, minTimelineTaskWidthPx)}px`;
+      }
+
       // Usa la larghezza della timeline in pixel (passata da timeline-view via props)
       const timelineWidth = timelineWidthPx || 0;
       const slotsCount = (window as any).globalTimeSlotsCount || 10;
