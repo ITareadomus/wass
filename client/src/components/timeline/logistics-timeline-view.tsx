@@ -12,7 +12,7 @@ import {
   Save,
   Bike,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent, type UIEvent } from "react";
 import { useLocation } from "wouter";
 import { Droppable } from "react-beautiful-dnd";
 import { useMutation } from "@tanstack/react-query";
@@ -69,6 +69,8 @@ export interface LogisticsDriverRow {
   counter_days?: number;
   contract_type?: string | null;
   show_plus_one?: boolean;
+  assigned_vehicle_name?: string | null;
+  vehicle_name?: string | null;
   /** Presente se il driver ha task in timeline ma non è più nei convocati */
   isRemoved?: boolean;
 }
@@ -192,10 +194,84 @@ export default function LogisticsTimelineView({
 
   const [priorityWindows, setPriorityWindows] = useState<PriorityWindows | null>(null);
   const [timelineWidthPx, setTimelineWidthPx] = useState(0);
-  const timelineRowRef = useRef<HTMLDivElement>(null);
+  const [timelineScrollLeft, setTimelineScrollLeft] = useState(0);
+  const timelineRowRef = useRef<HTMLDivElement | null>(null);
+  const timelineScrollRefs = useRef<HTMLDivElement[]>([]);
+  const isSyncingTimelineScrollRef = useRef(false);
+  const timelineScrollDragRef = useRef<{
+    scrollContainer: HTMLDivElement;
+    pointerId: number;
+    startX: number;
+    startScrollLeft: number;
+  } | null>(null);
 
   const displayInputClass =
     "h-9 border-transparent bg-transparent shadow-none focus-visible:ring-0 px-0 pointer-events-none select-none";
+
+  const registerTimelineScrollRef = useCallback((node: HTMLDivElement | null) => {
+    if (node && !timelineScrollRefs.current.includes(node)) {
+      timelineScrollRefs.current.push(node);
+    }
+  }, []);
+
+  const handleTimelineScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
+    if (isSyncingTimelineScrollRef.current) return;
+
+    const source = event.currentTarget;
+    setTimelineScrollLeft(source.scrollLeft);
+    isSyncingTimelineScrollRef.current = true;
+    timelineScrollRefs.current = timelineScrollRefs.current.filter((node) => node.isConnected);
+    timelineScrollRefs.current.forEach((node) => {
+      if (node !== source) {
+        node.scrollLeft = source.scrollLeft;
+      }
+    });
+    requestAnimationFrame(() => {
+      isSyncingTimelineScrollRef.current = false;
+    });
+  }, []);
+
+  const canStartTimelinePan = useCallback((target: EventTarget | null) => {
+    const element = target instanceof HTMLElement ? target : null;
+    if (!element) return false;
+
+    return !element.closest(
+      '[data-rbd-draggable-id], [data-rbd-drag-handle-draggable-id], button, input, textarea, select, a, [role="button"]'
+    );
+  }, []);
+
+  const handleTimelinePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const scrollContainer = event.currentTarget;
+    if (event.button !== 0 || !canStartTimelinePan(event.target)) return;
+    if (scrollContainer.scrollWidth <= scrollContainer.clientWidth) return;
+
+    timelineScrollDragRef.current = {
+      scrollContainer,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startScrollLeft: scrollContainer.scrollLeft,
+    };
+    scrollContainer.setPointerCapture(event.pointerId);
+    scrollContainer.classList.add("is-panning");
+    event.preventDefault();
+  }, [canStartTimelinePan]);
+
+  const handleTimelinePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const dragState = timelineScrollDragRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+    dragState.scrollContainer.scrollLeft = dragState.startScrollLeft - (event.clientX - dragState.startX);
+    event.preventDefault();
+  }, []);
+
+  const stopTimelinePan = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const dragState = timelineScrollDragRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+    dragState.scrollContainer.releasePointerCapture(event.pointerId);
+    dragState.scrollContainer.classList.remove("is-panning");
+    timelineScrollDragRef.current = null;
+  }, []);
 
   // Driver name box variants:
   // - left-bar: thin colored stripe
@@ -925,12 +1001,20 @@ export default function LogisticsTimelineView({
           </div>
         </div>
 
-        <div className="px-4 pt-4 pb-4 overflow-x-auto">
-          <div className="flex items-stretch mb-0 px-4 h-[26px]">
+        <div className="px-4 pt-4 pb-4 overflow-hidden">
+          <div className="flex items-stretch mb-0 px-4 h-[40px]">
             <div className="flex-shrink-0 h-full print:hidden" style={{ width: `${driverColumnWidth}px` }} />
-            <div className="flex-1 h-full relative">
+            <div
+              ref={registerTimelineScrollRef}
+              onScroll={handleTimelineScroll}
+              onPointerDown={handleTimelinePointerDown}
+              onPointerMove={handleTimelinePointerMove}
+              onPointerUp={stopTimelinePan}
+              onPointerCancel={stopTimelinePan}
+              className="timeline-center-scroll min-w-0 flex-1 h-full"
+            >
               {priorityWindows && (
-                <div className="absolute inset-0">
+                <div className="relative h-full min-w-full">
                   {(() => {
                     const eo1 = clamp(minutesToPct(timeToMinutes(priorityWindows.EO.start)), 0, 100);
                     const eo2 = clamp(minutesToPct(timeToMinutes(priorityWindows.EO.end)), 0, 100);
@@ -938,8 +1022,8 @@ export default function LogisticsTimelineView({
                     const hp2 = clamp(minutesToPct(timeToMinutes(priorityWindows.HP.end)), 0, 100);
                     const lp1 = clamp(minutesToPct(timeToMinutes(priorityWindows.LP.start)), 0, 100);
                     const lp2 = 100;
-                    const TOP_LP = -2;
-                    const TOP_MAIN = 16;
+                    const TOP_LP = 2;
+                    const TOP_MAIN = 18;
                     // EO deve seguire sempre l'inizio visibile della timeline:
                     // se la timeline si estende verso sinistra, anche il bracket EO si estende.
                     const eoLeft = 0;
@@ -1037,38 +1121,62 @@ export default function LogisticsTimelineView({
                 <UserMinus className="w-4 h-4" />
               </Button>
             </div>
-            <div
-              ref={timelineRowRef}
-              className="flex-1 h-full grid relative overflow-visible"
-              style={{ gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
-            >
-              {globalTimeSlots.map((slot, idx) => (
-                <div
-                  key={`${slot}-${idx}`}
-                  className="relative h-full"
+            <div className="relative min-w-0 flex-1 h-full overflow-visible">
+              {globalTimeSlots[0] && (
+                <span
+                  className={cn(
+                    "pointer-events-none absolute left-0 top-[14px] z-30 inline-flex -translate-x-1/2 flex-col items-center gap-0.5 rounded bg-custom-blue-light px-1 text-[13px] font-medium tabular-nums leading-none text-foreground whitespace-nowrap",
+                    timelineScrollLeft > 0 && "invisible"
+                  )}
                 >
-                  <span
-                    className="absolute top-[14px] inline-flex flex-col items-center gap-0.5 text-[13px] font-medium tabular-nums leading-none text-foreground whitespace-nowrap"
-                    style={{
-                      left: "0px",
-                      transform: "translateX(-50%)",
-                    }}
-                  >
-                    <span>{slot}</span>
-                  </span>
+                  <span>{globalTimeSlots[0]}</span>
+                </span>
+              )}
+              <div
+                ref={(node) => {
+                  timelineRowRef.current = node;
+                  registerTimelineScrollRef(node);
+                }}
+                onScroll={handleTimelineScroll}
+                onPointerDown={handleTimelinePointerDown}
+                onPointerMove={handleTimelinePointerMove}
+                onPointerUp={stopTimelinePan}
+                onPointerCancel={stopTimelinePan}
+                className="timeline-center-scroll h-full w-full"
+              >
+                <div
+                  className="relative h-full grid min-w-full"
+                  style={{ gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
+                >
+                {globalTimeSlots.map((slot, idx) => (
                   <div
-                    className="absolute top-[30px] h-[8px] border-l border-slate-500/60 dark:border-white/60 z-10"
-                    style={{ left: "0px" }}
-                  />
+                    key={`${slot}-${idx}`}
+                    className="relative h-full"
+                  >
+                    <span
+                      className={cn(
+                        "absolute top-[14px] z-30 inline-flex flex-col items-center gap-0.5 rounded bg-custom-blue-light px-1 text-[13px] font-medium tabular-nums leading-none text-foreground whitespace-nowrap",
+                        idx === 0 ? "invisible -translate-x-1/2" : "-translate-x-1/2"
+                      )}
+                      style={{ left: "0px" }}
+                    >
+                      <span>{slot}</span>
+                    </span>
+                    <div
+                      className="absolute top-[30px] h-[8px] border-l border-slate-500/60 dark:border-white/60 z-10"
+                      style={{ left: "0px" }}
+                    />
+                  </div>
+                ))}
                 </div>
-              ))}
+              </div>
             </div>
             <div className="flex-shrink-0 w-20 h-full text-center text-[13px] font-medium text-foreground border-l border-border/70 px-1 flex items-center justify-center">
               Ore lavorate
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto px-4 pb-4 pt-0">
+          <div className="flex-1 overflow-auto px-4 pb-1 pt-0">
             {drivers.length === 0 && !isReadOnly ? (
               <div className="flex items-center justify-center h-64 bg-yellow-100 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
                 <div className="text-center p-6">
@@ -1173,10 +1281,18 @@ export default function LogisticsTimelineView({
                     <Droppable droppableId={`timeline-${driver.id}`} direction="horizontal" isDropDisabled={isReadOnly}>
                       {(provided, snapshot) => (
                         <div
-                          ref={provided.innerRef}
                           {...provided.droppableProps}
+                          ref={(node) => {
+                            provided.innerRef(node);
+                            registerTimelineScrollRef(node);
+                          }}
+                          onScroll={handleTimelineScroll}
+                          onPointerDown={handleTimelinePointerDown}
+                          onPointerMove={handleTimelinePointerMove}
+                          onPointerUp={stopTimelinePan}
+                          onPointerCancel={stopTimelinePan}
                           className={cn(
-                            "relative min-h-[45px] flex-1 border-l border-border transition-colors",
+                            "timeline-center-scroll relative min-w-0 min-h-[45px] flex-1 border-l border-border transition-colors",
                             snapshot.isDraggingOver
                               ? "bg-blue-200/40 dark:bg-blue-900/40 border-l-2 border-blue-400"
                               : "bg-background"
@@ -1198,7 +1314,7 @@ export default function LogisticsTimelineView({
                               />
                             ))}
                           </div>
-                          <div className="relative z-10 flex items-center h-full min-h-[45px] px-0 gap-0 flex-wrap">
+                          <div className="relative z-10 flex min-w-full items-center h-full min-h-[45px] px-0 gap-0 flex-wrap">
                             {tasks.map((task, index) => (
                               <TaskCard
                                 key={`${task.id}-${driver.id}`}
