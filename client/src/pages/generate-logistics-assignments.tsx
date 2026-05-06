@@ -7,7 +7,6 @@ import LogisticsTimelineView from "@/components/timeline/logistics-timeline-view
 import type { TaskType } from "@shared/schema";
 import {
   CalendarIcon,
-  Loader2,
   RefreshCw,
   Search,
 } from "lucide-react";
@@ -333,7 +332,6 @@ export default function GenerateLogisticsAssignments() {
   const [searchTask, setSearchTask] = useState("");
   /** Solo sul pulsante refresh (come generate-assignments), nessun overlay pagina */
   const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
-  const [isRunningLogisticsOptimizer, setIsRunningLogisticsOptimizer] = useState(false);
   const [logisticsSummary, setLogisticsSummary] = useState<LogisticsSummaryState | null>(null);
   const [logisticsTaskLists, setLogisticsTaskLists] = useState<LogisticsTaskLists>(EMPTY_LOGISTICS_TASK_LISTS);
   const [logisticsDrivers, setLogisticsDrivers] = useState<
@@ -509,52 +507,6 @@ export default function GenerateLogisticsAssignments() {
     await loadLogisticsContainers(selectedDate);
     await loadLogisticsTimelineState(selectedDate);
   }, [selectedDate, loadLogisticsContainers, loadLogisticsTimelineState]);
-
-  const runLogisticsOptimizerAssign = useCallback(async () => {
-    if (isTimelineReadOnly) return;
-    const dateStr = format(selectedDate, "yyyy-MM-dd");
-    setIsRunningLogisticsOptimizer(true);
-    try {
-      const res = await fetch("/api/logistics-optimizer/apply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: dateStr,
-          modified_by: getCurrentUsername(),
-        }),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        success?: boolean;
-        error?: string;
-        status?: string;
-        unassigned?: Array<{ reasonCode?: string }>;
-      };
-      if (!res.ok || !data.success) {
-        toast({
-          title: "Assegnazione automatica fallita",
-          description: data.error || `HTTP ${res.status}`,
-          variant: "destructive",
-        });
-        return;
-      }
-      await reloadLogisticsPage();
-      const nonLockedUnassigned =
-        (data.unassigned || []).filter((u) => u.reasonCode !== "LOCKED_SKIP").length;
-      const partial = data.status === "partial" || nonLockedUnassigned > 0;
-      toast({
-        title: partial ? "Assegnazione completata con avvisi" : "Task assegnate",
-        description: partial
-          ? `Alcuni task non sono stati assegnati (${nonLockedUnassigned}). Verifica finestre HK e vincoli.`
-          : "Timeline logistica aggiornata.",
-        variant: partial ? "default" : "success",
-      });
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Errore sconosciuto";
-      toast({ title: "Errore di rete", description: msg, variant: "destructive" });
-    } finally {
-      setIsRunningLogisticsOptimizer(false);
-    }
-  }, [selectedDate, isTimelineReadOnly, reloadLogisticsPage, toast]);
 
   /**
    * Allineato a generate-assignments: data passata → solo PG; data oggi/futura → se la timeline ha già task
@@ -1043,27 +995,6 @@ export default function GenerateLogisticsAssignments() {
                 )}
               </Button>
               <div className="h-6 w-px bg-black/20 dark:bg-white/20" />
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={
-                  isTimelineReadOnly ||
-                  isExtractingLogistics ||
-                  isRefreshingContainers ||
-                  isRunningLogisticsOptimizer
-                }
-                title="Esegue l'ottimizzatore e salva le assegnazioni sulla timeline"
-                onClick={() => void runLogisticsOptimizerAssign()}
-                className="flex items-center gap-2 rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
-                data-testid="button-logistics-optimizer-assign"
-              >
-                {isRunningLogisticsOptimizer ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CalendarIcon className="h-4 w-4" />
-                )}
-                Assegna
-              </Button>
             </div>
           </div>
         </div>

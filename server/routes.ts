@@ -3777,65 +3777,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   registerLogisticsTimelineMutationRoutes(app, { getCurrentUsername, getRomeTimestamp });
 
-  app.get("/api/logistics-optimizer/prerequisites", async (req, res) => {
-    try {
-      const workDate = (req.query.workDate as string) || format(new Date(), "yyyy-MM-dd");
-      const { getLogisticsOptimizerPrerequisites } = await import(
-        "./services/logistics-optimizer/runAllPhasesLogistics"
-      );
-      const pre = await getLogisticsOptimizerPrerequisites(workDate);
-      res.json({ success: true, ...pre });
-    } catch (error: any) {
-      console.error("GET /api/logistics-optimizer/prerequisites:", error);
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-  app.post("/api/logistics-optimizer/run-all", async (req, res) => {
-    try {
-      const workDate = req.body?.date || req.body?.workDate || format(new Date(), "yyyy-MM-dd");
-      const dryRun = Boolean(req.body?.dryRun);
-      const modifiedBy = req.body?.modified_by || getCurrentUsername(req);
-      const { runAllPhasesLogistics } = await import("./services/logistics-optimizer/runAllPhasesLogistics");
-      const out = await runAllPhasesLogistics(workDate, { dryRun, modifiedBy });
-      res.json({ success: out.status !== "failed", ...out });
-    } catch (error: any) {
-      console.error("POST /api/logistics-optimizer/run-all:", error);
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-  app.post("/api/logistics-optimizer/apply", async (req, res) => {
-    try {
-      const workDate = req.body?.date || req.body?.workDate || format(new Date(), "yyyy-MM-dd");
-      const dryRun = Boolean(req.body?.dryRun);
-      const modifiedBy = req.body?.modified_by || getCurrentUsername(req);
-      const { runAllPhasesLogistics } = await import("./services/logistics-optimizer/runAllPhasesLogistics");
-      const out = await runAllPhasesLogistics(workDate, { dryRun, modifiedBy });
-      if (out.status === "failed" || !out.timelinePayload) {
-        return res.status(400).json({
-          success: false,
-          error: out.error || "Pipeline failed or no timeline",
-          ...out,
-        });
-      }
-      const saved = await workspaceFiles.saveLogisticsTimeline(
-        workDate,
-        out.timelinePayload as any,
-        false,
-        modifiedBy,
-        "logistics_optimizer_apply"
-      );
-      if (!saved) {
-        return res.status(500).json({ success: false, error: "saveLogisticsTimeline failed", ...out });
-      }
-      res.json({ success: true, ...out, saved: true });
-    } catch (error: any) {
-      console.error("POST /api/logistics-optimizer/apply:", error);
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
   // POST /api/selected-cleaners - Salva selected cleaners (per script Python)
   app.post("/api/selected-cleaners", async (req, res) => {
     try {
