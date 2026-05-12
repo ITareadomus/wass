@@ -9,6 +9,8 @@ export interface RefreshContainersResult {
   error?: string;
 }
 
+const CREATE_CONTAINERS_TIMEOUT_MS = 120000;
+
 /** Logistics: create_containers.py --workflow logistics → daily_logistics_* */
 export async function refreshLogisticsContainersFromAdam(
   workDate: string,
@@ -20,8 +22,14 @@ export async function refreshLogisticsContainersFromAdam(
     await new Promise<string>((resolve, reject) => {
       exec(
         `python3 "${createContainersPath}" --date "${workDate}" --skip-extract --use-api --workflow logistics`,
+        { timeout: CREATE_CONTAINERS_TIMEOUT_MS, maxBuffer: 5 * 1024 * 1024 },
         (error, stdout, stderr) => {
           if (error) {
+            if ((error as any).killed) {
+              const timeoutSeconds = Math.floor(CREATE_CONTAINERS_TIMEOUT_MS / 1000);
+              reject(new Error(`create_containers logistics timeout dopo ${timeoutSeconds}s`));
+              return;
+            }
             console.error(`❌ Errore create_containers (logistics): ${error.message}`);
             reject(new Error(stderr || error.message));
           } else {
@@ -82,15 +90,24 @@ export async function refreshContainersFromAdam(
     
     const workflowArg = workflow === 'office' ? ' --workflow office' : '';
     await new Promise<string>((resolve, reject) => {
-      exec(`python3 "${createContainersPath}" --date "${workDate}" --skip-extract --use-api${workflowArg}`, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`❌ Errore create_containers: ${error.message}`);
-          reject(new Error(stderr || error.message));
-        } else {
-          console.log(`create_containers output: ${stdout}`);
-          resolve(stdout);
+      exec(
+        `python3 "${createContainersPath}" --date "${workDate}" --skip-extract --use-api${workflowArg}`,
+        { timeout: CREATE_CONTAINERS_TIMEOUT_MS, maxBuffer: 5 * 1024 * 1024 },
+        (error, stdout, stderr) => {
+          if (error) {
+            if ((error as any).killed) {
+              const timeoutSeconds = Math.floor(CREATE_CONTAINERS_TIMEOUT_MS / 1000);
+              reject(new Error(`create_containers timeout dopo ${timeoutSeconds}s`));
+              return;
+            }
+            console.error(`❌ Errore create_containers: ${error.message}`);
+            reject(new Error(stderr || error.message));
+          } else {
+            console.log(`create_containers output: ${stdout}`);
+            resolve(stdout);
+          }
         }
-      });
+      );
     });
 
     let containersData = await workspaceFiles.loadContainers(workDate);

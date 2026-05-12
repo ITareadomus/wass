@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/select";
 
 const OFFICE_SCOPE_ENABLED = false;
+const REFRESH_TIMEOUT_MS = 45000;
 
 interface Task {
   task_id: string | number;
@@ -165,20 +166,33 @@ export default function UnconfirmedTasks() {
   } = useQuery({
     queryKey: ["/api/containers/refresh", selectedDate],
     queryFn: async () => {
-      const response = await fetch("/api/containers/refresh", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: selectedDate, scope: scopeValue }),
-      });
-      if (!response.ok) {
-        const msg = await response.text().catch(() => "");
-        throw new Error(msg || "Failed to refresh containers");
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
+      try {
+        const response = await fetch("/api/containers/refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: selectedDate, scope: scopeValue }),
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          const msg = await response.text().catch(() => "");
+          throw new Error(msg || "Failed to refresh containers");
+        }
+        return response.json();
+      } catch (error: any) {
+        if (error?.name === "AbortError") {
+          throw new Error("Timeout refresh containers: la richiesta ha superato 45 secondi.");
+        }
+        throw error;
+      } finally {
+        window.clearTimeout(timeoutId);
       }
-      return response.json();
     },
     // Ad ogni apertura pagina e ad ogni cambio data deve rieseguire il refresh
     staleTime: 0,
     gcTime: 0,
+    retry: false,
     refetchOnMount: "always",
     refetchOnWindowFocus: false,
   });
