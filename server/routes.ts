@@ -9869,6 +9869,37 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     }
   });
 
+  // ========== LOGISTICS OPTIMIZER (INITIAL CONSTRAINTS) ==========
+  app.post("/api/logistics-optimizer/run", async (req, res) => {
+    try {
+      const { date } = req.body || {};
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+
+      console.log(`🚀 POST /api/logistics-optimizer/run - Avvio logistics-optimizer per ${workDate}`);
+
+      const { runLogisticsOptimizer } = await import("./services/logistics-optimizer");
+      const result = await runLogisticsOptimizer(workDate);
+
+      if (!result.canRun) {
+        return res.status(400).json({
+          success: false,
+          ...result,
+        });
+      }
+
+      return res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error: any) {
+      console.error("❌ Errore logistics-optimizer:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
   // ========== OPTIMIZER RUN-ALL ENDPOINT ==========
   
   app.post("/api/optimizer/run-all", async (req, res) => {
