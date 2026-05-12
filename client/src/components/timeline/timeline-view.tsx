@@ -534,6 +534,15 @@ export default function TimelineView({
     };
   }, [tasks, allCleanersToShow, timelineCleaners, cleanersAliases, cleanersDirectory]);
 
+  const visiblePreassignedTasksSummary = React.useMemo(() => {
+    if (!lastAdamTransfer) return preassignedTasksSummary;
+    return {
+      all: preassignedTasksSummary.readonly,
+      readonly: preassignedTasksSummary.readonly,
+      normal: [] as typeof preassignedTasksSummary.normal,
+    };
+  }, [preassignedTasksSummary, lastAdamTransfer]);
+
   // Crea Set di ID cleaner rimossi per facile lookup
   const removedCleanerIds = React.useMemo(() => {
     const selectedIds = new Set(cleaners.map(c => c.id));
@@ -2107,13 +2116,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               <h2 className="text-xl font-bold text-foreground flex items-center">
                 <CalendarIcon className="w-5 h-5 mr-2 text-custom-blue" />
                 {isOfficeScope ? "Timeline Ufficio" : "Timeline Housekeeping"} - {cleaners.length} Cleaners
-                {preassignedTasksSummary.all.length > 0 && (
+                {visiblePreassignedTasksSummary.all.length > 0 && (
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
                     className="ml-2 h-7 w-7 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10"
-                    title={`Task pre-assegnate ADAM: ${preassignedTasksSummary.all.length}`}
+                    title={`Task pre-assegnate ADAM: ${visiblePreassignedTasksSummary.all.length}`}
                     onClick={() => setShowPreassignedTasksDialog(true)}
                   >
                     <Lock className="w-4 h-4" />
@@ -2834,13 +2843,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             <div className="rounded-md border border-amber-300/70 bg-amber-50/40 dark:bg-amber-950/20 p-3">
               <div className="font-semibold text-amber-700 dark:text-amber-300 mb-2 flex items-center gap-2">
                 <Lock className="w-4 h-4" />
-                Read-only ({preassignedTasksSummary.readonly.length})
+                Read-only ({visiblePreassignedTasksSummary.readonly.length})
               </div>
-              {preassignedTasksSummary.readonly.length === 0 ? (
+              {visiblePreassignedTasksSummary.readonly.length === 0 ? (
                 <p className="text-muted-foreground">Nessuna task read-only pre-assegnata.</p>
               ) : (
                 <div className="space-y-1.5">
-                  {preassignedTasksSummary.readonly.map((row) => (
+                  {visiblePreassignedTasksSummary.readonly.map((row) => (
                     <div key={`ro-${row.key}`} className="flex items-center justify-between gap-3 flex-nowrap min-w-0">
                       <span className="font-medium min-w-0 truncate whitespace-nowrap">
                         {row.logisticCode}
@@ -2852,27 +2861,29 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 </div>
               )}
             </div>
-            <div className="rounded-md border border-sky-300/70 bg-sky-50/40 dark:bg-sky-950/20 p-3">
-              <div className="font-semibold text-sky-700 dark:text-sky-300 mb-2 flex items-center gap-2">
-                <Unlock className="w-4 h-4" />
-                Non read-only ({preassignedTasksSummary.normal.length})
-              </div>
-              {preassignedTasksSummary.normal.length === 0 ? (
-                <p className="text-muted-foreground">Nessuna task pre-assegnata non read-only.</p>
-              ) : (
-                <div className="space-y-1.5">
-                  {preassignedTasksSummary.normal.map((row) => (
-                    <div key={`rw-${row.key}`} className="flex items-center justify-between gap-3 flex-nowrap min-w-0">
-                      <span className="font-medium min-w-0 truncate whitespace-nowrap">
-                        {row.logisticCode}
-                        {row.address ? ` - ${row.address}` : ""}
-                      </span>
-                      <span className="text-muted-foreground shrink-0 whitespace-nowrap text-right">{`assegnato a ${row.cleanerLabel}`}</span>
-                    </div>
-                  ))}
+            {!lastAdamTransfer && (
+              <div className="rounded-md border border-sky-300/70 bg-sky-50/40 dark:bg-sky-950/20 p-3">
+                <div className="font-semibold text-sky-700 dark:text-sky-300 mb-2 flex items-center gap-2">
+                  <Unlock className="w-4 h-4" />
+                  Non read-only ({visiblePreassignedTasksSummary.normal.length})
                 </div>
-              )}
-            </div>
+                {visiblePreassignedTasksSummary.normal.length === 0 ? (
+                  <p className="text-muted-foreground">Nessuna task pre-assegnata non read-only.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {visiblePreassignedTasksSummary.normal.map((row) => (
+                      <div key={`rw-${row.key}`} className="flex items-center justify-between gap-3 flex-nowrap min-w-0">
+                        <span className="font-medium min-w-0 truncate whitespace-nowrap">
+                          {row.logisticCode}
+                          {row.address ? ` - ${row.address}` : ""}
+                        </span>
+                        <span className="text-muted-foreground shrink-0 whitespace-nowrap text-right">{`assegnato a ${row.cleanerLabel}`}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
