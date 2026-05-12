@@ -14,24 +14,10 @@ export interface LogisticsPhase0Result {
   canRun: boolean;
   phase: 0;
   workDate: string;
-  housekeepingAssignmentsCount: number;
   totalLogisticsTasks: number;
   lockedTasksExcluded: number;
   unlockedTasks: number;
   unlockedTaskData: LogisticsTaskInputWithLock[];
-  blockedReason?: string;
-}
-
-async function getHousekeepingAssignmentsCount(workDate: string): Promise<number> {
-  const result = await pool.query<{ count: string }>(
-    `
-      SELECT COUNT(*) AS count
-      FROM daily_assignments_current
-      WHERE work_date = $1
-    `,
-    [workDate]
-  );
-  return parseInt(result.rows[0]?.count || "0", 10);
 }
 
 async function loadLogisticsTasksWithLockStatus(workDate: string): Promise<LogisticsTaskInputWithLock[]> {
@@ -68,23 +54,6 @@ async function loadLogisticsTasksWithLockStatus(workDate: string): Promise<Logis
 }
 
 export async function runLogisticsPhase0(workDate: string): Promise<LogisticsPhase0Result> {
-  const housekeepingAssignmentsCount = await getHousekeepingAssignmentsCount(workDate);
-
-  if (housekeepingAssignmentsCount === 0) {
-    return {
-      canRun: false,
-      phase: 0,
-      workDate,
-      housekeepingAssignmentsCount,
-      totalLogisticsTasks: 0,
-      lockedTasksExcluded: 0,
-      unlockedTasks: 0,
-      unlockedTaskData: [],
-      blockedReason:
-        "Logistics optimizer non avviabile: prima deve essere completato il programma housekeeping per la data selezionata.",
-    };
-  }
-
   const allTasks = await loadLogisticsTasksWithLockStatus(workDate);
   const unlockedTaskData = allTasks.filter((task) => !task.locked);
   const lockedTasksExcluded = allTasks.length - unlockedTaskData.length;
@@ -93,7 +62,6 @@ export async function runLogisticsPhase0(workDate: string): Promise<LogisticsPha
     canRun: true,
     phase: 0,
     workDate,
-    housekeepingAssignmentsCount,
     totalLogisticsTasks: allTasks.length,
     lockedTasksExcluded,
     unlockedTasks: unlockedTaskData.length,

@@ -19,6 +19,14 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { isContinuazioneStraordinariaTask, isTaskLocked } from "@/lib/taskValidation";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 function getCurrentUsername(): string {
   try {
@@ -332,6 +340,11 @@ export default function GenerateLogisticsAssignments() {
   const [searchTask, setSearchTask] = useState("");
   /** Solo sul pulsante refresh (come generate-assignments), nessun overlay pagina */
   const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
+  const [isRunningLogisticsOptimizer, setIsRunningLogisticsOptimizer] = useState(false);
+  const [showMissingCleanerWarningDialog, setShowMissingCleanerWarningDialog] = useState(false);
+  const [missingCleanerTaskCount, setMissingCleanerTaskCount] = useState(0);
+  const [missingCleanerTaskCodes, setMissingCleanerTaskCodes] = useState<string[]>([]);
+  const [showMissingCleanerTaskCodesList, setShowMissingCleanerTaskCodesList] = useState(false);
   const [logisticsSummary, setLogisticsSummary] = useState<LogisticsSummaryState | null>(null);
   const [logisticsTaskLists, setLogisticsTaskLists] = useState<LogisticsTaskLists>(EMPTY_LOGISTICS_TASK_LISTS);
   const [logisticsDrivers, setLogisticsDrivers] = useState<
@@ -661,6 +674,78 @@ export default function GenerateLogisticsAssignments() {
       setIsRefreshingContainers(false);
     }
   }, [selectedDate, toast, fetchAdamLogisticsFingerprint, reloadLogisticsPage]);
+
+  const executeLogisticsOptimizer = useCallback(async () => {
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    setIsRunningLogisticsOptimizer(true);
+    try {
+      const response = await fetch("/api/logistics-optimizer/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: dateStr }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || data?.blockedReason || "Esecuzione logistics-optimizer fallita");
+      }
+      toast({
+        variant: "success",
+        title: "Logistics optimizer avviato",
+        description: `Task sbloccate elaborate: ${Number(data.unlockedTasks ?? 0)}`,
+      });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Errore sconosciuto";
+      toast({
+        variant: "destructive",
+        title: "Errore logistics-optimizer",
+        description: msg,
+      });
+    } finally {
+      setIsRunningLogisticsOptimizer(false);
+    }
+  }, [selectedDate, toast]);
+
+  const handleRunLogisticsOptimizer = useCallback(async () => {
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    setIsRunningLogisticsOptimizer(true);
+    try {
+      const precheckRes = await fetch(
+        `/api/logistics-optimizer/precheck?date=${encodeURIComponent(dateStr)}`,
+        {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+        }
+      );
+      const precheck = await precheckRes.json().catch(() => ({}));
+      if (!precheckRes.ok || !precheck?.success) {
+        throw new Error(precheck?.error || "Precheck logistics-optimizer fallito");
+      }
+
+      const count = Number(precheck.count ?? 0);
+      const taskCodes = Array.isArray(precheck.taskCodes)
+        ? precheck.taskCodes.map((code: unknown) => String(code))
+        : [];
+
+      if (count > 0) {
+        setMissingCleanerTaskCount(count);
+        setMissingCleanerTaskCodes(taskCodes);
+        setShowMissingCleanerTaskCodesList(false);
+        setShowMissingCleanerWarningDialog(true);
+        return;
+      }
+
+      await executeLogisticsOptimizer();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Errore sconosciuto";
+      toast({
+        variant: "destructive",
+        title: "Errore precheck",
+        description: msg,
+      });
+    } finally {
+      setIsRunningLogisticsOptimizer(false);
+    }
+  }, [selectedDate, executeLogisticsOptimizer, toast]);
 
   const s = logisticsSummary;
 
@@ -995,6 +1080,21 @@ export default function GenerateLogisticsAssignments() {
                 )}
               </Button>
               <div className="h-6 w-px bg-black/20 dark:bg-white/20" />
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={isRunningLogisticsOptimizer}
+                title="Avvia Logistics Optimizer"
+                onClick={() => void handleRunLogisticsOptimizer()}
+                className="rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
+                data-testid="button-run-logistics-optimizer"
+              >
+                {isRunningLogisticsOptimizer ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <span className="text-xs font-semibold uppercase tracking-wide">Optimizer</span>
+                )}
+              </Button>
             </div>
           </div>
         </div>
@@ -1130,6 +1230,74 @@ export default function GenerateLogisticsAssignments() {
             </div>
           </div>
         </DragDropContext>
+
+        <Dialog
+          open={showMissingCleanerWarningDialog}
+          onOpenChange={(open) => {
+            setShowMissingCleanerWarningDialog(open);
+            if (!open) setShowMissingCleanerTaskCodesList(false);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Attenzione prima dell&apos;avvio</DialogTitle>
+              <DialogDescription>
+                Ci sono{" "}
+                <button
+                  type="button"
+                  className="font-semibold underline underline-offset-2 text-foreground"
+                  onClick={() =>
+                    setShowMissingCleanerTaskCodesList((prev) => !prev)
+                  }
+                >
+                  {missingCleanerTaskCount}
+                </button>{" "}
+                task a cui non è stato assegnato nessun cleaner.
+              </DialogDescription>
+            </DialogHeader>
+
+            {showMissingCleanerTaskCodesList && (
+              <div className="max-h-52 overflow-y-auto rounded-md border p-3 text-sm">
+                <p className="mb-2 font-medium">Codici ADAM:</p>
+                {missingCleanerTaskCodes.length === 0 ? (
+                  <p className="text-muted-foreground">Nessun codice disponibile.</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {missingCleanerTaskCodes.map((code) => (
+                      <li key={code} className="font-mono">
+                        {code}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                className="border-2 border-custom-blue"
+                onClick={() => {
+                  setShowMissingCleanerWarningDialog(false);
+                  setShowMissingCleanerTaskCodesList(false);
+                }}
+              >
+                Annulla
+              </Button>
+              <Button
+                variant="outline"
+                className="border-2 border-custom-blue"
+                onClick={async () => {
+                  setShowMissingCleanerWarningDialog(false);
+                  setShowMissingCleanerTaskCodesList(false);
+                  await executeLogisticsOptimizer();
+                }}
+              >
+                Procedi
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         </>
         )}
       </div>
