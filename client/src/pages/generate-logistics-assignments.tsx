@@ -706,18 +706,22 @@ export default function GenerateLogisticsAssignments() {
       if (!response.ok || !data?.success) {
         throw new Error(data?.error || data?.blockedReason || "Esecuzione logistics-optimizer fallita");
       }
+      const assignedCount = Number(
+        data?.apply?.insertedTasks ?? data?.phase2?.tasksAssigned ?? 0
+      );
+      const unassignedCount = Number(data?.phase2?.tasksUnassigned ?? 0);
       toast({
         variant: "success",
-        title: "Logistics optimizer avviato",
-        description: `Task applicate in timeline: ${Number(data?.apply?.insertedTasks ?? data.unlockedTasks ?? 0)}`,
+        title: "Assegnazione completata",
+        description: `${assignedCount} task assegnate, ${unassignedCount} non assegnate`,
       });
       await reloadLogisticsPage();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Errore sconosciuto";
       toast({
         variant: "destructive",
-        title: "Errore logistics-optimizer",
-        description: msg,
+        title: "Errore",
+        description: msg || "Errore durante l'assegnazione automatica",
       });
     } finally {
       setIsRunningLogisticsOptimizer(false);
@@ -1154,15 +1158,20 @@ export default function GenerateLogisticsAssignments() {
                 variant="ghost"
                 size="sm"
                 disabled={isRunningLogisticsOptimizer}
-                title="Avvia Logistics Optimizer"
                 onClick={() => void handleRunLogisticsOptimizer()}
-                className="rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
+                className="flex items-center gap-2 rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
                 data-testid="button-run-logistics-optimizer"
               >
                 {isRunningLogisticsOptimizer ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Assegnando...
+                  </>
                 ) : (
-                  <span className="text-xs font-semibold uppercase tracking-wide">Optimizer</span>
+                  <>
+                    <CalendarIcon className="h-4 w-4" />
+                    Assegna
+                  </>
                 )}
               </Button>
             </div>
