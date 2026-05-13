@@ -6,6 +6,12 @@ export interface LogisticsTaskInputWithLock {
   priority: string | null;
   lat: number | null;
   lng: number | null;
+  checkinDate: string | null;
+  checkoutDate: string | null;
+  checkinTime: string | null;
+  checkoutTime: string | null;
+  cleanerId: number | null;
+  cleanerStartTime: string | null;
   locked: boolean;
   lockedReason: string | null;
 }
@@ -29,6 +35,12 @@ async function loadLogisticsTasksWithLockStatus(workDate: string): Promise<Logis
         lc.priority AS "priority",
         lc.lat AS "lat",
         lc.lng AS "lng",
+        lc.checkin_date AS "checkinDate",
+        lc.checkout_date AS "checkoutDate",
+        lc.checkin_time AS "checkinTime",
+        lc.checkout_time AS "checkoutTime",
+        cleaner_ctx.cleaner_id AS "cleanerId",
+        cleaner_ctx.cleaner_start_time AS "cleanerStartTime",
         COALESCE(dtl.locked, lc.locked, false) AS "locked",
         COALESCE(dtl.locked_reason, lc.locked_reason) AS "lockedReason"
       FROM lg_containers lc
@@ -36,6 +48,18 @@ async function loadLogisticsTasksWithLockStatus(workDate: string): Promise<Logis
         ON dtl.work_date = lc.work_date
        AND dtl.task_id = lc.task_id
        AND dtl.locked = true
+      LEFT JOIN LATERAL (
+        SELECT
+          dac.cleaner_id,
+          dac.cleaner_start_time
+        FROM daily_assignments_current dac
+        WHERE dac.work_date = lc.work_date
+          AND dac.task_id = lc.task_id
+          AND (dac.scope = 'housekeeping' OR dac.scope IS NULL)
+          AND dac.cleaner_id IS NOT NULL
+        ORDER BY dac.id DESC
+        LIMIT 1
+      ) cleaner_ctx ON true
       WHERE lc.work_date = $1
       ORDER BY lc.task_id
     `,
@@ -48,6 +72,12 @@ async function loadLogisticsTasksWithLockStatus(workDate: string): Promise<Logis
     priority: row.priority ? String(row.priority) : null,
     lat: row.lat != null ? Number(row.lat) : null,
     lng: row.lng != null ? Number(row.lng) : null,
+    checkinDate: row.checkinDate ? String(row.checkinDate) : null,
+    checkoutDate: row.checkoutDate ? String(row.checkoutDate) : null,
+    checkinTime: row.checkinTime ? String(row.checkinTime).slice(0, 5) : null,
+    checkoutTime: row.checkoutTime ? String(row.checkoutTime).slice(0, 5) : null,
+    cleanerId: row.cleanerId != null ? Number(row.cleanerId) : null,
+    cleanerStartTime: row.cleanerStartTime ? String(row.cleanerStartTime).slice(0, 5) : null,
     locked: row.locked === true,
     lockedReason: row.lockedReason ? String(row.lockedReason) : null,
   }));

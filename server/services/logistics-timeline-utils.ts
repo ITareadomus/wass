@@ -18,7 +18,7 @@ function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number)
   return EARTH_RADIUS_M * c;
 }
 
-function estimateCarTravelMinutes(
+export function estimateCarTravelMinutes(
   a: { lat: number; lng: number },
   b: { lat: number; lng: number },
   avgSpeedKmh: number = DEFAULT_AVG_SPEED_KMH
