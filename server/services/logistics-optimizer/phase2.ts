@@ -21,6 +21,7 @@ interface LogisticsTaskForPhase2 extends LogisticsTaskCandidate {
   cleanerId: number | null;
   cleanerStartTime: string | null;
   cleanerSequence: number | null;
+  bagPolicy: ReturnType<typeof computeBagPolicy>;
   premium: boolean;
   paxIn: number | null;
 }
@@ -59,6 +60,7 @@ interface DriverState {
   lastLng: number | null;
   totalTravelMinutes: number;
   assignedTasks: LogisticsTaskSchedule[];
+  cleanerLastSequence: Map<number, number>;
 }
 
 interface FeasibilityFailure {
@@ -72,6 +74,7 @@ interface GroupSimulationResult {
   projectedClockMin: number;
   projectedLastLat: number | null;
   projectedLastLng: number | null;
+  projectedCleanerLastSequence: Map<number, number>;
   travelMinutesDelta: number;
   score: number;
   failure: FeasibilityFailure | null;
@@ -162,6 +165,12 @@ function buildPhase2Tasks(
 
   return taskCandidates.map((candidate) => {
     const taskData = byTaskId.get(candidate.taskId);
+    const bagPolicy = computeBagPolicy({
+      cleanerId: taskData?.cleanerId ?? null,
+      sequence: taskData?.cleanerSequence ?? null,
+      premium: taskData?.premium === true,
+      paxIn: taskData?.paxIn ?? null,
+    });
     return {
       ...candidate,
       checkinDate: taskData?.checkinDate ?? null,
@@ -171,6 +180,7 @@ function buildPhase2Tasks(
       cleanerId: taskData?.cleanerId ?? null,
       cleanerStartTime: taskData?.cleanerStartTime ?? null,
       cleanerSequence: taskData?.cleanerSequence ?? null,
+      bagPolicy,
       premium: taskData?.premium === true,
       paxIn: taskData?.paxIn ?? null,
     };
@@ -181,27 +191,8 @@ function filterTasksByBagRule(tasks: LogisticsTaskForPhase2[]): {
   included: LogisticsTaskForPhase2[];
   excludedTaskIds: number[];
 } {
-  const included: LogisticsTaskForPhase2[] = [];
-  const excludedTaskIds: number[] = [];
-
-  for (const task of tasks) {
-    const bagPolicy = computeBagPolicy({
-      cleanerId: task.cleanerId,
-      sequence: task.cleanerSequence,
-      premium: task.premium,
-      paxIn: task.paxIn,
-    });
-    const isFirstCleanerTask = task.cleanerSequence === 1;
-    const shouldInclude = !isFirstCleanerTask || bagPolicy === "DRIVER_BRINGS_BAG";
-
-    if (shouldInclude) {
-      included.push(task);
-    } else {
-      excludedTaskIds.push(task.taskId);
-    }
-  }
-
-  return { included, excludedTaskIds };
+  // Sequence=1 tasks are always eligible; bag policy only influences ordering preference.
+  return { included: tasks, excludedTaskIds: [] };
 }
 
 function buildSpatialGroups(
@@ -292,8 +283,30 @@ function buildDriverStates(selectedDrivers: LogisticsSelectedDriver[]): DriverSt
       lastLng: null,
       totalTravelMinutes: 0,
       assignedTasks: [],
+      cleanerLastSequence: new Map<number, number>(),
     };
   });
+}
+
+function getSequencePreferencePenalty(task: LogisticsTaskForPhase2, cleanerLastSequence: Map<number, number>): number {
+  if (task.cleanerId == null || task.cleanerSequence == null) return 0;
+  const cleanerId = task.cleanerId;
+  const currentLastSequence = cleanerLastSequence.get(cleanerId) ?? 0;
+  const expectedNext = currentLastSequence + 1;
+
+  let penalty = 0;
+  if (task.cleanerSequence > expectedNext) {
+    penalty += (task.cleanerSequence - expectedNext) * 2;
+  } else if (task.cleanerSequence < expectedNext) {
+    penalty += (expectedNext - task.cleanerSequence) * 3;
+  }
+
+  // If cleaner already has the bag, sequence=1 is de-prioritized but still eligible.
+  if (task.cleanerSequence === 1 && currentLastSequence === 0 && task.bagPolicy === "CLEANER_HAS_BAG") {
+    penalty += 8;
+  }
+
+  return penalty;
 }
 
 function sortGroupTasksForDriver(group: SpatialGroup, state: DriverState): LogisticsTaskForPhase2[] {
@@ -301,6 +314,7 @@ function sortGroupTasksForDriver(group: SpatialGroup, state: DriverState): Logis
   const ordered: LogisticsTaskForPhase2[] = [];
   let currentLat = state.lastLat;
   let currentLng = state.lastLng;
+  const cleanerLastSequence = new Map<number, number>(state.cleanerLastSequence);
 
   while (remaining.length > 0) {
     let bestIdx = 0;
@@ -315,7 +329,9 @@ function sortGroupTasksForDriver(group: SpatialGroup, state: DriverState): Logis
         : task.checkinTime
           ? parseMinutes(task.checkinTime, 23 * 60 + 59)
           : 23 * 60 + 59;
-      const score = travel * 10 + deadline;
+      const sequencePenalty = getSequencePreferencePenalty(task, cleanerLastSequence);
+      // Priority: feasibility is checked separately, then geography, then sequence.
+      const score = travel * 100 + sequencePenalty * 10 + deadline / 10000;
       if (score < bestScore) {
         bestScore = score;
         bestIdx = i;
@@ -323,6 +339,10 @@ function sortGroupTasksForDriver(group: SpatialGroup, state: DriverState): Logis
     }
     const next = remaining.splice(bestIdx, 1)[0];
     ordered.push(next);
+    if (next.cleanerId != null && next.cleanerSequence != null) {
+      const previous = cleanerLastSequence.get(next.cleanerId) ?? 0;
+      cleanerLastSequence.set(next.cleanerId, Math.max(previous, next.cleanerSequence));
+    }
     currentLat = next.lat;
     currentLng = next.lng;
   }
@@ -341,6 +361,7 @@ function simulateGroupForDriver(
   let currentLat = state.lastLat;
   let currentLng = state.lastLng;
   let travelDelta = 0;
+  const projectedCleanerLastSequence = new Map<number, number>(state.cleanerLastSequence);
 
   for (const task of orderedTasks) {
     const travelMinutes = currentLat != null && currentLng != null
@@ -356,6 +377,7 @@ function simulateGroupForDriver(
         projectedClockMin: state.clockMin,
         projectedLastLat: state.lastLat,
         projectedLastLng: state.lastLng,
+        projectedCleanerLastSequence: new Map<number, number>(state.cleanerLastSequence),
         travelMinutesDelta: 0,
         score: Number.NEGATIVE_INFINITY,
         failure: {
@@ -372,6 +394,7 @@ function simulateGroupForDriver(
         projectedClockMin: state.clockMin,
         projectedLastLat: state.lastLat,
         projectedLastLng: state.lastLng,
+        projectedCleanerLastSequence: new Map<number, number>(state.cleanerLastSequence),
         travelMinutesDelta: 0,
         score: Number.NEGATIVE_INFINITY,
         failure: {
@@ -395,6 +418,10 @@ function simulateGroupForDriver(
     travelDelta += travelMinutes;
     currentLat = task.lat;
     currentLng = task.lng;
+    if (task.cleanerId != null && task.cleanerSequence != null) {
+      const previous = projectedCleanerLastSequence.get(task.cleanerId) ?? 0;
+      projectedCleanerLastSequence.set(task.cleanerId, Math.max(previous, task.cleanerSequence));
+    }
   }
 
   const projectedTaskCount = state.assignedTasks.length + schedule.length;
@@ -409,6 +436,7 @@ function simulateGroupForDriver(
     projectedClockMin: clockMin,
     projectedLastLat: currentLat,
     projectedLastLng: currentLng,
+    projectedCleanerLastSequence,
     travelMinutesDelta: travelDelta,
     score,
     failure: null,
@@ -511,6 +539,7 @@ export async function runLogisticsPhase2(
     bestState.clockMin = bestSimulation.projectedClockMin;
     bestState.lastLat = bestSimulation.projectedLastLat;
     bestState.lastLng = bestSimulation.projectedLastLng;
+    bestState.cleanerLastSequence = bestSimulation.projectedCleanerLastSequence;
     bestState.totalTravelMinutes += bestSimulation.travelMinutesDelta;
 
     groupsAssigned += 1;

@@ -2209,13 +2209,11 @@ const displayClickableInputClass =
   const housekeepingStartDisplayValue =
     isLogisticsScope
       ? String(effectiveHousekeepingStartTime ?? "").trim() ||
-        String(assignmentTimes.start_time ?? "").trim() ||
         "non assegnato"
       : String(assignmentTimes.start_time ?? "non assegnato");
   const housekeepingEndDisplayValue =
     isLogisticsScope
       ? String(effectiveHousekeepingEndTime ?? "").trim() ||
-        String(assignmentTimes.end_time ?? "").trim() ||
         "non assegnato"
       : String(assignmentTimes.end_time ?? "non assegnato");
 
