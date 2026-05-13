@@ -206,6 +206,18 @@ interface TaskCardProps {
   timelineRowStaffDisplayLabel?: string | null;
 }
 
+function getTaskMapMarkerId(task: Task): string {
+  const collaboratorIds = (task as any).collaborator_ids as number[] | null;
+  const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
+  const assignedCleaner = (task as any).assignedCleaner as number | null;
+  const baseTaskId = String(
+    (task as any).task_id ?? (task as any).taskId ?? (task as any).id ?? task.name ?? ""
+  );
+  return isCollaborativeTask && assignedCleaner != null
+    ? `${baseTaskId}:${assignedCleaner}`
+    : baseTaskId;
+}
+
 interface AssignedTask {
   task_id: number;
   logistic_code: number;
@@ -404,13 +416,8 @@ const displayClickableInputClass =
   useEffect(() => {
     const checkMapFilter = setInterval(() => {
       const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-      // Per task collaborativi, controlla sia ID composto che task.name semplice
-      const collaboratorIds = (task as any).collaborator_ids as number[] | null;
-      const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
-      const assignedCleaner = (task as any).assignedCleaner as number | null;
-      const markerId = isCollaborativeTask && assignedCleaner 
-        ? `${task.name}:${assignedCleaner}` 
-        : task.name;
+      // Per task collaborativi usa ID composto taskId:cleanerId.
+      const markerId = getTaskMapMarkerId(task);
       
       const shouldBeFiltered = currentFilteredTaskId === markerId;
       if (shouldBeFiltered !== isMapFiltered) {
@@ -419,7 +426,7 @@ const displayClickableInputClass =
     }, 100);
 
     return () => clearInterval(checkMapFilter);
-  }, [task.name, isMapFiltered, task]);
+  }, [task.id, isMapFiltered, task]);
 
   // Gestisce il click sulla card: se multi-select toggle selezione, altrimenti apri modale
   const handleCardClick = (e: React.MouseEvent) => {
@@ -438,13 +445,8 @@ const displayClickableInputClass =
       setClickTimer(null);
 
       // Toggle filtro mappa per questa task (attiva/disattiva animazione)
-      // Per task collaborativi usa ID composto "taskName:cleanerId" per identificare il marker specifico
-      const collaboratorIds = (task as any).collaborator_ids as number[] | null;
-      const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
-      const assignedCleaner = (task as any).assignedCleaner as number | null;
-      const markerId = isCollaborativeTask && assignedCleaner 
-        ? `${task.name}:${assignedCleaner}` 
-        : task.name;
+      // Per task collaborativi usa ID composto "taskId:cleanerId" per identificare il marker specifico
+      const markerId = getTaskMapMarkerId(task);
       
       const currentFilteredTaskId = (window as any).mapFilteredTaskId;
       if (currentFilteredTaskId === markerId) {

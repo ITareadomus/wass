@@ -221,6 +221,8 @@ export default function LogisticsTimelineView({
   const [isSavingDriverStartTime, setIsSavingDriverStartTime] = useState(false);
   const [confirmRemoveDriverId, setConfirmRemoveDriverId] = useState<number | null>(null);
   const [selectedSwapDriver, setSelectedSwapDriver] = useState<string>("");
+  const [filteredDriverIdForMap, setFilteredDriverIdForMap] = useState<number | null>(null);
+  const [driverClickTimer, setDriverClickTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   const loadDriverAliases = useCallback(async () => {
     try {
@@ -766,6 +768,68 @@ export default function LogisticsTimelineView({
     void loadDriverAliases();
   };
 
+  const handleDriverHeaderClick = (driver: LogisticsDriverRow, e: any) => {
+    e.preventDefault();
+
+    if (driverClickTimer) {
+      clearTimeout(driverClickTimer);
+      setDriverClickTimer(null);
+
+      const currentFilteredDriverId = (window as any).mapFilteredCleanerId as number | null;
+      if (currentFilteredDriverId === driver.id) {
+        setFilteredDriverIdForMap(null);
+        (window as any).mapFilteredCleanerId = null;
+        toast({
+          title: "Filtro mappa rimosso",
+          description: "Ora visualizzi tutte le task in mappa",
+          variant: "default",
+        });
+      } else {
+        setFilteredDriverIdForMap(driver.id);
+        (window as any).mapFilteredCleanerId = driver.id;
+        (window as any).mapFilteredTaskId = null;
+        const driverLabel =
+          driversAliases[driver.id]?.alias ||
+          driver.alias ||
+          `${(driver.name || "").trim()} ${(driver.lastname || "").trim()}`.trim() ||
+          `Driver ${driver.id}`;
+        toast({
+          title: "Filtro mappa attivato",
+          description: `Visualizzi solo le task di ${driverLabel}`,
+          variant: "default",
+        });
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      openDriverDetails(driver);
+      setDriverClickTimer(null);
+    }, 250);
+    setDriverClickTimer(timer);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (driverClickTimer) {
+        clearTimeout(driverClickTimer);
+      }
+    };
+  }, [driverClickTimer]);
+
+  useEffect(() => {
+    const sync = setInterval(() => {
+      const globalFilteredDriverId = (window as any).mapFilteredCleanerId;
+      const normalized =
+        globalFilteredDriverId == null || Number.isNaN(Number(globalFilteredDriverId))
+          ? null
+          : Number(globalFilteredDriverId);
+      setFilteredDriverIdForMap((prev) => (prev === normalized ? prev : normalized));
+    }, 250);
+
+    return () => clearInterval(sync);
+  }, []);
+
   const handleOpenAliasDialogForDriver = (d: LogisticsDriverRow) => {
     const currentAlias = driversAliases[d.id]?.alias ?? d.alias ?? "";
     setEditingAlias(currentAlias);
@@ -1115,17 +1179,16 @@ export default function LogisticsTimelineView({
                       className={cn(
                         "flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-background/95",
                         "cursor-pointer hover:bg-muted/35 transition-colors",
+                        filteredDriverIdForMap === driver.id &&
+                          "ring-2 ring-amber-400 border-amber-500 dark:ring-amber-500/80 dark:border-amber-500",
                         driver.isRemoved && "opacity-70"
                       )}
                       style={{ width: `${driverColumnWidth}px` }}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        openDriverDetails(driver);
-                      }}
+                      onClick={(e) => handleDriverHeaderClick(driver, e)}
                       title={
                         driver.isRemoved
                           ? "Dettagli — driver rimosso dai convocati (sostituisci dal pannello)"
-                          : "Dettagli driver"
+                          : "Dettagli driver (doppio click: filtro mappa)"
                       }
                     >
                       {!driver.isRemoved && (

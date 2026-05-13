@@ -43,6 +43,16 @@ export default function MapSection({ tasks }: MapSectionProps) {
   const withScope = (url: string) =>
     `${url}${url.includes("?") ? "&" : "?"}scope=${scopeValue}`;
 
+  const getTaskMarkerId = (task: any): string => {
+    const baseTaskId = String(task?.task_id ?? task?.taskId ?? task?.id ?? task?.name ?? "");
+    const collaboratorIds = (task as any).collaborator_ids as number[] | null;
+    const assignedCleaner = (task as any).assignedCleaner as number | null;
+    const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
+    return isCollaborativeTask && assignedCleaner != null
+      ? `${baseTaskId}:${assignedCleaner}`
+      : baseTaskId;
+  };
+
   // Carica i cleaners
   useEffect(() => {
     const loadCleaners = async () => {
@@ -171,7 +181,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
     });
 
     // Determina quali marker evidenziare (non nascondere gli altri)
-    // Usa ID univoco per marker: "taskName:cleanerId" per task collaborativi, "taskName" per altri
+    // Usa ID univoco per marker: "taskId:cleanerId" per task collaborativi, "taskId" per altri
     const highlightedMarkerIds = new Set<string>();
     
     // Se c'è un filtro per task ID (doppio click su task card)
@@ -189,9 +199,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
         
         // Evidenzia solo se il task è assegnato al cleaner filtrato
         if (assignedCleaner === filteredCleanerId) {
-          const markerId = isCollaborativeTask 
-            ? `${task.name}:${assignedCleaner}` 
-            : task.name;
+          const markerId = getTaskMarkerId(task);
           highlightedMarkerIds.add(markerId);
         }
       });
@@ -271,10 +279,8 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const markerColor = assignedCleaner ? getCleanerColor(assignedCleaner) : '#6B7280';
       const sequence = (task as any).sequence;
       
-      // Calcola ID univoco per questo marker: "taskName:cleanerId" per collaborativi, "taskName" per altri
-      const markerId = isCollaborativeTask && assignedCleaner 
-        ? `${task.name}:${assignedCleaner}` 
-        : task.name;
+      // Calcola ID univoco per questo marker: "taskId:cleanerId" per collaborativi, "taskId" per altri
+      const markerId = getTaskMarkerId(task);
       
       // Verifica se questo marker specifico è evidenziato
       const isHighlighted = highlightedMarkerIds.has(markerId);
@@ -287,7 +293,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
       
       // Per task collaborativi, raggruppa per appartamento (task+coordinate) così da avere UNA sola linea.
       const collaborationGroupKey = isCollaborativeTask
-        ? `${task.name}:${coordKey}`
+        ? `${String(task.task_id ?? task.taskId ?? task.id ?? task.name ?? "")}:${coordKey}`
         : null;
       
       if (shouldUseCustomOverlay) {
@@ -529,9 +535,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
           const collaboratorIds = (task as any).collaborator_ids as number[] | null;
           const assignedCleaner = (task as any).assignedCleaner as number | null;
           const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
-          const markerId = isCollaborativeTask && assignedCleaner 
-            ? `${task.name}:${assignedCleaner}` 
-            : task.name;
+          const markerId = getTaskMarkerId(task);
           
           if (highlightedMarkerIds.has(markerId)) {
             const lat = parseFloat(task.lat || '0');

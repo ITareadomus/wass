@@ -4,6 +4,7 @@ import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics
 import { useToast } from "@/hooks/use-toast";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import LogisticsTimelineView from "@/components/timeline/logistics-timeline-view";
+import MapSection from "@/components/map/map-section";
 import type { TaskType } from "@shared/schema";
 import {
   CalendarIcon,
@@ -176,6 +177,55 @@ function convertLogisticsRawToTask(
   return convertedTask as TaskType;
 }
 
+function priorityUiFromTimelineTask(t: any): "early-out" | "high" | "low" {
+  const p = String(t?.priority || "").toLowerCase();
+  if (["early_out", "early-out", "earlyout", "early_out_assignment", "eo"].includes(p)) return "early-out";
+  if (["high_priority", "high-priority", "highpriority", "high", "high_priority_assignment", "hp"].includes(p)) return "high";
+  return "low";
+}
+
+function convertLogisticsTimelineTaskToMapTask(task: any, driverId: number): TaskType {
+  const cleaning = Number(task?.cleaning_time) || 0;
+  const hours = Math.floor(cleaning / 60);
+  const mins = cleaning % 60;
+  const co = task?.confirmed_operation;
+  const confirmed_operation =
+    typeof co === "boolean" ? co : typeof co === "number" ? co !== 0 : undefined;
+
+  return {
+    id: String(task?.task_id ?? task?.id ?? ""),
+    name: String(task?.logistic_code ?? task?.task_id ?? task?.id ?? "N/A"),
+    alias: task?.alias ?? undefined,
+    type: String(task?.customer_name || ""),
+    duration: `${hours}.${String(mins).padStart(2, "0")}`,
+    priority: priorityUiFromTimelineTask(task),
+    assignedTo: null,
+    status: "pending",
+    scheduledTime: task?.start_time ?? null,
+    address: task?.address != null ? String(task.address) : undefined,
+    lat: task?.lat != null ? String(task.lat) : undefined,
+    lng: task?.lng != null ? String(task.lng) : undefined,
+    premium: Boolean(task?.premium),
+    straordinaria: Boolean(task?.straordinaria),
+    confirmed_operation,
+    checkout_date: task?.checkout_date != null ? String(task.checkout_date) : undefined,
+    checkout_time: task?.checkout_time != null ? String(task.checkout_time) : undefined,
+    checkin_date: task?.checkin_date != null ? String(task.checkin_date) : undefined,
+    checkin_time: task?.checkin_time != null ? String(task.checkin_time) : undefined,
+    pax_in: typeof task?.pax_in === "number" ? task.pax_in : undefined,
+    pax_out: typeof task?.pax_out === "number" ? task.pax_out : undefined,
+    operation_id: typeof task?.operation_id === "number" ? task.operation_id : undefined,
+    customer_name: task?.customer_name != null ? String(task.customer_name) : undefined,
+    customer_reference: task?.customer_reference != null ? String(task.customer_reference) : undefined,
+    type_apt: task?.type_apt != null ? String(task.type_apt) : undefined,
+    locked: Boolean(task?.locked),
+    locked_reason: task?.locked_reason != null ? String(task.locked_reason) : undefined,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...( { assignedCleaner: driverId, sequence: task?.sequence } as any ),
+  } as TaskType;
+}
+
 /** Stessa logica di evidenziazione ricerca usata in generate-assignments (PriorityColumn + TaskCard). */
 function highlightedIdsForSearch(tasks: TaskType[], searchTask: string): Set<string> {
   const result = new Set<string>();
@@ -233,36 +283,6 @@ async function parseFetchJsonStrictWhenOk(res: Response, notOkMessage: string): 
         : "Risposta non valida dal server (non JSON)."
     );
   }
-}
-
-function parseLogisticsSummary(data: any): LogisticsSummaryState {
-  const eo = containerTasks(data?.containers?.early_out);
-  const hp = containerTasks(data?.containers?.high_priority);
-  const lp = containerTasks(data?.containers?.low_priority);
-  const unlockedEo = eo.filter((task) => !isTaskLocked(task));
-  const unlockedHp = hp.filter((task) => !isTaskLocked(task));
-  const unlockedLp = lp.filter((task) => !isTaskLocked(task));
-  const all = [...eo, ...hp, ...lp];
-  const unlocked = [...unlockedEo, ...unlockedHp, ...unlockedLp];
-  let premium = 0;
-  let standard = 0;
-  let straordinarie = 0;
-  for (const t of unlocked) {
-    if (isEquivalentStraordinariaTask(t)) straordinarie += 1;
-    else if (t?.premium) premium += 1;
-    else standard += 1;
-  }
-  const total = unlocked.length;
-  return {
-    early_out: unlockedEo.length,
-    high_priority: unlockedHp.length,
-    low_priority: unlockedLp.length,
-    total,
-    unassigned: all.length,
-    premium,
-    standard,
-    straordinarie,
-  };
 }
 
 const isDateInPast = (date: Date): boolean => {
@@ -345,7 +365,6 @@ export default function GenerateLogisticsAssignments() {
   const [missingCleanerTaskCount, setMissingCleanerTaskCount] = useState(0);
   const [missingCleanerTaskCodes, setMissingCleanerTaskCodes] = useState<string[]>([]);
   const [showMissingCleanerTaskCodesList, setShowMissingCleanerTaskCodesList] = useState(false);
-  const [logisticsSummary, setLogisticsSummary] = useState<LogisticsSummaryState | null>(null);
   const [logisticsTaskLists, setLogisticsTaskLists] = useState<LogisticsTaskLists>(EMPTY_LOGISTICS_TASK_LISTS);
   const [logisticsDrivers, setLogisticsDrivers] = useState<
     Array<{ id: number; name?: string; lastname?: string; role?: string; premium?: boolean; start_time?: string | null }>
@@ -456,7 +475,6 @@ export default function GenerateLogisticsAssignments() {
         getRes,
         "Impossibile caricare i containers logistics"
       );
-      setLogisticsSummary(parseLogisticsSummary(data));
       setLogisticsTaskLists(parseLogisticsTaskLists(data));
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Errore sconosciuto";
@@ -691,8 +709,9 @@ export default function GenerateLogisticsAssignments() {
       toast({
         variant: "success",
         title: "Logistics optimizer avviato",
-        description: `Task sbloccate elaborate: ${Number(data.unlockedTasks ?? 0)}`,
+        description: `Task applicate in timeline: ${Number(data?.apply?.insertedTasks ?? data.unlockedTasks ?? 0)}`,
       });
+      await reloadLogisticsPage();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Errore sconosciuto";
       toast({
@@ -703,7 +722,7 @@ export default function GenerateLogisticsAssignments() {
     } finally {
       setIsRunningLogisticsOptimizer(false);
     }
-  }, [selectedDate, toast]);
+  }, [selectedDate, toast, reloadLogisticsPage]);
 
   const handleRunLogisticsOptimizer = useCallback(async () => {
     const dateStr = format(selectedDate, "yyyy-MM-dd");
@@ -747,8 +766,6 @@ export default function GenerateLogisticsAssignments() {
     }
   }, [selectedDate, executeLogisticsOptimizer, toast]);
 
-  const s = logisticsSummary;
-
   const earlyOutTasks = useMemo(
     () => logisticsTaskLists.early_out.map((t) => convertLogisticsRawToTask(t, "early_out")),
     [logisticsTaskLists.early_out]
@@ -761,6 +778,59 @@ export default function GenerateLogisticsAssignments() {
     () => logisticsTaskLists.low_priority.map((t) => convertLogisticsRawToTask(t, "low_priority")),
     [logisticsTaskLists.low_priority]
   );
+  const mapTasks = useMemo(() => {
+    const assigned: TaskType[] = [];
+    const assignedTaskIds = new Set<string>();
+
+    for (const row of logisticsDriversAssignments) {
+      const driverId = Number(row?.driver?.id);
+      if (!Number.isFinite(driverId)) continue;
+      for (const task of row?.tasks || []) {
+        const mapTask = convertLogisticsTimelineTaskToMapTask(task, driverId);
+        assigned.push(mapTask);
+        assignedTaskIds.add(String(mapTask.id));
+      }
+    }
+
+    const unassigned = [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks].filter(
+      (task) => !assignedTaskIds.has(String(task.id))
+    );
+
+    return [...unassigned, ...assigned];
+  }, [earlyOutTasks, highPriorityTasks, lowPriorityTasks, logisticsDriversAssignments]);
+  const s = useMemo<LogisticsSummaryState>(() => {
+    const unlockedTasksForStats = mapTasks.filter((task) => !isTaskLocked(task));
+    const unassignedTasks = mapTasks.filter((task) => !(task as any).assignedCleaner);
+
+    let early_out = 0;
+    let high_priority = 0;
+    let low_priority = 0;
+    let premium = 0;
+    let standard = 0;
+    let straordinarie = 0;
+
+    for (const task of unlockedTasksForStats) {
+      const priority = String(task.priority || "").toLowerCase();
+      if (priority === "early-out") early_out += 1;
+      else if (priority === "high") high_priority += 1;
+      else low_priority += 1;
+
+      if (isEquivalentStraordinariaTask(task)) straordinarie += 1;
+      else if (task.premium) premium += 1;
+      else standard += 1;
+    }
+
+    return {
+      early_out,
+      high_priority,
+      low_priority,
+      total: unlockedTasksForStats.length,
+      unassigned: unassignedTasks.length,
+      premium,
+      standard,
+      straordinarie,
+    };
+  }, [mapTasks]);
 
   const highlightedEarlyOut = useMemo(
     () => highlightedIdsForSearch(earlyOutTasks, searchTask),
@@ -1153,9 +1223,7 @@ export default function GenerateLogisticsAssignments() {
             </div>
 
             <div className="space-y-6">
-            <div className="min-h-[200px] rounded-lg border-2 border-border bg-card shadow-sm flex items-center justify-center text-muted-foreground text-sm">
-              Mappa (in arrivo)
-            </div>
+            <MapSection tasks={mapTasks} />
 
             <div className="bg-card rounded-lg border shadow-sm">
               <div className="p-4 border-b border-border">
