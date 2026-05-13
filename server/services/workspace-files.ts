@@ -74,6 +74,7 @@ function getNormalizedTask(task: any): any {
   if (task.followup !== undefined) normalizedTask.followup = task.followup;
   if (task.sequence !== undefined) normalizedTask.sequence = task.sequence;
   if (task.travel_time !== undefined) normalizedTask.travel_time = task.travel_time;
+  if (task.bag_policy !== undefined) normalizedTask.bag_policy = task.bag_policy;
   
   return normalizedTask;
 }

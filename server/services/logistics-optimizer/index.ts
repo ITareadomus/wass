@@ -1,6 +1,7 @@
 import { runLogisticsPhase0, LogisticsPhase0Result } from "./phase0";
 import { runLogisticsPhase1, LogisticsPhase1Result } from "./phase1";
 import { LogisticsPhase2Result, runLogisticsPhase2 } from "./phase2";
+import { computeBagPolicy } from "./bag-rule";
 import { pgDailyAssignmentsService } from "../pg-daily-assignments-service";
 import {
   loadLogisticsContainers,
@@ -45,6 +46,20 @@ function ensureArray<T = any>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
+function resolveTaskCleanerId(
+  taskId: number,
+  task: any,
+  driverId: number | null,
+  cleanerIdByTaskId: Map<number, number>
+): number | null {
+  if (Number.isFinite(taskId) && cleanerIdByTaskId.has(taskId)) {
+    return cleanerIdByTaskId.get(taskId)!;
+  }
+  const candidate = Number(task?.cleaner_id ?? task?.cleanerId);
+  if (Number.isFinite(candidate)) return candidate;
+  return Number.isFinite(driverId) ? Number(driverId) : null;
+}
+
 async function applyLogisticsOptimizerResult(
   workDate: string,
   phase0: LogisticsPhase0Result,
@@ -60,6 +75,11 @@ async function applyLogisticsOptimizerResult(
 
   const driverById = new Map<number, any>(
     ensureArray(driverRows).map((row: any) => [Number(row.id), row])
+  );
+  const cleanerIdByTaskId = new Map<number, number>(
+    phase0.unlockedTaskData
+      .map((task) => [Number(task.taskId), Number(task.cleanerId)] as const)
+      .filter(([taskId, cleanerId]) => Number.isFinite(taskId) && Number.isFinite(cleanerId))
   );
   const taskById = flattenContainerTasks(containersData);
   const unlockedTaskIds = toTaskIdSet(phase0.unlockedTaskData);
@@ -163,11 +183,22 @@ async function applyLogisticsOptimizerResult(
         };
       });
 
-    const combined = [...preservedTasks, ...optimizedTasks].map((task: any, idx: number) => ({
-      ...task,
-      sequence: idx + 1,
-      followup: idx > 0,
-    }));
+    const combined = [...preservedTasks, ...optimizedTasks].map((task: any, idx: number) => {
+      const sequence = idx + 1;
+      const taskId = Number(task?.task_id);
+      const cleanerId = resolveTaskCleanerId(taskId, task, driverId, cleanerIdByTaskId);
+      return {
+        ...task,
+        sequence,
+        followup: idx > 0,
+        bag_policy: computeBagPolicy({
+          cleanerId,
+          sequence,
+          premium: task?.premium === true,
+          paxIn: task?.pax_in,
+        }),
+      };
+    });
 
     if (combined.length > 0) {
       driverAssignments.set(driverId, { driver, tasks: combined });
@@ -186,11 +217,22 @@ async function applyLogisticsOptimizerResult(
         tasks: tasks
           .slice()
           .sort((a: any, b: any) => Number(a?.sequence || 0) - Number(b?.sequence || 0))
-          .map((task: any, idx: number) => ({
-            ...task,
-            sequence: idx + 1,
-            followup: idx > 0,
-          })),
+          .map((task: any, idx: number) => {
+            const sequence = idx + 1;
+            const taskId = Number(task?.task_id);
+            const cleanerId = resolveTaskCleanerId(taskId, task, driverId, cleanerIdByTaskId);
+            return {
+              ...task,
+              sequence,
+              followup: idx > 0,
+              bag_policy: computeBagPolicy({
+                cleanerId,
+                sequence,
+                premium: task?.premium === true,
+                paxIn: task?.pax_in,
+              }),
+            };
+          }),
       });
     }
   }
