@@ -1,6 +1,7 @@
 import { estimateCarTravelMinutes } from "../logistics-timeline-utils";
 import { LogisticsTaskInputWithLock } from "./phase0";
 import { LogisticsPhase1Result, LogisticsSelectedDriver, LogisticsTaskCandidate } from "./phase1";
+import { computeBagPolicy } from "./bag-rule";
 
 const LOGISTICS_TASK_DURATION_MIN = 15;
 const GROUP_MAX_TASKS = 4;
@@ -19,6 +20,9 @@ interface LogisticsTaskForPhase2 extends LogisticsTaskCandidate {
   checkoutTime: string | null;
   cleanerId: number | null;
   cleanerStartTime: string | null;
+  cleanerSequence: number | null;
+  premium: boolean;
+  paxIn: number | null;
 }
 
 interface LogisticsTaskSchedule {
@@ -92,6 +96,8 @@ export interface LogisticsPhase2Result {
   unassignedTasks: LogisticsPhase2UnassignedTask[];
   validation: {
     noTaskCandidates: boolean;
+    bagPolicyExcludedCount: number;
+    bagPolicyExcludedTaskIds: number[];
     reasonCounts: Record<LogisticsPhase2ReasonCode, number>;
   };
 }
@@ -164,8 +170,38 @@ function buildPhase2Tasks(
       checkoutTime: taskData?.checkoutTime ?? null,
       cleanerId: taskData?.cleanerId ?? null,
       cleanerStartTime: taskData?.cleanerStartTime ?? null,
+      cleanerSequence: taskData?.cleanerSequence ?? null,
+      premium: taskData?.premium === true,
+      paxIn: taskData?.paxIn ?? null,
     };
   });
+}
+
+function filterTasksByBagRule(tasks: LogisticsTaskForPhase2[]): {
+  included: LogisticsTaskForPhase2[];
+  excludedTaskIds: number[];
+} {
+  const included: LogisticsTaskForPhase2[] = [];
+  const excludedTaskIds: number[] = [];
+
+  for (const task of tasks) {
+    const bagPolicy = computeBagPolicy({
+      cleanerId: task.cleanerId,
+      sequence: task.cleanerSequence,
+      premium: task.premium,
+      paxIn: task.paxIn,
+    });
+    const isFirstCleanerTask = task.cleanerSequence === 1;
+    const shouldInclude = !isFirstCleanerTask || bagPolicy === "DRIVER_BRINGS_BAG";
+
+    if (shouldInclude) {
+      included.push(task);
+    } else {
+      excludedTaskIds.push(task.taskId);
+    }
+  }
+
+  return { included, excludedTaskIds };
 }
 
 function buildSpatialGroups(
@@ -399,7 +435,11 @@ export async function runLogisticsPhase2(
   };
 
   const phase2Tasks = buildPhase2Tasks(unlockedTaskData, phase1.taskCandidates);
-  if (phase2Tasks.length === 0) {
+  const filteredByBagRule = filterTasksByBagRule(phase2Tasks);
+  const bagPolicyExcludedTaskIds = filteredByBagRule.excludedTaskIds;
+  const schedulableTasks = filteredByBagRule.included;
+
+  if (schedulableTasks.length === 0) {
     reasonCounts.NO_TASK_CANDIDATES = 1;
     return {
       canRun: true,
@@ -421,12 +461,14 @@ export async function runLogisticsPhase2(
       unassignedTasks: [],
       validation: {
         noTaskCandidates: true,
+        bagPolicyExcludedCount: bagPolicyExcludedTaskIds.length,
+        bagPolicyExcludedTaskIds,
         reasonCounts,
       },
     };
   }
 
-  const groups = buildSpatialGroups(phase2Tasks, phase1);
+  const groups = buildSpatialGroups(schedulableTasks, phase1);
   const driverStates = buildDriverStates(phase1.selectedDrivers);
   const unassignedTasks: LogisticsPhase2UnassignedTask[] = [];
   let groupsAssigned = 0;
@@ -484,7 +526,7 @@ export async function runLogisticsPhase2(
     assignments: state.assignedTasks.sort((a, b) => a.sequence - b.sequence),
   }));
 
-  for (const task of phase2Tasks) {
+  for (const task of schedulableTasks) {
     const assigned = driverPlans.some((plan) => plan.assignments.some((item) => item.taskId === task.taskId));
     if (!assigned && !unassignedTasks.some((item) => item.taskId === task.taskId)) {
       incrementReasonCount(reasonCounts, "NO_DRIVER_FEASIBLE");
@@ -509,6 +551,8 @@ export async function runLogisticsPhase2(
     unassignedTasks,
     validation: {
       noTaskCandidates: false,
+      bagPolicyExcludedCount: bagPolicyExcludedTaskIds.length,
+      bagPolicyExcludedTaskIds,
       reasonCounts,
     },
   };

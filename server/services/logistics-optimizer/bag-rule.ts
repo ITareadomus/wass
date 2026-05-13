@@ -24,7 +24,6 @@ export function computeBagPolicy(input: ComputeBagPolicyInput): LogisticsBagPoli
   // Without cleaner or sequence this task follows normal behavior.
   if (cleanerId === null || sequence === null) return "NORMAL_TASK";
   if (sequence !== 1) return "NORMAL_TASK";
-
   if (isPremium || paxIn > 4) return "DRIVER_BRINGS_BAG";
   return "CLEANER_HAS_BAG";
 }

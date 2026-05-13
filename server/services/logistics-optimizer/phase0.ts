@@ -12,6 +12,9 @@ export interface LogisticsTaskInputWithLock {
   checkoutTime: string | null;
   cleanerId: number | null;
   cleanerStartTime: string | null;
+  cleanerSequence: number | null;
+  premium: boolean;
+  paxIn: number | null;
   locked: boolean;
   lockedReason: string | null;
 }
@@ -39,8 +42,11 @@ async function loadLogisticsTasksWithLockStatus(workDate: string): Promise<Logis
         lc.checkout_date AS "checkoutDate",
         lc.checkin_time AS "checkinTime",
         lc.checkout_time AS "checkoutTime",
+        lc.premium AS "premium",
+        lc.pax_in AS "paxIn",
         cleaner_ctx.cleaner_id AS "cleanerId",
         cleaner_ctx.cleaner_start_time AS "cleanerStartTime",
+        cleaner_ctx.cleaner_sequence AS "cleanerSequence",
         COALESCE(dtl.locked, lc.locked, false) AS "locked",
         COALESCE(dtl.locked_reason, lc.locked_reason) AS "lockedReason"
       FROM lg_containers lc
@@ -51,7 +57,8 @@ async function loadLogisticsTasksWithLockStatus(workDate: string): Promise<Logis
       LEFT JOIN LATERAL (
         SELECT
           dac.cleaner_id,
-          dac.cleaner_start_time
+          dac.cleaner_start_time,
+          dac.sequence AS cleaner_sequence
         FROM daily_assignments_current dac
         WHERE dac.work_date = lc.work_date
           AND dac.task_id = lc.task_id
@@ -76,8 +83,11 @@ async function loadLogisticsTasksWithLockStatus(workDate: string): Promise<Logis
     checkoutDate: row.checkoutDate ? String(row.checkoutDate) : null,
     checkinTime: row.checkinTime ? String(row.checkinTime).slice(0, 5) : null,
     checkoutTime: row.checkoutTime ? String(row.checkoutTime).slice(0, 5) : null,
+    premium: row.premium === true,
+    paxIn: row.paxIn != null ? Number(row.paxIn) : null,
     cleanerId: row.cleanerId != null ? Number(row.cleanerId) : null,
     cleanerStartTime: row.cleanerStartTime ? String(row.cleanerStartTime).slice(0, 5) : null,
+    cleanerSequence: row.cleanerSequence != null ? Number(row.cleanerSequence) : null,
     locked: row.locked === true,
     lockedReason: row.lockedReason ? String(row.lockedReason) : null,
   }));
