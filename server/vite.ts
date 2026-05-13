@@ -42,6 +42,15 @@ export async function setupVite(app: Express, server: Server) {
 
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {
+    const acceptHeader = req.headers.accept ?? "";
+    if (req.method !== "GET") {
+      return res.status(404).type("text/plain").send("Not found");
+    }
+
+    if (!acceptHeader.includes("text/html")) {
+      return res.status(404).type("text/plain").send("Not found");
+    }
+
     const url = req.originalUrl;
 
     try {
@@ -78,8 +87,18 @@ export function serveStatic(app: Express) {
 
   app.use(express.static(distPath));
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
+  // Fall through to index.html only for browser navigations.
+  // Missing JS/CSS/assets should return 404 instead of HTML.
+  app.use("*", (req, res, next) => {
+    const acceptHeader = req.headers.accept ?? "";
+    if (req.method !== "GET") {
+      return res.status(404).type("text/plain").send("Not found");
+    }
+
+    if (!acceptHeader.includes("text/html")) {
+      return res.status(404).type("text/plain").send("Not found");
+    }
+
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
