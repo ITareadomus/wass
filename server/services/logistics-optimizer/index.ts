@@ -216,6 +216,8 @@ async function applyLogisticsOptimizerResult(
           end_time: assignment.endTime || null,
           sequence: Number(assignment.sequence || 0),
           travel_time: Number(assignment.travelMinutes || 0),
+          checkout_wait_minutes:
+            assignment.checkoutWaitMinutes != null ? Number(assignment.checkoutWaitMinutes) : 0,
           manually_moved: false,
         };
       });

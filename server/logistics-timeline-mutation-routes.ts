@@ -319,6 +319,7 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
           delete removedTask.start_time;
           delete removedTask.end_time;
           delete removedTask.travel_time;
+          delete removedTask.checkout_wait_minutes;
           delete removedTask.sequence;
           delete removedTask.followup;
           if (removedTask.reasons) {

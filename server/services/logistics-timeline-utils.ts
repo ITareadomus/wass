@@ -5,6 +5,9 @@ const DEFAULT_AVG_SPEED_KMH = 28;
 const BASE_MINUTES = 3;
 const MIN_LEG_MIN = 2;
 const MAX_LEG_MIN = 180;
+/** Primo tratto dalla base (Via Barrili 31, Milano). */
+const LOGISTICS_DEPOT_LAT = 45.434029;
+const LOGISTICS_DEPOT_LNG = 9.180008;
 
 function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const r1 = (lat1 * Math.PI) / 180;
@@ -114,6 +117,19 @@ function toFiniteNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function normalizeYmd(value: unknown): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  return raw.slice(0, 10);
+}
+
+function isCheckoutApplicableOnWorkDate(task: any, workDate: string): boolean {
+  if (!task?.checkout_time) return false;
+  const cd = normalizeYmd(task.checkout_date);
+  if (cd && cd !== normalizeYmd(workDate)) return false;
+  return true;
+}
+
 /** Logistics-only recalc: route travel + fixed 15m service window */
 export async function recalculateLogisticsDriverTimes(entry: any, workDate?: string): Promise<any> {
   const dateToUse = workDate || new Date().toISOString().slice(0, 10);
@@ -131,21 +147,31 @@ export async function recalculateLogisticsDriverTimes(entry: any, workDate?: str
 
   const driverStartMin = parseTimeToMinutes(entry.driver?.start_time, 10 * 60);
   let clockMin = driverStartMin;
-  let prevLat: number | null = null;
-  let prevLng: number | null = null;
+  let prevLat: number | null = LOGISTICS_DEPOT_LAT;
+  let prevLng: number | null = LOGISTICS_DEPOT_LNG;
 
   for (let i = 0; i < tasks.length; i++) {
     const task = tasks[i];
     const lat = toFiniteNumber(task?.lat);
     const lng = toFiniteNumber(task?.lng);
     let travel = 0;
-    if (i > 0 && prevLat !== null && prevLng !== null && lat !== null && lng !== null) {
+    if (prevLat !== null && prevLng !== null && lat !== null && lng !== null) {
       travel = estimateCarTravelMinutes({ lat: prevLat, lng: prevLng }, { lat, lng });
     }
-    const startMin = clockMin + travel;
+    const arrivalMin = clockMin + travel;
+    let checkoutWaitMinutes = 0;
+    let startMin = arrivalMin;
+    if (isCheckoutApplicableOnWorkDate(task, dateToUse)) {
+      const checkoutMin = parseTimeToMinutes(task.checkout_time, 0);
+      if (arrivalMin < checkoutMin) {
+        checkoutWaitMinutes = checkoutMin - arrivalMin;
+        startMin = checkoutMin;
+      }
+    }
     const endMin = startMin + 15;
 
     task.travel_time = travel;
+    task.checkout_wait_minutes = checkoutWaitMinutes;
     task.start_time = minutesToHHMM(startMin);
     task.end_time = minutesToHHMM(endMin);
     task.sequence = i + 1;

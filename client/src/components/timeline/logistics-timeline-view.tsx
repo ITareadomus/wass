@@ -12,7 +12,7 @@ import {
   Save,
   Bike,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, Fragment } from "react";
 import { useLocation } from "wouter";
 import { Droppable } from "react-beautiful-dnd";
 import { useMutation } from "@tanstack/react-query";
@@ -127,6 +127,8 @@ function timelineTaskToTask(t: any, driverId: number): Task {
     start_time: t.start_time != null ? String(t.start_time) : undefined,
     end_time: t.end_time != null ? String(t.end_time) : undefined,
     travel_time: t.travel_time != null ? Number(t.travel_time) : undefined,
+    checkout_wait_minutes:
+      t.checkout_wait_minutes != null ? Number(t.checkout_wait_minutes) : undefined,
     locked: Boolean(t.locked),
     locked_reason: t.locked_reason != null ? String(t.locked_reason) : undefined,
     createdAt: new Date().toISOString(),
@@ -1160,6 +1162,11 @@ export default function LogisticsTimelineView({
             ) : (
               drivers.map((driver) => {
                 const rawTasks = assignmentByDriver.get(driver.id) || [];
+                const rawByTaskId = new Map<number, any>();
+                for (const rt of rawTasks) {
+                  const tid = Number((rt as any)?.task_id);
+                  if (Number.isFinite(tid)) rawByTaskId.set(tid, rt);
+                }
                 const tasks = rawTasks
                   .map((t) => timelineTaskToTask(t, driver.id))
                   .sort((a, b) => {
@@ -1262,23 +1269,81 @@ export default function LogisticsTimelineView({
                             ))}
                           </div>
                           <div className="relative z-10 flex items-center h-full min-h-[45px] px-0 gap-0 flex-wrap">
-                            {tasks.map((task, index) => (
-                              <TaskCard
-                                key={`${task.id}-${driver.id}`}
-                                task={task}
-                                index={index}
-                                isInTimeline
-                                allTasks={tasks}
-                                currentContainer=""
-                                cleanerId={driver.id}
-                                isReadOnly={isReadOnly}
-                                isDragDisabled={isReadOnly || Boolean((task as any).locked)}
-                                timelineWidthPx={timelineWidthPx}
-                                operationsScope="logistics"
-                                isHighlighted={hi.has(String(task.id))}
-                                timelineRowStaffDisplayLabel={driverRowDisplayLabel}
-                              />
-                            ))}
+                            {tasks.map((task, index) => {
+                              const tid = Number(task.id);
+                              const raw = rawByTaskId.get(tid) as any;
+                              const travelTime =
+                                index > 0 && raw?.travel_time != null ? Number(raw.travel_time) : 0;
+                              const checkoutWait =
+                                raw?.checkout_wait_minutes != null ? Number(raw.checkout_wait_minutes) : 0;
+                              const virtualMinutes = globalTimeSlots.length * 60;
+                              const timelineWidth = timelineWidthPx || 0;
+                              const travelWidthPx =
+                                index > 0 && travelTime > 0 && virtualMinutes > 0 && timelineWidth > 0
+                                  ? (travelTime / virtualMinutes) * timelineWidth
+                                  : 0;
+                              const waitingGapWidthPx =
+                                checkoutWait > 0 && virtualMinutes > 0 && timelineWidth > 0
+                                  ? (checkoutWait / virtualMinutes) * timelineWidth
+                                  : 0;
+                              return (
+                                <Fragment key={`${task.id}-${driver.id}-frag`}>
+                                  {index > 0 && travelTime > 0 && travelWidthPx > 0 && (
+                                    <div
+                                      className="flex items-center justify-center flex-shrink-0 py-3"
+                                      style={{ width: `${travelWidthPx}px`, minHeight: "50px" }}
+                                      title={`${travelTime} min`}
+                                    >
+                                      <svg
+                                        width="20"
+                                        height="20"
+                                        viewBox="0 0 24 24"
+                                        fill="currentColor"
+                                        className="flex-shrink-0"
+                                        style={{ color: getCleanerHexColor(driver.id) }}
+                                      >
+                                        <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                  {checkoutWait > 0 && waitingGapWidthPx > 0 && (
+                                    <div
+                                      className="flex items-center justify-center flex-shrink-0 py-3 bg-amber-100/50 dark:bg-amber-900/20 border-y border-dashed border-amber-400"
+                                      style={{ width: `${waitingGapWidthPx}px`, minHeight: "50px" }}
+                                      title={`Attesa checkout: ${checkoutWait} min`}
+                                    >
+                                      <svg
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        className="text-amber-600 dark:text-amber-400 flex-shrink-0"
+                                      >
+                                        <circle cx="12" cy="12" r="10" />
+                                        <polyline points="12,6 12,12 16,14" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                  <TaskCard
+                                    key={`${task.id}-${driver.id}`}
+                                    task={task}
+                                    index={index}
+                                    isInTimeline
+                                    allTasks={tasks}
+                                    currentContainer=""
+                                    cleanerId={driver.id}
+                                    isReadOnly={isReadOnly}
+                                    isDragDisabled={isReadOnly || Boolean((task as any).locked)}
+                                    timelineWidthPx={timelineWidthPx}
+                                    operationsScope="logistics"
+                                    isHighlighted={hi.has(String(task.id))}
+                                    timelineRowStaffDisplayLabel={driverRowDisplayLabel}
+                                  />
+                                </Fragment>
+                              );
+                            })}
                             {provided.placeholder}
                           </div>
                         </div>

@@ -152,6 +152,7 @@ export interface PgLogisticsAssignmentRow {
   followup?: boolean | null;
   sequence: number;
   travel_time: number;
+  checkout_wait_minutes?: number;
   manually_moved?: boolean;
 }
 
@@ -651,6 +652,12 @@ export class PgDailyAssignmentsService {
       await query(`ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
       await query(`ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
       await query(`ALTER TABLE IF EXISTS lg_containers_history ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await query(
+        `ALTER TABLE IF EXISTS lg_timeline ADD COLUMN IF NOT EXISTS checkout_wait_minutes INTEGER NOT NULL DEFAULT 0`
+      );
+      await query(
+        `ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS checkout_wait_minutes INTEGER NOT NULL DEFAULT 0`
+      );
 
       await query(`
         CREATE TABLE IF NOT EXISTS lg_drivers (
@@ -1575,6 +1582,8 @@ export class PgDailyAssignmentsService {
           followup: task.followup != null ? Boolean(task.followup) : null,
           sequence: Number(task.sequence || 0),
           travel_time: Number(task.travel_time || 0),
+          checkout_wait_minutes:
+            task.checkout_wait_minutes != null ? Number(task.checkout_wait_minutes) : 0,
           manually_moved: Boolean(task.manually_moved),
         });
       }
@@ -1601,7 +1610,7 @@ export class PgDailyAssignmentsService {
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
             type_apt, alias, customer_name, customer_reference, customer_note, customer_note_history, reasons, manually_moved, priority,
-            start_time, end_time, followup, sequence, travel_time
+            start_time, end_time, followup, sequence, travel_time, checkout_wait_minutes
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7,
             $8, $9, $10,
@@ -1609,7 +1618,7 @@ export class PgDailyAssignmentsService {
             $17, $18, $19, $20,
             $21, $22, $23, $24, $25, $26,
             $27, $28, $29, $30, $31, $32, $33, $34, $35,
-            $36, $37, $38, $39, $40
+            $36, $37, $38, $39, $40, $41
           )
         `, [
           row.work_date,
@@ -1652,6 +1661,7 @@ export class PgDailyAssignmentsService {
           row.followup,
           row.sequence,
           row.travel_time,
+          row.checkout_wait_minutes ?? 0,
         ]);
       }
       await client.query('COMMIT');
@@ -1734,6 +1744,8 @@ export class PgDailyAssignmentsService {
         if (row.followup !== null) task.followup = row.followup;
         if (row.sequence !== null) task.sequence = row.sequence;
         if (row.travel_time !== null) task.travel_time = row.travel_time;
+        const cw = Number((row as any).checkout_wait_minutes ?? 0);
+        if (cw > 0) task.checkout_wait_minutes = cw;
         driverMap.get(row.driver_id)!.tasks.push(task);
       }
       const drivers_assignments = Array.from(driverMap.values()).map((da) => ({
@@ -1799,7 +1811,7 @@ export class PgDailyAssignmentsService {
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
             type_apt, alias, customer_name, customer_reference, customer_note, customer_note_history, reasons, manually_moved, priority,
-            start_time, end_time, followup, sequence, travel_time, created_by
+            start_time, end_time, followup, sequence, travel_time, checkout_wait_minutes, created_by
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8,
             $9, $10, $11,
@@ -1807,7 +1819,7 @@ export class PgDailyAssignmentsService {
             $18, $19, $20, $21,
             $22, $23, $24, $25, $26, $27,
             $28, $29, $30, $31, $32, $33, $34, $35, $36,
-            $37, $38, $39, $40, $41, $42
+            $37, $38, $39, $40, $41, $42, $43
           )
         `,
           [
@@ -1852,6 +1864,7 @@ export class PgDailyAssignmentsService {
             row.followup,
             row.sequence,
             row.travel_time,
+            row.checkout_wait_minutes ?? 0,
             createdBy,
           ]
         );
