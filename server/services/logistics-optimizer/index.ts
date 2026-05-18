@@ -108,6 +108,16 @@ async function applyLogisticsOptimizerResult(
       .map((task) => [Number(task.taskId), Number(task.cleanerSequence)] as const)
       .filter(([taskId, cleanerSequence]) => Number.isFinite(taskId) && Number.isFinite(cleanerSequence))
   );
+  for (const da of ensureArray(currentTimeline?.drivers_assignments)) {
+    for (const task of ensureArray(da?.tasks)) {
+      const taskId = Number(task?.task_id);
+      const cleanerSequence = Number(task?.cleaner_sequence ?? task?.cleanerSequence);
+      if (!Number.isFinite(taskId) || !Number.isFinite(cleanerSequence)) continue;
+      if (!cleanerSequenceByTaskId.has(taskId)) {
+        cleanerSequenceByTaskId.set(taskId, cleanerSequence);
+      }
+    }
+  }
   const taskById = flattenContainerTasks(containersData);
   const unlockedTaskIds = toTaskIdSet(phase0.unlockedTaskData);
 

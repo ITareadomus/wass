@@ -152,10 +152,14 @@ function getCheckinCheckoutViolation(
 }
 
 function getCleanerViolation(task: LogisticsTaskForPhase2, taskEndMin: number): boolean {
-  const cleanerReferenceTime = task.cleanerTaskStartTime ?? task.cleanerStartTime;
+  const cleanerReferenceTime = getCleanerDeadline(task);
   if (!cleanerReferenceTime) return false;
   const cleanerStartMin = parseMinutes(cleanerReferenceTime, 23 * 60 + 59);
   return taskEndMin >= cleanerStartMin;
+}
+
+function getCleanerDeadline(task: LogisticsTaskForPhase2): string | null {
+  return task.cleanerTaskStartTime ?? task.cleanerStartTime;
 }
 
 function buildPhase2Tasks(
@@ -258,14 +262,16 @@ function buildSpatialGroups(
     const aDeadline = Math.min(
       ...a.tasks.map((task) => {
         const checkin = task.checkinTime ? parseMinutes(task.checkinTime, 23 * 60 + 59) : 23 * 60 + 59;
-        const cleaner = task.cleanerStartTime ? parseMinutes(task.cleanerStartTime, 23 * 60 + 59) : 23 * 60 + 59;
+        const cleanerDeadline = getCleanerDeadline(task);
+        const cleaner = cleanerDeadline ? parseMinutes(cleanerDeadline, 23 * 60 + 59) : 23 * 60 + 59;
         return Math.min(checkin, cleaner);
       })
     );
     const bDeadline = Math.min(
       ...b.tasks.map((task) => {
         const checkin = task.checkinTime ? parseMinutes(task.checkinTime, 23 * 60 + 59) : 23 * 60 + 59;
-        const cleaner = task.cleanerStartTime ? parseMinutes(task.cleanerStartTime, 23 * 60 + 59) : 23 * 60 + 59;
+        const cleanerDeadline = getCleanerDeadline(task);
+        const cleaner = cleanerDeadline ? parseMinutes(cleanerDeadline, 23 * 60 + 59) : 23 * 60 + 59;
         return Math.min(checkin, cleaner);
       })
     );
@@ -327,8 +333,9 @@ function sortGroupTasksForDriver(group: SpatialGroup, state: DriverState): Logis
       const travel = currentLat != null && currentLng != null
         ? estimateCarTravelMinutes({ lat: currentLat, lng: currentLng }, { lat: task.lat, lng: task.lng })
         : 0;
-      const deadline = task.cleanerStartTime
-        ? parseMinutes(task.cleanerStartTime, 23 * 60 + 59)
+      const cleanerDeadline = getCleanerDeadline(task);
+      const deadline = cleanerDeadline
+        ? parseMinutes(cleanerDeadline, 23 * 60 + 59)
         : task.checkinTime
           ? parseMinutes(task.checkinTime, 23 * 60 + 59)
           : 23 * 60 + 59;
