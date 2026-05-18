@@ -953,7 +953,74 @@ function buildTaskSubsetsByDescendingSize(tasks: LogisticsTaskForPhase2[]): Logi
   return subsets;
 }
 
+function estimateRecoverableTaskCount(
+  group: SpatialGroup | null,
+  driverStates: DriverState[],
+  workDate: string,
+  depth = 0
+): number {
+  if (!group) return 0;
+
+  for (const state of driverStates) {
+    const simulation = simulateGroupForDriver(group, state, workDate);
+    if (simulation.feasible) {
+      return group.tasks.length;
+    }
+  }
+
+  if (group.tasks.length <= 1 || depth >= 2) {
+    return 0;
+  }
+
+  let best = 0;
+  const subsets = buildTaskSubsetsByDescendingSize(group.tasks)
+    .filter((subset) => subset.length < group.tasks.length);
+
+  for (const subset of subsets) {
+    const subsetGroup: SpatialGroup = {
+      ...group,
+      groupId: `${group.groupId}-estimate-${subset.map((task) => task.taskId).join("-")}`,
+      tasks: subset,
+      origin: subset.length === 1 ? "SINGLETON_FALLBACK" : group.origin,
+    };
+
+    for (const state of driverStates) {
+      const simulation = simulateGroupForDriver(subsetGroup, state, workDate);
+      if (!simulation.feasible) continue;
+
+      const selectedTaskIds = new Set(subset.map((task) => task.taskId));
+      const remainingTasks = group.tasks.filter((task) => !selectedTaskIds.has(task.taskId));
+      const remainingGroup: SpatialGroup | null = remainingTasks.length > 0
+        ? {
+          ...group,
+          groupId: `${group.groupId}-estimate-remaining-${remainingTasks.map((task) => task.taskId).join("-")}`,
+          tasks: remainingTasks,
+          origin: remainingTasks.length === 1 ? "SINGLETON_FALLBACK" : group.origin,
+        }
+        : null;
+
+      const projectedChoice: PartialGroupSimulationChoice = {
+        assignedGroup: subsetGroup,
+        remainingGroup,
+        state,
+        simulation,
+      };
+
+      const projectedStates = projectDriverStatesAfterChoice(projectedChoice, driverStates);
+      const recoverable =
+        subset.length + estimateRecoverableTaskCount(remainingGroup, projectedStates, workDate, depth + 1);
+
+      if (recoverable > best) {
+        best = recoverable;
+      }
+    }
+  }
+
+  return best;
+}
+
 interface PartialChoiceRanking {
+  expectedRecoverableTasks: number;
   assignedSize: number;
   remainingFeasibleOnSomeDriver: boolean;
   remainingScoreEstimate: number;
@@ -969,8 +1036,8 @@ function getPartialChoiceRanking(
 ): PartialChoiceRanking {
   let remainingFeasibleOnSomeDriver = false;
   let remainingScoreEstimate = Number.NEGATIVE_INFINITY;
+  const projectedDriverStates = projectDriverStatesAfterChoice(choice, driverStates);
   if (choice.remainingGroup) {
-    const projectedDriverStates = projectDriverStatesAfterChoice(choice, driverStates);
     for (const state of projectedDriverStates) {
       const remainingSimulation = simulateGroupForDriver(choice.remainingGroup, state, workDate);
       if (remainingSimulation.feasible) {
@@ -984,7 +1051,15 @@ function getPartialChoiceRanking(
     remainingFeasibleOnSomeDriver = true;
     remainingScoreEstimate = 0;
   }
+  const remainingRecoverableTasks = estimateRecoverableTaskCount(
+    choice.remainingGroup,
+    projectedDriverStates,
+    workDate
+  );
+  const expectedRecoverableTasks =
+    choice.assignedGroup.tasks.length + remainingRecoverableTasks;
   return {
+    expectedRecoverableTasks,
     assignedSize: choice.assignedGroup.tasks.length,
     remainingFeasibleOnSomeDriver,
     remainingScoreEstimate,
@@ -995,22 +1070,51 @@ function getPartialChoiceRanking(
 }
 
 function isBetterPartialRanking(candidate: PartialChoiceRanking, current: PartialChoiceRanking): boolean {
+  if (candidate.expectedRecoverableTasks !== current.expectedRecoverableTasks) {
+    return candidate.expectedRecoverableTasks > current.expectedRecoverableTasks;
+  }
   if (candidate.assignedSize !== current.assignedSize) {
     return candidate.assignedSize > current.assignedSize;
   }
   if (candidate.remainingFeasibleOnSomeDriver !== current.remainingFeasibleOnSomeDriver) {
     return candidate.remainingFeasibleOnSomeDriver;
   }
-  if (candidate.score !== current.score) {
-    return candidate.score > current.score;
-  }
   if (candidate.remainingScoreEstimate !== current.remainingScoreEstimate) {
     return candidate.remainingScoreEstimate > current.remainingScoreEstimate;
+  }
+  if (candidate.score !== current.score) {
+    return candidate.score > current.score;
   }
   if (candidate.travelMinutesDelta !== current.travelMinutesDelta) {
     return candidate.travelMinutesDelta < current.travelMinutesDelta;
   }
   return candidate.tieBreaker < current.tieBreaker;
+}
+
+function getBestSingletonFailureReason(
+  task: LogisticsTaskForPhase2,
+  sourceGroup: SpatialGroup,
+  driverStates: DriverState[],
+  workDate: string
+): LogisticsPhase2ReasonCode {
+  const singletonGroup: SpatialGroup = {
+    ...sourceGroup,
+    groupId: `${sourceGroup.groupId}-reason-${task.taskId}`,
+    tasks: [task],
+    origin: "SINGLETON_FALLBACK",
+  };
+
+  let bestFailure: FeasibilityFailure | null = null;
+
+  for (const state of driverStates) {
+    const simulation = simulateGroupForDriver(singletonGroup, state, workDate);
+    if (simulation.feasible) {
+      return "NO_DRIVER_FEASIBLE";
+    }
+    bestFailure = pickMoreUsefulFailure(bestFailure, simulation.failure);
+  }
+
+  return bestFailure?.reasonCode ?? "NO_DRIVER_FEASIBLE";
 }
 
 function findBestPartialGroupAssignment(
@@ -1026,8 +1130,13 @@ function findBestPartialGroupAssignment(
   let bestRanking: PartialChoiceRanking | null = null;
 
   for (const subset of subsets) {
-    if (currentSize !== null && subset.length < currentSize && bestChoice) {
-      // Tutti i subset della dimensione precedente sono stati valutati: si chiude qui.
+    if (
+      currentSize !== null &&
+      subset.length < currentSize &&
+      bestChoice &&
+      bestRanking?.remainingFeasibleOnSomeDriver
+    ) {
+      // Chiude solo se il miglior subset alla dimensione precedente lascia un remaining assegnabile.
       return bestChoice;
     }
     currentSize = subset.length;
@@ -1181,7 +1290,6 @@ export async function runLogisticsPhase2(
     }
     let bestState: DriverState | null = null;
     let bestSimulation: GroupSimulationResult | null = null;
-    let bestFailureNoTask: FeasibilityFailure | null = null;
     const bestFailureByTaskId = new Map<number, FeasibilityFailure>();
 
     for (const state of driverStates) {
@@ -1192,8 +1300,6 @@ export async function runLogisticsPhase2(
           const prev = bestFailureByTaskId.get(failure.taskId);
           const merged = pickMoreUsefulFailure(prev ?? null, failure);
           if (merged) bestFailureByTaskId.set(failure.taskId, merged);
-        } else {
-          bestFailureNoTask = pickMoreUsefulFailure(bestFailureNoTask, failure);
         }
         continue;
       }
@@ -1223,11 +1329,12 @@ export async function runLogisticsPhase2(
       continue;
     }
 
-    const defaultUnassignedReason = bestFailureNoTask?.reasonCode ?? "NO_DRIVER_FEASIBLE";
     groupsUnassigned += 1;
     for (const task of group.tasks) {
       const taskSpecific = bestFailureByTaskId.get(task.taskId);
-      const reasonCode = taskSpecific?.reasonCode ?? defaultUnassignedReason;
+      const reasonCode =
+        taskSpecific?.reasonCode ??
+        getBestSingletonFailureReason(task, group, driverStates, workDate);
       incrementReasonCount(reasonCounts, reasonCode);
       unassignedTasks.push({
         taskId: task.taskId,
