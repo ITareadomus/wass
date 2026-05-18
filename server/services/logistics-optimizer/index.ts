@@ -46,6 +46,16 @@ function ensureArray<T = any>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
+function parseTaskStartTimeForSort(value: unknown): number {
+  const raw = String(value ?? "").trim();
+  const match = raw.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return Number.POSITIVE_INFINITY;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return Number.POSITIVE_INFINITY;
+  return Math.max(0, Math.min(23 * 60 + 59, hours * 60 + minutes));
+}
+
 function resolveTaskCleanerId(
   taskId: number,
   task: any,
@@ -58,6 +68,18 @@ function resolveTaskCleanerId(
   const candidate = Number(task?.cleaner_id ?? task?.cleanerId);
   if (Number.isFinite(candidate)) return candidate;
   return Number.isFinite(driverId) ? Number(driverId) : null;
+}
+
+function resolveTaskCleanerSequence(
+  taskId: number,
+  task: any,
+  cleanerSequenceByTaskId: Map<number, number>
+): number | null {
+  if (Number.isFinite(taskId) && cleanerSequenceByTaskId.has(taskId)) {
+    return cleanerSequenceByTaskId.get(taskId)!;
+  }
+  const candidate = Number(task?.cleaner_sequence ?? task?.cleanerSequence);
+  return Number.isFinite(candidate) ? candidate : null;
 }
 
 async function applyLogisticsOptimizerResult(
@@ -80,6 +102,11 @@ async function applyLogisticsOptimizerResult(
     phase0.unlockedTaskData
       .map((task) => [Number(task.taskId), Number(task.cleanerId)] as const)
       .filter(([taskId, cleanerId]) => Number.isFinite(taskId) && Number.isFinite(cleanerId))
+  );
+  const cleanerSequenceByTaskId = new Map<number, number>(
+    phase0.unlockedTaskData
+      .map((task) => [Number(task.taskId), Number(task.cleanerSequence)] as const)
+      .filter(([taskId, cleanerSequence]) => Number.isFinite(taskId) && Number.isFinite(cleanerSequence))
   );
   const taskById = flattenContainerTasks(containersData);
   const unlockedTaskIds = toTaskIdSet(phase0.unlockedTaskData);
@@ -183,17 +210,27 @@ async function applyLogisticsOptimizerResult(
         };
       });
 
-    const combined = [...preservedTasks, ...optimizedTasks].map((task: any, idx: number) => {
+    const sortedFinalTasks = [...preservedTasks, ...optimizedTasks]
+      .map((task: any, originalIndex: number) => ({ task, originalIndex }))
+      .sort((a, b) => {
+        const diff = parseTaskStartTimeForSort(a.task?.start_time) - parseTaskStartTimeForSort(b.task?.start_time);
+        if (diff !== 0) return diff;
+        return a.originalIndex - b.originalIndex;
+      })
+      .map((entry) => entry.task);
+
+    const combined = sortedFinalTasks.map((task: any, idx: number) => {
       const sequence = idx + 1;
       const taskId = Number(task?.task_id);
       const cleanerId = resolveTaskCleanerId(taskId, task, driverId, cleanerIdByTaskId);
+      const cleanerSequence = resolveTaskCleanerSequence(taskId, task, cleanerSequenceByTaskId);
       return {
         ...task,
         sequence,
         followup: idx > 0,
         bag_policy: computeBagPolicy({
           cleanerId,
-          sequence,
+          sequence: cleanerSequence,
           premium: task?.premium === true,
           paxIn: task?.pax_in,
         }),
@@ -221,13 +258,14 @@ async function applyLogisticsOptimizerResult(
             const sequence = idx + 1;
             const taskId = Number(task?.task_id);
             const cleanerId = resolveTaskCleanerId(taskId, task, driverId, cleanerIdByTaskId);
+            const cleanerSequence = resolveTaskCleanerSequence(taskId, task, cleanerSequenceByTaskId);
             return {
               ...task,
               sequence,
               followup: idx > 0,
               bag_policy: computeBagPolicy({
                 cleanerId,
-                sequence,
+                sequence: cleanerSequence,
                 premium: task?.premium === true,
                 paxIn: task?.pax_in,
               }),

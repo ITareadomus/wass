@@ -12,6 +12,7 @@ export interface LogisticsTaskInputWithLock {
   checkoutTime: string | null;
   cleanerId: number | null;
   cleanerStartTime: string | null;
+  cleanerTaskStartTime: string | null;
   cleanerSequence: number | null;
   premium: boolean;
   paxIn: number | null;
@@ -46,6 +47,7 @@ async function loadLogisticsTasksWithLockStatus(workDate: string): Promise<Logis
         lc.pax_in AS "paxIn",
         cleaner_ctx.cleaner_id AS "cleanerId",
         cleaner_ctx.cleaner_start_time AS "cleanerStartTime",
+        cleaner_ctx.cleaner_task_start_time AS "cleanerTaskStartTime",
         cleaner_ctx.cleaner_sequence AS "cleanerSequence",
         COALESCE(dtl.locked, lc.locked, false) AS "locked",
         COALESCE(dtl.locked_reason, lc.locked_reason) AS "lockedReason"
@@ -58,6 +60,7 @@ async function loadLogisticsTasksWithLockStatus(workDate: string): Promise<Logis
         SELECT
           dac.cleaner_id,
           dac.cleaner_start_time,
+          dac.start_time AS cleaner_task_start_time,
           dac.sequence AS cleaner_sequence
         FROM daily_assignments_current dac
         WHERE dac.work_date = lc.work_date
@@ -87,6 +90,7 @@ async function loadLogisticsTasksWithLockStatus(workDate: string): Promise<Logis
     paxIn: row.paxIn != null ? Number(row.paxIn) : null,
     cleanerId: row.cleanerId != null ? Number(row.cleanerId) : null,
     cleanerStartTime: row.cleanerStartTime ? String(row.cleanerStartTime).slice(0, 5) : null,
+    cleanerTaskStartTime: row.cleanerTaskStartTime ? String(row.cleanerTaskStartTime).slice(0, 5) : null,
     cleanerSequence: row.cleanerSequence != null ? Number(row.cleanerSequence) : null,
     locked: row.locked === true,
     lockedReason: row.lockedReason ? String(row.lockedReason) : null,

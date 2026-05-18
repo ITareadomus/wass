@@ -20,6 +20,7 @@ interface LogisticsTaskForPhase2 extends LogisticsTaskCandidate {
   checkoutTime: string | null;
   cleanerId: number | null;
   cleanerStartTime: string | null;
+  cleanerTaskStartTime: string | null;
   cleanerSequence: number | null;
   bagPolicy: ReturnType<typeof computeBagPolicy>;
   premium: boolean;
@@ -151,8 +152,9 @@ function getCheckinCheckoutViolation(
 }
 
 function getCleanerViolation(task: LogisticsTaskForPhase2, taskEndMin: number): boolean {
-  if (!task.cleanerStartTime) return false;
-  const cleanerStartMin = parseMinutes(task.cleanerStartTime, 23 * 60 + 59);
+  const cleanerReferenceTime = task.cleanerTaskStartTime ?? task.cleanerStartTime;
+  if (!cleanerReferenceTime) return false;
+  const cleanerStartMin = parseMinutes(cleanerReferenceTime, 23 * 60 + 59);
   return taskEndMin >= cleanerStartMin;
 }
 
@@ -179,6 +181,7 @@ function buildPhase2Tasks(
       checkoutTime: taskData?.checkoutTime ?? null,
       cleanerId: taskData?.cleanerId ?? null,
       cleanerStartTime: taskData?.cleanerStartTime ?? null,
+      cleanerTaskStartTime: taskData?.cleanerTaskStartTime ?? null,
       cleanerSequence: taskData?.cleanerSequence ?? null,
       bagPolicy,
       premium: taskData?.premium === true,
