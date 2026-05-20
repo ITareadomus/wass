@@ -700,7 +700,7 @@ export default function GenerateLogisticsAssignments() {
       const response = await fetch("/api/logistics-optimizer/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: dateStr }),
+        body: JSON.stringify({ date: dateStr, debug: true }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data?.success) {
@@ -710,10 +710,16 @@ export default function GenerateLogisticsAssignments() {
         data?.apply?.insertedTasks ?? data?.phase2?.tasksAssigned ?? 0
       );
       const unassignedCount = Number(data?.phase2?.tasksUnassigned ?? 0);
+      const debugDir = typeof data?.debugDir === "string" ? data.debugDir : data?.phase2?.debugDir;
+      if (debugDir) {
+        console.info("[logistics-optimizer] Debug JSON:", debugDir);
+      }
       toast({
         variant: "success",
         title: "Assegnazione completata",
-        description: `${assignedCount} task assegnate, ${unassignedCount} non assegnate`,
+        description: debugDir
+          ? `${assignedCount} task assegnate, ${unassignedCount} non assegnate. Debug: server/debug/logistics-optimizer/… (vedi console)`
+          : `${assignedCount} task assegnate, ${unassignedCount} non assegnate`,
       });
       await reloadLogisticsPage();
     } catch (e: unknown) {

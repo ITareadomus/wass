@@ -1,6 +1,7 @@
 import { runLogisticsPhase0, LogisticsPhase0Result } from "./phase0";
 import { runLogisticsPhase1, LogisticsPhase1Result } from "./phase1";
 import { LogisticsPhase2Result, runLogisticsPhase2 } from "./phase2";
+import { isLogisticsOptimizerDebugEnabled, LogisticsPhase2DebugCollector } from "./phase2-debug";
 import { computeBagPolicy } from "./bag-rule";
 import { pgDailyAssignmentsService } from "../pg-daily-assignments-service";
 import {
@@ -9,11 +10,23 @@ import {
   saveLogisticsContainers,
   saveLogisticsTimeline,
 } from "../workspace-files";
+import { recalculateLogisticsTimeline } from "../logistics-timeline-utils";
+import {
+  assertLogisticsTimelineValidAfterRecalc,
+  buildFinalTimelineValidation,
+  writeFinalTimelineValidationDebugFile,
+} from "./apply-validation";
+
+export interface LogisticsOptimizerRunOptions {
+  /** Scrivi JSON di debug in server/debug/logistics-optimizer/{date}/{runId}/ */
+  debug?: boolean;
+}
 
 export interface LogisticsOptimizerRunResult extends LogisticsPhase0Result {
   phase1: LogisticsPhase1Result;
   phase2: LogisticsPhase2Result;
   apply: LogisticsOptimizerApplyResult;
+  debugDir?: string;
 }
 
 export interface LogisticsOptimizerApplyResult {
@@ -86,7 +99,8 @@ async function applyLogisticsOptimizerResult(
   workDate: string,
   phase0: LogisticsPhase0Result,
   phase1: LogisticsPhase1Result,
-  phase2: LogisticsPhase2Result
+  phase2: LogisticsPhase2Result,
+  options?: { debugDir?: string }
 ): Promise<LogisticsOptimizerApplyResult> {
   const selectedDriverIds = phase1.selectedDrivers.map((driver) => Number(driver.id)).filter((id) => Number.isFinite(id));
   const [driverRows, containersData, currentTimeline] = await Promise.all([
@@ -225,7 +239,7 @@ async function applyLogisticsOptimizerResult(
     const sortedFinalTasks = [...preservedTasks, ...optimizedTasks]
       .map((task: any, originalIndex: number) => ({ task, originalIndex }))
       .sort((a, b) => {
-        const diff = parseTaskStartTimeForSort(a.task?.start_time) - parseTaskStartTimeForSort(b.task?.start_time);
+        const diff = Number(a.task?.sequence || 0) - Number(b.task?.sequence || 0);
         if (diff !== 0) return diff;
         return a.originalIndex - b.originalIndex;
       })
@@ -309,6 +323,14 @@ async function applyLogisticsOptimizerResult(
     },
   };
 
+  await recalculateLogisticsTimeline(timeline, workDate);
+
+  const finalValidation = buildFinalTimelineValidation(timeline, workDate);
+  if (options?.debugDir) {
+    await writeFinalTimelineValidationDebugFile(options.debugDir, finalValidation);
+  }
+  assertLogisticsTimelineValidAfterRecalc(finalValidation);
+
   const saved = await saveLogisticsTimeline(
     workDate,
     timeline,
@@ -369,13 +391,23 @@ async function applyLogisticsOptimizerResult(
   };
 }
 
-export async function runLogisticsOptimizer(workDate: string): Promise<LogisticsOptimizerRunResult> {
+export { isLogisticsOptimizerDebugEnabled } from "./phase2-debug";
+
+export async function runLogisticsOptimizer(
+  workDate: string,
+  options?: LogisticsOptimizerRunOptions
+): Promise<LogisticsOptimizerRunResult> {
+  const debugEnabled = isLogisticsOptimizerDebugEnabled(options?.debug);
+  const debugCollector = debugEnabled ? new LogisticsPhase2DebugCollector(workDate) : null;
+
   const phase0 = await runLogisticsPhase0(workDate);
   const phase1 = await runLogisticsPhase1(workDate, phase0.unlockedTaskData);
-  const phase2 = await runLogisticsPhase2(workDate, phase0.unlockedTaskData, phase1);
+  const phase2 = await runLogisticsPhase2(workDate, phase0.unlockedTaskData, phase1, debugCollector);
   const canRun = phase0.canRun && phase1.canRun && phase2.canRun;
   const apply = canRun
-    ? await applyLogisticsOptimizerResult(workDate, phase0, phase1, phase2)
+    ? await applyLogisticsOptimizerResult(workDate, phase0, phase1, phase2, {
+        debugDir: phase2.debugDir,
+      })
     : { applied: false, insertedTasks: 0, totalTasksOnTimeline: 0, removedFromContainers: 0 };
 
   return {
@@ -384,5 +416,6 @@ export async function runLogisticsOptimizer(workDate: string): Promise<Logistics
     phase1,
     phase2,
     apply,
+    debugDir: phase2.debugDir,
   };
 }

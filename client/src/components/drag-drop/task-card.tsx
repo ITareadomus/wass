@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Draggable } from "react-beautiful-dnd";
 import { useQuery } from "@tanstack/react-query";
 import { TaskType as Task } from "@shared/schema";
+import { shouldBlinkLogisticsTaskCard } from "@shared/logistics-scheduling-constraints";
 import { format, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
 import { fetchWithOperation } from '@/lib/operationManager';
@@ -1919,39 +1920,53 @@ const displayClickableInputClass =
   const isOverdue = (() => {
     const taskForBar = isInTimeline ? task : displayTask;
     const taskObj = taskForBar as any;
-    // CRITICAL: Normalizza TUTTI i tempi per evitare date invalide (es. "15:55:00" -> "15:55")
-    // In timeline usa solo i tempi della task della card; fuori timeline usa assignmentTimes per pending edits
+
+    if (!isInTimeline) return false;
+
+    if (operationsScope === "logistics") {
+      const selectedWorkDate = localStorage.getItem("selected_work_date");
+      if (!selectedWorkDate) return false;
+      return shouldBlinkLogisticsTaskCard(
+        {
+          start_time: normalizeTime(taskObj.start_time || taskObj.startTime),
+          end_time: normalizeTime(taskObj.end_time || taskObj.endTime),
+          checkout_time: normalizeTime(taskObj.checkout_time),
+          checkout_date: normalizeDate(taskObj.checkout_date),
+          checkin_time: normalizeTime(taskObj.checkin_time),
+          checkin_date: normalizeDate(taskObj.checkin_date),
+          checkout_wait_minutes: taskObj.checkout_wait_minutes,
+        },
+        selectedWorkDate
+      );
+    }
+
+    // Housekeeping / office: regole esistenti
     const startTime = normalizeTime(
-      isInTimeline ? (taskObj.start_time || taskObj.startTime) : (assignmentTimes.start_time || taskObj.start_time || taskObj.startTime)
+      assignmentTimes.start_time || taskObj.start_time || taskObj.startTime
     );
     const endTime = normalizeTime(
-      isInTimeline ? (taskObj.end_time || taskObj.endTime) : (assignmentTimes.end_time || taskObj.end_time || taskObj.endTime)
+      assignmentTimes.end_time || taskObj.end_time || taskObj.endTime
     );
     const checkoutTime = normalizeTime(taskObj.checkout_time);
     const checkinTime = normalizeTime(taskObj.checkin_time);
     const checkoutDate = normalizeDate(taskObj.checkout_date);
     const checkinDate = normalizeDate(taskObj.checkin_date);
 
-    if (!isInTimeline) return false;
-
-    // CRITICAL: Caso 1 - start_time PRIMA di checkout_time (cleaner arriva prima che proprietà sia libera)
     if (startTime && checkoutTime && checkoutDate) {
-      const taskStartDateTime = new Date(checkoutDate + 'T' + startTime + ':00');
-      const checkoutDateTime = new Date(checkoutDate + 'T' + checkoutTime + ':00');
+      const taskStartDateTime = new Date(checkoutDate + "T" + startTime + ":00");
+      const checkoutDateTime = new Date(checkoutDate + "T" + checkoutTime + ":00");
       if (taskStartDateTime < checkoutDateTime) return true;
     }
 
-    // Caso 2: end_time sfora checkin_time
     if (endTime && checkinTime && checkoutDate && checkinDate) {
-      const checkoutDateTime = new Date(checkoutDate + 'T' + endTime + ':00');
-      const checkinDateTime = new Date(checkinDate + 'T' + checkinTime + ':00');
+      const checkoutDateTime = new Date(checkoutDate + "T" + endTime + ":00");
+      const checkinDateTime = new Date(checkinDate + "T" + checkinTime + ":00");
       if (checkoutDateTime > checkinDateTime) return true;
     }
 
-    // Caso 3: start_time è dopo o uguale a checkin_time (task inizia quando ospiti sono già arrivati)
     if (startTime && checkinTime && checkoutDate && checkinDate) {
-      const taskStartDateTime = new Date(checkoutDate + 'T' + startTime + ':00');
-      const checkinDateTime = new Date(checkinDate + 'T' + checkinTime + ':00');
+      const taskStartDateTime = new Date(checkoutDate + "T" + startTime + ":00");
+      const checkinDateTime = new Date(checkinDate + "T" + checkinTime + ":00");
       if (taskStartDateTime >= checkinDateTime) return true;
     }
 

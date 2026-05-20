@@ -102,6 +102,7 @@ import * as workspaceFiles from "./services/workspace-files";
 import {
   hydrateTasksFromLogisticsContainers,
   recalculateLogisticsDriverTimes,
+  recalculateLogisticsTimeline,
 } from "./services/logistics-timeline-utils";
 import { registerLogisticsTimelineMutationRoutes } from "./logistics-timeline-mutation-routes";
 import * as mysql from 'mysql2/promise';
@@ -2488,6 +2489,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           meta: { total_drivers: 0, used_drivers: 0, assigned_tasks: 0 },
         });
       }
+      if (Array.isArray(timeline.drivers_assignments)) {
+        for (const entry of timeline.drivers_assignments) {
+          const tasks = entry?.tasks;
+          if (!tasks?.length) continue;
+          tasks.sort((a: any, b: any) => (a.sequence ?? 9999) - (b.sequence ?? 9999));
+        }
+        await recalculateLogisticsTimeline(timeline, workDate);
+      }
       res.json(timeline);
     } catch (error: any) {
       console.error("GET /api/logistics-timeline:", error);
@@ -2507,8 +2516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata: { ...timeline.metadata, date: workDate, last_updated: getRomeTimestamp() },
       };
       if (timelineData.drivers_assignments && Array.isArray(timelineData.drivers_assignments)) {
-        for (let idx = 0; idx < timelineData.drivers_assignments.length; idx++) {
-          let entry = timelineData.drivers_assignments[idx];
+        for (const entry of timelineData.drivers_assignments) {
           const tasks = entry.tasks;
           if (!tasks?.length) continue;
           tasks.sort((a: any, b: any) => (a.sequence ?? 9999) - (b.sequence ?? 9999));
@@ -2516,10 +2524,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             tasks[i].sequence = i + 1;
             tasks[i].followup = i > 0;
           }
-          await hydrateTasksFromLogisticsContainers(entry, workDate);
-          entry = await recalculateLogisticsDriverTimes(entry, workDate);
-          timelineData.drivers_assignments[idx] = entry;
         }
+        await recalculateLogisticsTimeline(timelineData, workDate);
       }
       await workspaceFiles.saveLogisticsTimeline(workDate, timelineData, false, "python_script", "api_save_logistics_timeline");
       const taskCount =
@@ -9943,13 +9949,21 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
   app.post("/api/logistics-optimizer/run", async (req, res) => {
     try {
-      const { date } = req.body || {};
+      const { date, debug: debugBody } = req.body || {};
       const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const debugExplicit =
+        debugBody === true || debugBody === 1 || String(debugBody ?? "").toLowerCase() === "true";
 
-      console.log(`🚀 POST /api/logistics-optimizer/run - Avvio logistics-optimizer per ${workDate}`);
+      const { isLogisticsOptimizerDebugEnabled, runLogisticsOptimizer } = await import(
+        "./services/logistics-optimizer"
+      );
+      const debugEnabled = isLogisticsOptimizerDebugEnabled(debugExplicit);
+      console.log(
+        `🚀 POST /api/logistics-optimizer/run - Avvio logistics-optimizer per ${workDate}` +
+          (debugEnabled ? " (debug JSON attivo)" : "")
+      );
 
-      const { runLogisticsOptimizer } = await import("./services/logistics-optimizer");
-      const result = await runLogisticsOptimizer(workDate);
+      const result = await runLogisticsOptimizer(workDate, { debug: debugExplicit });
 
       if (!result.canRun) {
         return res.status(400).json({

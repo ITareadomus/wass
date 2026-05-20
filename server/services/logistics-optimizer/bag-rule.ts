@@ -15,6 +15,11 @@ function toFiniteNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Il driver deve consegnare la borsone prima che inizi l'HK su quel task. */
+export function requiresDriverBeforeCleaner(bagPolicy: LogisticsBagPolicy): boolean {
+  return bagPolicy === "DRIVER_BRINGS_BAG";
+}
+
 export function computeBagPolicy(input: ComputeBagPolicyInput): LogisticsBagPolicy {
   const cleanerId = toFiniteNumber(input.cleanerId);
   const sequence = toFiniteNumber(input.sequence);

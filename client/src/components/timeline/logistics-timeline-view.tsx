@@ -25,6 +25,10 @@ import { cn } from "@/lib/utils";
 import { getCleanerHexColor } from "@/lib/cleaner-colors";
 import type { TaskType as Task } from "@shared/schema";
 import {
+  computeLogisticsCheckoutWaitGap,
+  parseHmToMinutes,
+} from "@shared/logistics-scheduling-constraints";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -1272,10 +1276,21 @@ export default function LogisticsTimelineView({
                             {tasks.map((task, index) => {
                               const tid = Number(task.id);
                               const raw = rawByTaskId.get(tid) as any;
+                              const prevRaw = index > 0 ? rawTasks[index - 1] : null;
+                              const seq = Number(raw?.sequence ?? index + 1);
                               const travelTime =
                                 index > 0 && raw?.travel_time != null ? Number(raw.travel_time) : 0;
-                              const checkoutWait =
-                                raw?.checkout_wait_minutes != null ? Number(raw.checkout_wait_minutes) : 0;
+                              const checkoutWait = computeLogisticsCheckoutWaitGap({
+                                workDate,
+                                sequence: seq,
+                                startTime: raw?.start_time,
+                                checkoutTime: raw?.checkout_time,
+                                checkoutDate: raw?.checkout_date,
+                                checkoutWaitMinutes: raw?.checkout_wait_minutes,
+                                travelMinutes: travelTime,
+                                prevEndTime: prevRaw?.end_time,
+                                prevCheckinDate: prevRaw?.checkin_date,
+                              });
                               const virtualMinutes = globalTimeSlots.length * 60;
                               const timelineWidth = timelineWidthPx || 0;
                               const travelWidthPx =
@@ -1286,8 +1301,31 @@ export default function LogisticsTimelineView({
                                 checkoutWait > 0 && virtualMinutes > 0 && timelineWidth > 0
                                   ? (checkoutWait / virtualMinutes) * timelineWidth
                                   : 0;
+                              let initialOffsetWidthPx = 0;
+                              if (seq === 1 && raw?.start_time && virtualMinutes > 0 && timelineWidth > 0) {
+                                const gridStartMinutes = timeToMinutes(globalTimeSlots[0] || "10:00");
+                                const taskStartMinutes = parseHmToMinutes(raw.start_time, null);
+                                const driverStartMinutes = parseHmToMinutes(driver.start_time, null);
+                                const firstBlockStartMinutes =
+                                  taskStartMinutes ?? driverStartMinutes ?? gridStartMinutes;
+                                if (
+                                  firstBlockStartMinutes != null &&
+                                  firstBlockStartMinutes > gridStartMinutes
+                                ) {
+                                  initialOffsetWidthPx =
+                                    ((firstBlockStartMinutes - gridStartMinutes) / virtualMinutes) *
+                                    timelineWidth;
+                                }
+                              }
                               return (
                                 <Fragment key={`${task.id}-${driver.id}-frag`}>
+                                  {seq === 1 && initialOffsetWidthPx > 0 && (
+                                    <div
+                                      className="flex-shrink-0"
+                                      style={{ width: `${initialOffsetWidthPx}px`, minHeight: "50px" }}
+                                      aria-hidden
+                                    />
+                                  )}
                                   {index > 0 && travelTime > 0 && travelWidthPx > 0 && (
                                     <div
                                       className="flex items-center justify-center flex-shrink-0 py-3"
@@ -1306,7 +1344,7 @@ export default function LogisticsTimelineView({
                                       </svg>
                                     </div>
                                   )}
-                                  {checkoutWait > 0 && waitingGapWidthPx > 0 && (
+                                  {checkoutWait > 0 && waitingGapWidthPx > 0 && raw?.checkout_time && (
                                     <div
                                       className="flex items-center justify-center flex-shrink-0 py-3 bg-amber-100/50 dark:bg-amber-900/20 border-y border-dashed border-amber-400"
                                       style={{ width: `${waitingGapWidthPx}px`, minHeight: "50px" }}

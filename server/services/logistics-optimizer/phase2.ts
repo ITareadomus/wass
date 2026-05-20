@@ -1,18 +1,29 @@
 import { estimateCarTravelMinutes } from "../logistics-timeline-utils";
+import {
+  buildLogisticsScheduleForDriver,
+  toLogisticsScheduleTaskInput,
+} from "./logistics-driver-schedule";
 import { LogisticsTaskInputWithLock } from "./phase0";
 import { LogisticsPhase1Result, LogisticsSelectedDriver, LogisticsTaskCandidate } from "./phase1";
-import { computeBagPolicy } from "./bag-rule";
+import { LOGISTICS_SERVICE_DURATION_MIN } from "../../../shared/logistics-scheduling-constraints";
+import { computeBagPolicy, requiresDriverBeforeCleaner } from "./bag-rule";
+import {
+  GroupingReasonJson,
+  LogisticsPhase2DebugCollector,
+  mapAssignmentsToDebugSchedule,
+  type DriverAttemptJson,
+  type GroupCreatedJson,
+  type GroupDecisionJson,
+  type UnassignedTaskDebugJson,
+} from "./phase2-debug";
 
-const LOGISTICS_TASK_DURATION_MIN = 15;
+const LOGISTICS_TASK_DURATION_MIN = LOGISTICS_SERVICE_DURATION_MIN;
 const GROUP_MAX_TASKS = 4;
 const GROUP_NEARBY_THRESHOLD_MIN = 8;
 const CLEANER_CLUSTER_MAX_STEP_TRAVEL_MIN = 10;
 const CLEANER_CLUSTER_MAX_RADIUS_TRAVEL_MIN = 12;
 const GEO_FALLBACK_MAX_STEP_TRAVEL_MIN = GROUP_NEARBY_THRESHOLD_MIN;
 const GEO_FALLBACK_MAX_RADIUS_TRAVEL_MIN = 10;
-
-/** Attesa checkout oltre questa soglia (minuti) → simulazione non fattibile (altre permutazioni / partial). */
-const LOGISTICS_MAX_CHECKOUT_WAIT_MIN = 15;
 
 /** Magazzino / punto di partenza autisti (Via Barrili 31, Milano). */
 const LOGISTICS_DEPOT_LAT = 45.434029;
@@ -65,6 +76,19 @@ interface SpatialGroup {
   tasks: LogisticsTaskForPhase2[];
   origin?: "CLEANER_CLUSTER" | "GEOGRAPHIC_FALLBACK" | "SINGLETON_FALLBACK";
   cleanerId?: number | null;
+  groupingReason?: GroupingReasonJson;
+}
+
+interface CleanerClusterLinkMetrics {
+  compatible: boolean;
+  stepTravelMin: number;
+  centroidTravelMin: number;
+  limits: {
+    maxTasksPerCluster: number;
+    stepTravelMaxMin: number;
+    centroidRadiusMaxMin: number;
+  };
+  failedRules: string[];
 }
 
 interface LogisticsPhase2GroupingStats {
@@ -133,6 +157,7 @@ export interface LogisticsPhase2Result {
   tasksUnassigned: number;
   driverPlans: DriverPhase2Plan[];
   unassignedTasks: LogisticsPhase2UnassignedTask[];
+  debugDir?: string;
   validation: {
     noTaskCandidates: boolean;
     bagPolicyExcludedCount: number;
@@ -170,31 +195,19 @@ function isDateCompatibleWithWorkDate(taskDate: string | null, workDate: string)
   return normalizeYmd(taskDate) === normalizeYmd(workDate);
 }
 
-function getCheckinCheckoutViolation(
-  task: LogisticsTaskForPhase2,
-  workDate: string,
-  taskStartMin: number,
-  taskEndMin: number
-): boolean {
-  if (isDateCompatibleWithWorkDate(task.checkoutDate, workDate) && task.checkoutTime) {
-    const checkoutMin = parseMinutes(task.checkoutTime, 0);
-    if (taskStartMin < checkoutMin) return true;
-  }
-  if (isDateCompatibleWithWorkDate(task.checkinDate, workDate) && task.checkinTime) {
-    const checkinMin = parseMinutes(task.checkinTime, 23 * 60 + 59);
-    if (taskEndMin > checkinMin) return true;
-  }
-  return false;
-}
-
+/**
+ * Vincolo cleaner: solo DRIVER_BRINGS_BAG deve finire prima dell'inizio HK.
+ * CLEANER_HAS_BAG / NORMAL_TASK: solo ritiro (checkout/check-in), non consegna borsone.
+ */
 function getCleanerViolation(task: LogisticsTaskForPhase2, taskEndMin: number): boolean {
-  const cleanerReferenceTime = getCleanerDeadline(task);
+  const cleanerReferenceTime = getCleanerDeadlineForBagDelivery(task);
   if (!cleanerReferenceTime) return false;
   const cleanerStartMin = parseMinutes(cleanerReferenceTime, 23 * 60 + 59);
   return taskEndMin >= cleanerStartMin;
 }
 
-function getCleanerDeadline(task: LogisticsTaskForPhase2): string | null {
+function getCleanerDeadlineForBagDelivery(task: LogisticsTaskForPhase2): string | null {
+  if (!requiresDriverBeforeCleaner(task.bagPolicy)) return null;
   return task.cleanerTaskStartTime ?? task.cleanerStartTime;
 }
 
@@ -240,13 +253,20 @@ function filterTasksByBagRule(tasks: LogisticsTaskForPhase2[]): {
 
 function getTaskDeadlineMin(task: LogisticsTaskForPhase2, workDate?: string): number {
   const deadlines: number[] = [];
-  const cleanerDeadline = getCleanerDeadline(task);
+  const cleanerDeadline = getCleanerDeadlineForBagDelivery(task);
   if (cleanerDeadline) {
     deadlines.push(parseMinutes(cleanerDeadline, 23 * 60 + 59));
   }
   const checkinApplies = !workDate || isDateCompatibleWithWorkDate(task.checkinDate, workDate);
   if (checkinApplies && task.checkinTime) {
     deadlines.push(parseMinutes(task.checkinTime, 23 * 60 + 59));
+  }
+  // Ritiro sporco: urgenza legata al checkout (dopo checkout), non all'inizio cleaner.
+  if (!requiresDriverBeforeCleaner(task.bagPolicy)) {
+    const checkoutApplies = !workDate || isDateCompatibleWithWorkDate(task.checkoutDate, workDate);
+    if (checkoutApplies && task.checkoutTime) {
+      deadlines.push(parseMinutes(task.checkoutTime, 23 * 60 + 59));
+    }
   }
   return deadlines.length > 0 ? Math.min(...deadlines) : 23 * 60 + 59;
 }
@@ -311,25 +331,179 @@ function getDominantBandIndex(tasks: LogisticsTaskForPhase2[], bandIndexByTaskId
   return bestBand;
 }
 
+function describeCleanerClusterLink(
+  cluster: LogisticsTaskForPhase2[],
+  candidate: LogisticsTaskForPhase2
+): CleanerClusterLinkMetrics {
+  const limits = {
+    maxTasksPerCluster: GROUP_MAX_TASKS,
+    stepTravelMaxMin: CLEANER_CLUSTER_MAX_STEP_TRAVEL_MIN,
+    centroidRadiusMaxMin: CLEANER_CLUSTER_MAX_RADIUS_TRAVEL_MIN,
+  };
+  const failedRules: string[] = [];
+  if (cluster.length >= GROUP_MAX_TASKS) {
+    failedRules.push(`cluster_size>=${GROUP_MAX_TASKS}`);
+    return {
+      compatible: false,
+      stepTravelMin: 0,
+      centroidTravelMin: 0,
+      limits,
+      failedRules,
+    };
+  }
+  const previousTask = cluster[cluster.length - 1];
+  const stepTravelMin = estimateCarTravelMinutes(
+    { lat: previousTask.lat, lng: previousTask.lng },
+    { lat: candidate.lat, lng: candidate.lng }
+  );
+  if (stepTravelMin > CLEANER_CLUSTER_MAX_STEP_TRAVEL_MIN) {
+    failedRules.push(`step_travel>${CLEANER_CLUSTER_MAX_STEP_TRAVEL_MIN}min`);
+  }
+  const centroid = getGroupCentroid(cluster);
+  const centroidTravelMin = estimateCarTravelMinutes(
+    { lat: centroid.lat, lng: centroid.lng },
+    { lat: candidate.lat, lng: candidate.lng }
+  );
+  if (centroidTravelMin > CLEANER_CLUSTER_MAX_RADIUS_TRAVEL_MIN) {
+    failedRules.push(`centroid_travel>${CLEANER_CLUSTER_MAX_RADIUS_TRAVEL_MIN}min`);
+  }
+  return {
+    compatible: failedRules.length === 0,
+    stepTravelMin,
+    centroidTravelMin,
+    limits,
+    failedRules,
+  };
+}
+
 function isCleanerClusterCompatible(
   cluster: LogisticsTaskForPhase2[],
   candidate: LogisticsTaskForPhase2
 ): boolean {
-  if (cluster.length >= GROUP_MAX_TASKS) return false;
-  const previousTask = cluster[cluster.length - 1];
-  const previousTravel = estimateCarTravelMinutes(
-    { lat: previousTask.lat, lng: previousTask.lng },
-    { lat: candidate.lat, lng: candidate.lng }
-  );
-  if (previousTravel > CLEANER_CLUSTER_MAX_STEP_TRAVEL_MIN) return false;
+  return describeCleanerClusterLink(cluster, candidate).compatible;
+}
 
-  const centroid = getGroupCentroid(cluster);
-  const centroidTravel = estimateCarTravelMinutes(
-    { lat: centroid.lat, lng: centroid.lng },
-    { lat: candidate.lat, lng: candidate.lng }
-  );
-  if (centroidTravel > CLEANER_CLUSTER_MAX_RADIUS_TRAVEL_MIN) return false;
-  return true;
+function buildCleanerClusterGroupingReason(
+  cleanerId: number,
+  segment: LogisticsTaskForPhase2[],
+  segmentIndex: number,
+  splitBefore: CleanerClusterLinkMetrics | null,
+  splitFromTaskId: number | null
+): GroupingReasonJson {
+  const consecutiveLinks: Record<string, unknown>[] = [];
+  for (let i = 1; i < segment.length; i++) {
+    const prefix = segment.slice(0, i);
+    const metrics = describeCleanerClusterLink(prefix, segment[i]);
+    consecutiveLinks.push({
+      fromTaskId: segment[i - 1].taskId,
+      toTaskId: segment[i].taskId,
+      fromCleanerSequence: segment[i - 1].cleanerSequence,
+      toCleanerSequence: segment[i].cleanerSequence,
+      stepTravelMin: metrics.stepTravelMin,
+      centroidTravelMin: metrics.centroidTravelMin,
+      compatible: metrics.compatible,
+      limits: metrics.limits,
+    });
+  }
+  const splitNote = splitBefore
+    ? {
+        newSegmentBecause: splitBefore.failedRules.join(", ") || "incompatible_with_previous_task",
+        afterTaskId: splitFromTaskId,
+        metrics: {
+          stepTravelMin: splitBefore.stepTravelMin,
+          centroidTravelMin: splitBefore.centroidTravelMin,
+          limits: splitBefore.limits,
+        },
+      }
+    : null;
+
+  return {
+    strategy: "CLEANER_CLUSTER",
+    summary:
+      segment.length >= 2
+        ? `Cleaner ${cleanerId}: ${segment.length} task HK consecutivi (sequenza + vicinanza entro soglia)`
+        : `Cleaner ${cleanerId}: segmento singolo non clusterizzabile`,
+    details: {
+      cleanerId,
+      segmentIndex,
+      orderedBy: ["cleaner_sequence", "cleaner_task_start_time", "task_id"],
+      limits: {
+        maxTasksPerCluster: GROUP_MAX_TASKS,
+        stepTravelMaxMin: CLEANER_CLUSTER_MAX_STEP_TRAVEL_MIN,
+        centroidRadiusMaxMin: CLEANER_CLUSTER_MAX_RADIUS_TRAVEL_MIN,
+      },
+      members: segment.map((task) => ({
+        taskId: task.taskId,
+        logisticCode: task.logisticCode,
+        cleanerSequence: task.cleanerSequence,
+        bagPolicy: task.bagPolicy,
+        lat: task.lat,
+        lng: task.lng,
+      })),
+      consecutiveLinks,
+      splitBefore: splitNote,
+    },
+  };
+}
+
+function buildGeoFallbackGroupingReason(
+  seed: LogisticsTaskForPhase2,
+  members: LogisticsTaskForPhase2[],
+  additions: Record<string, unknown>[]
+): GroupingReasonJson {
+  return {
+    strategy: "GEOGRAPHIC_FALLBACK",
+    summary:
+      members.length > 1
+        ? `${members.length} task senza cluster cleaner: seed geografico + vicini entro soglia`
+        : "Task geografico isolato (nessun vicino entro soglia)",
+    details: {
+      seedTaskId: seed.taskId,
+      limits: {
+        maxTasksPerGroup: GROUP_MAX_TASKS,
+        stepTravelMaxMin: GEO_FALLBACK_MAX_STEP_TRAVEL_MIN,
+        radiusMaxMin: GEO_FALLBACK_MAX_RADIUS_TRAVEL_MIN,
+      },
+      members: members.map((task) => ({
+        taskId: task.taskId,
+        logisticCode: task.logisticCode,
+        lat: task.lat,
+        lng: task.lng,
+        priority: task.priority,
+        bagPolicy: task.bagPolicy,
+      })),
+      additions,
+    },
+  };
+}
+
+function buildSingletonBagGroupingReason(task: LogisticsTaskForPhase2): GroupingReasonJson {
+  return {
+    strategy: "SINGLETON_BAG_PRIORITY",
+    summary: "Seq.1 premium o pax_in>4: gruppo singleton prioritario (driver porta borsone)",
+    details: {
+      taskId: task.taskId,
+      logisticCode: task.logisticCode,
+      cleanerId: task.cleanerId,
+      cleanerSequence: task.cleanerSequence,
+      premium: task.premium,
+      paxIn: task.paxIn,
+      bagPolicy: task.bagPolicy,
+    },
+  };
+}
+
+function buildRecoverySingletonGroupingReason(task: LogisticsTaskForPhase2): GroupingReasonJson {
+  return {
+    strategy: "RECOVERY_SINGLETON",
+    summary: "Task non presente in nessun gruppo iniziale: singleton di recupero",
+    details: {
+      taskId: task.taskId,
+      logisticCode: task.logisticCode,
+      cleanerId: task.cleanerId,
+      cleanerSequence: task.cleanerSequence,
+    },
+  };
 }
 
 function compareFallbackSeedOrder(a: LogisticsTaskForPhase2, b: LogisticsTaskForPhase2, workDate: string): number {
@@ -358,11 +532,14 @@ function buildGeographicFallbackGroups(
   while (pending.length > 0) {
     const seed = pending.shift()!;
     const currentGroup: LogisticsTaskForPhase2[] = [seed];
+    const additions: Record<string, unknown>[] = [];
 
     while (currentGroup.length < GROUP_MAX_TASKS && pending.length > 0) {
       const centroid = getGroupCentroid(currentGroup);
       let bestIdx = -1;
       let bestScore = Number.POSITIVE_INFINITY;
+      let bestNearestTravel = 0;
+      let bestCentroidTravel = 0;
       for (let i = 0; i < pending.length; i++) {
         const candidate = pending[i];
         const nearestTravel = getNearestTravelToGroup(currentGroup, candidate);
@@ -378,11 +555,27 @@ function buildGeographicFallbackGroups(
         if (score < bestScore) {
           bestScore = score;
           bestIdx = i;
+          bestNearestTravel = nearestTravel;
+          bestCentroidTravel = centroidTravel;
         }
       }
 
       if (bestIdx === -1) break;
-      currentGroup.push(pending.splice(bestIdx, 1)[0]);
+      const added = pending.splice(bestIdx, 1)[0];
+      additions.push({
+        addedTaskId: added.taskId,
+        logisticCode: added.logisticCode,
+        nearestTravelMin: bestNearestTravel,
+        centroidTravelMin: bestCentroidTravel,
+        pickScore: bestScore,
+        reason:
+          "nearest_pending_task_under_step_and_centroid_limits",
+        limits: {
+          stepTravelMaxMin: GEO_FALLBACK_MAX_STEP_TRAVEL_MIN,
+          radiusMaxMin: GEO_FALLBACK_MAX_RADIUS_TRAVEL_MIN,
+        },
+      });
+      currentGroup.push(added);
     }
 
     groups.push({
@@ -391,6 +584,7 @@ function buildGeographicFallbackGroups(
       tasks: currentGroup,
       origin: "GEOGRAPHIC_FALLBACK",
       cleanerId: null,
+      groupingReason: buildGeoFallbackGroupingReason(seed, currentGroup, additions),
     });
     groupCounter += 1;
   }
@@ -455,24 +649,47 @@ function buildCleanerAwareGroups(
       return a.taskId - b.taskId;
     });
 
-    const segments: LogisticsTaskForPhase2[][] = [];
+    const segments: Array<{
+      tasks: LogisticsTaskForPhase2[];
+      segmentIndex: number;
+      splitBefore: CleanerClusterLinkMetrics | null;
+      splitFromTaskId: number | null;
+    }> = [];
     let currentCluster: LogisticsTaskForPhase2[] = [];
+    let nextSplitBefore: CleanerClusterLinkMetrics | null = null;
+    let nextSplitFromTaskId: number | null = null;
     for (const task of orderedTasks) {
       if (currentCluster.length === 0) {
         currentCluster = [task];
         continue;
       }
-      if (isCleanerClusterCompatible(currentCluster, task)) {
+      const linkMetrics = describeCleanerClusterLink(currentCluster, task);
+      if (linkMetrics.compatible) {
         currentCluster.push(task);
       } else {
-        segments.push(currentCluster);
+        segments.push({
+          tasks: currentCluster,
+          segmentIndex: segments.length,
+          splitBefore: nextSplitBefore,
+          splitFromTaskId: nextSplitFromTaskId,
+        });
+        nextSplitBefore = linkMetrics;
+        nextSplitFromTaskId = task.taskId;
         currentCluster = [task];
       }
     }
-    if (currentCluster.length > 0) segments.push(currentCluster);
+    if (currentCluster.length > 0) {
+      segments.push({
+        tasks: currentCluster,
+        segmentIndex: segments.length,
+        splitBefore: nextSplitBefore,
+        splitFromTaskId: nextSplitFromTaskId,
+      });
+    }
 
     let cleanerClusterCounter = 0;
-    for (const segment of segments) {
+    for (const segmentEntry of segments) {
+      const segment = segmentEntry.tasks;
       if (segment.length >= 2) {
         cleanerClusters.push({
           groupId: `cleaner-${cleanerId}-cluster-${cleanerClusterCounter}`,
@@ -480,6 +697,13 @@ function buildCleanerAwareGroups(
           tasks: segment,
           origin: "CLEANER_CLUSTER",
           cleanerId,
+          groupingReason: buildCleanerClusterGroupingReason(
+            cleanerId,
+            segment,
+            segmentEntry.segmentIndex,
+            segmentEntry.splitBefore,
+            segmentEntry.splitFromTaskId
+          ),
         });
         cleanerClusterCounter += 1;
         continue;
@@ -493,6 +717,7 @@ function buildCleanerAwareGroups(
           tasks: [singletonTask],
           origin: "SINGLETON_FALLBACK",
           cleanerId: singletonTask.cleanerId ?? null,
+          groupingReason: buildSingletonBagGroupingReason(singletonTask),
         });
       } else {
         fallbackTasks.push(singletonTask);
@@ -704,101 +929,78 @@ function simulateOrderedTasksForDriver(
   group: SpatialGroup,
   orderedTasks: LogisticsTaskForPhase2[],
   state: DriverState,
-  workDate: string
+  workDate: string,
+  taskById: Map<number, LogisticsTaskForPhase2>
 ): GroupSimulationResult {
+  const projectedCleanerLastSequence = new Map<number, number>(state.cleanerLastSequence);
+  const infeasibleResult = (reasonCode: LogisticsPhase2ReasonCode, taskId: number | null): GroupSimulationResult => ({
+    feasible: false,
+    assignments: [],
+    projectedClockMin: state.clockMin,
+    projectedLastLat: state.lastLat,
+    projectedLastLng: state.lastLng,
+    projectedCleanerLastSequence: new Map<number, number>(state.cleanerLastSequence),
+    travelMinutesDelta: 0,
+    score: Number.NEGATIVE_INFINITY,
+    failure: { reasonCode, taskId },
+  });
+
+  const existingOrdered = [...state.assignedTasks]
+    .sort((a, b) => a.sequence - b.sequence)
+    .map((assignment) => taskById.get(assignment.taskId))
+    .filter((task): task is LogisticsTaskForPhase2 => task != null);
+
+  const fullOrdered = [...existingOrdered, ...orderedTasks];
+  const built = buildLogisticsScheduleForDriver({
+    tasks: fullOrdered.map(toLogisticsScheduleTaskInput),
+    driverStartMin: state.driverStartMin,
+    workDate,
+  });
+
+  const candidateIds = new Set(orderedTasks.map((task) => task.taskId));
+
+  if (built.violations.checkin.length > 0) {
+    const fail =
+      built.violations.checkin.find((row) => candidateIds.has(row.taskId)) ?? built.violations.checkin[0];
+    return infeasibleResult("CHECKIN_CHECKOUT_CONSTRAINT", fail?.taskId ?? null);
+  }
+
+  if (built.violations.checkoutWaitExceeded.length > 0) {
+    const fail =
+      built.violations.checkoutWaitExceeded.find((row) => candidateIds.has(row.taskId)) ??
+      built.violations.checkoutWaitExceeded[0];
+    return infeasibleResult("CHECKIN_CHECKOUT_CONSTRAINT", fail?.taskId ?? null);
+  }
+
   const schedule: LogisticsTaskSchedule[] = [];
-  let clockMin = state.clockMin;
-  let currentLat = state.lastLat;
-  let currentLng = state.lastLng;
   let travelDelta = 0;
   let checkoutWaitMinutesDelta = 0;
-  const projectedCleanerLastSequence = new Map<number, number>(state.cleanerLastSequence);
 
-  for (const task of orderedTasks) {
-    const travelMinutes = currentLat != null && currentLng != null
-      ? estimateCarTravelMinutes({ lat: currentLat, lng: currentLng }, { lat: task.lat, lng: task.lng })
-      : 0;
-    const arrivalMin = clockMin + travelMinutes;
-    let checkoutWaitMinutes = 0;
-    let taskStartMin = arrivalMin;
-
-    if (isDateCompatibleWithWorkDate(task.checkoutDate, workDate) && task.checkoutTime) {
-      const checkoutMin = parseMinutes(task.checkoutTime, 0);
-      if (arrivalMin < checkoutMin) {
-        const waitNeeded = checkoutMin - arrivalMin;
-        if (waitNeeded > LOGISTICS_MAX_CHECKOUT_WAIT_MIN) {
-          return {
-            feasible: false,
-            assignments: [],
-            projectedClockMin: state.clockMin,
-            projectedLastLat: state.lastLat,
-            projectedLastLng: state.lastLng,
-            projectedCleanerLastSequence: new Map<number, number>(state.cleanerLastSequence),
-            travelMinutesDelta: 0,
-            score: Number.NEGATIVE_INFINITY,
-            failure: {
-              reasonCode: "CHECKIN_CHECKOUT_CONSTRAINT",
-              taskId: task.taskId,
-            },
-          };
-        }
-        checkoutWaitMinutes = waitNeeded;
-        checkoutWaitMinutesDelta += waitNeeded;
-        taskStartMin = checkoutMin;
-      }
+  for (let i = 0; i < orderedTasks.length; i++) {
+    const task = orderedTasks[i];
+    const row = built.tasks.find((scheduled) => scheduled.taskId === task.taskId);
+    if (!row) {
+      return infeasibleResult("CHECKIN_CHECKOUT_CONSTRAINT", task.taskId);
     }
 
-    const taskEndMin = taskStartMin + LOGISTICS_TASK_DURATION_MIN;
-
-    if (getCheckinCheckoutViolation(task, workDate, taskStartMin, taskEndMin)) {
-      return {
-        feasible: false,
-        assignments: [],
-        projectedClockMin: state.clockMin,
-        projectedLastLat: state.lastLat,
-        projectedLastLng: state.lastLng,
-        projectedCleanerLastSequence: new Map<number, number>(state.cleanerLastSequence),
-        travelMinutesDelta: 0,
-        score: Number.NEGATIVE_INFINITY,
-        failure: {
-          reasonCode: "CHECKIN_CHECKOUT_CONSTRAINT",
-          taskId: task.taskId,
-        },
-      };
-    }
-
-    if (getCleanerViolation(task, taskEndMin)) {
-      return {
-        feasible: false,
-        assignments: [],
-        projectedClockMin: state.clockMin,
-        projectedLastLat: state.lastLat,
-        projectedLastLng: state.lastLng,
-        projectedCleanerLastSequence: new Map<number, number>(state.cleanerLastSequence),
-        travelMinutesDelta: 0,
-        score: Number.NEGATIVE_INFINITY,
-        failure: {
-          reasonCode: "CLEANER_TIME_CONSTRAINT",
-          taskId: task.taskId,
-        },
-      };
+    if (getCleanerViolation(task, row.endMin)) {
+      return infeasibleResult("CLEANER_TIME_CONSTRAINT", task.taskId);
     }
 
     schedule.push({
       taskId: task.taskId,
       logisticCode: task.logisticCode,
-      startTime: toHHMM(taskStartMin),
-      endTime: toHHMM(taskEndMin),
-      travelMinutes,
-      checkoutWaitMinutes,
-      sequence: state.assignedTasks.length + schedule.length + 1,
+      startTime: row.startTime,
+      endTime: row.endTime,
+      travelMinutes: row.travelMinutes,
+      checkoutWaitMinutes: row.checkoutWaitMinutes,
+      sequence: row.sequence,
       reasonCode: null,
     });
 
-    clockMin = taskEndMin;
-    travelDelta += travelMinutes;
-    currentLat = task.lat;
-    currentLng = task.lng;
+    travelDelta += row.travelMinutes;
+    checkoutWaitMinutesDelta += row.checkoutWaitMinutes;
+
     if (task.cleanerId != null && task.cleanerSequence != null) {
       const previous = projectedCleanerLastSequence.get(task.cleanerId) ?? 0;
       projectedCleanerLastSequence.set(task.cleanerId, Math.max(previous, task.cleanerSequence));
@@ -850,12 +1052,14 @@ function simulateOrderedTasksForDriver(
     driverBringsBagUrgencyBonus -
     fallbackCompactnessPenalty;
 
+  const lastRow = built.tasks[built.tasks.length - 1];
+
   return {
     feasible: true,
     assignments: schedule,
-    projectedClockMin: clockMin,
-    projectedLastLat: currentLat,
-    projectedLastLng: currentLng,
+    projectedClockMin: lastRow?.endMin ?? state.clockMin,
+    projectedLastLat: built.lastLat,
+    projectedLastLng: built.lastLng,
     projectedCleanerLastSequence,
     travelMinutesDelta: travelDelta,
     score,
@@ -866,14 +1070,15 @@ function simulateOrderedTasksForDriver(
 function simulateGroupForDriver(
   group: SpatialGroup,
   state: DriverState,
-  workDate: string
+  workDate: string,
+  taskById: Map<number, LogisticsTaskForPhase2>
 ): GroupSimulationResult {
   const orderCandidates = buildOrderCandidates(group, state, workDate);
   let bestSimulation: GroupSimulationResult | null = null;
   let bestFailure: FeasibilityFailure | null = null;
 
   for (const orderedTasks of orderCandidates) {
-    const simulation = simulateOrderedTasksForDriver(group, orderedTasks, state, workDate);
+    const simulation = simulateOrderedTasksForDriver(group, orderedTasks, state, workDate, taskById);
     if (!simulation.feasible) {
       bestFailure = pickMoreUsefulFailure(bestFailure, simulation.failure);
       continue;
@@ -957,12 +1162,13 @@ function estimateRecoverableTaskCount(
   group: SpatialGroup | null,
   driverStates: DriverState[],
   workDate: string,
+  taskById: Map<number, LogisticsTaskForPhase2>,
   depth = 0
 ): number {
   if (!group) return 0;
 
   for (const state of driverStates) {
-    const simulation = simulateGroupForDriver(group, state, workDate);
+    const simulation = simulateGroupForDriver(group, state, workDate, taskById);
     if (simulation.feasible) {
       return group.tasks.length;
     }
@@ -985,7 +1191,7 @@ function estimateRecoverableTaskCount(
     };
 
     for (const state of driverStates) {
-      const simulation = simulateGroupForDriver(subsetGroup, state, workDate);
+      const simulation = simulateGroupForDriver(subsetGroup, state, workDate, taskById);
       if (!simulation.feasible) continue;
 
       const selectedTaskIds = new Set(subset.map((task) => task.taskId));
@@ -1008,7 +1214,8 @@ function estimateRecoverableTaskCount(
 
       const projectedStates = projectDriverStatesAfterChoice(projectedChoice, driverStates);
       const recoverable =
-        subset.length + estimateRecoverableTaskCount(remainingGroup, projectedStates, workDate, depth + 1);
+        subset.length +
+        estimateRecoverableTaskCount(remainingGroup, projectedStates, workDate, taskById, depth + 1);
 
       if (recoverable > best) {
         best = recoverable;
@@ -1032,14 +1239,15 @@ interface PartialChoiceRanking {
 function getPartialChoiceRanking(
   choice: PartialGroupSimulationChoice,
   driverStates: DriverState[],
-  workDate: string
+  workDate: string,
+  taskById: Map<number, LogisticsTaskForPhase2>
 ): PartialChoiceRanking {
   let remainingFeasibleOnSomeDriver = false;
   let remainingScoreEstimate = Number.NEGATIVE_INFINITY;
   const projectedDriverStates = projectDriverStatesAfterChoice(choice, driverStates);
   if (choice.remainingGroup) {
     for (const state of projectedDriverStates) {
-      const remainingSimulation = simulateGroupForDriver(choice.remainingGroup, state, workDate);
+      const remainingSimulation = simulateGroupForDriver(choice.remainingGroup, state, workDate, taskById);
       if (remainingSimulation.feasible) {
         remainingFeasibleOnSomeDriver = true;
         if (remainingSimulation.score > remainingScoreEstimate) {
@@ -1054,7 +1262,8 @@ function getPartialChoiceRanking(
   const remainingRecoverableTasks = estimateRecoverableTaskCount(
     choice.remainingGroup,
     projectedDriverStates,
-    workDate
+    workDate,
+    taskById
   );
   const expectedRecoverableTasks =
     choice.assignedGroup.tasks.length + remainingRecoverableTasks;
@@ -1095,7 +1304,8 @@ function getBestSingletonFailureReason(
   task: LogisticsTaskForPhase2,
   sourceGroup: SpatialGroup,
   driverStates: DriverState[],
-  workDate: string
+  workDate: string,
+  taskById: Map<number, LogisticsTaskForPhase2>
 ): LogisticsPhase2ReasonCode {
   const singletonGroup: SpatialGroup = {
     ...sourceGroup,
@@ -1107,7 +1317,7 @@ function getBestSingletonFailureReason(
   let bestFailure: FeasibilityFailure | null = null;
 
   for (const state of driverStates) {
-    const simulation = simulateGroupForDriver(singletonGroup, state, workDate);
+    const simulation = simulateGroupForDriver(singletonGroup, state, workDate, taskById);
     if (simulation.feasible) {
       return "NO_DRIVER_FEASIBLE";
     }
@@ -1120,7 +1330,8 @@ function getBestSingletonFailureReason(
 function findBestPartialGroupAssignment(
   group: SpatialGroup,
   driverStates: DriverState[],
-  workDate: string
+  workDate: string,
+  taskById: Map<number, LogisticsTaskForPhase2>
 ): PartialGroupSimulationChoice | null {
   if (group.tasks.length <= 1) return null;
   const subsets = buildTaskSubsetsByDescendingSize(group.tasks).filter((subset) => subset.length < group.tasks.length);
@@ -1149,7 +1360,7 @@ function findBestPartialGroupAssignment(
     };
 
     for (const state of driverStates) {
-      const simulation = simulateGroupForDriver(subsetGroup, state, workDate);
+      const simulation = simulateGroupForDriver(subsetGroup, state, workDate, taskById);
       if (!simulation.feasible) continue;
       const selectedTaskIds = new Set(subset.map((task) => task.taskId));
       const remainingTasks = group.tasks.filter((task) => !selectedTaskIds.has(task.taskId));
@@ -1168,7 +1379,7 @@ function findBestPartialGroupAssignment(
         state,
         simulation,
       };
-      const ranking = getPartialChoiceRanking(choice, driverStates, workDate);
+      const ranking = getPartialChoiceRanking(choice, driverStates, workDate, taskById);
 
       if (!bestRanking || isBetterPartialRanking(ranking, bestRanking)) {
         bestChoice = choice;
@@ -1180,10 +1391,80 @@ function findBestPartialGroupAssignment(
   return bestChoice;
 }
 
+function defaultGroupingReason(origin: string | undefined): GroupingReasonJson {
+  return {
+    strategy: "RECOVERY_SINGLETON",
+    summary: `Gruppo ${origin ?? "UNKNOWN"} senza metadati di raggruppamento`,
+    details: { origin: origin ?? "UNKNOWN" },
+  };
+}
+
+function buildQueueSortKeyForGroup(group: SpatialGroup, workDate: string): GroupCreatedJson["queueSortKey"] {
+  const key = getGroupSortKey(group, workDate);
+  return {
+    earliestDeadlineMin: key[0],
+    hasDriverBringsBag: key[1] === 0,
+    originPriority: key[2],
+    sizeScore: key[3],
+  };
+}
+
+function buildDriverAttemptsForGroup(
+  group: SpatialGroup,
+  driverStates: DriverState[],
+  workDate: string,
+  taskById: Map<number, LogisticsTaskForPhase2>
+): {
+  attempts: DriverAttemptJson[];
+  bestState: DriverState | null;
+  bestSimulation: GroupSimulationResult | null;
+  bestFailureByTaskId: Map<number, FeasibilityFailure>;
+} {
+  let bestState: DriverState | null = null;
+  let bestSimulation: GroupSimulationResult | null = null;
+  const bestFailureByTaskId = new Map<number, FeasibilityFailure>();
+  const attempts: DriverAttemptJson[] = [];
+
+  for (const state of driverStates) {
+    const simulation = simulateGroupForDriver(group, state, workDate, taskById);
+    attempts.push({
+      driverId: state.driverId,
+      feasible: simulation.feasible,
+      score: simulation.feasible ? simulation.score : undefined,
+      travelMinutesDelta: simulation.feasible ? simulation.travelMinutesDelta : undefined,
+      projectedClockEnd: simulation.feasible ? toHHMM(simulation.projectedClockMin) : undefined,
+      failure: simulation.feasible
+        ? undefined
+        : simulation.failure
+          ? {
+              reasonCode: simulation.failure.reasonCode,
+              taskId: simulation.failure.taskId,
+            }
+          : undefined,
+    });
+    if (!simulation.feasible) {
+      const failure = simulation.failure;
+      if (failure?.taskId != null) {
+        const prev = bestFailureByTaskId.get(failure.taskId);
+        const merged = pickMoreUsefulFailure(prev ?? null, failure);
+        if (merged) bestFailureByTaskId.set(failure.taskId, merged);
+      }
+      continue;
+    }
+    if (!bestSimulation || simulation.score > bestSimulation.score) {
+      bestSimulation = simulation;
+      bestState = state;
+    }
+  }
+
+  return { attempts, bestState, bestSimulation, bestFailureByTaskId };
+}
+
 export async function runLogisticsPhase2(
   workDate: string,
   unlockedTaskData: LogisticsTaskInputWithLock[],
-  phase1: LogisticsPhase1Result
+  phase1: LogisticsPhase1Result,
+  debugCollector?: LogisticsPhase2DebugCollector | null
 ): Promise<LogisticsPhase2Result> {
   const reasonCounts: Record<LogisticsPhase2ReasonCode, number> = {
     CHECKIN_CHECKOUT_CONSTRAINT: 0,
@@ -1196,6 +1477,7 @@ export async function runLogisticsPhase2(
   const filteredByBagRule = filterTasksByBagRule(phase2Tasks);
   const bagPolicyExcludedTaskIds = filteredByBagRule.excludedTaskIds;
   const schedulableTasks = filteredByBagRule.included;
+  const taskById = new Map(schedulableTasks.map((task) => [task.taskId, task]));
 
   if (schedulableTasks.length === 0) {
     reasonCounts.NO_TASK_CANDIDATES = 1;
@@ -1264,9 +1546,35 @@ export async function runLogisticsPhase2(
       tasks: [task],
       origin: "SINGLETON_FALLBACK",
       cleanerId: task.cleanerId ?? null,
+      groupingReason: buildRecoverySingletonGroupingReason(task),
     });
   }
   const groups = deduplicatedGroups.sort((a, b) => compareGroups(a, b, workDate));
+
+  if (debugCollector) {
+    debugCollector.recordGroupsCreated(
+      groups.map((group) => ({
+        groupId: group.groupId,
+        origin: group.origin,
+        seedBandIndex: group.seedBandIndex,
+        cleanerId: group.cleanerId ?? null,
+        tasks: group.tasks.map((task) => ({
+          taskId: task.taskId,
+          logisticCode: task.logisticCode,
+        })),
+        groupingReason: group.groupingReason ?? defaultGroupingReason(group.origin),
+        queueSortKey: buildQueueSortKeyForGroup(group, workDate),
+      }))
+    );
+    debugCollector.setGroupingStats({
+      cleanerClusters: grouped.groupingStats.cleanerClusters,
+      geographicFallbackGroups: grouped.groupingStats.geographicFallbackGroups,
+      singletonFallbackTasks: grouped.groupingStats.singletonFallbackTasks,
+      fallbackTasks: grouped.groupingStats.fallbackTasks,
+      recoveredMissingTaskCount: missingTasks.length,
+      duplicateGroupedTaskCount: duplicateTaskCount,
+    });
+  }
   const driverStates = buildDriverStates(phase1.selectedDrivers);
   const unassignedTasks: LogisticsPhase2UnassignedTask[] = [];
   let groupsAssigned = 0;
@@ -1280,6 +1588,7 @@ export async function runLogisticsPhase2(
   let queueGroupsProcessed = 0;
   let partialGroupsAssigned = 0;
   let groupsSplit = 0;
+  const debugUnassignedDetails: UnassignedTaskDebugJson[] = [];
   while (pendingGroups.length > 0) {
     const group = pendingGroups.shift()!;
     groupsProcessed += 1;
@@ -1288,35 +1597,45 @@ export async function runLogisticsPhase2(
     } else {
       queueGroupsProcessed += 1;
     }
-    let bestState: DriverState | null = null;
-    let bestSimulation: GroupSimulationResult | null = null;
-    const bestFailureByTaskId = new Map<number, FeasibilityFailure>();
 
-    for (const state of driverStates) {
-      const simulation = simulateGroupForDriver(group, state, workDate);
-      if (!simulation.feasible) {
-        const failure = simulation.failure;
-        if (failure?.taskId != null) {
-          const prev = bestFailureByTaskId.get(failure.taskId);
-          const merged = pickMoreUsefulFailure(prev ?? null, failure);
-          if (merged) bestFailureByTaskId.set(failure.taskId, merged);
-        }
-        continue;
-      }
-      if (!bestSimulation || simulation.score > bestSimulation.score) {
-        bestSimulation = simulation;
-        bestState = state;
-      }
-    }
+    const groupingReason = group.groupingReason ?? defaultGroupingReason(group.origin);
+    const { attempts, bestState, bestSimulation, bestFailureByTaskId } = buildDriverAttemptsForGroup(
+      group,
+      driverStates,
+      workDate,
+      taskById
+    );
 
     if (bestState && bestSimulation) {
       applySimulationToDriverState(bestState, bestSimulation);
       groupsAssigned += 1;
       tasksAssigned += bestSimulation.assignments.length;
+      if (debugCollector) {
+        const decision: GroupDecisionJson = {
+          step: groupsProcessed,
+          groupId: group.groupId,
+          origin: group.origin ?? "UNKNOWN",
+          taskIds: group.tasks.map((task) => task.taskId),
+          logisticCodes: group.tasks.map((task) => task.logisticCode),
+          groupingReason,
+          outcome: "FULL_ASSIGNED",
+          why: "highest_score_among_feasible_drivers",
+          winner: {
+            driverId: bestState.driverId,
+            score: bestSimulation.score,
+            travelMinutesDelta: bestSimulation.travelMinutesDelta,
+            projectedClockEnd: toHHMM(bestSimulation.projectedClockMin),
+            taskOrder: bestSimulation.assignments.map((item) => item.taskId),
+            schedule: mapAssignmentsToDebugSchedule(bestSimulation.assignments),
+          },
+          driverAttempts: attempts,
+        };
+        debugCollector.recordGroupDecision(decision);
+      }
       continue;
     }
 
-    const partialChoice = findBestPartialGroupAssignment(group, driverStates, workDate);
+    const partialChoice = findBestPartialGroupAssignment(group, driverStates, workDate, taskById);
     if (partialChoice) {
       applySimulationToDriverState(partialChoice.state, partialChoice.simulation);
       groupsAssigned += 1;
@@ -1326,20 +1645,83 @@ export async function runLogisticsPhase2(
         groupsSplit += 1;
         pendingGroups.unshift(partialChoice.remainingGroup);
       }
+      if (debugCollector) {
+        const partialRanking = getPartialChoiceRanking(partialChoice, driverStates, workDate);
+        const decision: GroupDecisionJson = {
+          step: groupsProcessed,
+          groupId: group.groupId,
+          origin: group.origin ?? "UNKNOWN",
+          taskIds: group.tasks.map((task) => task.taskId),
+          logisticCodes: group.tasks.map((task) => task.logisticCode),
+          groupingReason,
+          outcome: "PARTIAL_ASSIGNED",
+          why: "no_full_feasible_assignment; best_partial_subset_selected",
+          winner: {
+            driverId: partialChoice.state.driverId,
+            score: partialChoice.simulation.score,
+            travelMinutesDelta: partialChoice.simulation.travelMinutesDelta,
+            projectedClockEnd: toHHMM(partialChoice.simulation.projectedClockMin),
+            taskOrder: partialChoice.simulation.assignments.map((item) => item.taskId),
+            schedule: mapAssignmentsToDebugSchedule(partialChoice.simulation.assignments),
+          },
+          partial: {
+            assignedTaskIds: partialChoice.assignedGroup.tasks.map((task) => task.taskId),
+            remainingGroupId: partialChoice.remainingGroup?.groupId ?? null,
+            expectedRecoverableTasks: partialRanking.expectedRecoverableTasks,
+            assignedSize: partialRanking.assignedSize,
+            remainingFeasibleOnSomeDriver: partialRanking.remainingFeasibleOnSomeDriver,
+          },
+          driverAttempts: attempts,
+        };
+        debugCollector.recordGroupDecision(decision);
+      }
       continue;
     }
 
     groupsUnassigned += 1;
+    const perTaskReason: GroupDecisionJson["perTaskReason"] = [];
     for (const task of group.tasks) {
       const taskSpecific = bestFailureByTaskId.get(task.taskId);
       const reasonCode =
         taskSpecific?.reasonCode ??
-        getBestSingletonFailureReason(task, group, driverStates, workDate);
+        getBestSingletonFailureReason(task, group, driverStates, workDate, taskById);
       incrementReasonCount(reasonCounts, reasonCode);
       unassignedTasks.push({
         taskId: task.taskId,
         logisticCode: task.logisticCode,
         reasonCode,
+      });
+      perTaskReason.push({
+        taskId: task.taskId,
+        logisticCode: task.logisticCode,
+        reasonCode,
+      });
+      debugUnassignedDetails.push({
+        taskId: task.taskId,
+        logisticCode: task.logisticCode,
+        reasonCode,
+        sourceGroupId: group.groupId,
+        driverFailures: attempts
+          .filter((item) => !item.feasible && item.failure)
+          .map((item) => ({
+            driverId: item.driverId,
+            reasonCode: item.failure!.reasonCode,
+            taskId: item.failure!.taskId,
+          })),
+      });
+    }
+    if (debugCollector) {
+      debugCollector.recordGroupDecision({
+        step: groupsProcessed,
+        groupId: group.groupId,
+        origin: group.origin ?? "UNKNOWN",
+        taskIds: group.tasks.map((task) => task.taskId),
+        logisticCodes: group.tasks.map((task) => task.logisticCode),
+        groupingReason,
+        outcome: "REJECTED",
+        why: "no_feasible_full_or_partial_assignment_for_any_driver",
+        driverAttempts: attempts,
+        perTaskReason,
       });
     }
   }
@@ -1362,7 +1744,45 @@ export async function runLogisticsPhase2(
         logisticCode: task.logisticCode,
         reasonCode: "NO_DRIVER_FEASIBLE",
       });
+      debugUnassignedDetails.push({
+        taskId: task.taskId,
+        logisticCode: task.logisticCode,
+        reasonCode: "NO_DRIVER_FEASIBLE",
+        driverFailures: [],
+      });
     }
+  }
+
+  let debugDir: string | undefined;
+  if (debugCollector) {
+    debugCollector.setGroupingStats({
+      ...(debugCollector.groupingStats ?? {
+        cleanerClusters: grouped.groupingStats.cleanerClusters,
+        geographicFallbackGroups: grouped.groupingStats.geographicFallbackGroups,
+        singletonFallbackTasks: grouped.groupingStats.singletonFallbackTasks,
+        fallbackTasks: grouped.groupingStats.fallbackTasks,
+      }),
+      initialGroupsProcessed,
+      queueGroupsProcessed,
+      partialGroupsAssigned,
+      groupsSplit,
+      recoveredMissingTaskCount: missingTasks.length,
+      duplicateGroupedTaskCount: duplicateTaskCount,
+    });
+    debugCollector.recordUnassignedTasks(debugUnassignedDetails);
+    debugCollector.setSummary(
+      {
+        groupsProcessed,
+        groupsAssigned,
+        groupsUnassigned,
+        tasksAssigned,
+        tasksUnassigned: unassignedTasks.length,
+      },
+      reasonCounts
+    );
+    const { writeLogisticsPhase2DebugFiles } = await import("./phase2-debug");
+    debugDir = await writeLogisticsPhase2DebugFiles(debugCollector);
+    console.log(`📋 Logistics optimizer debug scritto in: ${debugDir}`);
   }
 
   return {
@@ -1376,6 +1796,7 @@ export async function runLogisticsPhase2(
     tasksUnassigned: unassignedTasks.length,
     driverPlans,
     unassignedTasks,
+    debugDir,
     validation: {
       noTaskCandidates: false,
       bagPolicyExcludedCount: bagPolicyExcludedTaskIds.length,
