@@ -4,6 +4,7 @@ export interface LogisticsTaskInputWithLock {
   taskId: number;
   logisticCode: number;
   priority: string | null;
+  cleaningTime: number | null;
   lat: number | null;
   lng: number | null;
   checkinDate: string | null;
@@ -37,6 +38,7 @@ async function loadLogisticsTasksWithLockStatus(workDate: string): Promise<Logis
         lc.task_id AS "taskId",
         lc.logistic_code AS "logisticCode",
         lc.priority AS "priority",
+        lc.cleaning_time AS "cleaningTime",
         lc.lat AS "lat",
         lc.lng AS "lng",
         lc.checkin_date AS "checkinDate",
@@ -80,6 +82,7 @@ async function loadLogisticsTasksWithLockStatus(workDate: string): Promise<Logis
     taskId: Number(row.taskId),
     logisticCode: Number(row.logisticCode),
     priority: row.priority ? String(row.priority) : null,
+    cleaningTime: row.cleaningTime != null ? Number(row.cleaningTime) : null,
     lat: row.lat != null ? Number(row.lat) : null,
     lng: row.lng != null ? Number(row.lng) : null,
     checkinDate: row.checkinDate ? String(row.checkinDate) : null,

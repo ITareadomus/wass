@@ -15,9 +15,12 @@ function toFiniteNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Il driver deve consegnare la borsone prima che inizi l'HK su quel task. */
+/**
+ * Il driver deve consegnare la borsone prima che inizi l'HK su quel task.
+ * Vale per NORMAL_TASK e DRIVER_BRINGS_BAG; solo CLEANER_HAS_BAG è escluso (solo ritiro sporco).
+ */
 export function requiresDriverBeforeCleaner(bagPolicy: LogisticsBagPolicy): boolean {
-  return bagPolicy === "DRIVER_BRINGS_BAG";
+  return bagPolicy !== "CLEANER_HAS_BAG";
 }
 
 export function computeBagPolicy(input: ComputeBagPolicyInput): LogisticsBagPolicy {

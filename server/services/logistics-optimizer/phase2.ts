@@ -18,6 +18,8 @@ import {
 } from "./phase2-debug";
 
 const LOGISTICS_TASK_DURATION_MIN = LOGISTICS_SERVICE_DURATION_MIN;
+const BAG_DELIVERY_DURATION_RATIO_TOLERANCE = 2 / 3;
+const BAG_DELIVERY_FALLBACK_TOLERANCE_MIN = 30;
 const GROUP_MAX_TASKS = 4;
 const GROUP_NEARBY_THRESHOLD_MIN = 8;
 const CLEANER_CLUSTER_MAX_STEP_TRAVEL_MIN = 10;
@@ -40,6 +42,7 @@ interface LogisticsTaskForPhase2 extends LogisticsTaskCandidate {
   checkoutDate: string | null;
   checkinTime: string | null;
   checkoutTime: string | null;
+  cleaningTime: number | null;
   cleanerId: number | null;
   cleanerStartTime: string | null;
   cleanerTaskStartTime: string | null;
@@ -195,15 +198,26 @@ function isDateCompatibleWithWorkDate(taskDate: string | null, workDate: string)
   return normalizeYmd(taskDate) === normalizeYmd(workDate);
 }
 
+function resolveBagDeliveryToleranceMin(task: LogisticsTaskForPhase2): number {
+  const taskDurationMin = Number(task.cleaningTime);
+  if (Number.isFinite(taskDurationMin) && taskDurationMin > 0) {
+    return Math.ceil(taskDurationMin * BAG_DELIVERY_DURATION_RATIO_TOLERANCE);
+  }
+  return BAG_DELIVERY_FALLBACK_TOLERANCE_MIN;
+}
+
 /**
- * Vincolo cleaner: solo DRIVER_BRINGS_BAG deve finire prima dell'inizio HK.
- * CLEANER_HAS_BAG / NORMAL_TASK: solo ritiro (checkout/check-in), non consegna borsone.
+ * Vincolo cleaner:
+ * - NORMAL_TASK / DRIVER_BRINGS_BAG: il task logistico può finire entro una tolleranza
+ *   rispetto all'inizio HK (2/3 durata task, fallback 30').
+ * - CLEANER_HAS_BAG: solo ritiro sporco (deadline su checkout), senza consegna borsone.
  */
 function getCleanerViolation(task: LogisticsTaskForPhase2, taskEndMin: number): boolean {
   const cleanerReferenceTime = getCleanerDeadlineForBagDelivery(task);
   if (!cleanerReferenceTime) return false;
   const cleanerStartMin = parseMinutes(cleanerReferenceTime, 23 * 60 + 59);
-  return taskEndMin >= cleanerStartMin;
+  const toleranceMin = resolveBagDeliveryToleranceMin(task);
+  return taskEndMin > cleanerStartMin + toleranceMin;
 }
 
 function getCleanerDeadlineForBagDelivery(task: LogisticsTaskForPhase2): string | null {
@@ -232,6 +246,7 @@ function buildPhase2Tasks(
       checkoutDate: taskData?.checkoutDate ?? null,
       checkinTime: taskData?.checkinTime ?? null,
       checkoutTime: taskData?.checkoutTime ?? null,
+      cleaningTime: taskData?.cleaningTime ?? null,
       cleanerId: taskData?.cleanerId ?? null,
       cleanerStartTime: taskData?.cleanerStartTime ?? null,
       cleanerTaskStartTime: taskData?.cleanerTaskStartTime ?? null,
@@ -510,8 +525,8 @@ function compareFallbackSeedOrder(a: LogisticsTaskForPhase2, b: LogisticsTaskFor
   const deadlineDiff = getTaskDeadlineMin(a, workDate) - getTaskDeadlineMin(b, workDate);
   if (deadlineDiff !== 0) return deadlineDiff;
 
-  const aBag = a.bagPolicy === "DRIVER_BRINGS_BAG" ? 0 : 1;
-  const bBag = b.bagPolicy === "DRIVER_BRINGS_BAG" ? 0 : 1;
+  const aBag = requiresDriverBeforeCleaner(a.bagPolicy) ? 0 : 1;
+  const bBag = requiresDriverBeforeCleaner(b.bagPolicy) ? 0 : 1;
   if (aBag !== bBag) return aBag - bBag;
 
   const priorityDiff = getPriorityRank(a) - getPriorityRank(b);
@@ -594,14 +609,14 @@ function buildGeographicFallbackGroups(
 
 function getGroupSortKey(group: SpatialGroup, workDate: string): [number, number, number, number, string] {
   const earliestDeadline = Math.min(...group.tasks.map((task) => getTaskDeadlineMin(task, workDate)));
-  const hasDriverBringsBag = group.tasks.some((task) => task.bagPolicy === "DRIVER_BRINGS_BAG") ? 0 : 1;
+  const hasBagDeliveryUrgency = group.tasks.some((task) => requiresDriverBeforeCleaner(task.bagPolicy)) ? 0 : 1;
   const originPriority = group.origin === "CLEANER_CLUSTER"
     ? 0
     : group.origin === "GEOGRAPHIC_FALLBACK"
       ? 1
       : 2;
   const sizeScore = -group.tasks.length;
-  return [earliestDeadline, hasDriverBringsBag, originPriority, sizeScore, group.groupId];
+  return [earliestDeadline, hasBagDeliveryUrgency, originPriority, sizeScore, group.groupId];
 }
 
 function compareGroups(a: SpatialGroup, b: SpatialGroup, workDate: string): number {
@@ -710,7 +725,7 @@ function buildCleanerAwareGroups(
       }
       const singletonTask = segment[0];
       if (!singletonTask) continue;
-      if (singletonTask.bagPolicy === "DRIVER_BRINGS_BAG") {
+      if (requiresDriverBeforeCleaner(singletonTask.bagPolicy)) {
         singletonFallbackGroups.push({
           groupId: `singleton-${singletonTask.taskId}`,
           seedBandIndex: getDominantBandIndex([singletonTask], bandIndexByTaskId),
@@ -802,7 +817,7 @@ function sortGroupTasksForDriver(group: SpatialGroup, state: DriverState, workDa
           ? -40
           : 0;
 
-      const bagBonus = task.bagPolicy === "DRIVER_BRINGS_BAG" ? -2 : 0;
+      const bagBonus = requiresDriverBeforeCleaner(task.bagPolicy) ? -2 : 0;
       let score: number;
       if (group.origin === "CLEANER_CLUSTER") {
         // Cleaner clusters prioritize sequence continuity but still consider travel.
@@ -1015,7 +1030,7 @@ function simulateOrderedTasksForDriver(
     ? getOrderSequencePenalty(orderedTasks, state) * 6
     : 0;
 
-  const hasDriverBringsBag = group.tasks.some((task) => task.bagPolicy === "DRIVER_BRINGS_BAG");
+  const hasBagDeliveryUrgency = group.tasks.some((task) => requiresDriverBeforeCleaner(task.bagPolicy));
   const cleanerContinuityBonus = group.tasks.reduce((sum, task) => {
     if (task.cleanerId == null || task.cleanerSequence == null) return sum;
     const previousSequence = state.cleanerLastSequence.get(task.cleanerId);
@@ -1038,7 +1053,7 @@ function simulateOrderedTasksForDriver(
       )
     )
     : 0;
-  const driverBringsBagUrgencyBonus = hasDriverBringsBag ? 3 : 0;
+  const bagDeliveryUrgencyBonus = hasBagDeliveryUrgency ? 3 : 0;
   const waitPenalty = checkoutWaitMinutesDelta * 0.5;
   const score =
     1000 -
@@ -1049,7 +1064,7 @@ function simulateOrderedTasksForDriver(
     orderSequencePenalty +
     cleanerContinuityBonus +
     cleanerClusterBonus +
-    driverBringsBagUrgencyBonus -
+    bagDeliveryUrgencyBonus -
     fallbackCompactnessPenalty;
 
   const lastRow = built.tasks[built.tasks.length - 1];
