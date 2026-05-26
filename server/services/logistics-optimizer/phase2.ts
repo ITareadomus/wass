@@ -3,6 +3,13 @@ import {
   buildLogisticsScheduleForDriver,
   toLogisticsScheduleTaskInput,
 } from "./logistics-driver-schedule";
+import {
+  loadPriorityStartWindows,
+  mapPriorityType,
+  priorityPenalty,
+  type Priority,
+  type PriorityWindows,
+} from "../optimizer/priorityWindows";
 import { LogisticsTaskInputWithLock } from "./phase0";
 import { LogisticsPhase1Result, LogisticsSelectedDriver, LogisticsTaskCandidate } from "./phase1";
 import { LOGISTICS_SERVICE_DURATION_MIN } from "../../../shared/logistics-scheduling-constraints";
@@ -48,6 +55,7 @@ interface LogisticsTaskForPhase2 extends LogisticsTaskCandidate {
   cleanerTaskStartTime: string | null;
   cleanerSequence: number | null;
   bagPolicy: ReturnType<typeof computeBagPolicy>;
+  priorityType: Priority | null;
   premium: boolean;
   paxIn: number | null;
 }
@@ -105,6 +113,7 @@ interface LogisticsPhase2GroupingStats {
   groupsSplit?: number;
   recoveredMissingTaskCount?: number;
   duplicateGroupedTaskCount?: number;
+  repairInsertedTasks?: number;
 }
 
 interface DriverState {
@@ -122,6 +131,7 @@ interface DriverState {
 interface FeasibilityFailure {
   reasonCode: LogisticsPhase2ReasonCode;
   taskId: number | null;
+  details?: Record<string, unknown>;
 }
 
 interface GroupSimulationResult {
@@ -141,6 +151,25 @@ interface PartialGroupSimulationChoice {
   remainingGroup: SpatialGroup | null;
   state: DriverState;
   simulation: GroupSimulationResult;
+}
+
+interface RepairRouteSimulationResult {
+  feasible: boolean;
+  assignments: LogisticsTaskSchedule[];
+  projectedClockMin: number;
+  projectedLastLat: number | null;
+  projectedLastLng: number | null;
+  projectedCleanerLastSequence: Map<number, number>;
+  totalTravelMinutes: number;
+  insertedTaskSchedule: LogisticsTaskSchedule | null;
+  failure: FeasibilityFailure | null;
+}
+
+interface RepairInsertionCandidate {
+  state: DriverState;
+  simulation: RepairRouteSimulationResult;
+  insertIndex: number;
+  cost: number;
 }
 
 export interface LogisticsPhase2UnassignedTask {
@@ -220,6 +249,26 @@ function getCleanerViolation(task: LogisticsTaskForPhase2, taskEndMin: number): 
   return taskEndMin > cleanerStartMin + toleranceMin;
 }
 
+function getCleanerFailureDetails(
+  task: LogisticsTaskForPhase2,
+  row: { startTime: string; endTime: string; endMin: number } | null
+): Record<string, unknown> | undefined {
+  const cleanerReferenceTime = getCleanerDeadlineForBagDelivery(task);
+  if (!cleanerReferenceTime || !row) return undefined;
+  const cleanerReferenceMin = parseMinutes(cleanerReferenceTime, 23 * 60 + 59);
+  const toleranceMin = resolveBagDeliveryToleranceMin(task);
+  const latestAllowedEndMin = cleanerReferenceMin + toleranceMin;
+  return {
+    reason: "CLEANER_TIME_CONSTRAINT",
+    cleanerReferenceTime,
+    toleranceMin,
+    latestAllowedEndTime: toHHMM(latestAllowedEndMin),
+    simulatedStart: row.startTime,
+    simulatedEnd: row.endTime,
+    overflowMin: Math.max(0, row.endMin - latestAllowedEndMin),
+  };
+}
+
 function getCleanerDeadlineForBagDelivery(task: LogisticsTaskForPhase2): string | null {
   if (!requiresDriverBeforeCleaner(task.bagPolicy)) return null;
   return task.cleanerTaskStartTime ?? task.cleanerStartTime;
@@ -252,6 +301,7 @@ function buildPhase2Tasks(
       cleanerTaskStartTime: taskData?.cleanerTaskStartTime ?? null,
       cleanerSequence: taskData?.cleanerSequence ?? null,
       bagPolicy,
+      priorityType: mapPriorityType(candidate.priority),
       premium: taskData?.premium === true,
       paxIn: taskData?.paxIn ?? null,
     };
@@ -282,6 +332,21 @@ function getTaskDeadlineMin(task: LogisticsTaskForPhase2, workDate?: string): nu
     if (checkoutApplies && task.checkoutTime) {
       deadlines.push(parseMinutes(task.checkoutTime, 23 * 60 + 59));
     }
+  }
+  return deadlines.length > 0 ? Math.min(...deadlines) : 23 * 60 + 59;
+}
+
+function getHardDeadlineMin(task: LogisticsTaskForPhase2, workDate: string): number {
+  const deadlines: number[] = [];
+  const cleanerDeadline = getCleanerDeadlineForBagDelivery(task);
+  if (cleanerDeadline) {
+    deadlines.push(parseMinutes(cleanerDeadline, 23 * 60 + 59) + resolveBagDeliveryToleranceMin(task));
+  }
+  if (isDateCompatibleWithWorkDate(task.checkinDate, workDate) && task.checkinTime) {
+    deadlines.push(parseMinutes(task.checkinTime, 23 * 60 + 59));
+  }
+  if (isDateCompatibleWithWorkDate(task.checkoutDate, workDate) && task.checkoutTime) {
+    deadlines.push(parseMinutes(task.checkoutTime, 23 * 60 + 59));
   }
   return deadlines.length > 0 ? Math.min(...deadlines) : 23 * 60 + 59;
 }
@@ -945,7 +1010,8 @@ function simulateOrderedTasksForDriver(
   orderedTasks: LogisticsTaskForPhase2[],
   state: DriverState,
   workDate: string,
-  taskById: Map<number, LogisticsTaskForPhase2>
+  taskById: Map<number, LogisticsTaskForPhase2>,
+  priorityWindows: PriorityWindows | null
 ): GroupSimulationResult {
   const projectedCleanerLastSequence = new Map<number, number>(state.cleanerLastSequence);
   const infeasibleResult = (reasonCode: LogisticsPhase2ReasonCode, taskId: number | null): GroupSimulationResult => ({
@@ -970,6 +1036,7 @@ function simulateOrderedTasksForDriver(
     tasks: fullOrdered.map(toLogisticsScheduleTaskInput),
     driverStartMin: state.driverStartMin,
     workDate,
+    priorityWindows,
   });
 
   const candidateIds = new Set(orderedTasks.map((task) => task.taskId));
@@ -990,6 +1057,7 @@ function simulateOrderedTasksForDriver(
   const schedule: LogisticsTaskSchedule[] = [];
   let travelDelta = 0;
   let checkoutWaitMinutesDelta = 0;
+  let priorityPenaltyDelta = 0;
 
   for (let i = 0; i < orderedTasks.length; i++) {
     const task = orderedTasks[i];
@@ -1015,6 +1083,10 @@ function simulateOrderedTasksForDriver(
 
     travelDelta += row.travelMinutes;
     checkoutWaitMinutesDelta += row.checkoutWaitMinutes;
+    if (priorityWindows && task.priorityType) {
+      const pp = priorityPenalty(task.priorityType, row.startMin, row.endMin, priorityWindows);
+      priorityPenaltyDelta += pp.penalty;
+    }
 
     if (task.cleanerId != null && task.cleanerSequence != null) {
       const previous = projectedCleanerLastSequence.get(task.cleanerId) ?? 0;
@@ -1059,6 +1131,7 @@ function simulateOrderedTasksForDriver(
     1000 -
     travelDelta -
     waitPenalty -
+    priorityPenaltyDelta * 2 -
     fairnessPenalty -
     bandPenalty -
     orderSequencePenalty +
@@ -1086,14 +1159,22 @@ function simulateGroupForDriver(
   group: SpatialGroup,
   state: DriverState,
   workDate: string,
-  taskById: Map<number, LogisticsTaskForPhase2>
+  taskById: Map<number, LogisticsTaskForPhase2>,
+  priorityWindows: PriorityWindows | null
 ): GroupSimulationResult {
   const orderCandidates = buildOrderCandidates(group, state, workDate);
   let bestSimulation: GroupSimulationResult | null = null;
   let bestFailure: FeasibilityFailure | null = null;
 
   for (const orderedTasks of orderCandidates) {
-    const simulation = simulateOrderedTasksForDriver(group, orderedTasks, state, workDate, taskById);
+    const simulation = simulateOrderedTasksForDriver(
+      group,
+      orderedTasks,
+      state,
+      workDate,
+      taskById,
+      priorityWindows
+    );
     if (!simulation.feasible) {
       bestFailure = pickMoreUsefulFailure(bestFailure, simulation.failure);
       continue;
@@ -1125,6 +1206,13 @@ function incrementReasonCount(
   reasonCode: LogisticsPhase2ReasonCode
 ): void {
   reasonCounts[reasonCode] += 1;
+}
+
+function decrementReasonCount(
+  reasonCounts: Record<LogisticsPhase2ReasonCode, number>,
+  reasonCode: LogisticsPhase2ReasonCode
+): void {
+  reasonCounts[reasonCode] = Math.max(0, reasonCounts[reasonCode] - 1);
 }
 
 function applySimulationToDriverState(state: DriverState, simulation: GroupSimulationResult): void {
@@ -1178,12 +1266,13 @@ function estimateRecoverableTaskCount(
   driverStates: DriverState[],
   workDate: string,
   taskById: Map<number, LogisticsTaskForPhase2>,
+  priorityWindows: PriorityWindows | null,
   depth = 0
 ): number {
   if (!group) return 0;
 
   for (const state of driverStates) {
-    const simulation = simulateGroupForDriver(group, state, workDate, taskById);
+    const simulation = simulateGroupForDriver(group, state, workDate, taskById, priorityWindows);
     if (simulation.feasible) {
       return group.tasks.length;
     }
@@ -1206,7 +1295,7 @@ function estimateRecoverableTaskCount(
     };
 
     for (const state of driverStates) {
-      const simulation = simulateGroupForDriver(subsetGroup, state, workDate, taskById);
+      const simulation = simulateGroupForDriver(subsetGroup, state, workDate, taskById, priorityWindows);
       if (!simulation.feasible) continue;
 
       const selectedTaskIds = new Set(subset.map((task) => task.taskId));
@@ -1230,7 +1319,14 @@ function estimateRecoverableTaskCount(
       const projectedStates = projectDriverStatesAfterChoice(projectedChoice, driverStates);
       const recoverable =
         subset.length +
-        estimateRecoverableTaskCount(remainingGroup, projectedStates, workDate, taskById, depth + 1);
+        estimateRecoverableTaskCount(
+          remainingGroup,
+          projectedStates,
+          workDate,
+          taskById,
+          priorityWindows,
+          depth + 1
+        );
 
       if (recoverable > best) {
         best = recoverable;
@@ -1255,14 +1351,21 @@ function getPartialChoiceRanking(
   choice: PartialGroupSimulationChoice,
   driverStates: DriverState[],
   workDate: string,
-  taskById: Map<number, LogisticsTaskForPhase2>
+  taskById: Map<number, LogisticsTaskForPhase2>,
+  priorityWindows: PriorityWindows | null
 ): PartialChoiceRanking {
   let remainingFeasibleOnSomeDriver = false;
   let remainingScoreEstimate = Number.NEGATIVE_INFINITY;
   const projectedDriverStates = projectDriverStatesAfterChoice(choice, driverStates);
   if (choice.remainingGroup) {
     for (const state of projectedDriverStates) {
-      const remainingSimulation = simulateGroupForDriver(choice.remainingGroup, state, workDate, taskById);
+      const remainingSimulation = simulateGroupForDriver(
+        choice.remainingGroup,
+        state,
+        workDate,
+        taskById,
+        priorityWindows
+      );
       if (remainingSimulation.feasible) {
         remainingFeasibleOnSomeDriver = true;
         if (remainingSimulation.score > remainingScoreEstimate) {
@@ -1278,7 +1381,8 @@ function getPartialChoiceRanking(
     choice.remainingGroup,
     projectedDriverStates,
     workDate,
-    taskById
+    taskById,
+    priorityWindows
   );
   const expectedRecoverableTasks =
     choice.assignedGroup.tasks.length + remainingRecoverableTasks;
@@ -1320,7 +1424,8 @@ function getBestSingletonFailureReason(
   sourceGroup: SpatialGroup,
   driverStates: DriverState[],
   workDate: string,
-  taskById: Map<number, LogisticsTaskForPhase2>
+  taskById: Map<number, LogisticsTaskForPhase2>,
+  priorityWindows: PriorityWindows | null
 ): LogisticsPhase2ReasonCode {
   const singletonGroup: SpatialGroup = {
     ...sourceGroup,
@@ -1332,7 +1437,7 @@ function getBestSingletonFailureReason(
   let bestFailure: FeasibilityFailure | null = null;
 
   for (const state of driverStates) {
-    const simulation = simulateGroupForDriver(singletonGroup, state, workDate, taskById);
+    const simulation = simulateGroupForDriver(singletonGroup, state, workDate, taskById, priorityWindows);
     if (simulation.feasible) {
       return "NO_DRIVER_FEASIBLE";
     }
@@ -1346,7 +1451,8 @@ function findBestPartialGroupAssignment(
   group: SpatialGroup,
   driverStates: DriverState[],
   workDate: string,
-  taskById: Map<number, LogisticsTaskForPhase2>
+  taskById: Map<number, LogisticsTaskForPhase2>,
+  priorityWindows: PriorityWindows | null
 ): PartialGroupSimulationChoice | null {
   if (group.tasks.length <= 1) return null;
   const subsets = buildTaskSubsetsByDescendingSize(group.tasks).filter((subset) => subset.length < group.tasks.length);
@@ -1375,7 +1481,7 @@ function findBestPartialGroupAssignment(
     };
 
     for (const state of driverStates) {
-      const simulation = simulateGroupForDriver(subsetGroup, state, workDate, taskById);
+      const simulation = simulateGroupForDriver(subsetGroup, state, workDate, taskById, priorityWindows);
       if (!simulation.feasible) continue;
       const selectedTaskIds = new Set(subset.map((task) => task.taskId));
       const remainingTasks = group.tasks.filter((task) => !selectedTaskIds.has(task.taskId));
@@ -1394,7 +1500,7 @@ function findBestPartialGroupAssignment(
         state,
         simulation,
       };
-      const ranking = getPartialChoiceRanking(choice, driverStates, workDate, taskById);
+      const ranking = getPartialChoiceRanking(choice, driverStates, workDate, taskById, priorityWindows);
 
       if (!bestRanking || isBetterPartialRanking(ranking, bestRanking)) {
         bestChoice = choice;
@@ -1428,7 +1534,8 @@ function buildDriverAttemptsForGroup(
   group: SpatialGroup,
   driverStates: DriverState[],
   workDate: string,
-  taskById: Map<number, LogisticsTaskForPhase2>
+  taskById: Map<number, LogisticsTaskForPhase2>,
+  priorityWindows: PriorityWindows | null
 ): {
   attempts: DriverAttemptJson[];
   bestState: DriverState | null;
@@ -1441,7 +1548,7 @@ function buildDriverAttemptsForGroup(
   const attempts: DriverAttemptJson[] = [];
 
   for (const state of driverStates) {
-    const simulation = simulateGroupForDriver(group, state, workDate, taskById);
+    const simulation = simulateGroupForDriver(group, state, workDate, taskById, priorityWindows);
     attempts.push({
       driverId: state.driverId,
       feasible: simulation.feasible,
@@ -1475,12 +1582,363 @@ function buildDriverAttemptsForGroup(
   return { attempts, bestState, bestSimulation, bestFailureByTaskId };
 }
 
+function getAssignedRouteTasks(
+  state: DriverState,
+  taskById: Map<number, LogisticsTaskForPhase2>
+): LogisticsTaskForPhase2[] {
+  return [...state.assignedTasks]
+    .sort((a, b) => a.sequence - b.sequence)
+    .map((assignment) => taskById.get(assignment.taskId))
+    .filter((task): task is LogisticsTaskForPhase2 => task != null);
+}
+
+function rebuildCleanerLastSequence(routeTasks: LogisticsTaskForPhase2[]): Map<number, number> {
+  const cleanerLastSequence = new Map<number, number>();
+  for (const task of routeTasks) {
+    if (task.cleanerId == null || task.cleanerSequence == null) continue;
+    const previous = cleanerLastSequence.get(task.cleanerId) ?? 0;
+    cleanerLastSequence.set(task.cleanerId, Math.max(previous, task.cleanerSequence));
+  }
+  return cleanerLastSequence;
+}
+
+function simulateFullRouteForRepair(
+  state: DriverState,
+  routeTasks: LogisticsTaskForPhase2[],
+  insertedTaskId: number,
+  workDate: string,
+  priorityWindows: PriorityWindows | null
+): RepairRouteSimulationResult {
+  const built = buildLogisticsScheduleForDriver({
+    tasks: routeTasks.map(toLogisticsScheduleTaskInput),
+    driverStartMin: state.driverStartMin,
+    workDate,
+    priorityWindows,
+  });
+
+  const rowByTaskId = new Map(built.tasks.map((row) => [row.taskId, row]));
+  const fail = (failure: FeasibilityFailure): RepairRouteSimulationResult => ({
+    feasible: false,
+    assignments: [],
+    projectedClockMin: state.clockMin,
+    projectedLastLat: state.lastLat,
+    projectedLastLng: state.lastLng,
+    projectedCleanerLastSequence: new Map(state.cleanerLastSequence),
+    totalTravelMinutes: state.totalTravelMinutes,
+    insertedTaskSchedule: null,
+    failure,
+  });
+
+  if (built.violations.checkin.length > 0) {
+    const violation =
+      built.violations.checkin.find((row) => row.taskId === insertedTaskId) ?? built.violations.checkin[0];
+    return fail({ reasonCode: "CHECKIN_CHECKOUT_CONSTRAINT", taskId: violation?.taskId ?? null });
+  }
+
+  if (built.violations.checkoutWaitExceeded.length > 0) {
+    const violation =
+      built.violations.checkoutWaitExceeded.find((row) => row.taskId === insertedTaskId) ??
+      built.violations.checkoutWaitExceeded[0];
+    return fail({ reasonCode: "CHECKIN_CHECKOUT_CONSTRAINT", taskId: violation?.taskId ?? null });
+  }
+
+  const assignments: LogisticsTaskSchedule[] = [];
+  let totalTravelMinutes = 0;
+  for (const task of routeTasks) {
+    const row = rowByTaskId.get(task.taskId);
+    if (!row) {
+      return fail({ reasonCode: "CHECKIN_CHECKOUT_CONSTRAINT", taskId: task.taskId });
+    }
+    if (getCleanerViolation(task, row.endMin)) {
+      return fail({
+        reasonCode: "CLEANER_TIME_CONSTRAINT",
+        taskId: task.taskId,
+        details: getCleanerFailureDetails(task, row),
+      });
+    }
+    totalTravelMinutes += row.travelMinutes;
+    assignments.push({
+      taskId: task.taskId,
+      logisticCode: task.logisticCode,
+      startTime: row.startTime,
+      endTime: row.endTime,
+      travelMinutes: row.travelMinutes,
+      checkoutWaitMinutes: row.checkoutWaitMinutes,
+      sequence: row.sequence,
+      reasonCode: null,
+    });
+  }
+
+  return {
+    feasible: true,
+    assignments,
+    projectedClockMin: built.projectedClockMin,
+    projectedLastLat: built.lastLat,
+    projectedLastLng: built.lastLng,
+    projectedCleanerLastSequence: rebuildCleanerLastSequence(routeTasks),
+    totalTravelMinutes,
+    insertedTaskSchedule: assignments.find((assignment) => assignment.taskId === insertedTaskId) ?? null,
+    failure: null,
+  };
+}
+
+function calculateRepairInsertionCost(
+  state: DriverState,
+  task: LogisticsTaskForPhase2,
+  routeBefore: LogisticsTaskForPhase2[],
+  routeAfter: LogisticsTaskForPhase2[],
+  insertIndex: number,
+  simulation: RepairRouteSimulationResult,
+  bandIndexByTaskId: Map<number, number>,
+  workDate: string
+): number {
+  const hardDeadlineMin = getHardDeadlineMin(task, workDate);
+  const insertedRow = simulation.insertedTaskSchedule;
+  const insertedEndMin = insertedRow ? parseMinutes(insertedRow.endTime, hardDeadlineMin) : hardDeadlineMin;
+  const urgencyOverflow = Math.max(0, insertedEndMin - hardDeadlineMin);
+  const addedTravel = Math.max(0, simulation.totalTravelMinutes - state.totalTravelMinutes);
+  const bandIndex = bandIndexByTaskId.get(task.taskId);
+  const bandPenalty = bandIndex == null ? 0 : Math.abs(bandIndex - state.driverIndex) * 10;
+  const previousTask = routeAfter[insertIndex - 1] ?? null;
+  const nextTask = routeAfter[insertIndex + 1] ?? null;
+  const cleanerContinuityBonus =
+    previousTask?.cleanerId != null &&
+    previousTask.cleanerId === task.cleanerId &&
+    previousTask.cleanerSequence != null &&
+    task.cleanerSequence != null &&
+    task.cleanerSequence === previousTask.cleanerSequence + 1
+      ? -20
+      : nextTask?.cleanerId != null &&
+          nextTask.cleanerId === task.cleanerId &&
+          nextTask.cleanerSequence != null &&
+          task.cleanerSequence != null &&
+          nextTask.cleanerSequence === task.cleanerSequence + 1
+        ? -10
+        : 0;
+
+  return (
+    urgencyOverflow * 10000 +
+    addedTravel * 100 +
+    simulation.totalTravelMinutes * 5 +
+    bandPenalty +
+    routeBefore.length +
+    insertIndex * 0.1 +
+    cleanerContinuityBonus
+  );
+}
+
+function applyRepairCandidate(candidate: RepairInsertionCandidate): void {
+  candidate.state.assignedTasks = candidate.simulation.assignments;
+  candidate.state.clockMin = candidate.simulation.projectedClockMin;
+  candidate.state.lastLat = candidate.simulation.projectedLastLat;
+  candidate.state.lastLng = candidate.simulation.projectedLastLng;
+  candidate.state.cleanerLastSequence = candidate.simulation.projectedCleanerLastSequence;
+  candidate.state.totalTravelMinutes = candidate.simulation.totalTravelMinutes;
+}
+
+function removeTaskFromUnassigned(
+  taskId: number,
+  unassignedTasks: LogisticsPhase2UnassignedTask[],
+  debugUnassignedDetails: UnassignedTaskDebugJson[],
+  reasonCounts: Record<LogisticsPhase2ReasonCode, number>
+): void {
+  const unassignedIndex = unassignedTasks.findIndex((item) => item.taskId === taskId);
+  if (unassignedIndex >= 0) {
+    const [removed] = unassignedTasks.splice(unassignedIndex, 1);
+    decrementReasonCount(reasonCounts, removed.reasonCode);
+  }
+
+  for (let i = debugUnassignedDetails.length - 1; i >= 0; i--) {
+    if (debugUnassignedDetails[i].taskId === taskId) {
+      debugUnassignedDetails.splice(i, 1);
+    }
+  }
+}
+
+function mergeRepairFailuresIntoDebug(
+  taskId: number,
+  debugUnassignedDetails: UnassignedTaskDebugJson[],
+  failuresByDriverId: Map<number, FeasibilityFailure>
+): void {
+  const entry = debugUnassignedDetails.find((item) => item.taskId === taskId);
+  if (!entry) return;
+  const existingKeys = new Set(
+    entry.driverFailures.map((failure) => `${failure.driverId}:${failure.reasonCode}:${failure.taskId ?? "null"}`)
+  );
+  for (const [driverId, failure] of failuresByDriverId.entries()) {
+    const key = `${driverId}:${failure.reasonCode}:${failure.taskId ?? "null"}`;
+    if (existingKeys.has(key)) continue;
+    entry.driverFailures.push({
+      driverId,
+      reasonCode: failure.reasonCode,
+      taskId: failure.taskId,
+      details: failure.details,
+    });
+  }
+}
+
+function repairUnassignedTasksWithInsertion(args: {
+  unassignedTasks: LogisticsPhase2UnassignedTask[];
+  debugUnassignedDetails: UnassignedTaskDebugJson[];
+  driverStates: DriverState[];
+  taskById: Map<number, LogisticsTaskForPhase2>;
+  bandIndexByTaskId: Map<number, number>;
+  workDate: string;
+  priorityWindows: PriorityWindows | null;
+  reasonCounts: Record<LogisticsPhase2ReasonCode, number>;
+  debugCollector?: LogisticsPhase2DebugCollector | null;
+  stepStart: number;
+}): number {
+  const pendingTasks = [...args.unassignedTasks]
+    .map((item) => args.taskById.get(item.taskId))
+    .filter((task): task is LogisticsTaskForPhase2 => task != null)
+    .sort((a, b) => {
+      const deadlineDiff = getHardDeadlineMin(a, args.workDate) - getHardDeadlineMin(b, args.workDate);
+      if (deadlineDiff !== 0) return deadlineDiff;
+      return a.taskId - b.taskId;
+    });
+
+  let repairedCount = 0;
+  for (const task of pendingTasks) {
+    if (!args.unassignedTasks.some((item) => item.taskId === task.taskId)) continue;
+
+    let bestCandidate: RepairInsertionCandidate | null = null;
+    const bestFailureByDriverId = new Map<number, FeasibilityFailure>();
+    const driverAttempts: DriverAttemptJson[] = [];
+
+    for (const state of args.driverStates) {
+      const currentRoute = getAssignedRouteTasks(state, args.taskById);
+      let bestDriverFailure: FeasibilityFailure | null = null;
+      let bestDriverSimulation: RepairRouteSimulationResult | null = null;
+      let bestDriverCost = Number.POSITIVE_INFINITY;
+
+      for (let insertIndex = 0; insertIndex <= currentRoute.length; insertIndex++) {
+        const candidateRoute = [
+          ...currentRoute.slice(0, insertIndex),
+          task,
+          ...currentRoute.slice(insertIndex),
+        ];
+        const simulation = simulateFullRouteForRepair(
+          state,
+          candidateRoute,
+          task.taskId,
+          args.workDate,
+          args.priorityWindows
+        );
+
+        if (!simulation.feasible) {
+          bestDriverFailure = pickMoreUsefulFailure(bestDriverFailure, simulation.failure);
+          continue;
+        }
+
+        const cost = calculateRepairInsertionCost(
+          state,
+          task,
+          currentRoute,
+          candidateRoute,
+          insertIndex,
+          simulation,
+          args.bandIndexByTaskId,
+          args.workDate
+        );
+        if (cost < bestDriverCost) {
+          bestDriverCost = cost;
+          bestDriverSimulation = simulation;
+        }
+        if (!bestCandidate || cost < bestCandidate.cost) {
+          bestCandidate = {
+            state,
+            simulation,
+            insertIndex,
+            cost,
+          };
+        }
+      }
+
+      if (bestDriverFailure) {
+        bestFailureByDriverId.set(state.driverId, bestDriverFailure);
+      }
+      driverAttempts.push({
+        driverId: state.driverId,
+        feasible: bestDriverSimulation != null,
+        score: bestDriverSimulation ? -bestDriverCost : undefined,
+        travelMinutesDelta: bestDriverSimulation
+          ? Math.max(0, bestDriverSimulation.totalTravelMinutes - state.totalTravelMinutes)
+          : undefined,
+        projectedClockEnd: bestDriverSimulation ? toHHMM(bestDriverSimulation.projectedClockMin) : undefined,
+        failure: bestDriverSimulation
+          ? undefined
+          : bestDriverFailure
+            ? {
+                reasonCode: bestDriverFailure.reasonCode,
+                taskId: bestDriverFailure.taskId,
+                details: bestDriverFailure.details,
+              }
+            : undefined,
+      });
+    }
+
+    if (!bestCandidate) {
+      mergeRepairFailuresIntoDebug(task.taskId, args.debugUnassignedDetails, bestFailureByDriverId);
+      continue;
+    }
+
+    const travelMinutesDelta = Math.max(
+      0,
+      bestCandidate.simulation.totalTravelMinutes - bestCandidate.state.totalTravelMinutes
+    );
+    applyRepairCandidate(bestCandidate);
+    removeTaskFromUnassigned(task.taskId, args.unassignedTasks, args.debugUnassignedDetails, args.reasonCounts);
+    repairedCount += 1;
+
+    if (args.debugCollector) {
+      args.debugCollector.recordGroupDecision({
+        step: args.stepStart + repairedCount,
+        groupId: `repair-${task.taskId}`,
+        origin: "REPAIR_INSERTION",
+        taskIds: [task.taskId],
+        logisticCodes: [task.logisticCode],
+        groupingReason: {
+          strategy: "REPAIR_INSERTION",
+          summary: "Task non assegnata recuperata inserendola in mezzo a una route esistente",
+          details: {
+            taskId: task.taskId,
+            driverId: bestCandidate.state.driverId,
+            insertIndex: bestCandidate.insertIndex,
+            cost: bestCandidate.cost,
+          },
+        },
+        outcome: "REPAIR_ASSIGNED",
+        why: "best_valid_position_across_existing_driver_routes",
+        winner: {
+          driverId: bestCandidate.state.driverId,
+          score: -bestCandidate.cost,
+          travelMinutesDelta,
+          projectedClockEnd: toHHMM(bestCandidate.simulation.projectedClockMin),
+          taskOrder: bestCandidate.simulation.assignments.map((item) => item.taskId),
+          schedule: mapAssignmentsToDebugSchedule(bestCandidate.simulation.assignments),
+        },
+        driverAttempts,
+      });
+    }
+  }
+
+  return repairedCount;
+}
+
 export async function runLogisticsPhase2(
   workDate: string,
   unlockedTaskData: LogisticsTaskInputWithLock[],
   phase1: LogisticsPhase1Result,
   debugCollector?: LogisticsPhase2DebugCollector | null
 ): Promise<LogisticsPhase2Result> {
+  let priorityWindows: PriorityWindows | null = null;
+  try {
+    priorityWindows = await loadPriorityStartWindows();
+  } catch (error) {
+    console.warn("[logistics-optimizer] Priority settings unavailable, continuing without priority windows:", error);
+  }
+
   const reasonCounts: Record<LogisticsPhase2ReasonCode, number> = {
     CHECKIN_CHECKOUT_CONSTRAINT: 0,
     CLEANER_TIME_CONSTRAINT: 0,
@@ -1603,6 +2061,7 @@ export async function runLogisticsPhase2(
   let queueGroupsProcessed = 0;
   let partialGroupsAssigned = 0;
   let groupsSplit = 0;
+  let repairInsertedTasks = 0;
   const debugUnassignedDetails: UnassignedTaskDebugJson[] = [];
   while (pendingGroups.length > 0) {
     const group = pendingGroups.shift()!;
@@ -1618,7 +2077,8 @@ export async function runLogisticsPhase2(
       group,
       driverStates,
       workDate,
-      taskById
+      taskById,
+      priorityWindows
     );
 
     if (bestState && bestSimulation) {
@@ -1650,7 +2110,13 @@ export async function runLogisticsPhase2(
       continue;
     }
 
-    const partialChoice = findBestPartialGroupAssignment(group, driverStates, workDate, taskById);
+    const partialChoice = findBestPartialGroupAssignment(
+      group,
+      driverStates,
+      workDate,
+      taskById,
+      priorityWindows
+    );
     if (partialChoice) {
       applySimulationToDriverState(partialChoice.state, partialChoice.simulation);
       groupsAssigned += 1;
@@ -1661,7 +2127,13 @@ export async function runLogisticsPhase2(
         pendingGroups.unshift(partialChoice.remainingGroup);
       }
       if (debugCollector) {
-        const partialRanking = getPartialChoiceRanking(partialChoice, driverStates, workDate);
+        const partialRanking = getPartialChoiceRanking(
+          partialChoice,
+          driverStates,
+          workDate,
+          taskById,
+          priorityWindows
+        );
         const decision: GroupDecisionJson = {
           step: groupsProcessed,
           groupId: group.groupId,
@@ -1699,7 +2171,7 @@ export async function runLogisticsPhase2(
       const taskSpecific = bestFailureByTaskId.get(task.taskId);
       const reasonCode =
         taskSpecific?.reasonCode ??
-        getBestSingletonFailureReason(task, group, driverStates, workDate, taskById);
+        getBestSingletonFailureReason(task, group, driverStates, workDate, taskById, priorityWindows);
       incrementReasonCount(reasonCounts, reasonCode);
       unassignedTasks.push({
         taskId: task.taskId,
@@ -1740,6 +2212,20 @@ export async function runLogisticsPhase2(
       });
     }
   }
+
+  repairInsertedTasks = repairUnassignedTasksWithInsertion({
+    unassignedTasks,
+    debugUnassignedDetails,
+    driverStates,
+    taskById,
+    bandIndexByTaskId,
+    workDate,
+    priorityWindows,
+    reasonCounts,
+    debugCollector,
+    stepStart: groupsProcessed,
+  });
+  tasksAssigned += repairInsertedTasks;
 
   const driverPlans: DriverPhase2Plan[] = driverStates.map((state) => ({
     driverId: state.driverId,
@@ -1783,6 +2269,7 @@ export async function runLogisticsPhase2(
       groupsSplit,
       recoveredMissingTaskCount: missingTasks.length,
       duplicateGroupedTaskCount: duplicateTaskCount,
+      repairInsertedTasks,
     });
     debugCollector.recordUnassignedTasks(debugUnassignedDetails);
     debugCollector.setSummary(
@@ -1792,6 +2279,7 @@ export async function runLogisticsPhase2(
         groupsUnassigned,
         tasksAssigned,
         tasksUnassigned: unassignedTasks.length,
+        repairInsertedTasks,
       },
       reasonCounts
     );
@@ -1828,6 +2316,7 @@ export async function runLogisticsPhase2(
         groupsSplit,
         recoveredMissingTaskCount: missingTasks.length,
         duplicateGroupedTaskCount: duplicateTaskCount,
+        repairInsertedTasks,
       },
     },
   };

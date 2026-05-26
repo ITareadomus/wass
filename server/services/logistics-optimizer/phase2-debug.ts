@@ -18,13 +18,15 @@ export interface LogisticsPhase2GroupingStatsJson {
   groupsSplit?: number;
   recoveredMissingTaskCount?: number;
   duplicateGroupedTaskCount?: number;
+  repairInsertedTasks?: number;
 }
 
 export type GroupingStrategy =
   | "CLEANER_CLUSTER"
   | "GEOGRAPHIC_FALLBACK"
   | "SINGLETON_BAG_PRIORITY"
-  | "RECOVERY_SINGLETON";
+  | "RECOVERY_SINGLETON"
+  | "REPAIR_INSERTION";
 
 export interface GroupingReasonJson {
   strategy: GroupingStrategy;
@@ -83,7 +85,11 @@ export interface DriverAttemptJson {
   score?: number;
   travelMinutesDelta?: number;
   projectedClockEnd?: string;
-  failure?: { reasonCode: LogisticsPhase2ReasonCode; taskId: number | null };
+  failure?: {
+    reasonCode: LogisticsPhase2ReasonCode;
+    taskId: number | null;
+    details?: Record<string, unknown>;
+  };
 }
 
 export interface GroupDecisionJson {
@@ -93,7 +99,7 @@ export interface GroupDecisionJson {
   taskIds: number[];
   logisticCodes: number[];
   groupingReason: GroupingReasonJson;
-  outcome: "FULL_ASSIGNED" | "PARTIAL_ASSIGNED" | "REJECTED";
+  outcome: "FULL_ASSIGNED" | "PARTIAL_ASSIGNED" | "REPAIR_ASSIGNED" | "REJECTED";
   why: string;
   winner?: {
     driverId: number;
@@ -123,7 +129,12 @@ export interface UnassignedTaskDebugJson {
   logisticCode: number;
   reasonCode: LogisticsPhase2ReasonCode;
   sourceGroupId?: string;
-  driverFailures: Array<{ driverId: number; reasonCode: LogisticsPhase2ReasonCode; taskId: number | null }>;
+  driverFailures: Array<{
+    driverId: number;
+    reasonCode: LogisticsPhase2ReasonCode;
+    taskId: number | null;
+    details?: Record<string, unknown>;
+  }>;
 }
 
 export function isLogisticsOptimizerDebugEnabled(explicit?: boolean): boolean {

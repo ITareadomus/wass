@@ -277,19 +277,17 @@ def classify_tasks(tasks, selected_date, use_api=False):
     early_out_config = settings.get("early-out", {})
     high_priority_config = settings.get("high-priority", {})
 
-    global_start_time = parse_time(
-        high_priority_config.get("global_start_time") or high_priority_config.get("hp_start_time")
-    )
+    hp_start_time = parse_time(high_priority_config.get("hp_start_time"))
     hp_end_time = parse_time(high_priority_config.get("hp_end_time"))
-    if global_start_time is None or hp_end_time is None:
+    if hp_start_time is None or hp_end_time is None:
         raise ValueError(
-            "Priority settings invalid: high-priority.global_start_time (or hp_start_time) and "
+            "Priority settings invalid: high-priority.hp_start_time and "
             "high-priority.hp_end_time are required in HH:MM format"
         )
-    if hp_end_time < global_start_time:
+    if hp_end_time < hp_start_time:
         raise ValueError(
             "Priority settings invalid: high-priority.hp_end_time must be "
-            "greater than or equal to global_start_time"
+            "greater than or equal to hp_start_time"
         )
 
     eo_clients = {str(client_id).strip() for client_id in (early_out_config.get("eo_clients") or [])}
@@ -323,7 +321,7 @@ def classify_tasks(tasks, selected_date, use_api=False):
         # EARLY OUT
         checkout_time = parse_time(task.get("checkout_time"))
 
-        if checkout_time is not None and checkout_time < global_start_time:
+        if checkout_time is not None and checkout_time < hp_start_time:
             eo_reasons.append("checkout_before_hp_start")
 
         if client_id is not None and client_id in eo_clients:
@@ -338,7 +336,7 @@ def classify_tasks(tasks, selected_date, use_api=False):
             bool(checkin_date) and bool(checkout_date) and (checkin_date == checkout_date)
         )
 
-        if same_day_turnover and checkin_time is not None and (global_start_time <= checkin_time <= hp_end_time):
+        if same_day_turnover and checkin_time is not None and (hp_start_time <= checkin_time <= hp_end_time):
             hp_reasons.append("same_day_checkin_between_hp_start_hp_end")
 
         if is_premium:

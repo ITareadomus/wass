@@ -9,6 +9,7 @@ import {
   parseHmToMinutes,
   resolveCheckoutSchedule,
 } from "../../../shared/logistics-scheduling-constraints";
+import type { Priority, PriorityWindows } from "../optimizer/priorityWindows";
 import { estimateCarTravelMinutes, LOGISTICS_DEPOT_LAT, LOGISTICS_DEPOT_LNG } from "../logistics-timeline-utils";
 
 export interface LogisticsScheduleTaskInput {
@@ -16,6 +17,7 @@ export interface LogisticsScheduleTaskInput {
   logisticCode: number;
   lat: number | null;
   lng: number | null;
+  priorityType?: Priority | null;
   checkoutTime?: string | null;
   checkoutDate?: string | null;
   checkinTime?: string | null;
@@ -68,8 +70,9 @@ export function buildLogisticsScheduleForDriver(args: {
   driverStartMin: number;
   workDate: string;
   startFromDepot?: boolean;
+  priorityWindows?: PriorityWindows | null;
 }): BuildLogisticsScheduleForDriverResult {
-  const { tasks, driverStartMin, workDate, startFromDepot = true } = args;
+  const { tasks, driverStartMin, workDate, startFromDepot = true, priorityWindows = null } = args;
   const scheduled: LogisticsScheduledTaskRow[] = [];
   const checkinViolations: LogisticsScheduleViolationRow[] = [];
   const checkoutWaitViolations: LogisticsScheduleViolationRow[] = [];
@@ -98,6 +101,15 @@ export function buildLogisticsScheduleForDriver(args: {
       startMin = resolved.startMin;
       checkoutWaitMinutes = resolved.checkoutWaitMinutes;
       checkoutWaitExceeded = resolved.checkoutWaitExceeded;
+    }
+
+    // Keep logistics aligned with housekeeping priority windows:
+    // HP/LP cannot start before hp_start_time; EO has no lower bound (startMin=0).
+    if (priorityWindows && task.priorityType) {
+      const window = priorityWindows[task.priorityType];
+      if (window) {
+        startMin = Math.max(startMin, window.startMin);
+      }
     }
 
     const endMin = startMin + LOGISTICS_SERVICE_DURATION_MIN;
@@ -165,6 +177,7 @@ export function toLogisticsScheduleTaskInput(task: {
   logisticCode: number;
   lat: number;
   lng: number;
+  priorityType?: Priority | null;
   checkoutTime?: string | null;
   checkoutDate?: string | null;
   checkinTime?: string | null;
@@ -175,6 +188,7 @@ export function toLogisticsScheduleTaskInput(task: {
     logisticCode: task.logisticCode,
     lat: task.lat,
     lng: task.lng,
+    priorityType: task.priorityType ?? null,
     checkoutTime: task.checkoutTime ?? null,
     checkoutDate: task.checkoutDate ?? null,
     checkinTime: task.checkinTime ?? null,

@@ -79,7 +79,7 @@ export function priorityPenalty(
   const effectiveEnd = endMin !== null ? endMin + graceMin : null;
 
   // EO policy:
-  // - No penalty when the task starts after global_start_time.
+  // - No penalty when the task starts after hp_start_time.
   // - Reward earlier starts (before/inside EO preferred window).
   if (priority === 'EO') {
     if (effectiveEnd !== null && startTimeMin <= effectiveEnd) {
@@ -98,7 +98,7 @@ export function priorityPenalty(
   }
 
   if (priority === 'HP') {
-    // Hard lower bound (start >= global_start_time) is already enforced in scheduling.
+    // Hard lower bound (start >= hp_start_time) is already enforced in scheduling.
     // Here we score quality:
     // - reward when HP is fully inside the preferred window
     // - penalize if it spills after hp_end_time

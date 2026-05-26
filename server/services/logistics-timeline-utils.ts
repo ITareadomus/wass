@@ -4,6 +4,11 @@ import {
   buildLogisticsScheduleForDriver,
   type LogisticsScheduleTaskInput,
 } from "./logistics-optimizer/logistics-driver-schedule";
+import {
+  loadPriorityStartWindows,
+  mapPriorityType,
+  type PriorityWindows,
+} from "./optimizer/priorityWindows";
 
 const EARTH_RADIUS_M = 6371000;
 const DEFAULT_AVG_SPEED_KMH = 28;
@@ -106,7 +111,11 @@ function toFiniteNumber(value: unknown): number | null {
 }
 
 /** Logistics-only recalc: route travel + fixed service window (15m). */
-export async function recalculateLogisticsDriverTimes(entry: any, workDate?: string): Promise<any> {
+export async function recalculateLogisticsDriverTimes(
+  entry: any,
+  workDate?: string,
+  priorityWindows: PriorityWindows | null = null
+): Promise<any> {
   const dateToUse = workDate || new Date().toISOString().slice(0, 10);
   const driver = entry.driver || {};
   const startTime = await getDriverStartTime(driver.id, dateToUse);
@@ -126,6 +135,7 @@ export async function recalculateLogisticsDriverTimes(entry: any, workDate?: str
     logisticCode: Number(task.logistic_code),
     lat: toFiniteNumber(task?.lat),
     lng: toFiniteNumber(task?.lng),
+    priorityType: mapPriorityType(task?.priority ?? null),
     checkoutTime: task.checkout_time ?? null,
     checkoutDate: task.checkout_date ?? null,
     checkinTime: task.checkin_time ?? null,
@@ -136,6 +146,7 @@ export async function recalculateLogisticsDriverTimes(entry: any, workDate?: str
     tasks: scheduleInputs,
     driverStartMin,
     workDate: dateToUse,
+    priorityWindows,
   });
 
   for (let i = 0; i < tasks.length; i++) {
@@ -163,10 +174,18 @@ export async function recalculateLogisticsTimeline(
 ): Promise<void> {
   const entries = timeline.drivers_assignments;
   if (!Array.isArray(entries)) return;
+
+  let priorityWindows: PriorityWindows | null = null;
+  try {
+    priorityWindows = await loadPriorityStartWindows();
+  } catch (error) {
+    console.warn("⚠️ recalculateLogisticsTimeline: priority windows unavailable, proceeding without them", error);
+  }
+
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
     if (!entry?.tasks?.length) continue;
     await hydrateTasksFromLogisticsContainers(entry, workDate);
-    entries[i] = await recalculateLogisticsDriverTimes(entry, workDate);
+    entries[i] = await recalculateLogisticsDriverTimes(entry, workDate, priorityWindows);
   }
 }

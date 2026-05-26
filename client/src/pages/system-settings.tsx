@@ -37,7 +37,6 @@ interface SettingsData {
     eo_clients: number[];
   };
   "high-priority": {
-    global_start_time: string;
     hp_start_time: string;
     hp_end_time: string;
     hp_clients: number[];
@@ -82,10 +81,7 @@ function withSettingsDefaults(data: Partial<SettingsData>): SettingsData {
       eo_clients: data["early-out"]?.eo_clients ?? [],
     },
     "high-priority": {
-      global_start_time:
-        data["high-priority"]?.global_start_time ?? data["high-priority"]?.hp_start_time ?? "",
-      hp_start_time:
-        data["high-priority"]?.hp_start_time ?? data["high-priority"]?.global_start_time ?? "",
+      hp_start_time: data["high-priority"]?.hp_start_time ?? "",
       hp_end_time: data["high-priority"]?.hp_end_time ?? "",
       hp_clients: data["high-priority"]?.hp_clients ?? [],
     },
@@ -331,18 +327,17 @@ export default function SystemSettings() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="global_start_time" className="text-sm">HP Start Time</Label>
+                      <Label htmlFor="hp_start_time" className="text-sm">HP Start Time</Label>
                       <Input
-                        id="global_start_time"
+                        id="hp_start_time"
                         type="time"
                         required
-                        value={settings["high-priority"].global_start_time}
+                        value={settings["high-priority"].hp_start_time}
                         onChange={(e) =>
                           setSettings({
                             ...settings,
                             "high-priority": {
                               ...settings["high-priority"],
-                              global_start_time: e.target.value,
                               hp_start_time: e.target.value,
                             },
                           })
@@ -370,7 +365,7 @@ export default function SystemSettings() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="dedupe_strategy" className="text-sm font-semibold">Duplex / dedupeStrategy</Label>
+                    <Label htmlFor="dedupe_strategy" className="text-sm font-semibold">Task Duplex</Label>
                     <Select
                       value={settings.dedupe_strategy}
                       onValueChange={(value) =>

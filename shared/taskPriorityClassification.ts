@@ -11,8 +11,6 @@ export interface PriorityWindow {
 export type PriorityWindows = Record<Priority, PriorityWindow>;
 
 export interface PriorityClassificationSettings {
-  globalStartTime: string;
-  globalStartMin: number;
   hpStartTime: string;
   hpEndTime: string;
   hpStartMin: number;
@@ -117,19 +115,12 @@ export function parsePrioritySettings(appSettingsRaw: unknown): PriorityClassifi
   const highPriority = appSettings["high-priority"] ?? {};
   const earlyOut = appSettings["early-out"] ?? {};
 
-  const globalStartRaw =
-    typeof highPriority.global_start_time === "string" && highPriority.global_start_time.trim() !== ""
-      ? highPriority.global_start_time
-      : highPriority.hp_start_time;
-  const globalStart = parseSettingsTime(
-    globalStartRaw,
-    "high-priority.global_start_time (or high-priority.hp_start_time for backward compatibility)"
-  );
+  const hpStart = parseSettingsTime(highPriority.hp_start_time, "high-priority.hp_start_time");
   const hpEnd = parseSettingsTime(highPriority.hp_end_time, "high-priority.hp_end_time");
 
-  if (hpEnd.minutes < globalStart.minutes) {
+  if (hpEnd.minutes < hpStart.minutes) {
     throw new PrioritySettingsError(
-      "high-priority.hp_end_time must be greater than or equal to high-priority.global_start_time"
+      "high-priority.hp_end_time must be greater than or equal to high-priority.hp_start_time"
     );
   }
 
@@ -139,11 +130,9 @@ export function parsePrioritySettings(appSettingsRaw: unknown): PriorityClassifi
   }
 
   return {
-    globalStartTime: globalStart.raw,
-    globalStartMin: globalStart.minutes,
-    hpStartTime: globalStart.raw,
+    hpStartTime: hpStart.raw,
     hpEndTime: hpEnd.raw,
-    hpStartMin: globalStart.minutes,
+    hpStartMin: hpStart.minutes,
     hpEndMin: hpEnd.minutes,
     eoClients: normalizeClientList(earlyOut.eo_clients),
     hpClients: normalizeClientList(highPriority.hp_clients),
@@ -167,7 +156,7 @@ export function getPriorityMatchReasons(
   const eoReasons: string[] = [];
   const hpReasons: string[] = [];
 
-  if (checkoutTime !== null && checkoutTime < settings.globalStartMin) {
+  if (checkoutTime !== null && checkoutTime < settings.hpStartMin) {
     eoReasons.push("checkout_before_hp_start");
   }
 
@@ -191,7 +180,7 @@ export function getPriorityMatchReasons(
   if (
     sameDayCheckinCheckout &&
     checkinTime !== null &&
-    checkinTime >= settings.globalStartMin &&
+    checkinTime >= settings.hpStartMin &&
     checkinTime <= settings.hpEndMin
   ) {
     hpReasons.push("same_day_checkin_between_hp_start_hp_end");
@@ -234,16 +223,16 @@ export function buildSchedulingWindows(settings: PriorityClassificationSettings)
   return {
     EO: {
       startMin: 0,
-      endMin: Math.max(0, settings.globalStartMin - 1),
+      endMin: Math.max(0, settings.hpStartMin - 1),
       graceMin: 0,
     },
     HP: {
-      startMin: settings.globalStartMin,
+      startMin: settings.hpStartMin,
       endMin: settings.hpEndMin,
       graceMin: 0,
     },
     LP: {
-      startMin: settings.globalStartMin,
+      startMin: settings.hpStartMin,
       endMin: null,
       graceMin: 0,
     },

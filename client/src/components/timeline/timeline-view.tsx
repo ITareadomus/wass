@@ -295,9 +295,7 @@ export default function TimelineView({
   
         const s = await res.json();
   
-        const hpStart =
-          s?.["high-priority"]?.global_start_time ??
-          s?.["high-priority"]?.hp_start_time;
+        const hpStart = s?.["high-priority"]?.hp_start_time;
         const hpEnd = s?.["high-priority"]?.hp_end_time;
 
         if (hpStart && hpEnd) {
@@ -1819,7 +1817,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     } else if (priorityType === 'hp') {
       return startMinutes < hpStart || startMinutes > hpEnd;
     } else if (priorityType === 'lp') {
-      return startMinutes <= hpEnd;
+      // LP can start from hp_start onward; there is no preferred upper bound.
+      return startMinutes < hpStart;
     }
     
     return false;
