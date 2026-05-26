@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Home, Settings, Loader2 } from "lucide-react";
+import { Save, Home, Loader2 } from "lucide-react";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,6 +37,7 @@ interface SettingsData {
     eo_clients: number[];
   };
   "high-priority": {
+    global_start_time: string;
     hp_start_time: string;
     hp_end_time: string;
     hp_clients: number[];
@@ -81,7 +82,10 @@ function withSettingsDefaults(data: Partial<SettingsData>): SettingsData {
       eo_clients: data["early-out"]?.eo_clients ?? [],
     },
     "high-priority": {
-      hp_start_time: data["high-priority"]?.hp_start_time ?? "",
+      global_start_time:
+        data["high-priority"]?.global_start_time ?? data["high-priority"]?.hp_start_time ?? "",
+      hp_start_time:
+        data["high-priority"]?.hp_start_time ?? data["high-priority"]?.global_start_time ?? "",
       hp_end_time: data["high-priority"]?.hp_end_time ?? "",
       hp_clients: data["high-priority"]?.hp_clients ?? [],
     },
@@ -325,26 +329,20 @@ export default function SystemSettings() {
             <CardContent className="bg-custom-blue-light">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <div className="rounded-md border bg-background/60 p-4 space-y-2 text-sm">
-                    <p><span className="font-semibold">EO</span>: checkout prima di HP Start oppure cliente nella lista EO.</p>
-                    <p><span className="font-semibold">HP</span>: task premium, cliente nella lista HP oppure check-in/out nello stesso giorno con check-in tra HP Start Time e HP End Time.</p>
-                    <p><span className="font-semibold">LP</span>: task che non sono EO o HP.</p>
-                    <p><span className="font-semibold">Duplex</span>: se un task è sia EO che HP, decide la strategia selezionata.</p>
-                  </div>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="hp_start_time" className="text-sm">HP Start Time</Label>
+                      <Label htmlFor="global_start_time" className="text-sm">HP Start Time</Label>
                       <Input
-                        id="hp_start_time"
+                        id="global_start_time"
                         type="time"
                         required
-                        value={settings["high-priority"].hp_start_time}
+                        value={settings["high-priority"].global_start_time}
                         onChange={(e) =>
                           setSettings({
                             ...settings,
                             "high-priority": {
                               ...settings["high-priority"],
+                              global_start_time: e.target.value,
                               hp_start_time: e.target.value,
                             },
                           })
@@ -399,7 +397,7 @@ export default function SystemSettings() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <div className="border-b pb-2 flex items-center justify-center gap-2">
-                      <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Lista clienti EO</span>
+                      <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Lista clienti </span>
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500 text-white border-blue-700">
                         EO
                       </span>
@@ -424,7 +422,7 @@ export default function SystemSettings() {
 
                   <div className="space-y-3">
                     <div className="border-b pb-2 flex items-center justify-center gap-2">
-                      <span className="text-sm font-medium text-orange-800 dark:text-orange-200">Lista clienti HP</span>
+                      <span className="text-sm font-medium text-orange-800 dark:text-orange-200">Lista clienti </span>
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-500 text-white border-orange-700">
                         HP
                       </span>
@@ -449,24 +447,6 @@ export default function SystemSettings() {
                 </div>
               </div>
 
-              <div className="mt-4 pt-4 border-t">
-                <div className="space-y-2 max-w-md">
-                  <Label className="text-sm font-semibold">Client Settings</Label>
-                  <Button
-                    onClick={() => setLocation("/client-settings")}
-                    variant="outline"
-                    className="w-full justify-start h-auto py-2 bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80 transition-colors"
-                  >
-                    <Settings className="w-4 h-4 mr-2 flex-shrink-0" />
-                    <div className="text-left">
-                      <p className="text-xs font-semibold">Vai a Client Settings</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        Modifica Check-in/out per cliente
-                      </p>
-                    </div>
-                  </Button>
-                </div>
-              </div>
             </CardContent>
           </Card>
 

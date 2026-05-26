@@ -10,6 +10,7 @@ const rawSettings = {
     eo_clients: [101],
   },
   "high-priority": {
+    global_start_time: "11:00",
     hp_start_time: "11:00",
     hp_end_time: "15:30",
     hp_clients: [202],
@@ -66,6 +67,7 @@ describe("classifyTaskPriority", () => {
     const bothListsSettings = parsePrioritySettings({
       "early-out": { eo_clients: [303] },
       "high-priority": {
+        global_start_time: "11:00",
         hp_start_time: "11:00",
         hp_end_time: "15:30",
         hp_clients: [303],
@@ -128,19 +130,19 @@ describe("classifyTaskPriority", () => {
     expect(classifyTaskPriority({ checkout_time: "12:00" }, settings)).toBe("LP");
   });
 
-  it("throws an explicit error when hpStart or hpEnd is missing", () => {
+  it("throws an explicit error when globalStart/hpStart fallback or hpEnd is missing", () => {
     expect(() =>
       parsePrioritySettings({
         "early-out": { eo_clients: [] },
         "high-priority": { hp_end_time: "15:30", hp_clients: [] },
         dedupe_strategy: "eo_wins",
       })
-    ).toThrow("high-priority.hp_start_time is required");
+    ).toThrow("high-priority.global_start_time");
 
     expect(() =>
       parsePrioritySettings({
         "early-out": { eo_clients: [] },
-        "high-priority": { hp_start_time: "11:00", hp_clients: [] },
+        "high-priority": { global_start_time: "11:00", hp_clients: [] },
         dedupe_strategy: "eo_wins",
       })
     ).toThrow("high-priority.hp_end_time is required");

@@ -1185,7 +1185,7 @@ export default function GenerateLogisticsAssignments() {
         </div>
 
         <DragDropContext onDragEnd={onDragEnd} onDragUpdate={onDragUpdate}>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 w-full">
             <PriorityColumn
               title="EARLY OUT"
               priority="early-out"
@@ -1224,7 +1224,7 @@ export default function GenerateLogisticsAssignments() {
             />
           </div>
 
-          <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="mt-0 grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-2">
               <LogisticsTimelineView
                 workDate={format(selectedDate, "yyyy-MM-dd")}
@@ -1237,7 +1237,7 @@ export default function GenerateLogisticsAssignments() {
               />
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-4">
             <MapSection tasks={mapTasks} />
 
             <div className="bg-card rounded-lg border shadow-sm">

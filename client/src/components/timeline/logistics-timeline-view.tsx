@@ -272,7 +272,9 @@ export default function LogisticsTimelineView({
         });
         if (!res.ok) return;
         const s = await res.json();
-        const hpStart = s?.["high-priority"]?.hp_start_time;
+        const hpStart =
+          s?.["high-priority"]?.global_start_time ??
+          s?.["high-priority"]?.hp_start_time;
         const hpEnd = s?.["high-priority"]?.hp_end_time;
         if (hpStart && hpEnd) {
           setPriorityWindows({ hpStart, hpEnd });

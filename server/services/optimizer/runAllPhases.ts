@@ -19,6 +19,7 @@ import { DEFAULT_TRAVEL_POLICY } from './travelPolicy';
 import path from 'path';
 import { TimelineContext } from './timelineContext';
 import { CONTINUAZIONE_PS_OPERATION_ID, isTaskEquivalentToStraordinaria } from '../../utils/straordinaria-utils';
+import { buildSchedulingWindows, parsePrioritySettings } from '../../../shared/taskPriorityClassification';
 
 export type WavePriority = 'early_out' | 'high_priority' | 'low_priority';
 
@@ -46,6 +47,28 @@ type PythonRecalcTask = {
   checkin_date?: string | null;
   priority?: string | null;
 };
+
+async function loadPythonPriorityWindowsFromAppSettings(): Promise<Record<string, { start_min: number }> | null> {
+  try {
+    const settingsResult = await pool.query(`
+      SELECT value
+      FROM app_settings
+      WHERE key = 'app_settings'
+      LIMIT 1
+    `);
+    const appSettings = settingsResult.rows[0]?.value;
+    const parsed = parsePrioritySettings(appSettings ?? {});
+    const windows = buildSchedulingWindows(parsed);
+    return {
+      EO: { start_min: windows.EO.startMin },
+      HP: { start_min: windows.HP.startMin },
+      LP: { start_min: windows.LP.startMin },
+    };
+  } catch (error) {
+    console.warn('[runAllPhases] Unable to load priority windows from app_settings for Python recalc:', error);
+    return null;
+  }
+}
 
 async function recalculateCleanerTimesViaPython(cleanerData: any): Promise<any> {
   const { spawn } = await import('child_process');
@@ -107,6 +130,7 @@ async function recalculateAffectedCleaners(
   cleanerIds: number[]
 ): Promise<CheckinViolation[]> {
   const violations: CheckinViolation[] = [];
+  const priorityWindows = await loadPythonPriorityWindowsFromAppSettings();
 
   for (const cleanerId of cleanerIds) {
     const tasksResult = await client.query(
@@ -138,6 +162,7 @@ async function recalculateAffectedCleaners(
     const cleanerData = {
       cleaner: { id: cleanerId, start_time: cleanerStartTime },
       work_date: workDate,
+      ...(priorityWindows ? { priority_windows: priorityWindows } : {}),
       tasks: tasksResult.rows.map((r: any): PythonRecalcTask => ({
         task_id: Number(r.task_id),
         logistic_code: Number(r.logistic_code),

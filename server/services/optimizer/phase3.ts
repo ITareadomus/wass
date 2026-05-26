@@ -268,7 +268,7 @@ export function simulateSequence(
     let taskReasons: string[] = [];
     
     if (priorityWindows && task.priorityType) {
-      const penaltyResult = priorityPenalty(task.priorityType, earliestStart, priorityWindows);
+      const penaltyResult = priorityPenalty(task.priorityType, earliestStart, endMinutes, priorityWindows);
       taskPenalty = penaltyResult.penalty;
       taskReasons = penaltyResult.reasons;
       totalPriorityPenalty += taskPenalty;

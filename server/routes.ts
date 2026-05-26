@@ -11,6 +11,7 @@ import { it } from "date-fns/locale";
 import { formatInTimeZone } from "date-fns-tz";
 import { databaseConfig } from "../config/database";
 import {
+  buildSchedulingWindows,
   classifyTaskPriority,
   parsePrioritySettings,
   priorityToContainerFormat,
@@ -896,6 +897,7 @@ function buildKey(isoDate: string) {
 async function recalculateCleanerTimes(cleanerData: any, workDate?: string): Promise<any> {
   try {
     const { spawn } = await import('child_process');
+    const { pgSettingsService } = await import("./services/pg-settings-service");
 
     // CRITICAL: Load start_time from PostgreSQL to ensure it's up-to-date
     const dateToUse = workDate || format(new Date(), 'yyyy-MM-dd');
@@ -907,9 +909,27 @@ async function recalculateCleanerTimes(cleanerData: any, workDate?: string): Pro
       console.warn(`⚠️ Could not load start_time from PostgreSQL for cleaner ${cleanerData.cleaner.id}, using default`);
     }
 
+    let priorityWindows: Record<string, { start_min: number }> | undefined;
+    try {
+      await pgSettingsService.ensureTables();
+      const appSettings = await pgSettingsService.getSettings("app_settings");
+      const parsedPrioritySettings = parsePrioritySettings(appSettings ?? {});
+      const windows = buildSchedulingWindows(parsedPrioritySettings);
+      priorityWindows = {
+        EO: { start_min: windows.EO.startMin },
+        HP: { start_min: windows.HP.startMin },
+        LP: { start_min: windows.LP.startMin },
+      };
+    } catch (settingsError) {
+      console.warn("⚠️ Unable to load priority windows from app_settings for manual recalc:", settingsError);
+    }
+
     return new Promise((resolve, reject) => {
       const scriptPath = path.join(process.cwd(), 'client/public/scripts/recalculate_times.py');
-      const cleanerDataJson = JSON.stringify(cleanerData);
+      const cleanerDataJson = JSON.stringify({
+        ...cleanerData,
+        ...(priorityWindows ? { priority_windows: priorityWindows } : {}),
+      });
 
       // Usa spawn con stdin per evitare ARG_MAX limit e command injection
       const pythonProcess = spawn('python3', [scriptPath], {

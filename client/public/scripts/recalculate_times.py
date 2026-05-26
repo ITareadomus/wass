@@ -14,11 +14,13 @@ from math import radians, cos, sin, asin, sqrt
 WORK_START_TIME = "10:00"
 WORK_END_TIME = "19:00"
 MAX_DISTANCE_KM = 50.0
+WORK_START_MIN = int(WORK_START_TIME.split(":")[0]) * 60 + int(WORK_START_TIME.split(":")[1])
 
 DEFAULT_PRIORITY_WINDOWS = {
-    "EO": {"start_min": 600},   # 10:00
-    "HP": {"start_min": 660},   # 11:00
-    "LP": {"start_min": 660},   # 11:00
+    # Fallback only: real values should be injected from app_settings by backend callers.
+    "EO": {"start_min": WORK_START_MIN},
+    "HP": {"start_min": WORK_START_MIN},
+    "LP": {"start_min": WORK_START_MIN},
 }
 
 PRIORITY_ALIASES = {

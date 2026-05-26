@@ -54,9 +54,15 @@ const PENALTY_CONFIG: Record<Priority, { k: number; max: number }> = {
   LP: { k: 1, max: 60 }
 };
 
+const EO_EARLY_BONUS_PER_MIN = 0.5;
+const EO_EARLY_BONUS_MAX = 30;
+const HP_IN_WINDOW_BONUS_PER_MIN = 0.25;
+const HP_IN_WINDOW_BONUS_MAX = 20;
+
 export function priorityPenalty(
   priority: Priority | null,
   startTimeMin: number,
+  endTimeMin: number | null,
   windows: PriorityWindows
 ): PriorityPenaltyResult {
   if (!priority) {
@@ -71,6 +77,61 @@ export function priorityPenalty(
   const { startMin, endMin, graceMin } = window;
   const effectiveStart = startMin - graceMin;
   const effectiveEnd = endMin !== null ? endMin + graceMin : null;
+
+  // EO policy:
+  // - No penalty when the task starts after global_start_time.
+  // - Reward earlier starts (before/inside EO preferred window).
+  if (priority === 'EO') {
+    if (effectiveEnd !== null && startTimeMin <= effectiveEnd) {
+      const minutesEarly = Math.max(0, effectiveEnd - startTimeMin + 1);
+      const bonus = Math.min(EO_EARLY_BONUS_MAX, Math.round(minutesEarly * EO_EARLY_BONUS_PER_MIN));
+      if (bonus > 0) {
+        return {
+          penalty: -bonus,
+          reasons: ['EO_EARLY_START_BONUS'],
+          violation: null
+        };
+      }
+    }
+
+    return { penalty: 0, reasons: [], violation: null };
+  }
+
+  if (priority === 'HP') {
+    // Hard lower bound (start >= global_start_time) is already enforced in scheduling.
+    // Here we score quality:
+    // - reward when HP is fully inside the preferred window
+    // - penalize if it spills after hp_end_time
+    if (effectiveEnd !== null && endTimeMin !== null && endTimeMin > effectiveEnd) {
+      const distance = endTimeMin - effectiveEnd;
+      const penalty = Math.min(PENALTY_CONFIG.HP.max, distance * PENALTY_CONFIG.HP.k);
+      return {
+        penalty,
+        reasons: ['HP_END_AFTER_PREFERRED_WINDOW'],
+        violation: {
+          priority,
+          startTimeMin,
+          windowStart: startMin,
+          windowEnd: endMin,
+          distanceMin: distance
+        }
+      };
+    }
+
+    if (startTimeMin >= effectiveStart) {
+      const minutesInside = Math.max(0, (effectiveEnd ?? startTimeMin) - startTimeMin + 1);
+      const bonus = Math.min(HP_IN_WINDOW_BONUS_MAX, Math.round(minutesInside * HP_IN_WINDOW_BONUS_PER_MIN));
+      if (bonus > 0) {
+        return {
+          penalty: -bonus,
+          reasons: ['HP_IN_WINDOW_BONUS'],
+          violation: null
+        };
+      }
+    }
+
+    return { penalty: 0, reasons: [], violation: null };
+  }
 
   let distance = 0;
   let isViolation = false;
