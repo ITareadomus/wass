@@ -42,7 +42,9 @@ type LogisticsPhase2ReasonCode =
   | "CHECKIN_CHECKOUT_CONSTRAINT"
   | "CLEANER_TIME_CONSTRAINT"
   | "NO_DRIVER_FEASIBLE"
-  | "NO_TASK_CANDIDATES";
+  | "NO_TASK_CANDIDATES"
+  | "TRULY_IMPOSSIBLE"
+  | "ROUTE_CAPACITY_OR_ORDERING_CONFLICT";
 
 interface LogisticsTaskForPhase2 extends LogisticsTaskCandidate {
   checkinDate: string | null;
@@ -114,6 +116,11 @@ interface LogisticsPhase2GroupingStats {
   recoveredMissingTaskCount?: number;
   duplicateGroupedTaskCount?: number;
   repairInsertedTasks?: number;
+}
+
+interface LogisticsPhase2PerformanceStats {
+  scheduleBuildCount: number;
+  scheduleBuildElapsedMs: number;
 }
 
 interface DriverState {
@@ -196,6 +203,7 @@ export interface LogisticsPhase2Result {
     bagPolicyExcludedTaskIds: number[];
     reasonCounts: Record<LogisticsPhase2ReasonCode, number>;
     groupingStats?: LogisticsPhase2GroupingStats;
+    performanceStats?: LogisticsPhase2PerformanceStats;
   };
 }
 
@@ -214,6 +222,17 @@ function toHHMM(totalMinutes: number): string {
   const h = Math.floor(bounded / 60);
   const m = bounded % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function buildScheduleWithMetrics(
+  args: Parameters<typeof buildLogisticsScheduleForDriver>[0],
+  performanceStats: LogisticsPhase2PerformanceStats
+): ReturnType<typeof buildLogisticsScheduleForDriver> {
+  const startedAt = Date.now();
+  const built = buildLogisticsScheduleForDriver(args);
+  performanceStats.scheduleBuildCount += 1;
+  performanceStats.scheduleBuildElapsedMs += Math.max(0, Date.now() - startedAt);
+  return built;
 }
 
 function normalizeYmd(value: string | null | undefined): string | null {
@@ -914,6 +933,10 @@ function sortGroupTasksForDriver(group: SpatialGroup, state: DriverState, workDa
 
 function getReasonPriority(reasonCode: LogisticsPhase2ReasonCode): number {
   switch (reasonCode) {
+    case "TRULY_IMPOSSIBLE":
+      return 5;
+    case "ROUTE_CAPACITY_OR_ORDERING_CONFLICT":
+      return 4;
     case "CHECKIN_CHECKOUT_CONSTRAINT":
       return 3;
     case "CLEANER_TIME_CONSTRAINT":
@@ -1011,7 +1034,8 @@ function simulateOrderedTasksForDriver(
   state: DriverState,
   workDate: string,
   taskById: Map<number, LogisticsTaskForPhase2>,
-  priorityWindows: PriorityWindows | null
+  priorityWindows: PriorityWindows | null,
+  performanceStats: LogisticsPhase2PerformanceStats
 ): GroupSimulationResult {
   const projectedCleanerLastSequence = new Map<number, number>(state.cleanerLastSequence);
   const infeasibleResult = (reasonCode: LogisticsPhase2ReasonCode, taskId: number | null): GroupSimulationResult => ({
@@ -1032,12 +1056,15 @@ function simulateOrderedTasksForDriver(
     .filter((task): task is LogisticsTaskForPhase2 => task != null);
 
   const fullOrdered = [...existingOrdered, ...orderedTasks];
-  const built = buildLogisticsScheduleForDriver({
-    tasks: fullOrdered.map(toLogisticsScheduleTaskInput),
-    driverStartMin: state.driverStartMin,
-    workDate,
-    priorityWindows,
-  });
+  const built = buildScheduleWithMetrics(
+    {
+      tasks: fullOrdered.map(toLogisticsScheduleTaskInput),
+      driverStartMin: state.driverStartMin,
+      workDate,
+      priorityWindows,
+    },
+    performanceStats
+  );
 
   const candidateIds = new Set(orderedTasks.map((task) => task.taskId));
 
@@ -1160,7 +1187,8 @@ function simulateGroupForDriver(
   state: DriverState,
   workDate: string,
   taskById: Map<number, LogisticsTaskForPhase2>,
-  priorityWindows: PriorityWindows | null
+  priorityWindows: PriorityWindows | null,
+  performanceStats: LogisticsPhase2PerformanceStats
 ): GroupSimulationResult {
   const orderCandidates = buildOrderCandidates(group, state, workDate);
   let bestSimulation: GroupSimulationResult | null = null;
@@ -1173,7 +1201,8 @@ function simulateGroupForDriver(
       state,
       workDate,
       taskById,
-      priorityWindows
+      priorityWindows,
+      performanceStats
     );
     if (!simulation.feasible) {
       bestFailure = pickMoreUsefulFailure(bestFailure, simulation.failure);
@@ -1267,12 +1296,13 @@ function estimateRecoverableTaskCount(
   workDate: string,
   taskById: Map<number, LogisticsTaskForPhase2>,
   priorityWindows: PriorityWindows | null,
+  performanceStats: LogisticsPhase2PerformanceStats,
   depth = 0
 ): number {
   if (!group) return 0;
 
   for (const state of driverStates) {
-    const simulation = simulateGroupForDriver(group, state, workDate, taskById, priorityWindows);
+    const simulation = simulateGroupForDriver(group, state, workDate, taskById, priorityWindows, performanceStats);
     if (simulation.feasible) {
       return group.tasks.length;
     }
@@ -1295,7 +1325,14 @@ function estimateRecoverableTaskCount(
     };
 
     for (const state of driverStates) {
-      const simulation = simulateGroupForDriver(subsetGroup, state, workDate, taskById, priorityWindows);
+      const simulation = simulateGroupForDriver(
+        subsetGroup,
+        state,
+        workDate,
+        taskById,
+        priorityWindows,
+        performanceStats
+      );
       if (!simulation.feasible) continue;
 
       const selectedTaskIds = new Set(subset.map((task) => task.taskId));
@@ -1325,6 +1362,7 @@ function estimateRecoverableTaskCount(
           workDate,
           taskById,
           priorityWindows,
+          performanceStats,
           depth + 1
         );
 
@@ -1352,7 +1390,8 @@ function getPartialChoiceRanking(
   driverStates: DriverState[],
   workDate: string,
   taskById: Map<number, LogisticsTaskForPhase2>,
-  priorityWindows: PriorityWindows | null
+  priorityWindows: PriorityWindows | null,
+  performanceStats: LogisticsPhase2PerformanceStats
 ): PartialChoiceRanking {
   let remainingFeasibleOnSomeDriver = false;
   let remainingScoreEstimate = Number.NEGATIVE_INFINITY;
@@ -1364,7 +1403,8 @@ function getPartialChoiceRanking(
         state,
         workDate,
         taskById,
-        priorityWindows
+        priorityWindows,
+        performanceStats
       );
       if (remainingSimulation.feasible) {
         remainingFeasibleOnSomeDriver = true;
@@ -1382,7 +1422,8 @@ function getPartialChoiceRanking(
     projectedDriverStates,
     workDate,
     taskById,
-    priorityWindows
+    priorityWindows,
+    performanceStats
   );
   const expectedRecoverableTasks =
     choice.assignedGroup.tasks.length + remainingRecoverableTasks;
@@ -1425,7 +1466,8 @@ function getBestSingletonFailureReason(
   driverStates: DriverState[],
   workDate: string,
   taskById: Map<number, LogisticsTaskForPhase2>,
-  priorityWindows: PriorityWindows | null
+  priorityWindows: PriorityWindows | null,
+  performanceStats: LogisticsPhase2PerformanceStats
 ): LogisticsPhase2ReasonCode {
   const singletonGroup: SpatialGroup = {
     ...sourceGroup,
@@ -1437,7 +1479,14 @@ function getBestSingletonFailureReason(
   let bestFailure: FeasibilityFailure | null = null;
 
   for (const state of driverStates) {
-    const simulation = simulateGroupForDriver(singletonGroup, state, workDate, taskById, priorityWindows);
+    const simulation = simulateGroupForDriver(
+      singletonGroup,
+      state,
+      workDate,
+      taskById,
+      priorityWindows,
+      performanceStats
+    );
     if (simulation.feasible) {
       return "NO_DRIVER_FEASIBLE";
     }
@@ -1452,7 +1501,8 @@ function findBestPartialGroupAssignment(
   driverStates: DriverState[],
   workDate: string,
   taskById: Map<number, LogisticsTaskForPhase2>,
-  priorityWindows: PriorityWindows | null
+  priorityWindows: PriorityWindows | null,
+  performanceStats: LogisticsPhase2PerformanceStats
 ): PartialGroupSimulationChoice | null {
   if (group.tasks.length <= 1) return null;
   const subsets = buildTaskSubsetsByDescendingSize(group.tasks).filter((subset) => subset.length < group.tasks.length);
@@ -1481,7 +1531,14 @@ function findBestPartialGroupAssignment(
     };
 
     for (const state of driverStates) {
-      const simulation = simulateGroupForDriver(subsetGroup, state, workDate, taskById, priorityWindows);
+      const simulation = simulateGroupForDriver(
+        subsetGroup,
+        state,
+        workDate,
+        taskById,
+        priorityWindows,
+        performanceStats
+      );
       if (!simulation.feasible) continue;
       const selectedTaskIds = new Set(subset.map((task) => task.taskId));
       const remainingTasks = group.tasks.filter((task) => !selectedTaskIds.has(task.taskId));
@@ -1500,7 +1557,14 @@ function findBestPartialGroupAssignment(
         state,
         simulation,
       };
-      const ranking = getPartialChoiceRanking(choice, driverStates, workDate, taskById, priorityWindows);
+      const ranking = getPartialChoiceRanking(
+        choice,
+        driverStates,
+        workDate,
+        taskById,
+        priorityWindows,
+        performanceStats
+      );
 
       if (!bestRanking || isBetterPartialRanking(ranking, bestRanking)) {
         bestChoice = choice;
@@ -1535,7 +1599,8 @@ function buildDriverAttemptsForGroup(
   driverStates: DriverState[],
   workDate: string,
   taskById: Map<number, LogisticsTaskForPhase2>,
-  priorityWindows: PriorityWindows | null
+  priorityWindows: PriorityWindows | null,
+  performanceStats: LogisticsPhase2PerformanceStats
 ): {
   attempts: DriverAttemptJson[];
   bestState: DriverState | null;
@@ -1548,7 +1613,14 @@ function buildDriverAttemptsForGroup(
   const attempts: DriverAttemptJson[] = [];
 
   for (const state of driverStates) {
-    const simulation = simulateGroupForDriver(group, state, workDate, taskById, priorityWindows);
+    const simulation = simulateGroupForDriver(
+      group,
+      state,
+      workDate,
+      taskById,
+      priorityWindows,
+      performanceStats
+    );
     attempts.push({
       driverId: state.driverId,
       feasible: simulation.feasible,
@@ -1607,14 +1679,18 @@ function simulateFullRouteForRepair(
   routeTasks: LogisticsTaskForPhase2[],
   insertedTaskId: number,
   workDate: string,
-  priorityWindows: PriorityWindows | null
+  priorityWindows: PriorityWindows | null,
+  performanceStats: LogisticsPhase2PerformanceStats
 ): RepairRouteSimulationResult {
-  const built = buildLogisticsScheduleForDriver({
-    tasks: routeTasks.map(toLogisticsScheduleTaskInput),
-    driverStartMin: state.driverStartMin,
-    workDate,
-    priorityWindows,
-  });
+  const built = buildScheduleWithMetrics(
+    {
+      tasks: routeTasks.map(toLogisticsScheduleTaskInput),
+      driverStartMin: state.driverStartMin,
+      workDate,
+      priorityWindows,
+    },
+    performanceStats
+  );
 
   const rowByTaskId = new Map(built.tasks.map((row) => [row.taskId, row]));
   const fail = (failure: FeasibilityFailure): RepairRouteSimulationResult => ({
@@ -1785,6 +1861,7 @@ function repairUnassignedTasksWithInsertion(args: {
   bandIndexByTaskId: Map<number, number>;
   workDate: string;
   priorityWindows: PriorityWindows | null;
+  performanceStats: LogisticsPhase2PerformanceStats;
   reasonCounts: Record<LogisticsPhase2ReasonCode, number>;
   debugCollector?: LogisticsPhase2DebugCollector | null;
   stepStart: number;
@@ -1823,7 +1900,8 @@ function repairUnassignedTasksWithInsertion(args: {
           candidateRoute,
           task.taskId,
           args.workDate,
-          args.priorityWindows
+          args.priorityWindows,
+          args.performanceStats
         );
 
         if (!simulation.feasible) {
@@ -1926,6 +2004,62 @@ function repairUnassignedTasksWithInsertion(args: {
   return repairedCount;
 }
 
+function classifyFinalUnassignedTasks(args: {
+  unassignedTasks: LogisticsPhase2UnassignedTask[];
+  debugUnassignedDetails: UnassignedTaskDebugJson[];
+  selectedDrivers: LogisticsSelectedDriver[];
+  taskById: Map<number, LogisticsTaskForPhase2>;
+  workDate: string;
+  priorityWindows: PriorityWindows | null;
+  performanceStats: LogisticsPhase2PerformanceStats;
+  reasonCounts: Record<LogisticsPhase2ReasonCode, number>;
+}): void {
+  for (const item of args.unassignedTasks) {
+    const task = args.taskById.get(item.taskId);
+    if (!task) continue;
+
+    const singletonGroup: SpatialGroup = {
+      groupId: `final-classify-${task.taskId}`,
+      seedBandIndex: 0,
+      tasks: [task],
+      origin: "SINGLETON_FALLBACK",
+      cleanerId: task.cleanerId ?? null,
+    };
+
+    const emptyStates = buildDriverStates(args.selectedDrivers);
+    const feasibleAloneOnDriverIds: number[] = [];
+    for (const state of emptyStates) {
+      const simulation = simulateGroupForDriver(
+        singletonGroup,
+        state,
+        args.workDate,
+        args.taskById,
+        args.priorityWindows,
+        args.performanceStats
+      );
+      if (simulation.feasible) {
+        feasibleAloneOnDriverIds.push(state.driverId);
+      }
+    }
+
+    const finalReasonCode: LogisticsPhase2ReasonCode = feasibleAloneOnDriverIds.length > 0
+      ? "ROUTE_CAPACITY_OR_ORDERING_CONFLICT"
+      : "TRULY_IMPOSSIBLE";
+    if (item.reasonCode !== finalReasonCode) {
+      decrementReasonCount(args.reasonCounts, item.reasonCode);
+      incrementReasonCount(args.reasonCounts, finalReasonCode);
+      item.reasonCode = finalReasonCode;
+    }
+
+    const debugEntry = args.debugUnassignedDetails.find((entry) => entry.taskId === item.taskId);
+    if (debugEntry) {
+      debugEntry.reasonCode = finalReasonCode;
+      debugEntry.feasibleAloneOnDriverIds = feasibleAloneOnDriverIds;
+      debugEntry.trulyImpossible = finalReasonCode === "TRULY_IMPOSSIBLE";
+    }
+  }
+}
+
 export async function runLogisticsPhase2(
   workDate: string,
   unlockedTaskData: LogisticsTaskInputWithLock[],
@@ -1944,6 +2078,12 @@ export async function runLogisticsPhase2(
     CLEANER_TIME_CONSTRAINT: 0,
     NO_DRIVER_FEASIBLE: 0,
     NO_TASK_CANDIDATES: 0,
+    TRULY_IMPOSSIBLE: 0,
+    ROUTE_CAPACITY_OR_ORDERING_CONFLICT: 0,
+  };
+  const performanceStats: LogisticsPhase2PerformanceStats = {
+    scheduleBuildCount: 0,
+    scheduleBuildElapsedMs: 0,
   };
 
   const phase2Tasks = buildPhase2Tasks(unlockedTaskData, phase1.taskCandidates);
@@ -1983,6 +2123,7 @@ export async function runLogisticsPhase2(
           singletonFallbackTasks: 0,
           fallbackTasks: 0,
         },
+        performanceStats,
       },
     };
   }
@@ -2078,7 +2219,8 @@ export async function runLogisticsPhase2(
       driverStates,
       workDate,
       taskById,
-      priorityWindows
+      priorityWindows,
+      performanceStats
     );
 
     if (bestState && bestSimulation) {
@@ -2115,7 +2257,8 @@ export async function runLogisticsPhase2(
       driverStates,
       workDate,
       taskById,
-      priorityWindows
+      priorityWindows,
+      performanceStats
     );
     if (partialChoice) {
       applySimulationToDriverState(partialChoice.state, partialChoice.simulation);
@@ -2132,7 +2275,8 @@ export async function runLogisticsPhase2(
           driverStates,
           workDate,
           taskById,
-          priorityWindows
+          priorityWindows,
+          performanceStats
         );
         const decision: GroupDecisionJson = {
           step: groupsProcessed,
@@ -2171,7 +2315,15 @@ export async function runLogisticsPhase2(
       const taskSpecific = bestFailureByTaskId.get(task.taskId);
       const reasonCode =
         taskSpecific?.reasonCode ??
-        getBestSingletonFailureReason(task, group, driverStates, workDate, taskById, priorityWindows);
+        getBestSingletonFailureReason(
+          task,
+          group,
+          driverStates,
+          workDate,
+          taskById,
+          priorityWindows,
+          performanceStats
+        );
       incrementReasonCount(reasonCounts, reasonCode);
       unassignedTasks.push({
         taskId: task.taskId,
@@ -2221,6 +2373,7 @@ export async function runLogisticsPhase2(
     bandIndexByTaskId,
     workDate,
     priorityWindows,
+    performanceStats,
     reasonCounts,
     debugCollector,
     stepStart: groupsProcessed,
@@ -2254,6 +2407,17 @@ export async function runLogisticsPhase2(
     }
   }
 
+  classifyFinalUnassignedTasks({
+    unassignedTasks,
+    debugUnassignedDetails,
+    selectedDrivers: phase1.selectedDrivers,
+    taskById,
+    workDate,
+    priorityWindows,
+    performanceStats,
+    reasonCounts,
+  });
+
   let debugDir: string | undefined;
   if (debugCollector) {
     debugCollector.setGroupingStats({
@@ -2280,6 +2444,8 @@ export async function runLogisticsPhase2(
         tasksAssigned,
         tasksUnassigned: unassignedTasks.length,
         repairInsertedTasks,
+        scheduleBuildCount: performanceStats.scheduleBuildCount,
+        scheduleBuildElapsedMs: performanceStats.scheduleBuildElapsedMs,
       },
       reasonCounts
     );
@@ -2318,6 +2484,7 @@ export async function runLogisticsPhase2(
         duplicateGroupedTaskCount: duplicateTaskCount,
         repairInsertedTasks,
       },
+      performanceStats,
     },
   };
 }

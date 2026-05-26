@@ -5,7 +5,9 @@ export type LogisticsPhase2ReasonCode =
   | "CHECKIN_CHECKOUT_CONSTRAINT"
   | "CLEANER_TIME_CONSTRAINT"
   | "NO_DRIVER_FEASIBLE"
-  | "NO_TASK_CANDIDATES";
+  | "NO_TASK_CANDIDATES"
+  | "TRULY_IMPOSSIBLE"
+  | "ROUTE_CAPACITY_OR_ORDERING_CONFLICT";
 
 export interface LogisticsPhase2GroupingStatsJson {
   cleanerClusters: number;
@@ -129,6 +131,8 @@ export interface UnassignedTaskDebugJson {
   logisticCode: number;
   reasonCode: LogisticsPhase2ReasonCode;
   sourceGroupId?: string;
+  feasibleAloneOnDriverIds?: number[];
+  trulyImpossible?: boolean;
   driverFailures: Array<{
     driverId: number;
     reasonCode: LogisticsPhase2ReasonCode;
