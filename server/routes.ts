@@ -10,6 +10,12 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { formatInTimeZone } from "date-fns-tz";
 import { databaseConfig } from "../config/database";
+import {
+  classifyTaskPriority,
+  parsePrioritySettings,
+  priorityToContainerFormat,
+  PrioritySettingsError,
+} from "../shared/taskPriorityClassification";
 
 const isTrue = (v: any) => v === true || v === 1 || v === "1" || v === "true";
 const OFFICE_SCOPE_ENABLED = false;
@@ -6804,29 +6810,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const d = String(parsed.getDate()).padStart(2, '0');
         return `${y}-${m}-${d}`;
       };
-      const parseMinutesFromHm = (value: unknown): number | null => {
-        const raw = String(value ?? '').trim();
-        if (!raw) return null;
-        const match = raw.match(/^(\d{1,2}):(\d{2})/);
-        if (!match) return null;
-        const h = Number(match[1]);
-        const m = Number(match[2]);
-        if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
-        if (h < 0 || h > 23 || m < 0 || m > 59) return null;
-        return h * 60 + m;
-      };
-      const isTimeWithinWindow = (minutes: number, start: number, end: number): boolean => {
-        if (start <= end) return minutes >= start && minutes <= end;
-        return minutes >= start || minutes <= end;
-      };
-      const toIntSet = (values: unknown): Set<number> => {
-        if (!Array.isArray(values)) return new Set<number>();
-        return new Set(
-          values
-            .map((v) => Number(v))
-            .filter((n) => Number.isFinite(n))
-        );
-      };
       const ensureContainersShape = (payload: any, effectiveDate: string) => {
         const data = payload || {};
         data.metadata = data.metadata || {};
@@ -6859,47 +6842,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       const classifyContainerPriority = (
         task: any,
-        appSettings: any
+        prioritySettings: ReturnType<typeof parsePrioritySettings>
       ): 'early_out' | 'high_priority' | 'low_priority' => {
-        const earlyOutConfig = appSettings?.['early-out'] || {};
-        const highPriorityConfig = appSettings?.['high-priority'] || {};
-
-        const eoStart = parseMinutesFromHm(earlyOutConfig?.eo_start_time) ?? (10 * 60);
-        const eoEnd = parseMinutesFromHm(earlyOutConfig?.eo_end_time) ?? (10 * 60 + 59);
-        const hpStart = parseMinutesFromHm(highPriorityConfig?.hp_start_time) ?? (11 * 60);
-        const hpEnd =
-          parseMinutesFromHm(highPriorityConfig?.hp_end_time) ??
-          parseMinutesFromHm(highPriorityConfig?.hp_time) ??
-          (15 * 60 + 30);
-
-        const clientIdNum = Number(task?.client_id);
-        const isPremium = Boolean(task?.premium);
-        const eoClients = toIntSet(earlyOutConfig?.eo_clients);
-        const hpClients = toIntSet(highPriorityConfig?.hp_clients);
-
-        const checkoutMinutes = parseMinutesFromHm(task?.checkout_time);
-        const checkinMinutes = parseMinutesFromHm(task?.checkin_time);
-        const checkinYmd = normalizeDateYmd(task?.checkin_date);
-        const checkoutYmd = normalizeDateYmd(task?.checkout_date);
-        const sameDayTurnover =
-          Boolean(checkinYmd) &&
-          Boolean(checkoutYmd) &&
-          checkinYmd === checkoutYmd;
-
-        const eoByTime =
-          checkoutMinutes != null &&
-          (isTimeWithinWindow(checkoutMinutes, eoStart, eoEnd) || checkoutMinutes < eoStart);
-        const eoByClient = Number.isFinite(clientIdNum) && eoClients.has(clientIdNum);
-        if (eoByTime || eoByClient) return 'early_out';
-
-        const hpByTime =
-          sameDayTurnover &&
-          checkinMinutes != null &&
-          isTimeWithinWindow(checkinMinutes, hpStart, hpEnd);
-        const hpByClient = Number.isFinite(clientIdNum) && hpClients.has(clientIdNum);
-        if (hpByTime || isPremium || hpByClient) return 'high_priority';
-
-        return 'low_priority';
+        return priorityToContainerFormat(classifyTaskPriority(task, prioritySettings));
       };
       let previousAdamCustomerNote: string | null = null;
       const appendCustomerNoteHistory = (
@@ -6977,6 +6922,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const containersData = ensureContainersShape(containersDataRaw, workDate);
       const { pgSettingsService } = await import("./services/pg-settings-service");
       const appSettings = await pgSettingsService.getSettings('app_settings').catch(() => ({}));
+      const prioritySettings = parsePrioritySettings(appSettings);
 
       let taskUpdated = false;
       let customerNoteChanged = false;
@@ -7093,7 +7039,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (updatedContainerTask && updatedContainerSourceType) {
-        const destinationPriority = classifyContainerPriority(updatedContainerTask, appSettings || {});
+        const destinationPriority = classifyContainerPriority(updatedContainerTask, prioritySettings);
         const destinationDate = normalizeDateYmd(updatedContainerTask.checkout_date) || workDate;
         const sourceBuckets = ['early_out', 'high_priority', 'low_priority'] as const;
 
@@ -8918,6 +8864,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
   app.post("/api/save-settings", async (req, res) => {
     try {
       const settingsData = req.body;
+      parsePrioritySettings(settingsData);
+
       const { pgSettingsService } = await import("./services/pg-settings-service");
       await pgSettingsService.ensureTables();
       
@@ -8929,6 +8877,9 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       });
     } catch (error: any) {
       console.error("Errore nel salvataggio delle impostazioni:", error);
+      if (error instanceof PrioritySettingsError) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
       res.status(500).json({ success: false, error: error.message });
     }
   });

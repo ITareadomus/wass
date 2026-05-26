@@ -56,9 +56,8 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type PriorityWindows = {
-  EO: { start: string; end: string };
-  HP: { start: string; end: string };
-  LP: { start: string; end?: string | null };
+  hpStart: string;
+  hpEnd: string;
 };
 
 export interface LogisticsDriverRow {
@@ -273,18 +272,10 @@ export default function LogisticsTimelineView({
         });
         if (!res.ok) return;
         const s = await res.json();
-        const eoStart = s?.["early-out"]?.eo_start_time;
-        const eoEnd = s?.["early-out"]?.eo_end_time;
         const hpStart = s?.["high-priority"]?.hp_start_time;
         const hpEnd = s?.["high-priority"]?.hp_end_time;
-        const lpStart =
-          s?.["low-priority"]?.lp_start_time ?? hpEnd ?? hpStart;
-        if (eoStart && eoEnd && hpStart && hpEnd && lpStart) {
-          setPriorityWindows({
-            EO: { start: eoStart, end: eoEnd },
-            HP: { start: hpStart, end: hpEnd },
-            LP: { start: lpStart, end: null },
-          });
+        if (hpStart && hpEnd) {
+          setPriorityWindows({ hpStart, hpEnd });
         }
       } catch (e) {
         console.warn("Failed to load /api/settings for logistics priority windows", e);
@@ -1002,11 +993,11 @@ export default function LogisticsTimelineView({
               {priorityWindows && (
                 <div className="absolute inset-0">
                   {(() => {
-                    const eo1 = clamp(minutesToPct(timeToMinutes(priorityWindows.EO.start)), 0, 100);
-                    const eo2 = clamp(minutesToPct(timeToMinutes(priorityWindows.EO.end)), 0, 100);
-                    const hp1 = clamp(minutesToPct(timeToMinutes(priorityWindows.HP.start)), 0, 100);
-                    const hp2 = clamp(minutesToPct(timeToMinutes(priorityWindows.HP.end)), 0, 100);
-                    const lp1 = clamp(minutesToPct(timeToMinutes(priorityWindows.LP.start)), 0, 100);
+                    const hpStartMin = timeToMinutes(priorityWindows.hpStart);
+                    const hpEndMin = timeToMinutes(priorityWindows.hpEnd);
+                    const hp1 = clamp(minutesToPct(hpStartMin), 0, 100);
+                    const hp2 = clamp(minutesToPct(hpEndMin), 0, 100);
+                    const lp1 = clamp(minutesToPct(hpEndMin), 0, 100);
                     const lp2 = 100;
                     const TOP_LP = -2;
                     const TOP_MAIN = 16;
@@ -1016,7 +1007,7 @@ export default function LogisticsTimelineView({
 
                     const windows = [
                       { key: "LP" as const, left: lp1, right: lp2, top: TOP_LP, opacity: 0.65 },
-                      { key: "EO" as const, left: eoLeft, right: eo2, top: TOP_MAIN, opacity: 0.85 },
+                      { key: "EO" as const, left: eoLeft, right: hp1, top: TOP_MAIN, opacity: 0.85 },
                       { key: "HP" as const, left: hp1, right: hp2, top: TOP_MAIN, opacity: 0.75 },
                     ];
                     return windows.map((w) => {

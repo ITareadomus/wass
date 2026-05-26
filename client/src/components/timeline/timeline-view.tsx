@@ -276,11 +276,10 @@ export default function TimelineView({
     });
   }, []);
 
-  // EO, HP, LP brackets for priority windows
+  // EO/HP/LP brackets derived from the hp-centric priority settings.
   type PriorityWindows = {
-    EO: { start: string; end: string };
-    HP: { start: string; end: string };
-    LP: { start: string; end?: string | null };
+    hpStart: string;
+    hpEnd: string;
   };
   
   const [priorityWindows, setPriorityWindows] = useState<PriorityWindows | null>(null);
@@ -296,29 +295,11 @@ export default function TimelineView({
   
         const s = await res.json();
   
-        // Struttura presa da app_settings.json nel DB:
-        // s["early-out"].eo_start_time / eo_end_time
-        // s["high-priority"].hp_start_time / hp_end_time
-        // low-priority potrebbe esserci o no (nel tuo repo lato server esiste come chiave)
-        const eoStart = s?.["early-out"]?.eo_start_time;
-        const eoEnd = s?.["early-out"]?.eo_end_time;
-  
         const hpStart = s?.["high-priority"]?.hp_start_time;
         const hpEnd = s?.["high-priority"]?.hp_end_time;
-  
-        const lpStart =
-          s?.["low-priority"]?.lp_start_time
-          // fallback sensato se non c’è low-priority nel JSON:
-          ?? hpEnd
-          ?? hpStart;
-  
-        if (eoStart && eoEnd && hpStart && hpEnd && lpStart) {
-          setPriorityWindows({
-            EO: { start: eoStart, end: eoEnd },
-            HP: { start: hpStart, end: hpEnd },
-            // LP tipicamente “da lpStart in poi”
-            LP: { start: lpStart, end: null },
-          });
+
+        if (hpStart && hpEnd) {
+          setPriorityWindows({ hpStart, hpEnd });
         }
       } catch (e) {
         console.warn("Failed to load /api/settings for priority windows", e);
@@ -1794,13 +1775,12 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     };
   };
 
-  // Funzione per verificare se un task viola la sua finestra temporale di priorità
-  // EO: 10:00-10:59, HP: 11:00-15:30, LP: >= 11:00
+  // Verifica le finestre operative derivate da HP Start/End.
   const isPriorityWindowViolation = (task: any): boolean => {
     const priority = task.priority;
     const startTimeStr = task.start_time;
     
-    if (!priority || !startTimeStr) return false;
+    if (!priority || !startTimeStr || !priorityWindows) return false;
     
     // Normalizza priority per gestire TUTTI i formati possibili:
     // DB: early_out, high_priority, low_priority, high, low
@@ -1829,19 +1809,15 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     if (isNaN(hours) || isNaN(minutes)) return false;
     const startMinutes = hours * 60 + minutes;
     
-    // Finestre temporali (in minuti dalla mezzanotte)
-    const EO_START = 10 * 60;      // 10:00 = 600
-    const EO_END = 10 * 60 + 59;   // 10:59 = 659
-    const HP_START = 11 * 60;      // 11:00 = 660
-    const HP_END = 15 * 60 + 30;   // 15:30 = 930
-    const LP_START = 11 * 60;      // 11:00 = 660
+    const hpStart = timeToMinutes(priorityWindows.hpStart);
+    const hpEnd = timeToMinutes(priorityWindows.hpEnd);
     
     if (priorityType === 'eo') {
-      return startMinutes < EO_START || startMinutes > EO_END;
+      return startMinutes >= hpStart;
     } else if (priorityType === 'hp') {
-      return startMinutes < HP_START || startMinutes > HP_END;
+      return startMinutes < hpStart || startMinutes > hpEnd;
     } else if (priorityType === 'lp') {
-      return startMinutes < LP_START;
+      return startMinutes <= hpEnd;
     }
     
     return false;
@@ -2161,13 +2137,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     {priorityWindows && (
     <div className="absolute inset-0">
       {(() => {
-        const eo1 = clamp(minutesToPct(timeToMinutes(priorityWindows.EO.start)), 0, 100);
-        const eo2 = clamp(minutesToPct(timeToMinutes(priorityWindows.EO.end)), 0, 100);
+        const hpStartMin = timeToMinutes(priorityWindows.hpStart);
+        const hpEndMin = timeToMinutes(priorityWindows.hpEnd);
 
-        const hp1 = clamp(minutesToPct(timeToMinutes(priorityWindows.HP.start)), 0, 100);
-        const hp2 = clamp(minutesToPct(timeToMinutes(priorityWindows.HP.end)), 0, 100);
+        const hp1 = clamp(minutesToPct(hpStartMin), 0, 100);
+        const hp2 = clamp(minutesToPct(hpEndMin), 0, 100);
 
-        const lp1 = clamp(minutesToPct(timeToMinutes(priorityWindows.LP.start)), 0, 100);
+        const lp1 = clamp(minutesToPct(hpEndMin), 0, 100);
         const lp2 = 100;
 
         // Due piani:
@@ -2182,7 +2158,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
         const windows = [
           { key: "LP", left: lp1, right: lp2, top: TOP_LP, opacity: 0.65 },
-          { key: "EO", left: eoLeft, right: eo2, top: TOP_MAIN, opacity: 0.85 },
+          { key: "EO", left: eoLeft, right: hp1, top: TOP_MAIN, opacity: 0.85 },
           { key: "HP", left: hp1, right: hp2, top: TOP_MAIN, opacity: 0.75 },
         ];
 

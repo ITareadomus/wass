@@ -28,6 +28,10 @@ interface ClientWindowsData {
   };
 }
 
+function getDefaultCheckoutForClient(clientId: number, eoClients: Set<number>): string {
+  return eoClients.has(clientId) ? "10:00" : "11:00";
+}
+
 export default function ClientSettings() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -60,11 +64,31 @@ export default function ClientSettings() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // Carica clienti attivi
-      const clientsResponse = await fetch("/api/get-active-clients");
+      // Carica clienti attivi e settings (per default EO checkout)
+      const [clientsResponse, settingsResponse] = await Promise.all([
+        fetch("/api/get-active-clients"),
+        fetch("/api/settings", {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        }),
+      ]);
+
       if (!clientsResponse.ok) throw new Error("Errore nel caricamento dei clienti");
       const clientsData = await clientsResponse.json();
-      setClients(clientsData.clients);
+      const loadedClients: Client[] = clientsData.clients || [];
+      setClients(loadedClients);
+
+      let eoClients = new Set<number>();
+      if (settingsResponse.ok) {
+        const settingsData = await settingsResponse.json();
+        eoClients = new Set<number>(
+          Array.isArray(settingsData?.["early-out"]?.eo_clients)
+            ? settingsData["early-out"].eo_clients
+                .map((id: unknown) => Number(id))
+                .filter((id: number) => Number.isFinite(id))
+            : []
+        );
+      }
 
       // Carica client_timewindows da API (PostgreSQL)
       try {
@@ -83,11 +107,41 @@ export default function ClientSettings() {
               checkout: w.checkout_time || ""
             });
           });
+
+          // Default checkout: 11:00 per tutti, 10:00 per clienti EO.
+          // Applica solo se checkout non è già valorizzato.
+          loadedClients.forEach((client) => {
+            const current = windowsMap.get(client.client_id) || { checkin: "", checkout: "" };
+            if (!current.checkout) {
+              windowsMap.set(client.client_id, {
+                ...current,
+                checkout: getDefaultCheckoutForClient(client.client_id, eoClients),
+              });
+            }
+          });
           
+          setWindows(windowsMap);
+        } else {
+          // Se non esistono timewindows salvate, inizializza tutti i clienti con i default checkout.
+          const windowsMap = new Map<number, { checkin: string; checkout: string }>();
+          loadedClients.forEach((client) => {
+            windowsMap.set(client.client_id, {
+              checkin: "",
+              checkout: getDefaultCheckoutForClient(client.client_id, eoClients),
+            });
+          });
           setWindows(windowsMap);
         }
       } catch (err) {
-        console.log("client_timewindows non trovato in PostgreSQL, usando valori vuoti");
+        console.log("client_timewindows non trovato in PostgreSQL, usando checkout di default");
+        const windowsMap = new Map<number, { checkin: string; checkout: string }>();
+        loadedClients.forEach((client) => {
+          windowsMap.set(client.client_id, {
+            checkin: "",
+            checkout: getDefaultCheckoutForClient(client.client_id, eoClients),
+          });
+        });
+        setWindows(windowsMap);
       }
     } catch (error) {
       toast({
@@ -181,7 +235,7 @@ export default function ClientSettings() {
           <CardHeader className="bg-custom-blue-light">
             <CardTitle>Finestre Temporali Clienti</CardTitle>
             <CardDescription>
-              Configura gli orari di checkin e checkout per ogni cliente attivo
+              Configura gli orari di checkout e checkin per ogni cliente attivo
             </CardDescription>
           </CardHeader>
           <CardContent className="bg-custom-blue-light">
@@ -201,8 +255,8 @@ export default function ClientSettings() {
                     <TableHead className="w-[100px] text-center text-white">Client ID</TableHead>
                     <TableHead className="w-[120px] text-center text-white">Alias</TableHead>
                     <TableHead className="text-white">Nome Cliente</TableHead>
-                    <TableHead className="w-[150px] text-left text-white">Checkin</TableHead>
                     <TableHead className="w-[150px] text-left text-white">Checkout</TableHead>
+                    <TableHead className="w-[150px] text-left text-white">Checkin</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -216,16 +270,16 @@ export default function ClientSettings() {
                         <TableCell>
                           <Input
                             type="time"
-                            value={windowData.checkin}
-                            onChange={(e) => handleTimeChange(client.client_id, 'checkin', e.target.value)}
+                            value={windowData.checkout}
+                            onChange={(e) => handleTimeChange(client.client_id, 'checkout', e.target.value)}
                             className="h-9"
                           />
                         </TableCell>
                         <TableCell>
                           <Input
                             type="time"
-                            value={windowData.checkout}
-                            onChange={(e) => handleTimeChange(client.client_id, 'checkout', e.target.value)}
+                            value={windowData.checkin}
+                            onChange={(e) => handleTimeChange(client.client_id, 'checkin', e.target.value)}
                             className="h-9"
                           />
                         </TableCell>
