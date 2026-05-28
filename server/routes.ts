@@ -9920,10 +9920,16 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
   app.post("/api/logistics-optimizer/run", async (req, res) => {
     try {
-      const { date, debug: debugBody } = req.body || {};
+      const { date, debug: debugBody, competitiveGrouping: competitiveGroupingBody } = req.body || {};
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       const debugExplicit =
         debugBody === true || debugBody === 1 || String(debugBody ?? "").toLowerCase() === "true";
+      const competitiveGroupingExplicit =
+        competitiveGroupingBody === undefined
+          ? true
+          : competitiveGroupingBody === true ||
+            competitiveGroupingBody === 1 ||
+            String(competitiveGroupingBody ?? "").toLowerCase() === "true";
 
       const { isLogisticsOptimizerDebugEnabled, runLogisticsOptimizer } = await import(
         "./services/logistics-optimizer"
@@ -9931,10 +9937,18 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       const debugEnabled = isLogisticsOptimizerDebugEnabled(debugExplicit);
       console.log(
         `🚀 POST /api/logistics-optimizer/run - Avvio logistics-optimizer per ${workDate}` +
-          (debugEnabled ? " (debug JSON attivo)" : "")
+          (debugEnabled ? " (debug JSON attivo)" : "") +
+          (competitiveGroupingExplicit == null
+            ? ""
+            : competitiveGroupingExplicit
+              ? " (competitive-grouping=ON)"
+              : " (competitive-grouping=OFF)")
       );
 
-      const result = await runLogisticsOptimizer(workDate, { debug: debugExplicit });
+      const result = await runLogisticsOptimizer(workDate, {
+        debug: debugExplicit,
+        competitiveGrouping: competitiveGroupingExplicit,
+      });
 
       if (!result.canRun) {
         return res.status(400).json({

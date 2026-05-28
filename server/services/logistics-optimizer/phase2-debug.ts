@@ -10,6 +10,7 @@ export type LogisticsPhase2ReasonCode =
   | "ROUTE_CAPACITY_OR_ORDERING_CONFLICT";
 
 export interface LogisticsPhase2GroupingStatsJson {
+  competitiveGroupingEnabled?: boolean;
   cleanerClusters: number;
   geographicFallbackGroups: number;
   singletonFallbackTasks: number;
@@ -21,6 +22,28 @@ export interface LogisticsPhase2GroupingStatsJson {
   recoveredMissingTaskCount?: number;
   duplicateGroupedTaskCount?: number;
   repairInsertedTasks?: number;
+  strongLocationClusters?: number;
+  strongLocationClusterTasks?: number;
+  addressGroupsDetected?: number;
+  competitiveCandidatesGenerated?: number;
+  competitiveCandidatesSelectedByType?: Record<string, number>;
+  cleanerClusterBeatenBySameLocationCount?: number;
+  sameLocationBeatenByCleanerClusterCount?: number;
+  sameLocationSplitAcceptedCount?: number;
+  sameLocationSplitAcceptedReasons?: string[];
+  candidateOverlapInvalidationCount?: number;
+  avgReturnToSameAddressAfterSplitMin?: number;
+  selectedCandidateScoreGapP50?: number;
+  selectedCandidateScoreGapP90?: number;
+  sameLocationReturnEvents?: Array<{
+    addressId: number;
+    logisticCode: number | null;
+    taskIds: number[];
+    driverIds: number[];
+    sequencePositions: number[];
+    minutesBetweenVisits: number;
+    reason: string;
+  }>;
 }
 
 export type GroupingStrategy =
@@ -28,7 +51,9 @@ export type GroupingStrategy =
   | "GEOGRAPHIC_FALLBACK"
   | "SINGLETON_BAG_PRIORITY"
   | "RECOVERY_SINGLETON"
-  | "REPAIR_INSERTION";
+  | "REPAIR_INSERTION"
+  | "STRONG_LOCATION_CLUSTER"
+  | "NEARBY_MICRO_CLUSTER";
 
 export interface GroupingReasonJson {
   strategy: GroupingStrategy;
@@ -124,6 +149,16 @@ export interface GroupDecisionJson {
     logisticCode: number;
     reasonCode: LogisticsPhase2ReasonCode;
   }>;
+  competitiveContext?: {
+    candidateType: "CLEANER_SEQUENCE" | "SAME_LOCATION" | "NEARBY_MICRO" | "SINGLETON";
+    competitorsConsidered: Array<{
+      id: string;
+      type: "CLEANER_SEQUENCE" | "SAME_LOCATION" | "NEARBY_MICRO" | "SINGLETON";
+      score: number | null;
+      feasible: boolean;
+    }>;
+    scoreGapToRunnerUp: number | null;
+  };
 }
 
 export interface UnassignedTaskDebugJson {

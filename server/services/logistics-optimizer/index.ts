@@ -20,6 +20,8 @@ import {
 export interface LogisticsOptimizerRunOptions {
   /** Scrivi JSON di debug in server/debug/logistics-optimizer/{date}/{runId}/ */
   debug?: boolean;
+  /** Forza competitve grouping Phase2 per questo run (true/false); se undefined usa env LOGISTICS_COMPETITIVE_GROUPING. */
+  competitiveGrouping?: boolean;
 }
 
 export interface LogisticsOptimizerRunResult extends LogisticsPhase0Result {
@@ -402,7 +404,13 @@ export async function runLogisticsOptimizer(
 
   const phase0 = await runLogisticsPhase0(workDate);
   const phase1 = await runLogisticsPhase1(workDate, phase0.unlockedTaskData);
-  const phase2 = await runLogisticsPhase2(workDate, phase0.unlockedTaskData, phase1, debugCollector);
+  const phase2 = await runLogisticsPhase2(
+    workDate,
+    phase0.unlockedTaskData,
+    phase1,
+    debugCollector,
+    options?.competitiveGrouping
+  );
   const canRun = phase0.canRun && phase1.canRun && phase2.canRun;
   const apply = canRun
     ? await applyLogisticsOptimizerResult(workDate, phase0, phase1, phase2, {
