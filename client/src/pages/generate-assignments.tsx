@@ -1,5 +1,9 @@
 import { DragDropContext, DropResult } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
+import {
+  isWorkDateHistoricallyLocked,
+  isWorkDateInPast,
+} from "@shared/work-date-access";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
 import MapSection from "@/components/map/map-section";
@@ -138,15 +142,6 @@ function indexById(list: Task[]): Map<string, Task> {
   }
   return m;
 }
-
-// Helper per verificare se una data è nel passato
-const isDateInPast = (date: Date): boolean => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Normalizza a inizio giornata per confronto
-  const targetDate = new Date(date);
-  targetDate.setHours(0, 0, 0, 0);
-  return targetDate < today;
-};
 
 // Tipo per risposta API timeline (evita inferenza never[] su assignments/cleaners_assignments)
 interface TimelineCleanerEntry {
@@ -705,7 +700,7 @@ export default function GenerateAssignments() {
       today.setHours(0, 0, 0, 0);
       const targetDate = new Date(date);
       targetDate.setHours(0, 0, 0, 0);
-      const isPastDate = targetDate < today;
+      const isPastDate = isWorkDateInPast(date);
       const isCurrentDate = targetDate.getTime() === today.getTime();
 
       // CRITICAL: Verifica SE esistono assegnazioni salvate per questa data
@@ -785,8 +780,8 @@ export default function GenerateAssignments() {
           });
 
           // Imposta timeline in modalità read-only SOLO per date passate
-          setIsTimelineReadOnly(isPastDate);
-          if (isPastDate) {
+          setIsTimelineReadOnly(isWorkDateHistoricallyLocked(date));
+          if (isWorkDateHistoricallyLocked(date)) {
             console.log("🔒 Timeline impostata in modalità READ-ONLY (data passata)");
           } else {
             console.log("✏️ Timeline impostata in modalità EDITABILE (data corrente/futura con salvataggio)");
@@ -812,7 +807,7 @@ export default function GenerateAssignments() {
           setIsExtracting(false);
         } else {
           // Caricamento fallito = nessun salvataggio disponibile
-          if (isPastDate) {
+          if (isWorkDateHistoricallyLocked(date)) {
             console.log("📭 Data passata senza salvataggi disponibili - mostro container in sola lettura");
             setIsTimelineReadOnly(true);
           } else {
@@ -852,7 +847,7 @@ export default function GenerateAssignments() {
         }
 
         // SOLO date STRETTAMENTE passate sono read-only
-        if (isPastDate) {
+        if (isWorkDateHistoricallyLocked(date)) {
           console.log("🔒 Data passata senza assegnazioni salvate - NESSUNA ESTRAZIONE");
           setIsTimelineReadOnly(true);
 
@@ -881,13 +876,8 @@ export default function GenerateAssignments() {
       console.error("Errore nella verifica assegnazioni salvate:", error);
 
       // Fallback SOLO per date NON passate
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const targetDate = new Date(date);
-      targetDate.setHours(0, 0, 0, 0);
-
-      if (targetDate >= today) {
-        console.log("Fallback: estrazione per data presente/futura");
+      if (!isWorkDateHistoricallyLocked(date)) {
+        console.log("Fallback: estrazione per data presente/futura (o passata in development)");
         await extractData(date);
       } else {
         console.log("Fallback: data passata, nessuna estrazione");
@@ -2117,7 +2107,7 @@ export default function GenerateAssignments() {
   // const allTasks = [...timelineTasksWithoutDuplicates, ...containerTasks];
 
   // Determina se la modalità storica è attiva (data passata)
-  const isHistoricalMode = isDateInPast(selectedDate);
+  const isHistoricalMode = isWorkDateHistoricallyLocked(selectedDate);
 
   const unlockedTasksForStats = useMemo(
     () => allTasksWithAssignments.filter((task) => !isTaskLocked(task)),

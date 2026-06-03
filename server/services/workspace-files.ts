@@ -1,4 +1,5 @@
 import { formatInTimeZone } from 'date-fns-tz';
+import { isPastWorkDateServerGuardBlocked } from '../../shared/work-date-access';
 
 /**
  * Workspace Files Helper
@@ -577,11 +578,7 @@ export async function resetLogisticsTimeline(
   modificationType: string = 'reset'
 ): Promise<boolean> {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const targetDate = new Date(workDate);
-    targetDate.setHours(0, 0, 0, 0);
-    if (targetDate < today) {
+    if (isPastWorkDateServerGuardBlocked(workDate)) {
       console.log(`🚫 resetLogisticsTimeline data passata ${workDate} — bloccato`);
       return false;
     }
@@ -734,12 +731,7 @@ export async function resetTimeline(
   scope: 'housekeeping' | 'office' = 'housekeeping'
 ): Promise<boolean> {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const targetDate = new Date(workDate);
-    targetDate.setHours(0, 0, 0, 0);
-
-    if (targetDate < today) {
+    if (isPastWorkDateServerGuardBlocked(workDate)) {
       console.log(`🚫 Tentativo di reset timeline per data passata ${workDate} - BLOCCATO`);
       return false;
     }

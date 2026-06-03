@@ -50,13 +50,13 @@ Implementato in Phase 2 (`getCleanerViolation`).
 
 | Policy | Comportamento |
 |--------|----------------|
-| `NORMAL_TASK` / `DRIVER_BRINGS_BAG` | Riferimento: `cleanerTaskStartTime` (o `cleanerStartTime`). Il driver può finire **dopo** l’inizio HK solo entro tolleranza: **`ceil(2/3 × cleaningTime)`** se durata presente (`lg_containers.cleaning_time`), altrimenti **30 min**. Oltre → `CLEANER_TIME_CONSTRAINT`. |
+| `NORMAL_TASK` / `DRIVER_BRINGS_BAG` | Riferimento: `cleanerTaskStartTime` (o `cleanerStartTime`). Il driver può iniziare il task logistico **dopo** l’inizio HK solo entro tolleranza: **`ceil(2/3 × cleaningTime)`** se durata presente (`lg_containers.cleaning_time`), altrimenti **30 min**. Oltre → `CLEANER_TIME_CONSTRAINT`. I 15 minuti di durata logistica non pesano su questo vincolo: conta l’arrivo/inizio, perché il borsone è disponibile da quel momento. |
 | `CLEANER_HAS_BAG` | **Nessun** vincolo “prima del cleaner” (solo ritiro sporco). Urgenza legata al **checkout** (priorità), non all’inizio HK. |
 
 **Formula violazione (consegna borsone):**
 
 ```
-taskEndMin > cleanerStartMin + toleranceMin
+taskStartMin > cleanerStartMin + toleranceMin
 ```
 
 dove `toleranceMin = ceil(cleaningTime × 2/3)` oppure `30` se `cleaningTime` assente o ≤ 0.

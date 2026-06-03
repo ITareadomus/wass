@@ -44,6 +44,43 @@ export interface LogisticsPhase2GroupingStatsJson {
     minutesBetweenVisits: number;
     reason: string;
   }>;
+  // Step 4.7-bis — Fragmentation + Route Linearity KPI
+  fragmentationPenaltyTotal?: number;
+  fragmentationPenaltyAvgPerCandidate?: number;
+  fragmentationCandidatesWithPenalty?: number;
+  fragmentationCandidatesCapped?: number;
+  fragmentationProtectedNearPairTotal?: number;
+  fragmentationEventCount?: number;
+  routeLinearityDeltaTotal?: number;
+  routeLinearityDeltaAppliedTotal?: number;
+  routeLinearityDeltaBonusAppliedCount?: number;
+  routeLinearityEventCount?: number;
+}
+
+// Step 4.7-bis — eventi di debug usati nel competitiveContext per ispezione
+// granulare dei singoli scatti di fragmentation / linearity.
+export interface FragmentationEventJson {
+  candidateId: string;
+  taskId: number;
+  otherTaskId: number;
+  reason: "same_location" | "same_logistic_code" | "very_near";
+  travelMin?: number;
+  penalty: number;
+}
+
+export interface RouteLinearityEventJson {
+  driverId?: number;
+  taskIdA: number;
+  taskIdB: number;
+  reason:
+    | "same_location_gap"
+    | "very_near_gap"
+    | "nearest_neighbor_waste"
+    | "return_to_area";
+  gapStops?: number;
+  gapMinutes?: number;
+  travelMin?: number;
+  penalty: number;
 }
 
 export type GroupingStrategy =
@@ -158,6 +195,16 @@ export interface GroupDecisionJson {
       feasible: boolean;
     }>;
     scoreGapToRunnerUp: number | null;
+    /** Step 4.7-bis — breakdown delle penalty del candidato vincente (fragmentation + route linearity). */
+    fragmentationPenalty?: number;
+    fragmentationPenaltyCapped?: boolean;
+    fragmentationProtectedNearPairCount?: number;
+    fragmentationEvents?: FragmentationEventJson[];
+    routeLinearityBefore?: number;
+    routeLinearityAfter?: number;
+    routeLinearityDelta?: number;
+    routeLinearityDeltaApplied?: number;
+    routeLinearityEvents?: RouteLinearityEventJson[];
   };
 }
 

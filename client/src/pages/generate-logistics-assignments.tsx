@@ -6,6 +6,7 @@ import PriorityColumn from "@/components/drag-drop/priority-column";
 import LogisticsTimelineView from "@/components/timeline/logistics-timeline-view";
 import MapSection from "@/components/map/map-section";
 import type { TaskType } from "@shared/schema";
+import { isWorkDateHistoricallyLocked } from "@shared/work-date-access";
 import {
   CalendarIcon,
   RefreshCw,
@@ -285,14 +286,6 @@ async function parseFetchJsonStrictWhenOk(res: Response, notOkMessage: string): 
   }
 }
 
-const isDateInPast = (date: Date): boolean => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(date);
-  target.setHours(0, 0, 0, 0);
-  return target < today;
-};
-
 /** Task timeline → TaskType per ricerca / drag */
 function timelineRowToTaskType(t: any, fallbackPriority: TaskType["priority"]): TaskType {
   const cleaning = Number(t.cleaning_time) || 0;
@@ -387,7 +380,7 @@ export default function GenerateLogisticsAssignments() {
   const adamBaselineRef = useRef<AdamFingerprint | null>(null);
   const [hasAdamUpdates, setHasAdamUpdates] = useState(false);
 
-  const isTimelineReadOnly = isDateInPast(selectedDate);
+  const isTimelineReadOnly = isWorkDateHistoricallyLocked(selectedDate);
 
   useEffect(() => {
     localStorage.setItem("selected_work_date", format(selectedDate, "yyyy-MM-dd"));
@@ -549,7 +542,7 @@ export default function GenerateLogisticsAssignments() {
     const dateStr = format(date, "yyyy-MM-dd");
 
     const run = async () => {
-      if (isDateInPast(date)) {
+      if (isWorkDateHistoricallyLocked(date)) {
         await loadLogisticsContainers(date);
         await loadLogisticsTimelineState(date);
         return;

@@ -57,9 +57,7 @@ const NEARBY_TASKS_TRAVEL_MAX_MIN = 5;
 const STRONG_LOCATION_TRAVEL_MAX_MIN = 1;
 const MAX_STRONG_CLUSTER_SIZE = 4;
 const SAME_LOCATION_CONTINUITY_BONUS_PER_PAIR = 8;
-const SAME_LOCATION_SPLIT_PENALTY_PER_GAP = 14;
 const SAME_LOCATION_CROSS_DRIVER_SPLIT_PENALTY = 40;
-const SAME_LOCATION_RETURN_AFTER_60_MIN_PENALTY = 25;
 const NEARBY_CONTINUITY_BONUS_PER_PAIR = 2;
 const ASSIGNED_TASK_WEIGHT = 100;
 const CLEANER_SEQUENCE_BREAK_PENALTY = 5;
@@ -67,7 +65,73 @@ const COMPETITIVE_TOP_N_LOOKAHEAD = 15;
 const MAX_CANDIDATES_PER_TASK = 6;
 const MAX_NEARBY_CANDIDATES_PER_TASK = 3;
 const VERY_NEAR_PAIR_TRAVEL_MAX_MIN = 3;
-const VERY_NEAR_PAIR_SPLIT_PROTECTION_PENALTY = 45;
+
+/**
+ * Step 4.7-bis — Candidate Fragmentation Penalty (Fix C).
+ *
+ * Penalizza un candidato che lascia "fuori" un fragmentation partner ancora
+ * schedulabile. Rispetto alla 4.7 originale i parametri sono molto più stretti
+ * per evitare di punire candidati per ogni task entro 5 min (a Milano centro
+ * questo causava `fragmentationPenaltyTotal` esplosa):
+ *
+ * - very-near solo entro 3 min (era 5);
+ * - very-near penalty 35 (era 70);
+ * - cap per candidato MAX_PER_CANDIDATE = 80 → no penalità totali a 800+;
+ * - very-near richiede una coppia "protetta" (mutual-nearest + feasibile),
+ *   non scatta su qualunque task entro 3 min.
+ *
+ * Same-location resta forte (150): è il segnale corretto per non spezzare
+ * 1744A/B o cluster su un addressId condiviso.
+ */
+const SAME_LOCATION_FRAGMENTATION_PENALTY = 150;
+const SAME_LOGISTIC_CODE_FRAGMENTATION_PENALTY = 150;
+const VERY_NEAR_FRAGMENTATION_MAX_TRAVEL_MIN = 3;
+const VERY_NEAR_FRAGMENTATION_PENALTY = 35;
+const VERY_NEAR_FRAGMENTATION_MAX_PER_CANDIDATE = 80;
+
+/**
+ * Step 4.7-bis — Route Linearity Penalty: gap weights (Fix B).
+ *
+ * Per stessa-address la penalty viene calcolata su `positionsByAddress` e SOLO
+ * sulle coppie consecutive nell'array di posizioni (così un blocco contiguo
+ * [549,761,975] tutti su 1637 paga 0). Per very-near (NON same-address) la
+ * coppia (i, j) paga solo se non esiste un intermedio k anch'esso very-near a
+ * taskA — evita doppi conteggi a cascata.
+ */
+const SAME_LOCATION_GAP_STOP_WEIGHT = 25;
+const SAME_LOCATION_GAP_MIN_WEIGHT = 0.5;
+const SAME_LOCATION_GAP_GRACE_MIN = 30;
+const VERY_NEAR_GAP_STOP_WEIGHT = 6;
+const VERY_NEAR_GAP_MIN_WEIGHT = 0.2;
+const VERY_NEAR_GAP_GRACE_MIN = 45;
+const VERY_NEAR_GAP_MAX_TRAVEL_MIN = 3;
+
+/**
+ * Step 4.7-bis — Nearest-Neighbor Waste (mantenuta come "smoke detector").
+ */
+const NEAREST_NEIGHBOR_WASTE_WEIGHT = 2;
+const NEAREST_NEIGHBOR_WASTE_IGNORE_BELOW_MIN = 3;
+
+/**
+ * Step 4.7-bis — Return-to-Area (Fix D: DISABILITATA).
+ *
+ * Su città dense (Milano) scatta troppo spesso su pattern operativamente
+ * leciti (attese check-in, micro-deviazioni) e duplica `very_near_gap`. La
+ * teniamo ferma a 0 finché non vediamo, dai debug, pattern realmente non
+ * catturati dal gap penalty.
+ */
+const RETURN_TO_AREA_ENABLED = false;
+const RETURN_TO_AREA_MAX_TRAVEL_MIN = 5;
+const RETURN_TO_AREA_WEIGHT = 8;
+
+/**
+ * Step 4.7-bis — Linearity penalty: bonus massimo concesso al delta negativo
+ * (Fix A). Una insertion che migliora la route esistente (linearity post <
+ * linearity pre) ottiene credito, ma cappato per evitare "fix mania" — il
+ * planner non deve preferire patchare route brutte rispetto a costruire route
+ * compatte.
+ */
+const ROUTE_LINEARITY_MAX_BONUS = 30;
 
 /**
  * Slack penalty: penalizza route in cui un task resta troppo vicino al limite hard
@@ -212,6 +276,17 @@ interface LogisticsPhase2GroupingStats {
     minutesBetweenVisits: number;
     reason: string;
   }>;
+  // Step 4.7-bis — Fragmentation + Route Linearity KPI
+  fragmentationPenaltyTotal?: number;
+  fragmentationPenaltyAvgPerCandidate?: number;
+  fragmentationCandidatesWithPenalty?: number;
+  fragmentationCandidatesCapped?: number;
+  fragmentationProtectedNearPairTotal?: number;
+  fragmentationEventCount?: number;
+  routeLinearityDeltaTotal?: number;
+  routeLinearityDeltaAppliedTotal?: number;
+  routeLinearityDeltaBonusAppliedCount?: number;
+  routeLinearityEventCount?: number;
 }
 
 interface LogisticsPhase2PerformanceStats {
@@ -255,6 +330,19 @@ interface GroupSimulationResult {
   travelMinutesDelta: number;
   score: number;
   failure: FeasibilityFailure | null;
+  /**
+   * Step 4.7-bis (Fix A) — Route Linearity DELTA actually subtracted from
+   * `score` (after `before` baseline + bonus cap). Can be negative if the
+   * insertion improved the existing route shape.
+   */
+  routeLinearityBefore?: number;
+  routeLinearityAfter?: number;
+  routeLinearityDelta?: number;
+  routeLinearityDeltaApplied?: number;
+  routeLinearitySameOrNearGapPenalty?: number;
+  routeLinearityNearestNeighborWastePenalty?: number;
+  routeLinearityReturnToAreaPenalty?: number;
+  routeLinearityEvents?: RouteLinearityEvent[];
 }
 
 interface SimulationOptions {
@@ -264,6 +352,59 @@ interface SimulationOptions {
    * cheaper, used by look-ahead/heuristic estimators.
    */
   allowInsertion?: boolean;
+  /**
+   * Step 4.7-bis — travel matrix precomputata sui task schedulabili. Usata
+   * dalle route linearity / fragmentation per evitare N×N
+   * `estimateCarTravelMinutes` a ogni simulazione. Se assente, gli helper
+   * fallano sulla stima live.
+   */
+  travelMatrix?: TravelMatrix;
+}
+
+/**
+ * Step 4.7-bis — Travel matrix simmetrica (taskIdA, taskIdB) -> travelMin,
+ * costruita una sola volta in `runLogisticsPhase2`.
+ */
+type TravelMatrix = Map<string, number>;
+
+interface FragmentationEvent {
+  candidateId: string;
+  taskId: number;
+  otherTaskId: number;
+  reason: "same_location" | "same_logistic_code" | "very_near";
+  travelMin?: number;
+  penalty: number;
+}
+
+interface FragmentationResult {
+  penalty: number;
+  rawPenalty: number;
+  cappedByMax: boolean;
+  events: FragmentationEvent[];
+  protectedNearPairCount: number;
+}
+
+interface RouteLinearityEvent {
+  driverId?: number;
+  taskIdA: number;
+  taskIdB: number;
+  reason:
+    | "same_location_gap"
+    | "very_near_gap"
+    | "nearest_neighbor_waste"
+    | "return_to_area";
+  gapStops?: number;
+  gapMinutes?: number;
+  travelMin?: number;
+  penalty: number;
+}
+
+interface RouteLinearityResult {
+  totalPenalty: number;
+  sameOrNearGapPenalty: number;
+  nearestNeighborWastePenalty: number;
+  returnToAreaPenalty: number;
+  events: RouteLinearityEvent[];
 }
 
 interface PartialGroupSimulationChoice {
@@ -369,35 +510,35 @@ function resolveBagDeliveryToleranceMin(task: LogisticsTaskForPhase2): number {
 
 /**
  * Vincolo cleaner:
- * - NORMAL_TASK / DRIVER_BRINGS_BAG: il task logistico può finire entro una tolleranza
+ * - NORMAL_TASK / DRIVER_BRINGS_BAG: il task logistico può iniziare entro una tolleranza
  *   rispetto all'inizio HK (2/3 durata task, fallback 30').
  * - CLEANER_HAS_BAG: solo ritiro sporco (deadline su checkout), senza consegna borsone.
  */
-function getCleanerViolation(task: LogisticsTaskForPhase2, taskEndMin: number): boolean {
+function getCleanerViolation(task: LogisticsTaskForPhase2, taskStartMin: number): boolean {
   const cleanerReferenceTime = getCleanerDeadlineForBagDelivery(task);
   if (!cleanerReferenceTime) return false;
   const cleanerStartMin = parseMinutes(cleanerReferenceTime, 23 * 60 + 59);
   const toleranceMin = resolveBagDeliveryToleranceMin(task);
-  return taskEndMin > cleanerStartMin + toleranceMin;
+  return taskStartMin > cleanerStartMin + toleranceMin;
 }
 
 function getCleanerFailureDetails(
   task: LogisticsTaskForPhase2,
-  row: { startTime: string; endTime: string; endMin: number } | null
+  row: { startTime: string; endTime: string; startMin: number } | null
 ): Record<string, unknown> | undefined {
   const cleanerReferenceTime = getCleanerDeadlineForBagDelivery(task);
   if (!cleanerReferenceTime || !row) return undefined;
   const cleanerReferenceMin = parseMinutes(cleanerReferenceTime, 23 * 60 + 59);
   const toleranceMin = resolveBagDeliveryToleranceMin(task);
-  const latestAllowedEndMin = cleanerReferenceMin + toleranceMin;
+  const latestAllowedStartMin = cleanerReferenceMin + toleranceMin;
   return {
     reason: "CLEANER_TIME_CONSTRAINT",
     cleanerReferenceTime,
     toleranceMin,
-    latestAllowedEndTime: toHHMM(latestAllowedEndMin),
+    latestAllowedStartTime: toHHMM(latestAllowedStartMin),
     simulatedStart: row.startTime,
     simulatedEnd: row.endTime,
-    overflowMin: Math.max(0, row.endMin - latestAllowedEndMin),
+    overflowMin: Math.max(0, row.startMin - latestAllowedStartMin),
   };
 }
 
@@ -416,7 +557,7 @@ function getCleanerDeadlineForBagDelivery(task: LogisticsTaskForPhase2): string 
  */
 function computeTaskSlackPenalty(
   task: LogisticsTaskForPhase2,
-  row: { endMin: number; checkoutWaitMinutes: number },
+  row: { startMin: number; endMin: number; checkoutWaitMinutes: number },
   workDate: string
 ): number {
   let penalty = 0;
@@ -442,13 +583,14 @@ function computeTaskSlackPenalty(
   }
 
   // Cleaner tolerance (solo se il driver deve arrivare prima del cleaner).
-  // Margine = (cleanerRef + tolerance) - end.
+  // Margine = (cleanerRef + tolerance) - start: il borsone è disponibile
+  // quando il driver arriva, non quando termina i 15 minuti di servizio.
   const cleanerReferenceTime = getCleanerDeadlineForBagDelivery(task);
   if (cleanerReferenceTime) {
     const cleanerMin = parseMinutes(cleanerReferenceTime, 23 * 60 + 59);
     const toleranceMin = resolveBagDeliveryToleranceMin(task);
     const latestAllowed = cleanerMin + toleranceMin;
-    const margin = latestAllowed - row.endMin;
+    const margin = latestAllowed - row.startMin;
     if (margin < SLACK_THRESHOLD_MIN) {
       const deficit = Math.max(0, Math.min(SLACK_THRESHOLD_MIN, SLACK_THRESHOLD_MIN - margin));
       penalty += deficit * SLACK_CLEANER_WEIGHT;
@@ -526,6 +668,484 @@ function areTasksNearby(a: LogisticsTaskForPhase2, b: LogisticsTaskForPhase2): b
     { lat: b.lat, lng: b.lng }
   );
   return travel <= NEARBY_TASKS_TRAVEL_MAX_MIN;
+}
+
+// ============================================================================
+// Step 4.7-bis — Travel matrix + location helpers
+// ============================================================================
+
+/** Chiave canonica simmetrica per la travel matrix. */
+function travelMatrixKey(taskIdA: number, taskIdB: number): string {
+  return taskIdA < taskIdB ? `${taskIdA}|${taskIdB}` : `${taskIdB}|${taskIdA}`;
+}
+
+/**
+ * Precomputa la travel matrix simmetrica O(N²/2) sui task schedulabili in
+ * una singola passata. Le helper di fragmentation / route linearity sono
+ * O(N²) per simulazione: senza matrix farebbero N² stime live ogni round.
+ */
+function buildTravelMatrix(tasks: LogisticsTaskForPhase2[]): TravelMatrix {
+  const matrix: TravelMatrix = new Map();
+  for (let i = 0; i < tasks.length; i++) {
+    for (let j = i + 1; j < tasks.length; j++) {
+      const t = estimateCarTravelMinutes(
+        { lat: tasks[i].lat, lng: tasks[i].lng },
+        { lat: tasks[j].lat, lng: tasks[j].lng }
+      );
+      matrix.set(travelMatrixKey(tasks[i].taskId, tasks[j].taskId), t);
+    }
+  }
+  return matrix;
+}
+
+function getTravelMinBetweenTasks(
+  a: LogisticsTaskForPhase2,
+  b: LogisticsTaskForPhase2,
+  travelMatrix?: TravelMatrix
+): number {
+  if (a.taskId === b.taskId) return 0;
+  if (travelMatrix) {
+    const cached = travelMatrix.get(travelMatrixKey(a.taskId, b.taskId));
+    if (cached != null) return cached;
+  }
+  return estimateCarTravelMinutes(
+    { lat: a.lat, lng: a.lng },
+    { lat: b.lat, lng: b.lng }
+  );
+}
+
+/**
+ * Step 4.7-bis — due task condividono la stessa "strong location" se il
+ * cluster address-id globale (popolato da populateAddressIds, che fonde già
+ * logisticCode + coordinate praticamente identiche) coincide.
+ */
+function haveSameStrongLocation(
+  a: LogisticsTaskForPhase2,
+  b: LogisticsTaskForPhase2
+): boolean {
+  if (a.taskId === b.taskId) return false;
+  if (a.addressId == null || b.addressId == null) return false;
+  return a.addressId === b.addressId;
+}
+
+/**
+ * Step 4.7-bis — due task sono "very near" se NON sono già same-address e il
+ * travel è entro la soglia. L'esclusione esplicita delle strong-location
+ * evita doppi conteggi a cavallo tra le due dimensioni.
+ */
+function areVeryNearTasks(
+  a: LogisticsTaskForPhase2,
+  b: LogisticsTaskForPhase2,
+  travelMatrix?: TravelMatrix,
+  maxMin: number = VERY_NEAR_FRAGMENTATION_MAX_TRAVEL_MIN
+): boolean {
+  if (a.taskId === b.taskId) return false;
+  if (haveSameStrongLocation(a, b)) return false;
+  return getTravelMinBetweenTasks(a, b, travelMatrix) <= maxMin;
+}
+
+// ============================================================================
+// Step 4.7-bis (Fix C) — Mutual-nearest helper.
+//
+// Una coppia (A, B) è "mutual-nearest" se:
+//  - B è il task PIÙ VICINO ad A nel pool dei `eligibleTasks` (escludendo A),
+//  - A è il task PIÙ VICINO a B nel pool dei `eligibleTasks` (escludendo B).
+//
+// Senza questo filtro, very-near fragmentation scattava su ogni task entro
+// VERY_NEAR_FRAGMENTATION_MAX_TRAVEL_MIN min, esplodendo in città dense
+// (Milano: tipicamente 5-10 partner per task). Con mutual-nearest la coppia
+// è "naturalmente legata" e merita protezione.
+// ============================================================================
+
+function getNearestTaskWithin(
+  task: LogisticsTaskForPhase2,
+  pool: LogisticsTaskForPhase2[],
+  maxMin: number,
+  travelMatrix?: TravelMatrix,
+  excludeTaskId?: number
+): LogisticsTaskForPhase2 | null {
+  let best: LogisticsTaskForPhase2 | null = null;
+  let bestTravel = Number.POSITIVE_INFINITY;
+  for (const candidate of pool) {
+    if (candidate.taskId === task.taskId) continue;
+    if (excludeTaskId != null && candidate.taskId === excludeTaskId) continue;
+    if (haveSameStrongLocation(task, candidate)) continue;
+    const travel = getTravelMinBetweenTasks(task, candidate, travelMatrix);
+    if (travel > maxMin) continue;
+    if (travel < bestTravel) {
+      bestTravel = travel;
+      best = candidate;
+    }
+  }
+  return best;
+}
+
+function isMutualNearestPair(
+  a: LogisticsTaskForPhase2,
+  b: LogisticsTaskForPhase2,
+  eligibleTasks: LogisticsTaskForPhase2[],
+  maxMin: number,
+  travelMatrix?: TravelMatrix
+): boolean {
+  const nearestOfA = getNearestTaskWithin(a, eligibleTasks, maxMin, travelMatrix);
+  if (!nearestOfA || nearestOfA.taskId !== b.taskId) return false;
+  const nearestOfB = getNearestTaskWithin(b, eligibleTasks, maxMin, travelMatrix);
+  if (!nearestOfB || nearestOfB.taskId !== a.taskId) return false;
+  return true;
+}
+
+// ============================================================================
+// Step 4.7-bis (Fix C) — Candidate Fragmentation Penalty.
+//
+// Punisce un candidato che lascia "fuori" un fragmentation partner ancora
+// schedulabile.
+//
+// Same-location: penalità forte (150) → un cluster su stesso addressId NON
+// deve essere spezzato (caso 1744A/B).
+// Very-near: penalità BLANDA (35) e solo se la coppia è PROTETTA:
+//   - travel <= 3 min
+//   - mutual-nearest sul pool dei feasible partner
+//
+// In più: cap MAX_PER_CANDIDATE = 80 sulla penalty very-near totale, così un
+// cluster da 4 con 3 partner ciascuno non paga 4×3×35 = 420.
+//
+// Dedup per coppia (un partner contato 1 volta anche se sta vicino a più
+// task del candidato).
+// ============================================================================
+
+function calculateCandidateFragmentationPenalty(args: {
+  candidate: CompetitiveCandidate;
+  remainingTasks: LogisticsTaskForPhase2[];
+  taskById: Map<number, LogisticsTaskForPhase2>;
+  travelMatrix?: TravelMatrix;
+  feasibleTaskIds?: Set<number>;
+}): FragmentationResult {
+  const candidateTaskIds = new Set(args.candidate.taskIds);
+  let sameLocationPenalty = 0;
+  let veryNearPenalty = 0;
+  const events: FragmentationEvent[] = [];
+  const seenPairs = new Set<string>();
+  let protectedNearPairCount = 0;
+
+  // Pool dei partner valutabili: task non nel candidato + ancora feasibili.
+  const partnerPool = args.remainingTasks.filter((other) => {
+    if (candidateTaskIds.has(other.taskId)) return false;
+    if (args.feasibleTaskIds && !args.feasibleTaskIds.has(other.taskId)) return false;
+    return true;
+  });
+
+  // Pool per la mutual-nearest: include anche i task del candidato così che
+  // il "nearest" di un partner possa essere un task dentro al candidato (è
+  // proprio questo che lo rende "protetto" per quel candidato).
+  const mutualPool = args.remainingTasks.filter((task) => {
+    if (args.feasibleTaskIds && !args.feasibleTaskIds.has(task.taskId)) return false;
+    return true;
+  });
+
+  for (const taskId of args.candidate.taskIds) {
+    const task = args.taskById.get(taskId);
+    if (!task) continue;
+
+    for (const other of partnerPool) {
+      if (other.taskId === task.taskId) continue;
+
+      const pairKey =
+        task.taskId < other.taskId
+          ? `${task.taskId}|${other.taskId}`
+          : `${other.taskId}|${task.taskId}`;
+      if (seenPairs.has(pairKey)) continue;
+
+      if (haveSameStrongLocation(task, other)) {
+        seenPairs.add(pairKey);
+        const sameLogisticCode =
+          Number.isFinite(task.logisticCode) &&
+          Number.isFinite(other.logisticCode) &&
+          task.logisticCode > 0 &&
+          task.logisticCode === other.logisticCode;
+        const pairPenalty = sameLogisticCode
+          ? SAME_LOGISTIC_CODE_FRAGMENTATION_PENALTY
+          : SAME_LOCATION_FRAGMENTATION_PENALTY;
+        sameLocationPenalty += pairPenalty;
+        events.push({
+          candidateId: args.candidate.id,
+          taskId: task.taskId,
+          otherTaskId: other.taskId,
+          reason: sameLogisticCode ? "same_logistic_code" : "same_location",
+          penalty: pairPenalty,
+        });
+        continue;
+      }
+
+      // Very-near: applica solo se la coppia è PROTETTA (mutual-nearest).
+      if (!areVeryNearTasks(task, other, args.travelMatrix, VERY_NEAR_FRAGMENTATION_MAX_TRAVEL_MIN)) {
+        continue;
+      }
+      if (
+        !isMutualNearestPair(
+          task,
+          other,
+          mutualPool,
+          VERY_NEAR_FRAGMENTATION_MAX_TRAVEL_MIN,
+          args.travelMatrix
+        )
+      ) {
+        continue;
+      }
+
+      seenPairs.add(pairKey);
+      protectedNearPairCount += 1;
+      veryNearPenalty += VERY_NEAR_FRAGMENTATION_PENALTY;
+      events.push({
+        candidateId: args.candidate.id,
+        taskId: task.taskId,
+        otherTaskId: other.taskId,
+        reason: "very_near",
+        travelMin: getTravelMinBetweenTasks(task, other, args.travelMatrix),
+        penalty: VERY_NEAR_FRAGMENTATION_PENALTY,
+      });
+    }
+  }
+
+  // Cap separato sulla sola componente very-near: same-location rimane senza
+  // cap perché è il segnale forte che NON vogliamo attenuare.
+  const veryNearCapped = Math.min(veryNearPenalty, VERY_NEAR_FRAGMENTATION_MAX_PER_CANDIDATE);
+  const rawPenalty = sameLocationPenalty + veryNearPenalty;
+  const penalty = sameLocationPenalty + veryNearCapped;
+
+  return {
+    penalty,
+    rawPenalty,
+    cappedByMax: veryNearPenalty > VERY_NEAR_FRAGMENTATION_MAX_PER_CANDIDATE,
+    events,
+    protectedNearPairCount,
+  };
+}
+
+// ============================================================================
+// Step 4.7-bis (Fix B) — Route Linearity: Same-or-Near Gap Penalty.
+//
+// Same-address: usa `positionsByAddress` e penalizza SOLO le posizioni
+// consecutive nell'array (no false positive su blocchi contigui 1637 1637 1637).
+//
+// Very-near (non same-address): per ogni task A, penalizza la coppia (A, B)
+// solo se NON esiste un intermedio K (i<k<j) che sia ANCH'ESSO very-near a A.
+// In pratica: si paga solo il "salto al prossimo very-near", non ogni coppia.
+// ============================================================================
+
+function calculateSameOrNearGapPenalty(
+  route: LogisticsTaskSchedule[],
+  taskById: Map<number, LogisticsTaskForPhase2>,
+  travelMatrix?: TravelMatrix
+): { penalty: number; events: RouteLinearityEvent[] } {
+  let penalty = 0;
+  const events: RouteLinearityEvent[] = [];
+
+  // ---- Same-address (positions approach: contiguous blocks pay 0) -----------
+  const positionsByAddress = new Map<number, number[]>();
+  for (let i = 0; i < route.length; i++) {
+    const task = taskById.get(route[i].taskId);
+    if (!task || task.addressId == null) continue;
+    if (!positionsByAddress.has(task.addressId)) positionsByAddress.set(task.addressId, []);
+    positionsByAddress.get(task.addressId)!.push(i);
+  }
+
+  for (const positions of positionsByAddress.values()) {
+    if (positions.length < 2) continue;
+    for (let k = 1; k < positions.length; k++) {
+      const idxPrev = positions[k - 1];
+      const idxCur = positions[k];
+      const gapStops = idxCur - idxPrev - 1;
+      if (gapStops <= 0) continue; // blocco contiguo = 0 penalty
+
+      const startCur = parseMinutes(route[idxCur].startTime, 0);
+      const endPrev = parseMinutes(route[idxPrev].endTime, 0);
+      const gapMinutes = Math.max(0, startCur - endPrev);
+
+      let pairPenalty = gapStops * SAME_LOCATION_GAP_STOP_WEIGHT;
+      if (gapMinutes > SAME_LOCATION_GAP_GRACE_MIN) {
+        pairPenalty += (gapMinutes - SAME_LOCATION_GAP_GRACE_MIN) * SAME_LOCATION_GAP_MIN_WEIGHT;
+      }
+      penalty += pairPenalty;
+      events.push({
+        taskIdA: route[idxPrev].taskId,
+        taskIdB: route[idxCur].taskId,
+        reason: "same_location_gap",
+        gapStops,
+        gapMinutes,
+        penalty: pairPenalty,
+      });
+    }
+  }
+
+  // ---- Very-near (skip se esiste un intermedio anch'esso very-near) --------
+  for (let i = 0; i < route.length; i++) {
+    const taskA = taskById.get(route[i].taskId);
+    if (!taskA) continue;
+
+    for (let j = i + 1; j < route.length; j++) {
+      const taskB = taskById.get(route[j].taskId);
+      if (!taskB) continue;
+      const gapStops = j - i - 1;
+      if (gapStops <= 0) continue;
+      if (haveSameStrongLocation(taskA, taskB)) continue; // già coperta sopra
+      if (!areVeryNearTasks(taskA, taskB, travelMatrix, VERY_NEAR_GAP_MAX_TRAVEL_MIN)) continue;
+
+      // Salta se esiste un intermedio K che è anch'esso very-near di A: vuol
+      // dire che (A, B) non è il "prossimo very-near", quindi non va contato.
+      let hasIntermediateVeryNear = false;
+      for (let k = i + 1; k < j; k++) {
+        const taskK = taskById.get(route[k].taskId);
+        if (!taskK) continue;
+        if (areVeryNearTasks(taskA, taskK, travelMatrix, VERY_NEAR_GAP_MAX_TRAVEL_MIN)) {
+          hasIntermediateVeryNear = true;
+          break;
+        }
+      }
+      if (hasIntermediateVeryNear) continue;
+
+      const startB = parseMinutes(route[j].startTime, 0);
+      const endA = parseMinutes(route[i].endTime, 0);
+      const gapMinutes = Math.max(0, startB - endA);
+
+      let pairPenalty = gapStops * VERY_NEAR_GAP_STOP_WEIGHT;
+      if (gapMinutes > VERY_NEAR_GAP_GRACE_MIN) {
+        pairPenalty += (gapMinutes - VERY_NEAR_GAP_GRACE_MIN) * VERY_NEAR_GAP_MIN_WEIGHT;
+      }
+      penalty += pairPenalty;
+      events.push({
+        taskIdA: taskA.taskId,
+        taskIdB: taskB.taskId,
+        reason: "very_near_gap",
+        gapStops,
+        gapMinutes,
+        travelMin: getTravelMinBetweenTasks(taskA, taskB, travelMatrix),
+        penalty: pairPenalty,
+      });
+    }
+  }
+
+  return { penalty, events };
+}
+
+/**
+ * Step 4.7-bis — Nearest-Neighbor Waste (smoke detector).
+ *
+ * Per ciascuna transizione i→i+1, se nella route futura esiste un task
+ * ancora più vicino al corrente di quello effettivamente scelto, registra
+ * la differenza come "occasione persa". Penalty bassa (×2) perché il
+ * best-insertion già tende a evitare questi pattern.
+ */
+function calculateNearestNeighborWastePenalty(
+  route: LogisticsTaskSchedule[],
+  taskById: Map<number, LogisticsTaskForPhase2>,
+  travelMatrix?: TravelMatrix
+): { penalty: number; events: RouteLinearityEvent[] } {
+  let penalty = 0;
+  const events: RouteLinearityEvent[] = [];
+
+  for (let i = 0; i < route.length - 1; i++) {
+    const current = taskById.get(route[i].taskId);
+    const next = taskById.get(route[i + 1].taskId);
+    if (!current || !next) continue;
+
+    const actualTravel = getTravelMinBetweenTasks(current, next, travelMatrix);
+    let nearestFutureTravel: number | null = null;
+    let nearestFutureTaskId: number | null = null;
+
+    for (let j = i + 2; j < route.length; j++) {
+      const future = taskById.get(route[j].taskId);
+      if (!future) continue;
+      const t = getTravelMinBetweenTasks(current, future, travelMatrix);
+      if (nearestFutureTravel == null || t < nearestFutureTravel) {
+        nearestFutureTravel = t;
+        nearestFutureTaskId = future.taskId;
+      }
+    }
+
+    if (nearestFutureTravel == null) continue;
+    if (nearestFutureTravel > NEAREST_NEIGHBOR_WASTE_IGNORE_BELOW_MIN) continue;
+
+    const waste = actualTravel - nearestFutureTravel;
+    if (waste <= 0) continue;
+
+    const pairPenalty = waste * NEAREST_NEIGHBOR_WASTE_WEIGHT;
+    penalty += pairPenalty;
+    events.push({
+      taskIdA: current.taskId,
+      taskIdB: nearestFutureTaskId ?? next.taskId,
+      reason: "nearest_neighbor_waste",
+      gapStops: 1,
+      travelMin: nearestFutureTravel,
+      penalty: pairPenalty,
+    });
+  }
+
+  return { penalty, events };
+}
+
+/**
+ * Step 4.7-bis (Fix D) — Return-to-Area: DISABILITATA via RETURN_TO_AREA_ENABLED=false.
+ *
+ * In città dense scattava troppo spesso su pattern leciti (attese check-in) e
+ * duplicava `very_near_gap`. La logica resta presente per riattivazione futura.
+ */
+function calculateReturnToAreaPenalty(
+  route: LogisticsTaskSchedule[],
+  taskById: Map<number, LogisticsTaskForPhase2>,
+  travelMatrix?: TravelMatrix
+): { penalty: number; events: RouteLinearityEvent[] } {
+  if (!RETURN_TO_AREA_ENABLED) return { penalty: 0, events: [] };
+
+  let penalty = 0;
+  const events: RouteLinearityEvent[] = [];
+  for (let j = 2; j < route.length; j++) {
+    const current = taskById.get(route[j].taskId);
+    if (!current) continue;
+    for (let i = 0; i < j - 1; i++) {
+      const previous = taskById.get(route[i].taskId);
+      if (!previous) continue;
+      const travelBack = getTravelMinBetweenTasks(current, previous, travelMatrix);
+      if (travelBack > RETURN_TO_AREA_MAX_TRAVEL_MIN) continue;
+      const gapStops = j - i - 1;
+      if (gapStops <= 0) continue;
+      const startJ = parseMinutes(route[j].startTime, 0);
+      const endI = parseMinutes(route[i].endTime, 0);
+      const minutesBetween = Math.max(0, startJ - endI);
+
+      let pairPenalty = gapStops * RETURN_TO_AREA_WEIGHT;
+      if (minutesBetween > 60) {
+        pairPenalty += Math.min(40, (minutesBetween - 60) * 0.2);
+      }
+      penalty += pairPenalty;
+      events.push({
+        taskIdA: previous.taskId,
+        taskIdB: current.taskId,
+        reason: "return_to_area",
+        gapStops,
+        gapMinutes: minutesBetween,
+        travelMin: travelBack,
+        penalty: pairPenalty,
+      });
+    }
+  }
+  return { penalty, events };
+}
+
+function calculateRouteLinearityPenalty(args: {
+  route: LogisticsTaskSchedule[];
+  taskById: Map<number, LogisticsTaskForPhase2>;
+  travelMatrix?: TravelMatrix;
+}): RouteLinearityResult {
+  const gap = calculateSameOrNearGapPenalty(args.route, args.taskById, args.travelMatrix);
+  const waste = calculateNearestNeighborWastePenalty(args.route, args.taskById, args.travelMatrix);
+  const back = calculateReturnToAreaPenalty(args.route, args.taskById, args.travelMatrix);
+  return {
+    totalPenalty: gap.penalty + waste.penalty + back.penalty,
+    sameOrNearGapPenalty: gap.penalty,
+    nearestNeighborWastePenalty: waste.penalty,
+    returnToAreaPenalty: back.penalty,
+    events: [...gap.events, ...waste.events, ...back.events],
+  };
 }
 
 /**
@@ -1801,6 +2421,17 @@ function simulateOrderedTasksForDriver(
   let bestSimulation: GroupSimulationResult | null = null;
   let bestFailure: FeasibilityFailure | null = null;
 
+  // Step 4.7-bis (Fix A) — Linearity baseline ("before"): calcolata UNA VOLTA
+  // sulla route pre-insertion. Per ogni candidate insertion calcoleremo
+  // l'"after" e sottrarremo dallo score solo il DELTA (con bonus cappato),
+  // così il driver con route già "sporca" non paga il pregresso ad ogni round.
+  const routeLinearityBeforeFull = calculateRouteLinearityPenalty({
+    route: baselineFullRoute,
+    taskById,
+    travelMatrix: options?.travelMatrix,
+  });
+  const routeLinearityBefore = routeLinearityBeforeFull.totalPenalty;
+
   for (let insertIndex = insertStart; insertIndex <= insertEnd; insertIndex++) {
     const fullOrdered = [
       ...existingOrdered.slice(0, insertIndex),
@@ -1849,7 +2480,7 @@ function simulateOrderedTasksForDriver(
         routeFailure = { reasonCode: "CHECKIN_CHECKOUT_CONSTRAINT", taskId: task.taskId };
         break;
       }
-      if (getCleanerViolation(task, row.endMin)) {
+      if (getCleanerViolation(task, row.startMin)) {
         routeFailure = {
           reasonCode: "CLEANER_TIME_CONSTRAINT",
           taskId: task.taskId,
@@ -1931,14 +2562,11 @@ function simulateOrderedTasksForDriver(
       )
       : 0;
 
-    // Same-location continuity / split detection sulla route completa (esistenti + nuovi).
-    // - Continuity bonus: ogni coppia consecutiva con stesso addressId conta come "good".
-    // - Split penalty: per ciascun address-group, ogni "gap" tra task della stessa
-    //   address è penalizzato (più i task sono dispersi, più la penalità cresce).
-    // - Nearby bonus: piccolo extra per coppie consecutive con travel <= soglia medium.
+    // Step 4.7-bis (Fix A,B,D) — continuity bonus su coppie consecutive resta
+    // inline; le penalty di SPLIT (stesso address con stop in mezzo) e RETURN
+    // sono ora dentro calculateRouteLinearityPenalty più sotto, applicate come
+    // DELTA (after - before) per non punire il pregresso del driver.
     let sameLocationBonus = 0;
-    let sameLocationSplitPenalty = 0;
-    let sameLocationReturnAfter60Penalty = 0;
     let nearbyContinuityBonus = 0;
     let cleanerSequenceBreakPenalty = 0;
     const routeTasks: (LogisticsTaskForPhase2 | undefined)[] = built.tasks.map((row) =>
@@ -1964,28 +2592,23 @@ function simulateOrderedTasksForDriver(
         cleanerSequenceBreakPenalty += CLEANER_SEQUENCE_BREAK_PENALTY;
       }
     }
-    const positionsByAddress = new Map<number, number[]>();
-    for (let i = 0; i < routeTasks.length; i++) {
-      const t = routeTasks[i];
-      if (!t || t.addressId == null) continue;
-      const arr = positionsByAddress.get(t.addressId);
-      if (arr) arr.push(i);
-      else positionsByAddress.set(t.addressId, [i]);
-    }
-    for (const positions of positionsByAddress.values()) {
-      if (positions.length < 2) continue;
-      for (let k = 1; k < positions.length; k++) {
-        const gap = positions[k] - positions[k - 1];
-        if (gap > 1) {
-          sameLocationSplitPenalty += (gap - 1) * SAME_LOCATION_SPLIT_PENALTY_PER_GAP;
-          const prevRow = built.tasks[positions[k - 1]];
-          const nextRow = built.tasks[positions[k]];
-          if (prevRow && nextRow && nextRow.startMin - prevRow.endMin > 60) {
-            sameLocationReturnAfter60Penalty += SAME_LOCATION_RETURN_AFTER_60_MIN_PENALTY;
-          }
-        }
-      }
-    }
+
+    // Step 4.7-bis (Fix A) — Route Linearity DELTA.
+    // before = baseline (state.assignedTasks pre-inserzione) calcolato fuori dal loop
+    // after  = full route dopo l'inserzione
+    // delta  = after - before; può essere NEGATIVO se l'inserzione ricompatta la route
+    // applied = max(-ROUTE_LINEARITY_MAX_BONUS, delta) → bonus cappato per evitare
+    //           "fix mania": premiamo migliorie reali ma non spingiamo a patchare
+    //           route brutte a discapito di route già compatte.
+    const routeLinearityAfterFull = calculateRouteLinearityPenalty({
+      route: fullRouteAssignments,
+      taskById,
+      travelMatrix: options?.travelMatrix,
+    });
+    const routeLinearityAfter = routeLinearityAfterFull.totalPenalty;
+    const routeLinearityDelta = routeLinearityAfter - routeLinearityBefore;
+    const routeLinearityDeltaApplied = Math.max(-ROUTE_LINEARITY_MAX_BONUS, routeLinearityDelta);
+
     const bagDeliveryUrgencyBonus = hasBagDeliveryUrgency ? 3 : 0;
     const waitPenalty = checkoutWaitMinutesDelta * 0.5;
     const assignedTaskReward = group.tasks.length * ASSIGNED_TASK_WEIGHT;
@@ -2012,10 +2635,9 @@ function simulateOrderedTasksForDriver(
       cleanerClusterBonus +
       strongLocationClusterBonus +
       bagDeliveryUrgencyBonus -
-      sameLocationSplitPenalty -
-      sameLocationReturnAfter60Penalty -
       cleanerSequenceBreakPenalty -
       fallbackCompactnessPenalty -
+      routeLinearityDeltaApplied -
       priorityPenaltyDelta * 2 -
       fairnessPenalty -
       bandPenalty;
@@ -2035,6 +2657,14 @@ function simulateOrderedTasksForDriver(
       travelMinutesDelta,
       score,
       failure: null,
+      routeLinearityBefore,
+      routeLinearityAfter,
+      routeLinearityDelta,
+      routeLinearityDeltaApplied,
+      routeLinearitySameOrNearGapPenalty: routeLinearityAfterFull.sameOrNearGapPenalty,
+      routeLinearityNearestNeighborWastePenalty: routeLinearityAfterFull.nearestNeighborWastePenalty,
+      routeLinearityReturnToAreaPenalty: routeLinearityAfterFull.returnToAreaPenalty,
+      routeLinearityEvents: routeLinearityAfterFull.events,
     };
 
     const isBetter =
@@ -2269,7 +2899,8 @@ function getPartialChoiceRanking(
   workDate: string,
   taskById: Map<number, LogisticsTaskForPhase2>,
   priorityWindows: PriorityWindows | null,
-  performanceStats: LogisticsPhase2PerformanceStats
+  performanceStats: LogisticsPhase2PerformanceStats,
+  options?: { travelMatrix?: TravelMatrix; fragmentationPenalty?: number }
 ): PartialChoiceRanking {
   let remainingFeasibleOnSomeDriver = false;
   let remainingScoreEstimate = Number.NEGATIVE_INFINITY;
@@ -2282,7 +2913,8 @@ function getPartialChoiceRanking(
         workDate,
         taskById,
         priorityWindows,
-        performanceStats
+        performanceStats,
+        { travelMatrix: options?.travelMatrix }
       );
       if (remainingSimulation.feasible) {
         remainingFeasibleOnSomeDriver = true;
@@ -2305,12 +2937,16 @@ function getPartialChoiceRanking(
   );
   const expectedRecoverableTasks =
     choice.assignedGroup.tasks.length + remainingRecoverableTasks;
+  // Step 4.7-bis — fragmentation entra nello score del partial ranking, così
+  // un subset che spezza partner protetti viene preferito dopo uno che li tiene
+  // insieme (a parità di task recuperabili).
+  const fragmentationPenalty = options?.fragmentationPenalty ?? 0;
   return {
     expectedRecoverableTasks,
     assignedSize: choice.assignedGroup.tasks.length,
     remainingFeasibleOnSomeDriver,
     remainingScoreEstimate,
-    score: choice.simulation.score,
+    score: choice.simulation.score - fragmentationPenalty,
     travelMinutesDelta: choice.simulation.travelMinutesDelta,
     tieBreaker: choice.assignedGroup.groupId,
   };
@@ -2381,14 +3017,21 @@ function findBestPartialGroupAssignment(
   workDate: string,
   taskById: Map<number, LogisticsTaskForPhase2>,
   priorityWindows: PriorityWindows | null,
-  performanceStats: LogisticsPhase2PerformanceStats
-): PartialGroupSimulationChoice | null {
+  performanceStats: LogisticsPhase2PerformanceStats,
+  options?: {
+    travelMatrix?: TravelMatrix;
+    feasibleTaskIds?: Set<number>;
+    remainingTasksForFragmentation?: LogisticsTaskForPhase2[];
+  }
+): { choice: PartialGroupSimulationChoice; fragmentationPenalty: number; fragmentation?: FragmentationResult } | null {
   if (group.tasks.length <= 1) return null;
   const subsets = buildTaskSubsetsByDescendingSize(group.tasks).filter((subset) => subset.length < group.tasks.length);
 
   let currentSize: number | null = null;
   let bestChoice: PartialGroupSimulationChoice | null = null;
   let bestRanking: PartialChoiceRanking | null = null;
+  let bestFragmentationPenalty = 0;
+  let bestFragmentation: FragmentationResult | undefined;
 
   for (const subset of subsets) {
     if (
@@ -2398,7 +3041,7 @@ function findBestPartialGroupAssignment(
       bestRanking?.remainingFeasibleOnSomeDriver
     ) {
       // Chiude solo se il miglior subset alla dimensione precedente lascia un remaining assegnabile.
-      return bestChoice;
+      return { choice: bestChoice, fragmentationPenalty: bestFragmentationPenalty, fragmentation: bestFragmentation };
     }
     currentSize = subset.length;
 
@@ -2409,6 +3052,32 @@ function findBestPartialGroupAssignment(
       origin: subset.length === 1 ? "SINGLETON_FALLBACK" : group.origin,
     };
 
+    // Step 4.7-bis — fragmentation calcolata sul subset assegnato (è
+    // indipendente dal driver scelto, quindi una volta per subset).
+    let fragmentation: FragmentationResult | undefined;
+    let fragmentationPenalty = 0;
+    if (options?.remainingTasksForFragmentation) {
+      const subsetCandidate: CompetitiveCandidate = {
+        id: subsetGroup.groupId,
+        type: subset.length === 1 ? "SINGLETON" : "SAME_LOCATION",
+        group: subsetGroup,
+        taskIds: subset.map((task) => task.taskId),
+        assignedTaskCount: subset.length,
+        preScore: 0,
+        priorityRank: 0,
+        compactnessScore: 0,
+        cleanerSequenceScore: 0,
+      };
+      fragmentation = calculateCandidateFragmentationPenalty({
+        candidate: subsetCandidate,
+        remainingTasks: options.remainingTasksForFragmentation,
+        taskById,
+        travelMatrix: options.travelMatrix,
+        feasibleTaskIds: options.feasibleTaskIds,
+      });
+      fragmentationPenalty = fragmentation.penalty;
+    }
+
     for (const state of driverStates) {
       const simulation = simulateGroupForDriver(
         subsetGroup,
@@ -2417,7 +3086,7 @@ function findBestPartialGroupAssignment(
         taskById,
         priorityWindows,
         performanceStats,
-        { allowInsertion: true }
+        { allowInsertion: true, travelMatrix: options?.travelMatrix }
       );
       if (!simulation.feasible) continue;
       const selectedTaskIds = new Set(subset.map((task) => task.taskId));
@@ -2443,17 +3112,21 @@ function findBestPartialGroupAssignment(
         workDate,
         taskById,
         priorityWindows,
-        performanceStats
+        performanceStats,
+        { travelMatrix: options?.travelMatrix, fragmentationPenalty }
       );
 
       if (!bestRanking || isBetterPartialRanking(ranking, bestRanking)) {
         bestChoice = choice;
         bestRanking = ranking;
+        bestFragmentationPenalty = fragmentationPenalty;
+        bestFragmentation = fragmentation;
       }
     }
   }
 
-  return bestChoice;
+  if (!bestChoice) return null;
+  return { choice: bestChoice, fragmentationPenalty: bestFragmentationPenalty, fragmentation: bestFragmentation };
 }
 
 function defaultGroupingReason(origin: string | undefined): GroupingReasonJson {
@@ -2480,7 +3153,8 @@ function buildDriverAttemptsForGroup(
   workDate: string,
   taskById: Map<number, LogisticsTaskForPhase2>,
   priorityWindows: PriorityWindows | null,
-  performanceStats: LogisticsPhase2PerformanceStats
+  performanceStats: LogisticsPhase2PerformanceStats,
+  options?: SimulationOptions
 ): {
   attempts: DriverAttemptJson[];
   bestState: DriverState | null;
@@ -2500,7 +3174,7 @@ function buildDriverAttemptsForGroup(
       taskById,
       priorityWindows,
       performanceStats,
-      { allowInsertion: true }
+      { allowInsertion: true, ...options }
     );
     attempts.push({
       driverId: state.driverId,
@@ -2624,36 +3298,6 @@ function estimateSameLocationCrossDriverSplitPenalty(args: {
   return penalties;
 }
 
-function estimateVeryNearPairSplitProtectionPenalty(args: {
-  candidate: CompetitiveCandidate;
-  remainingTasks: LogisticsTaskForPhase2[];
-}): number {
-  const selected = new Set(args.candidate.taskIds);
-  const selectedTasks = args.candidate.group.tasks;
-  const pairSeen = new Set<string>();
-  let penalty = 0;
-
-  for (const task of selectedTasks) {
-    if (task.checkinTime) continue;
-    for (const other of args.remainingTasks) {
-      if (selected.has(other.taskId)) continue;
-      if (other.checkinTime) continue;
-      const travelMin = estimateCarTravelMinutes(
-        { lat: task.lat, lng: task.lng },
-        { lat: other.lat, lng: other.lng }
-      );
-      if (travelMin > VERY_NEAR_PAIR_TRAVEL_MAX_MIN) continue;
-      const pairKey =
-        task.taskId < other.taskId ? `${task.taskId}:${other.taskId}` : `${other.taskId}:${task.taskId}`;
-      if (pairSeen.has(pairKey)) continue;
-      pairSeen.add(pairKey);
-      penalty += VERY_NEAR_PAIR_SPLIT_PROTECTION_PENALTY;
-    }
-  }
-
-  return penalty;
-}
-
 interface CompetitiveBestPick {
   candidate: CompetitiveCandidate;
   state: DriverState;
@@ -2663,6 +3307,15 @@ interface CompetitiveBestPick {
   scoreGapToRunnerUp: number | null;
   competitorsConsidered: Array<{ id: string; type: CandidateType; score: number | null; feasible: boolean }>;
   sameLocationSplitAcceptedReason: string | null;
+  fragmentationPenalty: number;
+  fragmentationPenaltyCapped: boolean;
+  fragmentationProtectedNearPairCount: number;
+  fragmentationEvents: FragmentationEvent[];
+  routeLinearityBefore: number;
+  routeLinearityAfter: number;
+  routeLinearityDelta: number;
+  routeLinearityDeltaApplied: number;
+  routeLinearityEvents: RouteLinearityEvent[];
 }
 
 function pickBestCompetitiveCandidate(args: {
@@ -2673,6 +3326,8 @@ function pickBestCompetitiveCandidate(args: {
   priorityWindows: PriorityWindows | null;
   performanceStats: LogisticsPhase2PerformanceStats;
   remainingTasks: LogisticsTaskForPhase2[];
+  travelMatrix?: TravelMatrix;
+  feasibleTaskIds?: Set<number>;
 }): CompetitiveBestPick | null {
   const competitorRows: Array<{ id: string; type: CandidateType; score: number | null; feasible: boolean }> = [];
   const feasible: Array<{
@@ -2682,6 +3337,7 @@ function pickBestCompetitiveCandidate(args: {
     attempts: DriverAttemptJson[];
     score: number;
     sameLocationSplitAcceptedReason: string | null;
+    fragmentation: FragmentationResult;
   }> = [];
 
   for (const candidate of args.candidates) {
@@ -2691,7 +3347,8 @@ function pickBestCompetitiveCandidate(args: {
       args.workDate,
       args.taskById,
       args.priorityWindows,
-      args.performanceStats
+      args.performanceStats,
+      { travelMatrix: args.travelMatrix }
     );
     if (!bestState || !bestSimulation) {
       competitorRows.push({ id: candidate.id, type: candidate.type, score: null, feasible: false });
@@ -2715,11 +3372,17 @@ function pickBestCompetitiveCandidate(args: {
       driverStates: args.driverStates,
       taskById: args.taskById,
     });
-    const veryNearSplitPenalty = estimateVeryNearPairSplitProtectionPenalty({
+    // Step 4.7-bis (Fix C) — fragmentation calcolata 1 volta per candidato (non
+    // per (candidato × driver)): la dipendenza è solo da `remainingTasks` +
+    // taskById, indipendente dal driver scelto.
+    const fragmentation = calculateCandidateFragmentationPenalty({
       candidate,
       remainingTasks: args.remainingTasks,
+      taskById: args.taskById,
+      travelMatrix: args.travelMatrix,
+      feasibleTaskIds: args.feasibleTaskIds,
     });
-    const finalScore = bestSimulation.score - lookaheadRisk - crossDriverPenalty - veryNearSplitPenalty;
+    const finalScore = bestSimulation.score - lookaheadRisk - crossDriverPenalty - fragmentation.penalty;
     const sameLocationSplitAcceptedReason = crossDriverPenalty > 0 ? "cross_driver_same_location_split" : null;
     feasible.push({
       candidate,
@@ -2728,6 +3391,7 @@ function pickBestCompetitiveCandidate(args: {
       attempts,
       score: finalScore,
       sameLocationSplitAcceptedReason,
+      fragmentation,
     });
     competitorRows.push({ id: candidate.id, type: candidate.type, score: finalScore, feasible: true });
   }
@@ -2735,6 +3399,17 @@ function pickBestCompetitiveCandidate(args: {
   if (feasible.length === 0) return null;
   feasible.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
+    // Tie-break (Step 4.7-bis):
+    //  1. meno fragmentation (preferiamo candidati che non spezzano partner protetti)
+    //  2. linearity delta più basso (preferiamo inserzioni che ricompattano)
+    //  3. più task assegnati
+    //  4. id lessicografico (determinismo)
+    if (a.fragmentation.penalty !== b.fragmentation.penalty) {
+      return a.fragmentation.penalty - b.fragmentation.penalty;
+    }
+    const aLin = a.simulation.routeLinearityDeltaApplied ?? 0;
+    const bLin = b.simulation.routeLinearityDeltaApplied ?? 0;
+    if (aLin !== bLin) return aLin - bLin;
     if (b.candidate.assignedTaskCount !== a.candidate.assignedTaskCount) {
       return b.candidate.assignedTaskCount - a.candidate.assignedTaskCount;
     }
@@ -2751,6 +3426,15 @@ function pickBestCompetitiveCandidate(args: {
     scoreGapToRunnerUp: runnerUp ? best.score - runnerUp.score : null,
     competitorsConsidered: competitorRows,
     sameLocationSplitAcceptedReason: best.sameLocationSplitAcceptedReason,
+    fragmentationPenalty: best.fragmentation.penalty,
+    fragmentationPenaltyCapped: best.fragmentation.cappedByMax,
+    fragmentationProtectedNearPairCount: best.fragmentation.protectedNearPairCount,
+    fragmentationEvents: best.fragmentation.events,
+    routeLinearityBefore: best.simulation.routeLinearityBefore ?? 0,
+    routeLinearityAfter: best.simulation.routeLinearityAfter ?? 0,
+    routeLinearityDelta: best.simulation.routeLinearityDelta ?? 0,
+    routeLinearityDeltaApplied: best.simulation.routeLinearityDeltaApplied ?? 0,
+    routeLinearityEvents: best.simulation.routeLinearityEvents ?? [],
   };
 }
 
@@ -2761,39 +3445,53 @@ function pickBestPartialAcrossCandidates(args: {
   taskById: Map<number, LogisticsTaskForPhase2>;
   priorityWindows: PriorityWindows | null;
   performanceStats: LogisticsPhase2PerformanceStats;
+  remainingTasks?: LogisticsTaskForPhase2[];
+  travelMatrix?: TravelMatrix;
+  feasibleTaskIds?: Set<number>;
 }): {
   candidate: CompetitiveCandidate;
   choice: PartialGroupSimulationChoice;
   ranking: PartialChoiceRanking;
+  fragmentationPenalty: number;
+  fragmentation?: FragmentationResult;
 } | null {
   let best:
     | {
         candidate: CompetitiveCandidate;
         choice: PartialGroupSimulationChoice;
         ranking: PartialChoiceRanking;
+        fragmentationPenalty: number;
+        fragmentation?: FragmentationResult;
       }
     | null = null;
 
   for (const candidate of args.candidates) {
-    const choice = findBestPartialGroupAssignment(
+    const partial = findBestPartialGroupAssignment(
       candidate.group,
       args.driverStates,
       args.workDate,
       args.taskById,
       args.priorityWindows,
-      args.performanceStats
+      args.performanceStats,
+      {
+        travelMatrix: args.travelMatrix,
+        feasibleTaskIds: args.feasibleTaskIds,
+        remainingTasksForFragmentation: args.remainingTasks,
+      }
     );
-    if (!choice) continue;
+    if (!partial) continue;
+    const { choice, fragmentationPenalty, fragmentation } = partial;
     const ranking = getPartialChoiceRanking(
       choice,
       args.driverStates,
       args.workDate,
       args.taskById,
       args.priorityWindows,
-      args.performanceStats
+      args.performanceStats,
+      { travelMatrix: args.travelMatrix, fragmentationPenalty }
     );
     if (!best || isBetterPartialRanking(ranking, best.ranking)) {
-      best = { candidate, choice, ranking };
+      best = { candidate, choice, ranking, fragmentationPenalty, fragmentation };
     }
   }
 
@@ -2871,7 +3569,7 @@ function simulateFullRouteForRepair(
     if (!row) {
       return fail({ reasonCode: "CHECKIN_CHECKOUT_CONSTRAINT", taskId: task.taskId });
     }
-    if (getCleanerViolation(task, row.endMin)) {
+    if (getCleanerViolation(task, row.startMin)) {
       return fail({
         reasonCode: "CLEANER_TIME_CONSTRAINT",
         taskId: task.taskId,
@@ -2916,8 +3614,24 @@ function calculateRepairInsertionCost(
 ): number {
   const hardDeadlineMin = getHardDeadlineMin(task, workDate);
   const insertedRow = simulation.insertedTaskSchedule;
+  const insertedStartMin = insertedRow ? parseMinutes(insertedRow.startTime, hardDeadlineMin) : hardDeadlineMin;
   const insertedEndMin = insertedRow ? parseMinutes(insertedRow.endTime, hardDeadlineMin) : hardDeadlineMin;
-  const urgencyOverflow = Math.max(0, insertedEndMin - hardDeadlineMin);
+  const cleanerDeadline = getCleanerDeadlineForBagDelivery(task);
+  const cleanerOverflow =
+    cleanerDeadline != null
+      ? Math.max(
+          0,
+          insertedStartMin -
+            (parseMinutes(cleanerDeadline, 23 * 60 + 59) + resolveBagDeliveryToleranceMin(task))
+        )
+      : 0;
+  const checkinOverflow =
+    isDateCompatibleWithWorkDate(task.checkinDate, workDate) && task.checkinTime
+      ? Math.max(0, insertedEndMin - parseMinutes(task.checkinTime, 23 * 60 + 59))
+      : 0;
+  const fallbackOverflow =
+    cleanerDeadline == null && checkinOverflow === 0 ? Math.max(0, insertedEndMin - hardDeadlineMin) : 0;
+  const urgencyOverflow = Math.max(cleanerOverflow, checkinOverflow, fallbackOverflow);
   const addedTravel = Math.max(0, simulation.totalTravelMinutes - state.totalTravelMinutes);
   const bandIndex = bandIndexByTaskId.get(task.taskId);
   const bandPenalty = bandIndex == null ? 0 : Math.abs(bandIndex - state.driverIndex) * 10;
@@ -3206,6 +3920,56 @@ function classifyFinalUnassignedTasks(args: {
   }
 }
 
+/**
+ * Step 4.7-bis (Fix C, supporto a feasibleTaskIds) — precomputa l'insieme dei
+ * task che almeno UN driver può servire come singleton partendo dal depot.
+ *
+ * Usato dalla fragmentation penalty per non punire un candidato per aver
+ * lasciato fuori task che nessuno comunque potrebbe servire (stranded by
+ * deadline / cleaner / check-in). Snapshot statico: i driver "veri"
+ * cambieranno state durante il loop, ma per la quasi totalità dei task
+ * "stranded" non c'è alcuna giornata in cui diventeranno feasibili.
+ */
+function buildAssignableTaskIds(
+  schedulableTasks: LogisticsTaskForPhase2[],
+  selectedDrivers: LogisticsSelectedDriver[],
+  workDate: string,
+  taskById: Map<number, LogisticsTaskForPhase2>,
+  priorityWindows: PriorityWindows | null,
+  performanceStats: LogisticsPhase2PerformanceStats,
+  travelMatrix?: TravelMatrix
+): Set<number> {
+  const result = new Set<number>();
+  const freshDriverStates = buildDriverStates(selectedDrivers);
+  const simulationOptions: SimulationOptions = { allowInsertion: false, travelMatrix };
+
+  for (const task of schedulableTasks) {
+    const singletonGroup: SpatialGroup = {
+      groupId: `assignability-${task.taskId}`,
+      seedBandIndex: 0,
+      tasks: [task],
+      origin: "SINGLETON_FALLBACK",
+      cleanerId: task.cleanerId ?? null,
+    };
+    for (const state of freshDriverStates) {
+      const sim = simulateGroupForDriver(
+        singletonGroup,
+        state,
+        workDate,
+        taskById,
+        priorityWindows,
+        performanceStats,
+        simulationOptions
+      );
+      if (sim.feasible) {
+        result.add(task.taskId);
+        break;
+      }
+    }
+  }
+  return result;
+}
+
 function collectSameLocationReturnEvents(
   driverStates: DriverState[],
   taskById: Map<number, LogisticsTaskForPhase2>
@@ -3305,6 +4069,33 @@ export async function runLogisticsPhase2(
   // alla penalità di split e al bonus di continuità nello scoring.
   const addressGroupsDetected = populateAddressIds(schedulableTasks);
   const taskById = new Map(schedulableTasks.map((task) => [task.taskId, task]));
+
+  // Step 4.7-bis — Travel matrix precomputata sui task schedulabili. Letta da
+  // tutte le helper di fragmentation / route linearity attraverso SimulationOptions.
+  const travelMatrix = buildTravelMatrix(schedulableTasks);
+  // Step 4.7-bis (Fix C, supporto) — Task feasibili come singleton dal depot:
+  // fragmentation NON deve punire un candidato se il partner che lascia fuori è
+  // comunque non assegnabile da nessun driver (stranded). Snapshot statico.
+  const feasibleTaskIds = buildAssignableTaskIds(
+    schedulableTasks,
+    phase1.selectedDrivers,
+    workDate,
+    taskById,
+    priorityWindows,
+    performanceStats,
+    travelMatrix
+  );
+
+  // Step 4.7-bis — KPI accumulators per il debug.
+  let fragmentationPenaltyTotal = 0;
+  let fragmentationCandidatesWithPenalty = 0;
+  let fragmentationCandidatesCapped = 0;
+  let fragmentationProtectedNearPairTotal = 0;
+  const fragmentationEvents: FragmentationEvent[] = [];
+  let routeLinearityDeltaTotal = 0;
+  let routeLinearityDeltaAppliedTotal = 0;
+  let routeLinearityDeltaBonusApplied = 0;
+  const routeLinearityEvents: RouteLinearityEvent[] = [];
 
   if (schedulableTasks.length === 0) {
     reasonCounts.NO_TASK_CANDIDATES = 1;
@@ -3490,13 +4281,22 @@ export async function runLogisticsPhase2(
         workDate,
         taskById,
         priorityWindows,
-        performanceStats
+        performanceStats,
+        { travelMatrix }
       );
 
       if (bestState && bestSimulation) {
         applySimulationToDriverState(bestState, bestSimulation);
         groupsAssigned += 1;
         tasksAssigned += bestSimulation.assignments.length;
+        if (bestSimulation.routeLinearityDelta != null) {
+          routeLinearityDeltaTotal += bestSimulation.routeLinearityDelta;
+        }
+        if (bestSimulation.routeLinearityDeltaApplied != null) {
+          routeLinearityDeltaAppliedTotal += bestSimulation.routeLinearityDeltaApplied;
+          if (bestSimulation.routeLinearityDeltaApplied < 0) routeLinearityDeltaBonusApplied += 1;
+        }
+        if (bestSimulation.routeLinearityEvents) routeLinearityEvents.push(...bestSimulation.routeLinearityEvents);
         if (debugCollector) {
           const decision: GroupDecisionJson = {
             step: groupsProcessed,
@@ -3522,19 +4322,51 @@ export async function runLogisticsPhase2(
         continue;
       }
 
-      const partialChoice = findBestPartialGroupAssignment(
+      const legacyRemainingTasks = schedulableTasks.filter((task) => {
+        // Considera "remaining" sia i task del gruppo corrente non assegnati sia quelli
+        // ancora nei gruppi pendenti — è il vero pool da cui valutare i partner.
+        const isInCurrentGroup = group.tasks.some((t) => t.taskId === task.taskId);
+        if (isInCurrentGroup) return false;
+        return pendingGroups.some((g) => g.tasks.some((t) => t.taskId === task.taskId));
+      });
+      const partialResult = findBestPartialGroupAssignment(
         group,
         driverStates,
         workDate,
         taskById,
         priorityWindows,
-        performanceStats
+        performanceStats,
+        {
+          travelMatrix,
+          feasibleTaskIds,
+          remainingTasksForFragmentation: legacyRemainingTasks,
+        }
       );
-      if (partialChoice) {
+      if (partialResult) {
+        const { choice: partialChoice, fragmentationPenalty: partialFragPenalty, fragmentation: partialFrag } = partialResult;
         applySimulationToDriverState(partialChoice.state, partialChoice.simulation);
         groupsAssigned += 1;
         partialGroupsAssigned += 1;
         tasksAssigned += partialChoice.simulation.assignments.length;
+        if (partialFragPenalty > 0) {
+          fragmentationPenaltyTotal += partialFragPenalty;
+          fragmentationCandidatesWithPenalty += 1;
+          if (partialFrag?.cappedByMax) fragmentationCandidatesCapped += 1;
+          if (partialFrag) {
+            fragmentationProtectedNearPairTotal += partialFrag.protectedNearPairCount;
+            fragmentationEvents.push(...partialFrag.events);
+          }
+        }
+        if (partialChoice.simulation.routeLinearityDelta != null) {
+          routeLinearityDeltaTotal += partialChoice.simulation.routeLinearityDelta;
+        }
+        if (partialChoice.simulation.routeLinearityDeltaApplied != null) {
+          routeLinearityDeltaAppliedTotal += partialChoice.simulation.routeLinearityDeltaApplied;
+          if (partialChoice.simulation.routeLinearityDeltaApplied < 0) routeLinearityDeltaBonusApplied += 1;
+        }
+        if (partialChoice.simulation.routeLinearityEvents) {
+          routeLinearityEvents.push(...partialChoice.simulation.routeLinearityEvents);
+        }
         if (partialChoice.remainingGroup) {
           groupsSplit += 1;
           pendingGroups.unshift(partialChoice.remainingGroup);
@@ -3546,7 +4378,8 @@ export async function runLogisticsPhase2(
             workDate,
             taskById,
             priorityWindows,
-            performanceStats
+            performanceStats,
+            { travelMatrix, fragmentationPenalty: partialFragPenalty }
           );
           const decision: GroupDecisionJson = {
             step: groupsProcessed,
@@ -3663,6 +4496,8 @@ export async function runLogisticsPhase2(
           priorityWindows,
           performanceStats,
           remainingTasks,
+          travelMatrix,
+          feasibleTaskIds,
         }) ??
         pickBestCompetitiveCandidate({
           candidates: ranked,
@@ -3672,6 +4507,8 @@ export async function runLogisticsPhase2(
           priorityWindows,
           performanceStats,
           remainingTasks,
+          travelMatrix,
+          feasibleTaskIds,
         });
 
       if (bestPick) {
@@ -3697,6 +4534,20 @@ export async function runLogisticsPhase2(
           sameLocationBeatenByCleanerClusterCount += 1;
         }
         for (const taskId of bestPick.candidate.taskIds) consumedTaskIds.add(taskId);
+
+        // Step 4.7-bis — KPI accumulators (fragmentation + linearity).
+        if (bestPick.fragmentationPenalty > 0) {
+          fragmentationPenaltyTotal += bestPick.fragmentationPenalty;
+          fragmentationCandidatesWithPenalty += 1;
+          if (bestPick.fragmentationPenaltyCapped) fragmentationCandidatesCapped += 1;
+        }
+        fragmentationProtectedNearPairTotal += bestPick.fragmentationProtectedNearPairCount;
+        if (bestPick.fragmentationEvents.length > 0) fragmentationEvents.push(...bestPick.fragmentationEvents);
+        routeLinearityDeltaTotal += bestPick.routeLinearityDelta;
+        routeLinearityDeltaAppliedTotal += bestPick.routeLinearityDeltaApplied;
+        if (bestPick.routeLinearityDeltaApplied < 0) routeLinearityDeltaBonusApplied += 1;
+        if (bestPick.routeLinearityEvents.length > 0) routeLinearityEvents.push(...bestPick.routeLinearityEvents);
+
         if (debugCollector) {
           debugCollector.recordGroupDecision({
             step: groupsProcessed,
@@ -3720,6 +4571,15 @@ export async function runLogisticsPhase2(
               candidateType: bestPick.candidate.type,
               competitorsConsidered: bestPick.competitorsConsidered,
               scoreGapToRunnerUp: bestPick.scoreGapToRunnerUp,
+              fragmentationPenalty: bestPick.fragmentationPenalty,
+              fragmentationPenaltyCapped: bestPick.fragmentationPenaltyCapped,
+              fragmentationProtectedNearPairCount: bestPick.fragmentationProtectedNearPairCount,
+              fragmentationEvents: bestPick.fragmentationEvents,
+              routeLinearityBefore: bestPick.routeLinearityBefore,
+              routeLinearityAfter: bestPick.routeLinearityAfter,
+              routeLinearityDelta: bestPick.routeLinearityDelta,
+              routeLinearityDeltaApplied: bestPick.routeLinearityDeltaApplied,
+              routeLinearityEvents: bestPick.routeLinearityEvents,
             },
           });
         }
@@ -3733,6 +4593,9 @@ export async function runLogisticsPhase2(
         taskById,
         priorityWindows,
         performanceStats,
+        remainingTasks,
+        travelMatrix,
+        feasibleTaskIds,
       });
       if (partial) {
         applySimulationToDriverState(partial.choice.state, partial.choice.simulation);
@@ -3742,13 +4605,35 @@ export async function runLogisticsPhase2(
         selectedByType[partial.candidate.type] += 1;
         for (const task of partial.choice.assignedGroup.tasks) consumedTaskIds.add(task.taskId);
         if (partial.choice.remainingGroup) groupsSplit += 1;
+
+        if (partial.fragmentationPenalty > 0) {
+          fragmentationPenaltyTotal += partial.fragmentationPenalty;
+          fragmentationCandidatesWithPenalty += 1;
+          if (partial.fragmentation?.cappedByMax) fragmentationCandidatesCapped += 1;
+          if (partial.fragmentation) {
+            fragmentationProtectedNearPairTotal += partial.fragmentation.protectedNearPairCount;
+            fragmentationEvents.push(...partial.fragmentation.events);
+          }
+        }
+        if (partial.choice.simulation.routeLinearityDelta != null) {
+          routeLinearityDeltaTotal += partial.choice.simulation.routeLinearityDelta;
+        }
+        if (partial.choice.simulation.routeLinearityDeltaApplied != null) {
+          routeLinearityDeltaAppliedTotal += partial.choice.simulation.routeLinearityDeltaApplied;
+          if (partial.choice.simulation.routeLinearityDeltaApplied < 0) routeLinearityDeltaBonusApplied += 1;
+        }
+        if (partial.choice.simulation.routeLinearityEvents) {
+          routeLinearityEvents.push(...partial.choice.simulation.routeLinearityEvents);
+        }
+
         const { attempts } = buildDriverAttemptsForGroup(
           partial.candidate.group,
           driverStates,
           workDate,
           taskById,
           priorityWindows,
-          performanceStats
+          performanceStats,
+          { travelMatrix }
         );
         if (debugCollector) {
           debugCollector.recordGroupDecision({
@@ -3785,6 +4670,15 @@ export async function runLogisticsPhase2(
                 feasible: true,
               })),
               scoreGapToRunnerUp: null,
+              fragmentationPenalty: partial.fragmentationPenalty,
+              fragmentationPenaltyCapped: partial.fragmentation?.cappedByMax ?? false,
+              fragmentationProtectedNearPairCount: partial.fragmentation?.protectedNearPairCount ?? 0,
+              fragmentationEvents: partial.fragmentation?.events ?? [],
+              routeLinearityBefore: partial.choice.simulation.routeLinearityBefore ?? 0,
+              routeLinearityAfter: partial.choice.simulation.routeLinearityAfter ?? 0,
+              routeLinearityDelta: partial.choice.simulation.routeLinearityDelta ?? 0,
+              routeLinearityDeltaApplied: partial.choice.simulation.routeLinearityDeltaApplied ?? 0,
+              routeLinearityEvents: partial.choice.simulation.routeLinearityEvents ?? [],
             },
           });
         }
@@ -3892,6 +4786,20 @@ export async function runLogisticsPhase2(
       selectedCandidateScoreGapP50: percentileScoreGap(50),
       selectedCandidateScoreGapP90: percentileScoreGap(90),
       sameLocationReturnEvents,
+      // Step 4.7-bis KPI
+      fragmentationPenaltyTotal,
+      fragmentationPenaltyAvgPerCandidate:
+        fragmentationCandidatesWithPenalty > 0
+          ? Math.round((fragmentationPenaltyTotal / fragmentationCandidatesWithPenalty) * 100) / 100
+          : 0,
+      fragmentationCandidatesWithPenalty,
+      fragmentationCandidatesCapped,
+      fragmentationProtectedNearPairTotal,
+      fragmentationEventCount: fragmentationEvents.length,
+      routeLinearityDeltaTotal: Math.round(routeLinearityDeltaTotal * 100) / 100,
+      routeLinearityDeltaAppliedTotal: Math.round(routeLinearityDeltaAppliedTotal * 100) / 100,
+      routeLinearityDeltaBonusAppliedCount: routeLinearityDeltaBonusApplied,
+      routeLinearityEventCount: routeLinearityEvents.length,
     });
     debugCollector.recordUnassignedTasks(debugUnassignedDetails);
     debugCollector.setSummary(
