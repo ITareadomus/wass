@@ -2,7 +2,8 @@ import { parseHmToMinutes } from "../../../shared/logistics-scheduling-constrain
 import { mapPriorityType, type Priority } from "../optimizer/priorityWindows";
 
 export const DEFAULT_DRIVER_START_TIME = "10:00";
-export const DEFAULT_DRIVER_END_MIN = 23 * 60 + 59;
+export const DEFAULT_DRIVER_END_TIME = "20:00";
+export const DEFAULT_DRIVER_END_MIN = 20 * 60;
 
 export function toFiniteNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
@@ -18,6 +19,18 @@ export function normalizeStartTime(value: unknown): {
   if (!raw) return { time: DEFAULT_DRIVER_START_TIME, source: "default" };
   return {
     time: raw.length >= 5 ? raw.slice(0, 5) : DEFAULT_DRIVER_START_TIME,
+    source: raw.length >= 5 ? "driver_row" : "default",
+  };
+}
+
+export function normalizeEndTime(value: unknown): {
+  time: string;
+  source: "driver_row" | "default";
+} {
+  const raw = String(value ?? "").trim();
+  if (!raw) return { time: DEFAULT_DRIVER_END_TIME, source: "default" };
+  return {
+    time: raw.length >= 5 ? raw.slice(0, 5) : DEFAULT_DRIVER_END_TIME,
     source: raw.length >= 5 ? "driver_row" : "default",
   };
 }

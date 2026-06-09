@@ -74,6 +74,7 @@ export interface PgDailyAssignmentRow {
   cleaner_role?: string | null;
   cleaner_premium?: boolean | null;
   cleaner_start_time?: string | null;
+  cleaner_end_time?: string | null;
   task_id: number;
   logistic_code: number;
   client_id?: number | null;
@@ -120,6 +121,7 @@ export interface PgLogisticsAssignmentRow {
   driver_role?: string | null;
   driver_premium?: boolean | null;
   driver_start_time?: string | null;
+  driver_end_time?: string | null;
   task_id: number;
   logistic_code: number;
   client_id?: number | null;
@@ -551,6 +553,7 @@ export class PgDailyAssignmentsService {
           driver_role VARCHAR(100),
           driver_premium BOOLEAN DEFAULT FALSE,
           driver_start_time VARCHAR(10) DEFAULT '10:00',
+          driver_end_time VARCHAR(10) DEFAULT '20:00',
           task_id INTEGER NOT NULL,
           logistic_code INTEGER NOT NULL,
           client_id INTEGER,
@@ -603,6 +606,7 @@ export class PgDailyAssignmentsService {
           driver_role VARCHAR(100),
           driver_premium BOOLEAN DEFAULT FALSE,
           driver_start_time VARCHAR(10) DEFAULT '10:00',
+          driver_end_time VARCHAR(10) DEFAULT '20:00',
           task_id INTEGER NOT NULL,
           logistic_code INTEGER NOT NULL,
           client_id INTEGER,
@@ -658,6 +662,12 @@ export class PgDailyAssignmentsService {
       await query(
         `ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS checkout_wait_minutes INTEGER NOT NULL DEFAULT 0`
       );
+      await query(`ALTER TABLE IF EXISTS lg_timeline ADD COLUMN IF NOT EXISTS driver_end_time VARCHAR(10) DEFAULT '20:00'`);
+      await query(`ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS driver_end_time VARCHAR(10) DEFAULT '20:00'`);
+      await query(`ALTER TABLE IF EXISTS lg_drivers ADD COLUMN IF NOT EXISTS end_time VARCHAR(10) NOT NULL DEFAULT '20:00'`);
+      await query(`UPDATE lg_timeline SET driver_end_time = '20:00' WHERE driver_end_time IS NULL`);
+      await query(`UPDATE lg_timeline_history SET driver_end_time = '20:00' WHERE driver_end_time IS NULL`);
+      await query(`UPDATE lg_drivers SET end_time = '20:00' WHERE end_time IS NULL`);
 
       await query(`
         CREATE TABLE IF NOT EXISTS lg_drivers (
@@ -676,6 +686,7 @@ export class PgDailyAssignmentsService {
           preferred_customers INTEGER[] DEFAULT '{}',
           telegram_id BIGINT,
           start_time VARCHAR(10) DEFAULT '10:00',
+          end_time VARCHAR(10) NOT NULL DEFAULT '20:00',
           can_do_straordinaria BOOLEAN DEFAULT false,
           created_at TIMESTAMPTZ DEFAULT NOW(),
           updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -838,6 +849,7 @@ export class PgDailyAssignmentsService {
           cleaner_role: cleaner.role || null,
           cleaner_premium: cleaner.premium != null ? Boolean(cleaner.premium) : null,
           cleaner_start_time: cleaner.start_time ?? '10:00',
+          cleaner_end_time: cleaner.end_time ?? '20:00',
           // Task data
           task_id: Number(task.task_id),
           logistic_code: Number(task.logistic_code || 0),
@@ -920,7 +932,7 @@ export class PgDailyAssignmentsService {
         await client.query(`
           INSERT INTO daily_assignments_current (
             scope,
-            work_date, cleaner_id, cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time,
+            work_date, cleaner_id, cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time, cleaner_end_time,
             task_id, logistic_code, client_id,
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
@@ -929,13 +941,13 @@ export class PgDailyAssignmentsService {
             start_time, end_time, followup, sequence, travel_time
           ) VALUES (
             $1,
-            $2, $3, $4, $5, $6, $7, $8,
-            $9, $10, $11,
-            $12, $13, $14, $15, $16, $17,
-            $18, $19, $20, $21,
-            $22, $23, $24, $25, $26, $27,
-            $28, $29, $30, $31, $32, $33, $34, $35, $36,
-            $37, $38, $39, $40, $41
+            $2, $3, $4, $5, $6, $7, $8, $9,
+            $10, $11, $12,
+            $13, $14, $15, $16, $17, $18,
+            $19, $20, $21, $22,
+            $23, $24, $25, $26, $27, $28,
+            $29, $30, $31, $32, $33, $34, $35, $36, $37,
+            $38, $39, $40, $41, $42
           )
         `, [
           normalizedScope,
@@ -946,6 +958,7 @@ export class PgDailyAssignmentsService {
           row.cleaner_role,
           row.cleaner_premium,
           row.cleaner_start_time,
+          row.cleaner_end_time,
           row.task_id,
           row.logistic_code,
           row.client_id,
@@ -1070,6 +1083,7 @@ export class PgDailyAssignmentsService {
           if (rosterCleaner?.alias) cleaner.alias = rosterCleaner.alias;
           if (row.cleaner_premium !== null) cleaner.premium = row.cleaner_premium;
           cleaner.start_time = row.cleaner_start_time ?? '10:00';
+          cleaner.end_time = row.cleaner_end_time ?? '20:00';
 
           cleanerMap.set(row.cleaner_id, {
             cleaner,
@@ -1294,7 +1308,7 @@ export class PgDailyAssignmentsService {
         await client.query(`
           INSERT INTO daily_assignments_history (
             scope,
-            work_date, revision, cleaner_id, cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time,
+            work_date, revision, cleaner_id, cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time, cleaner_end_time,
             task_id, logistic_code, client_id,
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
@@ -1303,13 +1317,13 @@ export class PgDailyAssignmentsService {
             start_time, end_time, followup, sequence, travel_time, created_by
           ) VALUES (
             $1,
-            $2, $3, $4, $5, $6, $7, $8, $9,
-            $10, $11, $12,
-            $13, $14, $15, $16, $17, $18,
-            $19, $20, $21, $22,
-            $23, $24, $25, $26, $27, $28,
-            $29, $30, $31, $32, $33, $34, $35, $36, $37,
-            $38, $39, $40, $41, $42, $43
+            $2, $3, $4, $5, $6, $7, $8, $9, $10,
+            $11, $12, $13,
+            $14, $15, $16, $17, $18, $19,
+            $20, $21, $22, $23,
+            $24, $25, $26, $27, $28, $29,
+            $30, $31, $32, $33, $34, $35, $36, $37, $38,
+            $39, $40, $41, $42, $43, $44
           )
         `, [
           normalizedScope,
@@ -1321,6 +1335,7 @@ export class PgDailyAssignmentsService {
           row.cleaner_role,
           row.cleaner_premium,
           row.cleaner_start_time,
+          row.cleaner_end_time,
           row.task_id,
           row.logistic_code,
           row.client_id,
@@ -1550,6 +1565,7 @@ export class PgDailyAssignmentsService {
           driver_role: driver.role || null,
           driver_premium: driver.premium != null ? Boolean(driver.premium) : null,
           driver_start_time: driver.start_time ?? '10:00',
+          driver_end_time: driver.end_time ?? '20:00',
           task_id: Number(task.task_id),
           logistic_code: Number(task.logistic_code || 0),
           client_id: task.client_id ? Number(task.client_id) : null,
@@ -1604,7 +1620,7 @@ export class PgDailyAssignmentsService {
       for (const row of rows) {
         await client.query(`
           INSERT INTO lg_timeline (
-            work_date, driver_id, driver_name, driver_lastname, driver_role, driver_premium, driver_start_time,
+            work_date, driver_id, driver_name, driver_lastname, driver_role, driver_premium, driver_start_time, driver_end_time,
             task_id, logistic_code, client_id,
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
@@ -1612,13 +1628,13 @@ export class PgDailyAssignmentsService {
             type_apt, alias, customer_name, customer_reference, customer_note, customer_note_history, reasons, manually_moved, priority,
             start_time, end_time, followup, sequence, travel_time, checkout_wait_minutes
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7,
-            $8, $9, $10,
-            $11, $12, $13, $14, $15, $16,
-            $17, $18, $19, $20,
-            $21, $22, $23, $24, $25, $26,
-            $27, $28, $29, $30, $31, $32, $33, $34, $35,
-            $36, $37, $38, $39, $40, $41
+            $1, $2, $3, $4, $5, $6, $7, $8,
+            $9, $10, $11,
+            $12, $13, $14, $15, $16, $17,
+            $18, $19, $20, $21,
+            $22, $23, $24, $25, $26, $27,
+            $28, $29, $30, $31, $32, $33, $34, $35, $36,
+            $37, $38, $39, $40, $41, $42
           )
         `, [
           row.work_date,
@@ -1628,6 +1644,7 @@ export class PgDailyAssignmentsService {
           row.driver_role,
           row.driver_premium,
           row.driver_start_time,
+          row.driver_end_time,
           row.task_id,
           row.logistic_code,
           row.client_id,
@@ -1703,6 +1720,7 @@ export class PgDailyAssignmentsService {
           if (row.driver_role) driver.role = row.driver_role;
           if (row.driver_premium !== null) driver.premium = row.driver_premium;
           driver.start_time = row.driver_start_time ?? '10:00';
+          driver.end_time = row.driver_end_time ?? '20:00';
           driverMap.set(row.driver_id, { driver, tasks: [] });
         }
         const task: any = {
@@ -1805,7 +1823,7 @@ export class PgDailyAssignmentsService {
         await client.query(
           `
           INSERT INTO lg_timeline_history (
-            work_date, revision, driver_id, driver_name, driver_lastname, driver_role, driver_premium, driver_start_time,
+            work_date, revision, driver_id, driver_name, driver_lastname, driver_role, driver_premium, driver_start_time, driver_end_time,
             task_id, logistic_code, client_id,
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
@@ -1813,13 +1831,13 @@ export class PgDailyAssignmentsService {
             type_apt, alias, customer_name, customer_reference, customer_note, customer_note_history, reasons, manually_moved, priority,
             start_time, end_time, followup, sequence, travel_time, checkout_wait_minutes, created_by
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8,
-            $9, $10, $11,
-            $12, $13, $14, $15, $16, $17,
-            $18, $19, $20, $21,
-            $22, $23, $24, $25, $26, $27,
-            $28, $29, $30, $31, $32, $33, $34, $35, $36,
-            $37, $38, $39, $40, $41, $42, $43
+            $1, $2, $3, $4, $5, $6, $7, $8, $9,
+            $10, $11, $12,
+            $13, $14, $15, $16, $17, $18,
+            $19, $20, $21, $22,
+            $23, $24, $25, $26, $27, $28,
+            $29, $30, $31, $32, $33, $34, $35, $36, $37,
+            $38, $39, $40, $41, $42, $43, $44
           )
         `,
           [
@@ -1831,6 +1849,7 @@ export class PgDailyAssignmentsService {
             row.driver_role,
             row.driver_premium,
             row.driver_start_time,
+            row.driver_end_time,
             row.task_id,
             row.logistic_code,
             row.client_id,
@@ -3645,9 +3664,9 @@ export class PgDailyAssignmentsService {
           INSERT INTO lg_drivers
           (driver_id, work_date, name, lastname, role, active, ranking,
            counter_hours, counter_days, available, contract_type,
-           preferred_customers, telegram_id, start_time,
+           preferred_customers, telegram_id, start_time, end_time,
            created_at, updated_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
         `,
           [
             d.id,
@@ -3664,6 +3683,7 @@ export class PgDailyAssignmentsService {
             d.preferred_customers || [],
             d.telegram_id || null,
             d.start_time ?? '10:00',
+            d.end_time ?? '20:00',
           ]
         );
       }
@@ -3680,7 +3700,7 @@ export class PgDailyAssignmentsService {
   }
 
   async updateLgDriverField(driverId: number, workDate: string, field: string, value: any): Promise<boolean> {
-    const allowedFields = ['start_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days'];
+    const allowedFields = ['start_time', 'end_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days'];
     if (!allowedFields.includes(field)) {
       console.error(`❌ PG: Campo lg_drivers non consentito: ${field}`);
       return false;
@@ -3770,9 +3790,9 @@ export class PgDailyAssignmentsService {
           INSERT INTO cleaners 
           (cleaner_id, work_date, name, lastname, role, active, ranking,
            counter_hours, counter_days, available, contract_type,
-           preferred_customers, telegram_id, start_time,
+           preferred_customers, telegram_id, start_time, end_time,
            created_at, updated_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
         `, [
           cleaner.id,
           workDate,
@@ -3787,7 +3807,8 @@ export class PgDailyAssignmentsService {
           cleaner.contract_type || null,
           cleaner.preferred_customers || [],
           cleaner.telegram_id || null,
-          cleaner.start_time ?? '10:00'
+          cleaner.start_time ?? '10:00',
+          cleaner.end_time ?? '20:00'
         ]);
       }
 
@@ -3813,7 +3834,7 @@ export class PgDailyAssignmentsService {
    * NOTE: For alias updates, this also saves to aliases table
    */
   async updateCleanerField(cleanerId: number, workDate: string, field: string, value: any): Promise<boolean> {
-    const allowedFields = ['start_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days', 'alias'];
+    const allowedFields = ['start_time', 'end_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days', 'alias'];
     if (!allowedFields.includes(field)) {
       console.error(`❌ PG: Campo non consentito: ${field}`);
       return false;

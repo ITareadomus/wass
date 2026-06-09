@@ -115,6 +115,7 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
             role: info?.role || "Standard",
             premium: info?.premium || false,
             start_time: info?.start_time || "10:00",
+            end_time: info?.end_time || "20:00",
           },
           tasks: [],
         };
@@ -169,8 +170,10 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
         const sel = await workspaceFiles.loadSelectedLogisticsDrivers(workDate);
         const sd = sel?.drivers?.find((d: any) => d.id === normalizedDriverId);
         driverEntry.driver.start_time = sd?.start_time || driverEntry.driver.start_time || "10:00";
+        driverEntry.driver.end_time = sd?.end_time || driverEntry.driver.end_time || "20:00";
       } catch {
         driverEntry.driver.start_time = driverEntry.driver.start_time || "10:00";
+        driverEntry.driver.end_time = driverEntry.driver.end_time || "20:00";
       }
 
       try {
@@ -568,6 +571,7 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
           role: row.role || "Driver",
           premium: Boolean(row.premium || row.role === "Premium"),
           start_time: row.start_time || "10:00",
+          end_time: row.end_time || "20:00",
         };
       };
 

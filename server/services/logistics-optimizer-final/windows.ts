@@ -19,7 +19,7 @@ import {
   type RuleTrace,
 } from "./business-rules";
 
-const END_OF_DAY_MIN = 23 * 60 + 59;
+const END_OF_DAY_MIN = 20 * 60;
 export const DRIVER_BRINGS_BAG_TOLERANCE_REASON =
   "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE" as const;
 

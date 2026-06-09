@@ -77,6 +77,7 @@ interface Cleaner {
   preferred_customers: number[];
   telegram_id: number | null;
   start_time: string | null;
+  end_time?: string | null;
   show_plus_one?: boolean;
 }
 
@@ -768,18 +769,35 @@ export default function TimelineView({
     return minTime;
   };
 
+  const getGlobalEndTime = () => {
+    if (allCleanersToShow.length === 0) return "20:00";
+
+    const endTimes = allCleanersToShow.map((c: any) => c.end_time || "20:00");
+    const maxTime = endTimes.reduce((max: string, current: string) => {
+      const [maxH, maxM] = max.split(":").map(Number);
+      const [curH, curM] = current.split(":").map(Number);
+      const maxMinutes = maxH * 60 + maxM;
+      const curMinutes = curH * 60 + curM;
+      return curMinutes > maxMinutes ? current : max;
+    });
+
+    return maxTime;
+  };
+
   // Genera time slots globali basati sullo start time minimo (solo orari interi)
   const generateGlobalTimeSlots = () => {
     const globalStartTime = getGlobalStartTime();
+    const globalEndTime = getGlobalEndTime();
     const [startHour, startMin] = globalStartTime.split(':').map(Number);
+    const [endHourRaw] = globalEndTime.split(':').map(Number);
 
     // Arrotonda all'ora intera precedente per iniziare sempre da un'ora intera
     const startHourRounded = startMin > 0 ? startHour : startHour;
-    const endHour = 19; // Fine fissa alle 19:00
+    const endHour = endHourRaw;
 
     const slots: string[] = [];
 
-    // Genera slot ogni ora fino alle 19:00 (solo orari interi)
+    // Genera slot ogni ora fino all'end_time massimo dei cleaner (solo orari interi)
     for (let hour = startHourRounded; hour <= endHour; hour++) {
       slots.push(`${String(hour).padStart(2, '0')}:00`);
     }
@@ -790,12 +808,14 @@ export default function TimelineView({
   // Calcola i minuti totali della timeline globale (in base all'ora ARROTONDATA per match con la griglia)
   const getGlobalTimelineMinutes = () => {
     const globalStartTime = getGlobalStartTime();
+    const globalEndTime = getGlobalEndTime();
     const [startHour, startMin] = globalStartTime.split(':').map(Number);
+    const [endHour, endMin] = globalEndTime.split(':').map(Number);
 
     // CRITICAL: Usa l'ora arrotondata (come la griglia visiva) per calcolare i minuti
     const startHourRounded = startMin > 0 ? startHour : startHour;
     const startMinutes = startHourRounded * 60; // Parte dall'ora intera
-    const endMinutes = 19 * 60; // 19:00
+    const endMinutes = endHour * 60 + endMin;
     return endMinutes - startMinutes;
   };
 
@@ -819,7 +839,7 @@ const getTimelineStartMinutes = () => {
   return timeToMinutes(first);
 };
 
-const getTimelineEndMinutes = () => 19 * 60; // 19:00 fixed end
+const getTimelineEndMinutes = () => timeToMinutes(getGlobalEndTime());
 
 const minutesToPct = (absoluteMinutes: number) => {
   if (!globalTimeSlots?.length) return 0;
@@ -3525,6 +3545,15 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     }}
                   >
                     {selectedCleaner.start_time || "10:00"}
+                  </p>
+                </div>
+
+                <div className="col-span-2">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">
+                    End Time
+                  </p>
+                  <p className="text-sm p-2 rounded border border-border">
+                    {selectedCleaner.end_time || "20:00"}
                   </p>
                 </div>
 

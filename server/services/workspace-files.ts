@@ -27,6 +27,7 @@ function getNormalizedCleaner(cleaner: any): any {
   if (cleaner.role !== undefined) normalizedCleaner.role = cleaner.role;
   if (cleaner.premium !== undefined) normalizedCleaner.premium = cleaner.premium;
   normalizedCleaner.start_time = cleaner.start_time ?? "10:00";
+  normalizedCleaner.end_time = cleaner.end_time ?? "20:00";
   
   return normalizedCleaner;
 }
@@ -108,6 +109,7 @@ function getNormalizedDriver(driver: any): any {
   if (driver.role !== undefined) n.role = driver.role;
   if (driver.premium !== undefined) n.premium = driver.premium;
   n.start_time = driver.start_time ?? '10:00';
+  n.end_time = driver.end_time ?? '20:00';
   return n;
 }
 
@@ -407,6 +409,7 @@ export async function loadSelectedCleaners(
           role: c?.role || null,
           premium: Boolean(c?.premium),
           start_time: c?.start_time ?? '10:00',
+          end_time: c?.end_time ?? '20:00',
           active: c?.active !== false,
           available: c?.available !== false,
           ranking: c?.ranking || 0,
@@ -628,6 +631,7 @@ export async function loadSelectedLogisticsDrivers(workDate: string): Promise<an
             role: row.role ?? 'Driver',
             premium: row.role === 'Premium',
             start_time: row.start_time ?? '10:00',
+            end_time: row.end_time ?? '20:00',
             active: row.active !== false,
             available: row.available !== false,
             counter_hours: row.counter_hours ?? 0,
@@ -647,6 +651,7 @@ export async function loadSelectedLogisticsDrivers(workDate: string): Promise<an
           role: 'Driver',
           premium: false,
           start_time: '10:00',
+          end_time: '20:00',
           active: true,
           available: true,
           counter_hours: 0,

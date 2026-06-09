@@ -7,7 +7,7 @@ import type {
   LogisticsWindowConfig,
   RawLogisticsTaskInput,
 } from "./input-contract";
-import { normalizeStartTime, toFiniteNumber } from "./normalizers";
+import { normalizeEndTime, normalizeStartTime, toFiniteNumber } from "./normalizers";
 
 export type { RawLogisticsTaskInput, ExistingLockedAssignment };
 
@@ -15,6 +15,8 @@ export interface SelectedLogisticsDriverInput {
   id: number;
   startTime: string;
   startTimeSource: "driver_row" | "default";
+  endTime: string;
+  endTimeSource: "driver_row" | "default";
 }
 
 export interface SchedulableLogisticsTaskInput extends RawLogisticsTaskInput {
@@ -173,10 +175,13 @@ export async function loadSelectedDrivers(workDate: string): Promise<SelectedLog
 
   return uniqueIdsInOrder.map((id) => {
     const start = normalizeStartTime(byId.get(id)?.start_time);
+    const end = normalizeEndTime(byId.get(id)?.end_time);
     return {
       id,
       startTime: start.time,
       startTimeSource: start.source,
+      endTime: end.time,
+      endTimeSource: end.source,
     };
   });
 }

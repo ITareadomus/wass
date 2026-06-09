@@ -4,19 +4,19 @@ overview: Introdurre `cleaner_end_time` e `driver_end_time` (default `20:00`) e 
 todos:
   - id: db-migrations-end-time
     content: Definire e applicare migrazioni DB per end_time cleaner/driver e campi denormalizzati timeline.
-    status: pending
+    status: completed
   - id: services-api-end-time
     content: Estendere service layer e API per leggere/scrivere end_time in housekeeping e logistica.
-    status: pending
+    status: completed
   - id: optimizer-hardcode-replacement
     content: Sostituire hardcoded end-of-day in optimizer/script con limiti per-risorsa e fallback 20:00.
-    status: pending
+    status: completed
   - id: ui-timeline-end-time
     content: Aggiornare timeline e schermate convocazioni/logistica per mostrare e modificare end_time.
-    status: pending
+    status: completed
   - id: validation-testing
     content: Aggiungere validazioni HH:mm/coerenza start-end e verifiche funzionali/test automatici.
-    status: pending
+    status: completed
 isProject: false
 ---
 

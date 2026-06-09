@@ -30,6 +30,7 @@ async function main() {
         preferred_customers INTEGER[] DEFAULT '{}',
         telegram_id BIGINT,
         start_time VARCHAR(10) DEFAULT '10:00',
+        end_time VARCHAR(10) NOT NULL DEFAULT '20:00',
         can_do_straordinaria BOOLEAN DEFAULT false,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW(),

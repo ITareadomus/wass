@@ -158,9 +158,11 @@ export function simulateSequence(
   tasksMap: Map<number, TaskForScheduling>,
   previousTask: TaskForScheduling | null = null,
   priorityWindows: PriorityWindows | null = null,
-  timelineConstraints: Phase3TimelineConstraints | null = null
+  timelineConstraints: Phase3TimelineConstraints | null = null,
+  endTimeStr: string = '20:00'
 ): SimulationResult {
   const startMinutes = parseTimeToMinutes(startTimeStr) ?? 540;
+  const endTimeMaxMinutes = parseTimeToMinutes(endTimeStr) ?? 1200;
   let currentMinutes = startMinutes;
   const scheduleRows: ScheduleRow[] = [];
   let totalTravel = 0;
@@ -248,9 +250,8 @@ export function simulateSequence(
       }
     }
     
-    // VINCOLO HARD GLOBALE: nessun task può finire oltre le 19:00 (1140 minuti)
-    const END_TIME_MAX_MINUTES = 1140; // 19:00
-    if (endMinutes > END_TIME_MAX_MINUTES) {
+    // Vincolo hard per-cleaner: nessun task può finire oltre end_time turno.
+    if (endMinutes > endTimeMaxMinutes) {
       return {
         ok: false,
         scheduleRows,
@@ -259,7 +260,7 @@ export function simulateSequence(
         totalPriorityPenalty,
         priorityViolations,
         endTime: null,
-        failReason: 'END_TIME_EXCEEDS_19:00',
+        failReason: 'END_TIME_EXCEEDS_CLEANER_SHIFT',
         failedTaskId: task.taskId
       };
     }
@@ -363,6 +364,7 @@ export function scheduleSingleGroup(
   taskIds: number[],
   tasksMap: Map<number, TaskForScheduling>,
   cleanerStartTime: string,
+  cleanerEndTime: string = '20:00',
   previousTask: TaskForScheduling | null = null,
   priorityWindows: PriorityWindows | null = null,
   timelineConstraints: Phase3TimelineConstraints | null = null
@@ -386,7 +388,7 @@ export function scheduleSingleGroup(
   }
 
   if (tasks.length === 1) {
-    const result = simulateSequence(workDate, tasks, cleanerStartTime, tasksMap, previousTask, priorityWindows, timelineConstraints);
+    const result = simulateSequence(workDate, tasks, cleanerStartTime, tasksMap, previousTask, priorityWindows, timelineConstraints, cleanerEndTime);
     return {
       ok: result.ok,
       scheduleRows: result.scheduleRows,
@@ -409,7 +411,7 @@ export function scheduleSingleGroup(
 
   for (const perm of perms) {
     permutationsChecked++;
-    const result = simulateSequence(workDate, perm, cleanerStartTime, tasksMap, previousTask, priorityWindows, timelineConstraints);
+    const result = simulateSequence(workDate, perm, cleanerStartTime, tasksMap, previousTask, priorityWindows, timelineConstraints, cleanerEndTime);
     
     if (result.ok) {
       if (!bestResult || comparePermutations(result, bestResult) < 0) {
@@ -439,7 +441,7 @@ export function scheduleSingleGroup(
       const remaining = tasks.filter((_, idx) => idx !== dropIdx);
       const remainingIds = remaining.map(t => t.taskId);
       
-      const subResult = scheduleSingleGroup(workDate, remainingIds, tasksMap, cleanerStartTime, previousTask, priorityWindows, timelineConstraints);
+      const subResult = scheduleSingleGroup(workDate, remainingIds, tasksMap, cleanerStartTime, cleanerEndTime, previousTask, priorityWindows, timelineConstraints);
       
       if (subResult.ok) {
         return {
@@ -477,6 +479,7 @@ export interface CleanerGroups {
   cleanerId: number;
   cleanerName: string;
   startTime: string;
+  endTime: string;
   groups: { taskIds: number[]; score: number }[];
   anchorTask?: TaskForScheduling;
   anchorEndTimeStr?: string;
@@ -520,7 +523,7 @@ export function runPhase3Algorithm(
     }
 
     for (const group of cg.groups) {
-      const result = scheduleSingleGroup(workDate, group.taskIds, tasksMap, currentTimeStr, lastTask, priorityWindows, cleanerConstraints);
+      const result = scheduleSingleGroup(workDate, group.taskIds, tasksMap, currentTimeStr, cg.endTime, lastTask, priorityWindows, cleanerConstraints);
 
       if (result.ok && result.endTime) {
         const adjustedRows = result.scheduleRows.map((row, idx) => ({

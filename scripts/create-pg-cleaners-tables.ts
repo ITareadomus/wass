@@ -33,7 +33,8 @@ async function createCleanersTables() {
         contract_type VARCHAR(50),
         preferred_customers INTEGER[] DEFAULT '{}',
         telegram_id BIGINT,
-        start_time VARCHAR(10) DEFAULT '09:00',
+        start_time VARCHAR(10) DEFAULT '10:00',
+        end_time VARCHAR(10) NOT NULL DEFAULT '20:00',
         can_do_straordinaria BOOLEAN DEFAULT false,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW(),
@@ -68,6 +69,7 @@ async function createCleanersTables() {
         preferred_customers INTEGER[],
         telegram_id BIGINT,
         start_time VARCHAR(10),
+        end_time VARCHAR(10),
         can_do_straordinaria BOOLEAN,
         snapshot_at TIMESTAMP DEFAULT NOW(),
         snapshot_reason VARCHAR(100)

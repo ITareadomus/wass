@@ -554,6 +554,7 @@ async function rehydratePreassignedAssignmentsFromAdam(
           role: cleanerInfo?.role || "Standard",
           premium: Boolean(cleanerInfo?.premium),
           start_time: cleanerInfo?.start_time || "10:00",
+          end_time: cleanerInfo?.end_time || "20:00",
         },
         tasks: [],
       };
@@ -567,6 +568,7 @@ async function rehydratePreassignedAssignmentsFromAdam(
         role: cleanerEntry?.cleaner?.role || "Standard",
         premium: Boolean(cleanerEntry?.cleaner?.premium),
         start_time: cleanerEntry?.cleaner?.start_time || "10:00",
+        end_time: cleanerEntry?.cleaner?.end_time || "20:00",
       });
     }
 
@@ -704,6 +706,17 @@ function isValidWorkDate(dateStr: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
 }
 
+function isValidHHmm(value: string): boolean {
+  if (!/^\d{2}:\d{2}$/.test(value)) return false;
+  const [hh, mm] = value.split(":").map(Number);
+  return hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59;
+}
+
+function toMinutesHHmm(value: string): number {
+  const [hh, mm] = value.split(":").map(Number);
+  return hh * 60 + mm;
+}
+
 /**
  * Helper: Load cleaner start_time from PostgreSQL (selected cleaners)
  * Falls back to filesystem if PostgreSQL fails
@@ -724,6 +737,25 @@ async function getCleanerStartTime(
     }
   } catch (err) {
     console.warn(`⚠️ Could not load start_time from PostgreSQL for cleaner ${cleanerId}`);
+  }
+  return null;
+}
+
+async function getCleanerEndTime(
+  cleanerId: number,
+  workDate: string,
+  scope: "housekeeping" | "office" = "housekeeping"
+): Promise<string | null> {
+  try {
+    const selectedCleaners = await workspaceFiles.loadSelectedCleaners(workDate, scope);
+    if (selectedCleaners?.cleaners) {
+      const cleaner = selectedCleaners.cleaners.find((c: any) => c.id === cleanerId);
+      if (cleaner?.end_time) {
+        return cleaner.end_time;
+      }
+    }
+  } catch (err) {
+    console.warn(`⚠️ Could not load end_time from PostgreSQL for cleaner ${cleanerId}`);
   }
   return null;
 }
@@ -902,11 +934,18 @@ async function recalculateCleanerTimes(cleanerData: any, workDate?: string): Pro
     // CRITICAL: Load start_time from PostgreSQL to ensure it's up-to-date
     const dateToUse = workDate || format(new Date(), 'yyyy-MM-dd');
     const startTime = await getCleanerStartTime(cleanerData.cleaner.id, dateToUse);
+    const endTime = await getCleanerEndTime(cleanerData.cleaner.id, dateToUse);
     if (startTime) {
       cleanerData.cleaner.start_time = startTime;
       console.log(`✅ Loaded start_time ${startTime} from PostgreSQL for cleaner ${cleanerData.cleaner.id}`);
     } else {
       console.warn(`⚠️ Could not load start_time from PostgreSQL for cleaner ${cleanerData.cleaner.id}, using default`);
+    }
+    if (endTime) {
+      cleanerData.cleaner.end_time = endTime;
+      console.log(`✅ Loaded end_time ${endTime} from PostgreSQL for cleaner ${cleanerData.cleaner.id}`);
+    } else {
+      console.warn(`⚠️ Could not load end_time from PostgreSQL for cleaner ${cleanerData.cleaner.id}, using default`);
     }
 
     let priorityWindows: Record<string, { start_min: number }> | undefined;
@@ -3076,16 +3115,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const existing = await pgDailyAssignmentsService.loadLgDriversForDate(workDate);
       const existingStartTimes = new Map<number, string>();
+      const existingEndTimes = new Map<number, string>();
       if (existing && existing.length > 0) {
         for (const d of existing) {
           if (d.id && d.start_time) {
             existingStartTimes.set(d.id, d.start_time);
+          }
+          if (d.id && d.end_time) {
+            existingEndTimes.set(d.id, d.end_time);
           }
         }
       }
       const merged = drivers.map((d: any) => ({
         ...d,
         start_time: existingStartTimes.get(d.id) ?? d.start_time ?? "10:00",
+        end_time: existingEndTimes.get(d.id) ?? d.end_time ?? "20:00",
       }));
       const ok = await pgDailyAssignmentsService.saveLgDriversForDate(
         workDate,
@@ -3126,6 +3170,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           typeof d === "object" && d && d.start_time != null
             ? d.start_time
             : row?.start_time || "10:00";
+        const et =
+          typeof d === "object" && d && d.end_time != null
+            ? d.end_time
+            : row?.end_time || "20:00";
         const rawVid =
           typeof d === "object" && d && d.assigned_vehicle_id != null && d.assigned_vehicle_id !== ""
             ? Number(d.assigned_vehicle_id)
@@ -3139,6 +3187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             role: row.role || "Driver",
             premium: row.role === "Premium",
             start_time: st,
+            end_time: et,
             assigned_vehicle_id: structureId,
             assigned_vehicle_name:
               typeof d === "object" && d ? d.assigned_vehicle_name ?? null : null,
@@ -3154,6 +3203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               role: "Driver",
               premium: false,
               start_time: st,
+              end_time: et,
               assigned_vehicle_id: structureId,
               assigned_vehicle_name: null,
               assigned_vehicle_pms_code: null,
@@ -3165,6 +3215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               role: d.role || "Driver",
               premium: Boolean(d.premium),
               start_time: st,
+              end_time: et,
               assigned_vehicle_id: structureId,
               assigned_vehicle_name: d.assigned_vehicle_name ?? null,
               assigned_vehicle_pms_code: d.assigned_vehicle_pms_code ?? null,
@@ -3515,6 +3566,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const workDate = date;
       const currentUsername = modified_by || getCurrentUsername(req);
+      if (!isValidHHmm(startTime)) {
+        return res.status(400).json({ success: false, message: "startTime deve essere nel formato HH:mm" });
+      }
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
 
       const selectedResult = await workspaceFiles.loadSelectedLogisticsDrivers(workDate);
@@ -3528,6 +3582,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         ids = [...ids, Number(driverId)];
+      }
+      const driverRowsForValidation = await pgDailyAssignmentsService.loadLgDriversByIds([Number(driverId)], workDate);
+      const currentEndTime = driverRowsForValidation[0]?.end_time || "20:00";
+      if (isValidHHmm(currentEndTime) && toMinutesHHmm(startTime) >= toMinutesHHmm(currentEndTime)) {
+        return res.status(400).json({
+          success: false,
+          message: "startTime deve essere precedente a endTime",
+        });
       }
 
       await pgDailyAssignmentsService.updateLgDriverField(Number(driverId), workDate, "start_time", startTime);
@@ -3569,6 +3631,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/update-logistics-driver-end-time", async (req, res) => {
+    try {
+      const { driverId, endTime, date, modified_by } = req.body;
+      if (driverId == null || !endTime || !date) {
+        return res.status(400).json({
+          success: false,
+          message: "driverId, endTime e date sono richiesti",
+        });
+      }
+      const workDate = date;
+      const currentUsername = modified_by || getCurrentUsername(req);
+      if (!isValidHHmm(endTime)) {
+        return res.status(400).json({ success: false, message: "endTime deve essere nel formato HH:mm" });
+      }
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+
+      const selectedResult = await workspaceFiles.loadSelectedLogisticsDrivers(workDate);
+      let ids: number[] = selectedResult?.drivers?.map((d: any) => d.id) ?? [];
+      if (!ids.includes(Number(driverId))) {
+        const rows = await pgDailyAssignmentsService.loadLgDriversByIds([Number(driverId)], workDate);
+        if (!rows.length) {
+          return res.status(404).json({
+            success: false,
+            message: "Driver non trovato in lg_drivers per questa data",
+          });
+        }
+        ids = [...ids, Number(driverId)];
+      }
+      const driverRowsForValidation = await pgDailyAssignmentsService.loadLgDriversByIds([Number(driverId)], workDate);
+      const currentStartTime = driverRowsForValidation[0]?.start_time || "10:00";
+      if (isValidHHmm(currentStartTime) && toMinutesHHmm(endTime) <= toMinutesHHmm(currentStartTime)) {
+        return res.status(400).json({
+          success: false,
+          message: "endTime deve essere successivo a startTime",
+        });
+      }
+
+      await pgDailyAssignmentsService.updateLgDriverField(Number(driverId), workDate, "end_time", endTime);
+
+      await workspaceFiles.saveSelectedLogisticsDrivers(
+        workDate,
+        {
+          drivers: ids.map((id) => ({ id })),
+          total_selected: ids.length,
+          metadata: { date: workDate },
+        },
+        true,
+        currentUsername,
+        "END_TIME"
+      );
+
+      try {
+        const timelineData = await workspaceFiles.loadLogisticsTimeline(workDate);
+        if (timelineData?.drivers_assignments) {
+          const row = timelineData.drivers_assignments.find(
+            (da: any) => da.driver?.id === Number(driverId)
+          );
+          if (row?.driver) {
+            row.driver.end_time = endTime;
+            timelineData.metadata = timelineData.metadata || {};
+            timelineData.metadata.last_updated = getRomeTimestamp();
+            timelineData.metadata.date = workDate;
+            await workspaceFiles.saveLogisticsTimeline(workDate, timelineData, true);
+          }
+        }
+      } catch {
+        /* timeline assente */
+      }
+
+      res.json({ success: true, message: "End time aggiornato" });
+    } catch (error: any) {
+      console.error("POST /api/update-logistics-driver-end-time:", error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
   app.post("/api/add-driver-to-timeline", async (req, res) => {
     try {
       const { driverId, date, modified_by, created_by } = req.body;
@@ -3589,6 +3727,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingFromSelected = selectedDriversData?.drivers?.find((d: any) => d.id === Number(driverId));
       if (existingFromSelected?.start_time) {
         driverData.start_time = existingFromSelected.start_time;
+      }
+      if (existingFromSelected?.end_time) {
+        driverData.end_time = existingFromSelected.end_time;
       }
 
       const selectedDriverIds = new Set(
@@ -3627,6 +3768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: driverData.role || "Driver",
         premium: driverData.role === "Premium",
         start_time: driverData.start_time || "10:00",
+        end_time: driverData.end_time || "20:00",
       };
 
       if (driverToReplace) {
@@ -3872,28 +4014,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       
-      // CRITICAL: Carica gli start_time esistenti da PostgreSQL PRIMA di sovrascrivere
-      // Questo preserva gli start_time custom impostati dall'utente
+      // CRITICAL: Carica gli orari turno esistenti da PostgreSQL PRIMA di sovrascrivere
       const existingCleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate, resolvedScope);
       const existingStartTimes = new Map<number, string>();
+      const existingEndTimes = new Map<number, string>();
       if (existingCleaners && existingCleaners.length > 0) {
         for (const c of existingCleaners) {
           if (c.id && c.start_time) {
             existingStartTimes.set(c.id, c.start_time);
           }
+          if (c.id && c.end_time) {
+            existingEndTimes.set(c.id, c.end_time);
+          }
         }
         console.log(`✅ Preservati ${existingStartTimes.size} start_time custom da PostgreSQL`);
       }
       
-      // Merge: usa lo start_time esistente se presente e non nullo, altrimenti usa quello passato
+      // Merge: usa gli orari esistenti se presenti, altrimenti fallback default
       const mergedCleaners = cleaners.map((c: any) => {
         const existingStartTime = existingStartTimes.get(c.id);
-        // Preserva lo start_time esistente solo se è custom (diverso da '10:00' o tw_start da ADAM)
-        // Se il cleaner passato ha start_time e anche PostgreSQL ha uno start_time diverso dal default,
-        // usa quello di PostgreSQL (è quello impostato dall'utente)
+        const existingEndTime = existingEndTimes.get(c.id);
         return {
           ...c,
-          start_time: existingStartTime ?? c.start_time ?? '10:00'
+          start_time: existingStartTime ?? c.start_time ?? '10:00',
+          end_time: existingEndTime ?? c.end_time ?? '20:00',
         };
       });
       
@@ -4275,7 +4419,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       cleanerEntry.tasks.splice(targetIndex, 0, taskForTimeline);
 
-      // CRITICAL: Carica start_time aggiornato da PostgreSQL PRIMA di ricalcolare
+      // CRITICAL: Carica orari turno aggiornati da PostgreSQL PRIMA di ricalcolare
       try {
         const selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate, resolvedScope);
         const selectedCleaner = selectedCleanersData?.cleaners?.find((c: any) => c.id === normalizedCleanerId);
@@ -4287,9 +4431,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.warn(`⚠️ No start_time found for cleaner ${normalizedCleanerId}, using default 10:00`);
           cleanerEntry.cleaner.start_time = "10:00";
         }
+        if (selectedCleaner?.end_time) {
+          cleanerEntry.cleaner.end_time = selectedCleaner.end_time;
+          console.log(`✅ Loaded end_time ${selectedCleaner.end_time} from PostgreSQL for cleaner ${normalizedCleanerId}`);
+        } else {
+          cleanerEntry.cleaner.end_time = "20:00";
+        }
       } catch (err) {
         console.warn(`⚠️ Could not load start_time from PostgreSQL for cleaner ${normalizedCleanerId}, using default`);
         cleanerEntry.cleaner.start_time = "10:00";
+        cleanerEntry.cleaner.end_time = "20:00";
       }
 
       // Ricalcola travel_time, start_time, end_time usando lo script Python
@@ -4956,19 +5107,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Arricchisci i cleaners con i dati completi da PostgreSQL
-      // Preserva solo lo start_time se è stato modificato dall'utente
+      // Preserva gli orari turno custom se sono stati modificati dall'utente
       const enrichedCleaners = selectedCleaners.map((c: any) => {
         const cleanerId = typeof c === 'number' ? c : c.id;
         const fullCleaner = cleanersMap.get(cleanerId);
         if (fullCleaner) {
-          // Usa l'oggetto completo, ma preserva start_time custom se presente
+          // Usa l'oggetto completo, ma preserva start_time/end_time custom se presenti
           return {
             ...fullCleaner,
-            start_time: c.start_time || fullCleaner.start_time
+            start_time: c.start_time || fullCleaner.start_time || "10:00",
+            end_time: c.end_time || fullCleaner.end_time || "20:00",
           };
         }
         // Fallback: usa i dati passati se non trovato in PostgreSQL
-        return typeof c === 'number' ? { id: c, name: 'Unknown', start_time: '10:00' } : c;
+        return typeof c === 'number'
+          ? { id: c, name: 'Unknown', start_time: '10:00', end_time: '20:00' }
+          : { ...c, end_time: c.end_time || "20:00" };
       });
 
       const dataToSave = {
@@ -5056,6 +5210,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         console.log(`ℹ️ Nessun start_time pre-esistente, usando default ${cleanerData.start_time || '10:00'}`);
       }
+      if (existingCleaner?.end_time) {
+        cleanerData.end_time = existingCleaner.end_time;
+      } else if (!cleanerData.end_time) {
+        cleanerData.end_time = "20:00";
+      }
 
       const selectedCleanerIds = new Set(selectedCleanersData.cleaners.map((c: any) => c.id));
 
@@ -5099,7 +5258,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: cleanerData.name,
           lastname: cleanerData.lastname,
           role: cleanerData.role,
-          premium: cleanerData.role === "Premium"
+          premium: cleanerData.role === "Premium",
+          start_time: cleanerData.start_time || "10:00",
+          end_time: cleanerData.end_time || "20:00",
         };
 
         // Ricalcola i tempi per le task con il nuovo cleaner
@@ -5127,7 +5288,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             name: cleanerData.name,
             lastname: cleanerData.lastname,
             role: cleanerData.role,
-            premium: cleanerData.role === "Premium"
+            premium: cleanerData.role === "Premium",
+            start_time: cleanerData.start_time || "10:00",
+            end_time: cleanerData.end_time || "20:00",
           },
           tasks: []
         };
@@ -5291,6 +5454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cleaner_role: cleaner.role,
         cleaner_contract_type: cleaner.contract_type,
         cleaner_start_time: cleaner.start_time,
+        cleaner_end_time: cleaner.end_time,
 
         // Campi specifici dell'assegnazione
         total_tasks: tasks.length,
@@ -5485,6 +5649,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Trova e aggiorna il cleaner se esiste
       const cleanerIndex = selectedCleanersData.cleaners.findIndex((c: any) => Number(c.id) === cleanerIdNum);
+      const currentEndTime =
+        cleanerIndex !== -1
+          ? selectedCleanersData.cleaners[cleanerIndex].end_time || "20:00"
+          : "20:00";
+      if (isValidHHmm(currentEndTime) && toMinutesHHmm(startTime) >= toMinutesHHmm(currentEndTime)) {
+        return res.status(400).json({
+          success: false,
+          message: "startTime deve essere precedente a endTime",
+        });
+      }
       if (cleanerIndex !== -1) {
         selectedCleanersData.cleaners[cleanerIndex].start_time = startTime;
       } else {
@@ -5553,6 +5727,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         message: error.message || "Errore nel salvataggio dello start time"
+      });
+    }
+  });
+
+  app.post("/api/update-cleaner-end-time", async (req, res) => {
+    try {
+      const { cleanerId, endTime, date, modified_by } = req.body;
+      const cleanerIdNum = Number(cleanerId);
+
+      if (!Number.isFinite(cleanerIdNum) || !endTime || !date) {
+        return res.status(400).json({
+          success: false,
+          message: "cleanerId, endTime e date sono richiesti"
+        });
+      }
+
+      const workDate = date;
+      const currentUsername = modified_by || getCurrentUsername(req);
+
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const selectedCleanersResult = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
+      let selectedCleanersData = selectedCleanersResult || {
+        cleaners: [],
+        total_selected: 0,
+        metadata: { date: workDate }
+      };
+
+      const cleanerIndex = selectedCleanersData.cleaners.findIndex((c: any) => Number(c.id) === cleanerIdNum);
+      const currentStartTime =
+        cleanerIndex !== -1
+          ? selectedCleanersData.cleaners[cleanerIndex].start_time || "10:00"
+          : "10:00";
+      if (isValidHHmm(currentStartTime) && toMinutesHHmm(endTime) <= toMinutesHHmm(currentStartTime)) {
+        return res.status(400).json({
+          success: false,
+          message: "endTime deve essere successivo a startTime",
+        });
+      }
+      if (cleanerIndex !== -1) {
+        selectedCleanersData.cleaners[cleanerIndex].end_time = endTime;
+      } else {
+        const cleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate, resolveScopeFromReq(req));
+        let cleanerData = cleaners?.find((c: any) => Number(c.id) === cleanerIdNum);
+
+        if (!cleanerData) {
+          return res.status(404).json({
+            success: false,
+            message: "Cleaner non trovato in PostgreSQL"
+          });
+        }
+
+        cleanerData.end_time = endTime;
+        selectedCleanersData.cleaners.push(cleanerData);
+        selectedCleanersData.total_selected = selectedCleanersData.cleaners.length;
+        console.log(`✅ Cleaner ${cleanerId} aggiunto a selected_cleaners con end_time ${endTime}`);
+      }
+
+      await pgDailyAssignmentsService.updateCleanerField(cleanerIdNum, workDate, 'end_time', endTime);
+      await workspaceFiles.saveSelectedCleaners(workDate, selectedCleanersData, true, 'system', 'INIT', resolveScopeFromReq(req));
+
+      try {
+        const timelineData = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
+        if (timelineData) {
+          const cleanerAssignment = timelineData.cleaners_assignments?.find((ca: any) => Number(ca.cleaner?.id) === cleanerIdNum);
+          if (cleanerAssignment && cleanerAssignment.cleaner) {
+            cleanerAssignment.cleaner.end_time = endTime;
+
+            timelineData.metadata = timelineData.metadata || {};
+            timelineData.metadata.last_updated = getRomeTimestamp();
+            timelineData.metadata.date = workDate;
+            if (!timelineData.metadata.created_by) {
+              timelineData.metadata.created_by = currentUsername;
+            }
+            timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
+            if (currentUsername && currentUsername !== 'system' && currentUsername !== 'unknown' && !timelineData.metadata.modified_by.includes(currentUsername)) {
+              timelineData.metadata.modified_by.push(currentUsername);
+            }
+
+            await workspaceFiles.saveTimeline(workDate, timelineData, true, 'system', 'manual', undefined, resolveScopeFromReq(req));
+          }
+        }
+      } catch (error) {
+        console.log('Timeline non trovata o non aggiornata');
+      }
+
+      console.log(`✅ End time aggiornato per cleaner ${cleanerId}: ${endTime}`);
+      res.json({
+        success: true,
+        message: "End time aggiornato con successo"
+      });
+    } catch (error: any) {
+      console.error('Errore aggiornamento end time:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Errore nel salvataggio dell'end time"
       });
     }
   });
@@ -5990,11 +6259,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (tasksResult.rows.length === 0) continue;
 
           const cleanerStartTime = await getCleanerStartTime(cId, workDate) || '10:00';
+          const cleanerEndTime = await getCleanerEndTime(cId, workDate) || '20:00';
 
           const cleanerData = {
             cleaner: {
               id: cId,
-              start_time: cleanerStartTime
+              start_time: cleanerStartTime,
+              end_time: cleanerEndTime
             },
             tasks: tasksResult.rows.map((r: any) => ({
               task_id: r.task_id,
@@ -6236,11 +6507,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (tasksResult.rows.length === 0) continue;
 
           const cleanerStartTime = await getCleanerStartTime(Number(cId), workDate) || '10:00';
+          const cleanerEndTime = await getCleanerEndTime(Number(cId), workDate) || '20:00';
           
           const cleanerData = {
             cleaner: {
               id: Number(cId),
-              start_time: cleanerStartTime
+              start_time: cleanerStartTime,
+              end_time: cleanerEndTime
             },
             tasks: tasksResult.rows.map((r: any) => ({
               task_id: r.task_id,
@@ -6432,9 +6705,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (tasksResult.rows.length === 0) continue;
 
           const cleanerStartTime = await getCleanerStartTime(cId, workDate) || '10:00';
+          const cleanerEndTime = await getCleanerEndTime(cId, workDate) || '20:00';
           
           const cleanerData = {
-            cleaner: { id: cId, start_time: cleanerStartTime },
+            cleaner: { id: cId, start_time: cleanerStartTime, end_time: cleanerEndTime },
             tasks: tasksResult.rows.map((r: any) => ({
               task_id: r.task_id,
               logistic_code: r.logistic_code,
@@ -6611,9 +6885,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           const cleanerStartTime = await getCleanerStartTime(cleanerId, workDate) || '10:00';
+          const cleanerEndTime = await getCleanerEndTime(cleanerId, workDate) || '20:00';
           
           const cleanerData = {
-            cleaner: { id: cleanerId, start_time: cleanerStartTime },
+            cleaner: { id: cleanerId, start_time: cleanerStartTime, end_time: cleanerEndTime },
             tasks: tasksResult.rows.map((r: any) => ({
               task_id: r.task_id,
               logistic_code: r.logistic_code,

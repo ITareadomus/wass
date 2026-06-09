@@ -40,6 +40,7 @@ interface Cleaner {
   preferred_customers: number[];
   telegram_id: number | null;
   start_time: string | null;
+  end_time?: string | null;
   show_plus_one?: boolean;
   assigned_vehicle_id?: number | null;
   assigned_vehicle_name?: string | null;
@@ -1191,6 +1192,58 @@ export default function Convocazioni() {
                           ));
                           setFilteredCleaners(prev => prev.map(c => 
                             c.id === cleaner.id ? { ...c, start_time: newTime } : c
+                          ));
+                        }}
+                      >
+                        <span className="text-base font-bold">+</span>
+                      </Button>
+                    </div>
+                    <div className={`flex items-center gap-1 bg-background border-2 rounded-lg px-3 py-1 ${borderColor}`}>
+                      <span className="text-xs font-semibold text-foreground mr-2">End Time:</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 hover:bg-red-100 dark:hover:bg-red-900"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const currentTime = cleaner.end_time || "20:00";
+                          const [hours, minutes] = currentTime.split(':').map(Number);
+                          let totalMinutes = hours * 60 + minutes - 30;
+                          if (totalMinutes < 0) totalMinutes += 24 * 60;
+                          const newHours = Math.floor(totalMinutes / 60);
+                          const newMinutes = totalMinutes % 60;
+                          const newTime = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
+                          setCleaners(prev => prev.map(c =>
+                            c.id === cleaner.id ? { ...c, end_time: newTime } : c
+                          ));
+                          setFilteredCleaners(prev => prev.map(c =>
+                            c.id === cleaner.id ? { ...c, end_time: newTime } : c
+                          ));
+                        }}
+                      >
+                        <span className="text-base font-bold">−</span>
+                      </Button>
+                      <span className="text-sm font-mono font-bold min-w-[45px] text-center">
+                        {cleaner.end_time || "20:00"}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const currentTime = cleaner.end_time || "20:00";
+                          const [hours, minutes] = currentTime.split(':').map(Number);
+                          let totalMinutes = hours * 60 + minutes + 30;
+                          if (totalMinutes >= 24 * 60) totalMinutes -= 24 * 60;
+                          const newHours = Math.floor(totalMinutes / 60);
+                          const newMinutes = totalMinutes % 60;
+                          const newTime = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
+                          setCleaners(prev => prev.map(c =>
+                            c.id === cleaner.id ? { ...c, end_time: newTime } : c
+                          ));
+                          setFilteredCleaners(prev => prev.map(c =>
+                            c.id === cleaner.id ? { ...c, end_time: newTime } : c
                           ));
                         }}
                       >

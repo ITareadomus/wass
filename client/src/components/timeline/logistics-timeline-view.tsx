@@ -67,10 +67,13 @@ export interface LogisticsDriverRow {
   role?: string;
   premium?: boolean;
   start_time?: string | null;
+  end_time?: string | null;
   alias?: string;
   counter_hours?: number | string;
   counter_days?: number;
   contract_type?: string | null;
+  assigned_vehicle_name?: string | null;
+  vehicle_name?: string | null;
   show_plus_one?: boolean;
   /** Presente se il driver ha task in timeline ma non è più nei convocati */
   isRemoved?: boolean;
@@ -452,11 +455,25 @@ export default function LogisticsTimelineView({
     });
   };
 
+  const getGlobalEndTime = () => {
+    if (drivers.length === 0) return "20:00";
+    const endTimes = drivers.map((d) => d.end_time || "20:00");
+    return endTimes.reduce((max, current) => {
+      const [maxH, maxM] = max.split(":").map(Number);
+      const [curH, curM] = current.split(":").map(Number);
+      const maxMinutes = maxH * 60 + maxM;
+      const curMinutes = curH * 60 + curM;
+      return curMinutes > maxMinutes ? current : max;
+    });
+  };
+
   const generateGlobalTimeSlots = () => {
     const globalStartTime = getGlobalStartTime();
+    const globalEndTime = getGlobalEndTime();
     const [startHour, startMin] = globalStartTime.split(":").map(Number);
+    const [endHourRaw] = globalEndTime.split(":").map(Number);
     const startHourRounded = startMin > 0 ? startHour : startHour;
-    const endHour = 19;
+    const endHour = endHourRaw;
     const slots: string[] = [];
     for (let hour = startHourRounded; hour <= endHour; hour++) {
       slots.push(`${String(hour).padStart(2, "0")}:00`);
@@ -466,10 +483,12 @@ export default function LogisticsTimelineView({
 
   const getGlobalTimelineMinutes = () => {
     const globalStartTime = getGlobalStartTime();
+    const globalEndTime = getGlobalEndTime();
     const [startHour, startMin] = globalStartTime.split(":").map(Number);
+    const [endHour, endMin] = globalEndTime.split(":").map(Number);
     const startHourRounded = startMin > 0 ? startHour : startHour;
     const startMinutes = startHourRounded * 60;
-    const endMinutes = 19 * 60;
+    const endMinutes = endHour * 60 + endMin;
     return endMinutes - startMinutes;
   };
 
@@ -1893,6 +1912,15 @@ export default function LogisticsTimelineView({
                       selectedDriverForDetails.alias ||
                       `${selectedDriverForDetails.name ?? ""} ${selectedDriverForDetails.lastname ?? ""}`.trim() ||
                       `ID ${selectedDriverForDetails.id}`}
+                  </p>
+                </div>
+
+                <div className="col-span-2">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">
+                    End Time
+                  </p>
+                  <p className="text-sm p-2 rounded border border-border">
+                    {selectedDriverForDetails.end_time || "20:00"}
                   </p>
                 </div>
 

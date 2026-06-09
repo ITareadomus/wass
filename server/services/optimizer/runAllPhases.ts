@@ -144,23 +144,25 @@ async function recalculateAffectedCleaners(
          AND oa.run_id = $3
          AND oa.cleaner_id = dac.cleaner_id
        WHERE dac.work_date = $1 AND dac.cleaner_id = $2
-       ORDER BY COALESCE(oa.start_time::time, dac.start_time::time, '23:59'::time) ASC, dac.task_id ASC`,
+       ORDER BY COALESCE(oa.start_time::time, dac.start_time::time, '20:00'::time) ASC, dac.task_id ASC`,
       [workDate, cleanerId, runId]
     );
 
     if (tasksResult.rows.length === 0) continue;
 
     const startTimeResult = await client.query(
-      `SELECT COALESCE(start_time, '10:00') as start_time
+      `SELECT COALESCE(start_time, '10:00') as start_time,
+              COALESCE(end_time, '20:00') as end_time
        FROM cleaners
        WHERE work_date = $1 AND cleaner_id = $2
        LIMIT 1`,
       [workDate, cleanerId]
     );
     const cleanerStartTime = startTimeResult.rows[0]?.start_time || '10:00';
+    const cleanerEndTime = startTimeResult.rows[0]?.end_time || '20:00';
 
     const cleanerData = {
-      cleaner: { id: cleanerId, start_time: cleanerStartTime },
+      cleaner: { id: cleanerId, start_time: cleanerStartTime, end_time: cleanerEndTime },
       work_date: workDate,
       ...(priorityWindows ? { priority_windows: priorityWindows } : {}),
       tasks: tasksResult.rows.map((r: any): PythonRecalcTask => ({
@@ -900,7 +902,7 @@ export async function applyOptimizerToProduction(
         pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
         type_apt, alias, customer_name, reasons,
         priority, start_time, end_time, followup, sequence, travel_time,
-        cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time,
+        cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time, cleaner_end_time,
         customer_reference, base_cleaning_time
       )
       SELECT 
@@ -939,6 +941,7 @@ export async function applyOptimizerToProduction(
         c.role as cleaner_role,
         false as cleaner_premium,
         COALESCE(c.start_time, '10:00') as cleaner_start_time,
+        COALESCE(c.end_time, '20:00') as cleaner_end_time,
         dc.customer_reference,
         dc.cleaning_time as base_cleaning_time
       FROM optimizer.optimizer_assignment oa
@@ -1217,7 +1220,8 @@ async function synchronizeTimelineWithRunAfterRerun(
           cleaner_name = c.name,
           cleaner_lastname = c.lastname,
           cleaner_role = c.role,
-          cleaner_start_time = COALESCE(c.start_time, '10:00')
+          cleaner_start_time = COALESCE(c.start_time, '10:00'),
+          cleaner_end_time = COALESCE(c.end_time, '20:00')
         FROM optimizer.optimizer_assignment oa
         LEFT JOIN cleaners c
           ON c.cleaner_id = oa.cleaner_id
@@ -1518,7 +1522,7 @@ export async function applyWaveToProduction(
         pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
         type_apt, alias, customer_name, reasons,
         priority, start_time, end_time, followup, sequence, travel_time,
-        cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time,
+        cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time, cleaner_end_time,
         customer_reference, base_cleaning_time
       )
       SELECT
@@ -1557,6 +1561,7 @@ export async function applyWaveToProduction(
         c.role as cleaner_role,
         false as cleaner_premium,
         COALESCE(c.start_time, '10:00') as cleaner_start_time,
+        COALESCE(c.end_time, '20:00') as cleaner_end_time,
         dc.customer_reference,
         dc.cleaning_time as base_cleaning_time
       FROM optimizer.optimizer_assignment oa

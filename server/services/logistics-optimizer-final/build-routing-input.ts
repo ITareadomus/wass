@@ -13,7 +13,7 @@ import {
   type LogisticsRoutingSourceData,
   type SchedulableLogisticsTaskInput,
 } from "./loaders";
-import { DEFAULT_DRIVER_END_MIN, normalizePriority } from "./normalizers";
+import { normalizePriority } from "./normalizers";
 import { buildTaskWindow } from "./windows";
 import { buildDepotNode, buildLocationNodes, buildTravelMatrixMin } from "./travel-matrix";
 import { validateRoutingProblemInput } from "./validation";
@@ -21,13 +21,14 @@ import { validateRoutingProblemInput } from "./validation";
 function buildDriverNodes(sourceData: LogisticsRoutingSourceData): DriverNode[] {
   return sourceData.selectedDrivers.map((driver) => {
     const startMin = parseHmToMinutes(driver.startTime, 10 * 60) ?? 10 * 60;
+    const endMin = parseHmToMinutes(driver.endTime, 20 * 60) ?? 20 * 60;
     return {
       id: driver.id,
       startLocationNodeId: "depot",
       workWindow: {
         startMin,
-        endMin: DEFAULT_DRIVER_END_MIN,
-        source: driver.startTimeSource,
+        endMin,
+        source: driver.endTimeSource,
       },
       selected: true,
     };
