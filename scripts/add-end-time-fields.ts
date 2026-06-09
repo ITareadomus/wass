@@ -46,16 +46,11 @@ async function addEndTimeFields() {
   try {
     await client.query("BEGIN");
 
-    // Roster fields (cleaners_history non esiste nel DB attuale: vedi db.sql / ensureCleanerAliasesAndRevisionsTables)
+    // Roster fields (db.sql: solo cleaners + lg_drivers, cleaners_history assente)
     await addColumnIfTableExists(
       client,
       "cleaners",
       `ALTER TABLE cleaners ADD COLUMN IF NOT EXISTS end_time VARCHAR(10) NOT NULL DEFAULT '20:00'`
-    );
-    await addColumnIfTableExists(
-      client,
-      "cleaners_history",
-      `ALTER TABLE cleaners_history ADD COLUMN IF NOT EXISTS end_time VARCHAR(10)`
     );
     await addColumnIfTableExists(
       client,
