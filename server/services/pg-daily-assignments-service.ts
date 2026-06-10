@@ -3592,7 +3592,7 @@ export class PgDailyAssignmentsService {
         SELECT
           d.driver_id as id, d.name, d.lastname, d.role, d.active, d.ranking,
           d.counter_hours, d.counter_days, d.available, d.contract_type,
-          d.preferred_customers, d.telegram_id, d.start_time,
+          d.preferred_customers, d.telegram_id, d.start_time, d.end_time,
           ca.alias
         FROM lg_drivers d
         LEFT JOIN aliases ca ON ca.cleaner_id = d.driver_id
@@ -3621,7 +3621,7 @@ export class PgDailyAssignmentsService {
         SELECT
           d.driver_id as id, d.name, d.lastname, d.role, d.active, d.ranking,
           d.counter_hours, d.counter_days, d.available, d.contract_type,
-          d.preferred_customers, d.telegram_id, d.start_time,
+          d.preferred_customers, d.telegram_id, d.start_time, d.end_time,
           ca.alias
         FROM lg_drivers d
         LEFT JOIN aliases ca ON ca.cleaner_id = d.driver_id

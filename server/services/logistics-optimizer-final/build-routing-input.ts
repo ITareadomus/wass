@@ -28,7 +28,8 @@ function buildDriverNodes(sourceData: LogisticsRoutingSourceData): DriverNode[] 
       workWindow: {
         startMin,
         endMin,
-        source: driver.endTimeSource,
+        startSource: driver.startTimeSource,
+        endSource: driver.endTimeSource,
       },
       selected: true,
     };

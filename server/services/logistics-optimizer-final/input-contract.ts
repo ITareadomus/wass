@@ -68,7 +68,8 @@ export interface DriverNode {
   workWindow: {
     startMin: Minutes;
     endMin: Minutes;
-    source: "driver_row" | "default";
+    startSource: "driver_row" | "default";
+    endSource: "driver_row" | "default";
   };
   selected: true;
 }

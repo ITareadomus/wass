@@ -554,7 +554,13 @@ describe("buildRoutingProblemInputFromSource", () => {
       ],
       lockedTasksExcluded: 1,
       tasksExcludedNoCoordinatesIds: [102],
-      selectedDrivers: [{ id: 7, startTime: "09:30", startTimeSource: "driver_row" }],
+      selectedDrivers: [{
+        id: 7,
+        startTime: "09:30",
+        startTimeSource: "driver_row",
+        endTime: "20:00",
+        endTimeSource: "default",
+      }],
       existingLockedAssignments: [],
       windowConfig: {
         source: "app_settings",
@@ -613,7 +619,13 @@ describe("buildRoutingProblemInputFromSource", () => {
       schedulableTasks: [task],
       lockedTasksExcluded: 0,
       tasksExcludedNoCoordinatesIds: [],
-      selectedDrivers: [{ id: 7, startTime: "09:30", startTimeSource: "driver_row" }],
+      selectedDrivers: [{
+        id: 7,
+        startTime: "09:30",
+        startTimeSource: "driver_row",
+        endTime: "20:00",
+        endTimeSource: "default",
+      }],
       existingLockedAssignments: [],
       windowConfig: {
         source: "app_settings",

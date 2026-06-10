@@ -10245,6 +10245,45 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     }
   });
 
+  // ========== LOGISTICS OPTIMIZER FINAL (Milestone 1 — routing input debug) ==========
+  app.post("/api/logistics-optimizer-final/routing-input-debug", async (req, res) => {
+    try {
+      const { date, debug: debugBody } = req.body || {};
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const hasDebugBody = Object.prototype.hasOwnProperty.call(req.body || {}, "debug");
+      const debugExplicit = hasDebugBody
+        ? debugBody === true ||
+          debugBody === 1 ||
+          String(debugBody ?? "").toLowerCase() === "true"
+        : undefined;
+
+      const { runLogisticsRoutingInputDebug } = await import(
+        "./services/logistics-optimizer-final/run-routing-input-debug"
+      );
+      const { isLogisticsOptimizerFinalDebugEnabled } = await import(
+        "./services/logistics-optimizer-final/debug-writer"
+      );
+      const debugEnabled = isLogisticsOptimizerFinalDebugEnabled(debugExplicit);
+      console.log(
+        `🚀 POST /api/logistics-optimizer-final/routing-input-debug - ${workDate}` +
+          (debugEnabled ? " (debug JSON attivo)" : "")
+      );
+
+      const result = await runLogisticsRoutingInputDebug(workDate, { debug: debugExplicit });
+
+      return res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error: any) {
+      console.error("❌ Errore logistics-optimizer-final routing-input-debug:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
   // ========== OPTIMIZER RUN-ALL ENDPOINT ==========
   
   app.post("/api/optimizer/run-all", async (req, res) => {
