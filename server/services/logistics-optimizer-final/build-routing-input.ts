@@ -15,6 +15,10 @@ import {
 } from "./loaders";
 import { normalizePriority } from "./normalizers";
 import { buildTaskWindow } from "./windows";
+import {
+  buildBusinessGroupSoftConstraints,
+  buildBusinessGroups,
+} from "./groups/build-business-groups";
 import { buildDepotNode, buildLocationNodes, buildTravelMatrixMin } from "./travel-matrix";
 import { validateRoutingProblemInput } from "./validation";
 
@@ -190,8 +194,14 @@ function buildMetadata(sourceData: LogisticsRoutingSourceData): RoutingProblemMe
 export function buildRoutingProblemInputFromSource(sourceData: LogisticsRoutingSourceData): RoutingProblemInput {
   const workDate = sourceData.workDate;
   const drivers = buildDriverNodes(sourceData);
-  const { tasks, hardConstraints, softConstraints } = buildTaskNodes(sourceData, workDate);
+  const { tasks, hardConstraints, softConstraints: taskSoftConstraints } = buildTaskNodes(
+    sourceData,
+    workDate
+  );
   const nodes = buildLocationNodes(tasks);
+  const travelMatrixMin = buildTravelMatrixMin(nodes);
+  const businessGroups = buildBusinessGroups(tasks, travelMatrixMin);
+  const businessSoftConstraints = buildBusinessGroupSoftConstraints(businessGroups);
   const metadata = buildMetadata(sourceData);
 
   const input: RoutingProblemInput = {
@@ -201,10 +211,11 @@ export function buildRoutingProblemInputFromSource(sourceData: LogisticsRoutingS
     depot: buildDepotNode(),
     drivers,
     tasks,
-    travelMatrixMin: buildTravelMatrixMin(nodes),
+    travelMatrixMin,
     serviceDurationMin: LOGISTICS_SERVICE_DURATION_MIN,
     hardConstraints: [...buildDriverConstraints(drivers), ...hardConstraints],
-    softConstraints,
+    softConstraints: [...taskSoftConstraints, ...businessSoftConstraints],
+    businessGroups,
     metadata,
   };
 

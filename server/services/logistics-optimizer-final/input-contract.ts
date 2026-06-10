@@ -1,5 +1,6 @@
 import type { Priority, PriorityWindows } from "../optimizer/priorityWindows";
 import type { RuleTrace } from "./business-rules";
+import type { RoutingBusinessGroup } from "./groups/group-contract";
 import type { RoutingProblemValidationResult } from "./validation-contract";
 
 export type Minutes = number;
@@ -184,6 +185,40 @@ export type SoftConstraintSpec =
       startMin: Minutes;
       endMin?: Minutes;
       penaltyPerMinOutside: number;
+    }
+  | {
+      type: "KEEP_SAME_COORDINATES_BUILDING_TOGETHER";
+      groupId: string;
+      weight: number;
+      toleranceMeters: number;
+    }
+  | {
+      type: "KEEP_CLEANER_SEQUENCE";
+      groupId: string;
+      weight: number;
+      cleanerId: number;
+      orderedTaskIds: TaskId[];
+    }
+  | {
+      type: "KEEP_SAME_CLEANER_TASKS_TOGETHER";
+      groupId: string;
+      weight: number;
+      cleanerId: number;
+    }
+  | {
+      type: "KEEP_PRIORITY_COMPATIBLE_TASKS_TOGETHER";
+      groupId: string;
+      weight: number;
+      windowOverlap: {
+        startMin: Minutes;
+        endMin: Minutes;
+      };
+    }
+  | {
+      type: "KEEP_NEARBY_CLUSTER_TOGETHER";
+      groupId: string;
+      weight: number;
+      maxTravelMin: number;
     };
 
 export interface LogisticsWindowConfig {
@@ -224,5 +259,6 @@ export interface RoutingProblemInput {
   serviceDurationMin: Minutes;
   hardConstraints: HardConstraintSpec[];
   softConstraints: SoftConstraintSpec[];
+  businessGroups: RoutingBusinessGroup[];
   metadata: RoutingProblemMetadata;
 }

@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
-import type { RoutingProblemInput } from "./input-contract";
+import type { BusinessGroupType } from "./groups/group-contract";
+import type { RoutingProblemInput, SoftConstraintSpec } from "./input-contract";
 
 export function isLogisticsOptimizerFinalDebugEnabled(explicit?: boolean): boolean {
   if (explicit === true) return true;
@@ -17,6 +18,32 @@ function debugRootDir(): string {
 
 export function createLogisticsOptimizerFinalRunId(startedAt = new Date()): string {
   return startedAt.toISOString().replace(/[:.]/g, "-");
+}
+
+function countBusinessGroupsByType(
+  groups: RoutingProblemInput["businessGroups"]
+): Record<BusinessGroupType, number> {
+  const counts: Record<BusinessGroupType, number> = {
+    SAME_COORDINATES_BUILDING: 0,
+    SAME_CLEANER: 0,
+    CLEANER_SEQUENCE: 0,
+    PRIORITY_COMPATIBLE: 0,
+    NEARBY_CLUSTER: 0,
+  };
+
+  for (const group of groups) {
+    counts[group.type] += 1;
+  }
+
+  return counts;
+}
+
+function extractBusinessSoftConstraints(
+  softConstraints: SoftConstraintSpec[]
+): SoftConstraintSpec[] {
+  return softConstraints.filter((constraint) =>
+    constraint.type.startsWith("KEEP_")
+  );
 }
 
 export async function writeRoutingProblemInputDebug(
@@ -43,9 +70,13 @@ export async function writeRoutingProblemInputDebug(
       tasks: input.tasks.length,
       hardConstraints: input.hardConstraints.length,
       softConstraints: input.softConstraints.length,
+      businessGroups: input.businessGroups.length,
+      businessSoftConstraints: extractBusinessSoftConstraints(input.softConstraints).length,
       existingLockedAssignments: input.metadata.existingLockedAssignmentsCount,
       excludedTasks: input.metadata.excludedTasks.length,
     },
+    businessGroupsByType: countBusinessGroupsByType(input.businessGroups),
+    businessSoftConstraints: extractBusinessSoftConstraints(input.softConstraints),
     files: ["01-routing-input.json"],
   };
 

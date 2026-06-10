@@ -23,6 +23,11 @@ async function main(): Promise<void> {
   console.log(`Date: ${result.workDate}`);
   console.log(`Drivers: ${result.driverCount}`);
   console.log(`Tasks: ${result.taskCount}`);
+  console.log(`Business groups: ${result.businessGroupCount}`);
+  console.log("Business groups by type:");
+  for (const [type, count] of Object.entries(result.businessGroupsByType)) {
+    console.log(`  ${type}: ${count}`);
+  }
   console.log(`Validation: ${result.validation.valid ? "valid" : "invalid"}`);
   console.log(`Warnings: ${result.warningCount}`);
   if (result.errorCount > 0) {
