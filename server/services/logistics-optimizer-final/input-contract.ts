@@ -1,5 +1,6 @@
 import type { Priority, PriorityWindows } from "../optimizer/priorityWindows";
 import type { RuleTrace } from "./business-rules";
+import type { RoutingProblemValidationResult } from "./validation-contract";
 
 export type Minutes = number;
 export type TaskId = number;
@@ -209,11 +210,7 @@ export interface RoutingProblemMetadata {
   existingLockedAssignments: ExistingLockedAssignment[];
   existingLockedAssignmentsCount: number;
   lockedAssignmentsSolverIntegration: "pending";
-  validation: {
-    valid: boolean;
-    errors: string[];
-    warnings: string[];
-  };
+  validation: RoutingProblemValidationResult;
 }
 
 export interface RoutingProblemInput {

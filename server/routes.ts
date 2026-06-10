@@ -10245,7 +10245,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     }
   });
 
-  // ========== LOGISTICS OPTIMIZER FINAL (Milestone 1 — routing input debug) ==========
+  // ========== LOGISTICS OPTIMIZER FINAL (pre-solver routing input debug) ==========
   app.post("/api/logistics-optimizer-final/routing-input-debug", async (req, res) => {
     try {
       const { date, debug: debugBody } = req.body || {};

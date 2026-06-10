@@ -5,4 +5,5 @@ export * from "./input-contract";
 export * from "./loaders";
 export * from "./run-routing-input-debug";
 export * from "./validation";
+export * from "./validation-contract";
 export * from "./windows";

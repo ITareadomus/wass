@@ -16,4 +16,4 @@ replacements.txt
 git-filter-repo/
 
 # Logistics optimizer debug dumps
-server/debug/logistics-optimizer/
+server/debug/

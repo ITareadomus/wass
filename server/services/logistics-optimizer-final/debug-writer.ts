@@ -33,6 +33,19 @@ export async function writeRoutingProblemInputDebug(
     runId,
     startedAt,
     milestone: "routing-input-only",
+    validation: {
+      valid: input.metadata.validation.valid,
+      errorCount: input.metadata.validation.errors.length,
+      warningCount: input.metadata.validation.warnings.length,
+    },
+    counts: {
+      drivers: input.drivers.length,
+      tasks: input.tasks.length,
+      hardConstraints: input.hardConstraints.length,
+      softConstraints: input.softConstraints.length,
+      existingLockedAssignments: input.metadata.existingLockedAssignmentsCount,
+      excludedTasks: input.metadata.excludedTasks.length,
+    },
     files: ["01-routing-input.json"],
   };
 

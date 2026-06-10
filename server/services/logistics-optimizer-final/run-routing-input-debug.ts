@@ -12,10 +12,13 @@ export interface RunLogisticsRoutingInputDebugResult {
   validation: RoutingProblemInput["metadata"]["validation"];
   taskCount: number;
   driverCount: number;
+  errorCount: number;
+  warningCount: number;
 }
 
 /**
- * Milestone 1: build RoutingProblemInput and optionally persist debug JSON.
+ * Pre-solver debug runner: builds RoutingProblemInput, validates it,
+ * and optionally persists debug JSON.
  * Does not run solver or apply assignments.
  */
 export async function runLogisticsRoutingInputDebug(
@@ -37,5 +40,7 @@ export async function runLogisticsRoutingInputDebug(
     validation: input.metadata.validation,
     taskCount: input.tasks.length,
     driverCount: input.drivers.length,
+    errorCount: input.metadata.validation.errors.length,
+    warningCount: input.metadata.validation.warnings.length,
   };
 }
