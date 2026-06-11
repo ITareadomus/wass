@@ -1,4 +1,7 @@
 import { LOGISTICS_SERVICE_DURATION_MIN } from "../../../shared/logistics-scheduling-constraints";
+import { validateBusinessGroupSemantics } from "./groups/business-group-semantics";
+import type { RoutingBusinessGroup } from "./groups/group-contract";
+import { BUSINESS_GROUP_THRESHOLDS } from "./groups/group-weights";
 import type {
   HardConstraintSpec,
   RoutingProblemInput,
@@ -90,6 +93,14 @@ function validateSchemaAndDepot(
       code: "UNSUPPORTED_SCHEMA_VERSION",
       message: "softConstraints must be an array",
       path: "softConstraints",
+    });
+  }
+
+  if (!Array.isArray(input.businessGroups)) {
+    pushError(errors, {
+      code: "UNSUPPORTED_SCHEMA_VERSION",
+      message: "businessGroups must be an array",
+      path: "businessGroups",
     });
   }
 
@@ -487,9 +498,219 @@ function validateHardConstraints(
   }
 }
 
-function validateSoftConstraints(
+function validateBusinessGroups(
   input: RoutingProblemInput,
   errors: ValidationIssue[]
+): Map<string, RoutingBusinessGroup> {
+  const taskById = new Map(input.tasks.map((task) => [task.taskId, task]));
+  const taskIds = new Set(taskById.keys());
+  const groupsById = new Map<string, RoutingBusinessGroup>();
+  const seenGroupIds = new Set<string>();
+
+  input.businessGroups.forEach((group, index) => {
+    if (!group.groupId || typeof group.groupId !== "string") {
+      pushError(errors, {
+        code: "INVALID_BUSINESS_GROUP",
+        message: "Business group must have a non-empty groupId",
+        path: `businessGroups[${index}].groupId`,
+      });
+      return;
+    }
+
+    if (seenGroupIds.has(group.groupId)) {
+      pushError(errors, {
+        code: "DUPLICATE_BUSINESS_GROUP_ID",
+        message: `Duplicate business group id ${group.groupId}`,
+        path: `businessGroups[${index}].groupId`,
+        actual: group.groupId,
+      });
+    }
+    seenGroupIds.add(group.groupId);
+
+    if (!Array.isArray(group.taskIds) || group.taskIds.length < 2) {
+      pushError(errors, {
+        code: "INVALID_BUSINESS_GROUP",
+        message: `Business group ${group.groupId} must include at least two taskIds`,
+        path: `businessGroups[${index}].taskIds`,
+        actual: group.taskIds,
+      });
+    }
+
+    const uniqueTaskIds = new Set<number>();
+    for (const taskId of group.taskIds ?? []) {
+      if (!isFiniteNumber(taskId)) {
+        pushError(errors, {
+          code: "INVALID_BUSINESS_GROUP",
+          message: `Business group ${group.groupId} has invalid taskId`,
+          path: `businessGroups[${index}].taskIds`,
+          actual: taskId,
+        });
+        continue;
+      }
+      if (!taskIds.has(taskId)) {
+        pushError(errors, {
+          code: "UNKNOWN_TASK_IN_BUSINESS_GROUP",
+          message: `Business group ${group.groupId} references unknown task ${taskId}`,
+          taskId,
+          path: `businessGroups[${index}].taskIds`,
+        });
+      }
+      if (uniqueTaskIds.has(taskId)) {
+        pushError(errors, {
+          code: "INVALID_BUSINESS_GROUP",
+          message: `Business group ${group.groupId} has duplicate taskId ${taskId}`,
+          taskId,
+          path: `businessGroups[${index}].taskIds`,
+        });
+      }
+      uniqueTaskIds.add(taskId);
+    }
+
+    switch (group.type) {
+      case "SAME_COORDINATES_BUILDING": {
+        if (!isFiniteNumber(group.toleranceMeters) || group.toleranceMeters <= 0) {
+          pushError(errors, {
+            code: "INVALID_BUSINESS_GROUP",
+            message: `SAME_COORDINATES_BUILDING ${group.groupId} requires toleranceMeters > 0`,
+            path: `businessGroups[${index}].toleranceMeters`,
+            actual: group.toleranceMeters,
+          });
+        }
+        const { lat, lng } = group.centroid ?? {};
+        if (
+          !isFiniteNumber(lat) ||
+          !isFiniteNumber(lng) ||
+          lat < -90 ||
+          lat > 90 ||
+          lng < -180 ||
+          lng > 180
+        ) {
+          pushError(errors, {
+            code: "INVALID_BUSINESS_GROUP",
+            message: `SAME_COORDINATES_BUILDING ${group.groupId} has invalid centroid`,
+            path: `businessGroups[${index}].centroid`,
+            actual: group.centroid,
+          });
+        }
+        break;
+      }
+      case "SAME_CLEANER": {
+        if (!isFiniteNumber(group.cleanerId)) {
+          pushError(errors, {
+            code: "INVALID_BUSINESS_GROUP",
+            message: `SAME_CLEANER ${group.groupId} requires finite cleanerId`,
+            path: `businessGroups[${index}].cleanerId`,
+            actual: group.cleanerId,
+          });
+        }
+        break;
+      }
+      case "CLEANER_SEQUENCE": {
+        if (!isFiniteNumber(group.cleanerId)) {
+          pushError(errors, {
+            code: "INVALID_BUSINESS_GROUP",
+            message: `CLEANER_SEQUENCE ${group.groupId} requires finite cleanerId`,
+            path: `businessGroups[${index}].cleanerId`,
+            actual: group.cleanerId,
+          });
+        }
+        if (!Array.isArray(group.orderedTaskIds) || group.orderedTaskIds.length < 2) {
+          pushError(errors, {
+            code: "INVALID_BUSINESS_GROUP",
+            message: `CLEANER_SEQUENCE ${group.groupId} requires orderedTaskIds length >= 2`,
+            path: `businessGroups[${index}].orderedTaskIds`,
+            actual: group.orderedTaskIds,
+          });
+        } else if (
+          group.orderedTaskIds.length !== group.taskIds.length ||
+          group.orderedTaskIds.some((taskId, taskIndex) => taskId !== group.taskIds[taskIndex])
+        ) {
+          pushError(errors, {
+            code: "INVALID_BUSINESS_GROUP",
+            message: `CLEANER_SEQUENCE ${group.groupId} taskIds must equal orderedTaskIds`,
+            path: `businessGroups[${index}].orderedTaskIds`,
+            expected: group.taskIds,
+            actual: group.orderedTaskIds,
+          });
+        }
+        break;
+      }
+      case "PRIORITY_COMPATIBLE": {
+        const { startMin, endMin } = group.windowOverlap ?? {};
+        if (!isValidMinute(startMin) || !isValidMinute(endMin) || startMin > endMin) {
+          pushError(errors, {
+            code: "INVALID_BUSINESS_GROUP",
+            message: `PRIORITY_COMPATIBLE ${group.groupId} has invalid windowOverlap`,
+            path: `businessGroups[${index}].windowOverlap`,
+            actual: group.windowOverlap,
+          });
+        } else if (
+          endMin - startMin <
+          BUSINESS_GROUP_THRESHOLDS.PRIORITY_COMPATIBLE_MIN_OVERLAP_MIN
+        ) {
+          pushError(errors, {
+            code: "INVALID_BUSINESS_GROUP",
+            message: `PRIORITY_COMPATIBLE ${group.groupId} overlap is below ${BUSINESS_GROUP_THRESHOLDS.PRIORITY_COMPATIBLE_MIN_OVERLAP_MIN} minutes`,
+            path: `businessGroups[${index}].windowOverlap`,
+            expected: BUSINESS_GROUP_THRESHOLDS.PRIORITY_COMPATIBLE_MIN_OVERLAP_MIN,
+            actual: endMin - startMin,
+          });
+        }
+        break;
+      }
+      case "NEARBY_CLUSTER": {
+        if (!isFiniteNumber(group.maxTravelMin) || group.maxTravelMin <= 0) {
+          pushError(errors, {
+            code: "INVALID_BUSINESS_GROUP",
+            message: `NEARBY_CLUSTER ${group.groupId} requires maxTravelMin > 0`,
+            path: `businessGroups[${index}].maxTravelMin`,
+            actual: group.maxTravelMin,
+          });
+        }
+        if (!taskIds.has(group.hubTaskId)) {
+          pushError(errors, {
+            code: "UNKNOWN_TASK_IN_BUSINESS_GROUP",
+            message: `NEARBY_CLUSTER ${group.groupId} references unknown hubTaskId ${group.hubTaskId}`,
+            taskId: group.hubTaskId,
+            path: `businessGroups[${index}].hubTaskId`,
+          });
+        }
+        break;
+      }
+      default:
+        pushError(errors, {
+          code: "INVALID_BUSINESS_GROUP",
+          message: `Unknown business group type`,
+          path: `businessGroups[${index}].type`,
+          actual: (group as RoutingBusinessGroup).type,
+        });
+    }
+
+    for (const semanticIssue of validateBusinessGroupSemantics(
+      group,
+      taskById,
+      input.travelMatrixMin
+    )) {
+      pushError(errors, {
+        code: "INVALID_BUSINESS_GROUP",
+        message: semanticIssue.message,
+        path: `businessGroups[${index}]`,
+        taskId: semanticIssue.taskId,
+        expected: semanticIssue.expected,
+        actual: semanticIssue.actual,
+      });
+    }
+
+    groupsById.set(group.groupId, group);
+  });
+
+  return groupsById;
+}
+
+function validateSoftConstraints(
+  input: RoutingProblemInput,
+  errors: ValidationIssue[],
+  groupsById: Map<string, RoutingBusinessGroup>
 ): void {
   const taskIds = new Set(input.tasks.map((task) => task.taskId));
 
@@ -564,7 +785,157 @@ function validateSoftConstraints(
           actual: constraint.penaltyPerMinOutside,
         });
       }
+      continue;
     }
+
+    if (
+      constraint.type === "KEEP_SAME_COORDINATES_BUILDING_TOGETHER" ||
+      constraint.type === "KEEP_CLEANER_SEQUENCE" ||
+      constraint.type === "KEEP_SAME_CLEANER_TASKS_TOGETHER" ||
+      constraint.type === "KEEP_PRIORITY_COMPATIBLE_TASKS_TOGETHER" ||
+      constraint.type === "KEEP_NEARBY_CLUSTER_TOGETHER"
+    ) {
+      if (!isFiniteNumber(constraint.weight) || constraint.weight <= 0) {
+        pushError(errors, {
+          code: "INVALID_SOFT_CONSTRAINT",
+          message: `${constraint.type} weight must be > 0`,
+          path: "softConstraints",
+          actual: constraint.weight,
+        });
+      }
+
+      const group = groupsById.get(constraint.groupId);
+      if (!group) {
+        pushError(errors, {
+          code: "UNKNOWN_BUSINESS_GROUP_IN_CONSTRAINT",
+          message: `${constraint.type} references unknown group ${constraint.groupId}`,
+          path: "softConstraints",
+          actual: constraint.groupId,
+        });
+        continue;
+      }
+
+      if (constraint.type === "KEEP_SAME_COORDINATES_BUILDING_TOGETHER") {
+        if (group.type !== "SAME_COORDINATES_BUILDING") {
+          pushError(errors, {
+            code: "INVALID_SOFT_CONSTRAINT",
+            message: `${constraint.type} group type mismatch for ${constraint.groupId}`,
+            path: "softConstraints",
+            expected: "SAME_COORDINATES_BUILDING",
+            actual: group.type,
+          });
+        } else if (constraint.toleranceMeters !== group.toleranceMeters) {
+          pushError(errors, {
+            code: "INVALID_SOFT_CONSTRAINT",
+            message: `${constraint.type} toleranceMeters mismatch for ${constraint.groupId}`,
+            path: "softConstraints",
+            expected: group.toleranceMeters,
+            actual: constraint.toleranceMeters,
+          });
+        }
+        continue;
+      }
+
+      if (constraint.type === "KEEP_SAME_CLEANER_TASKS_TOGETHER") {
+        if (group.type !== "SAME_CLEANER") {
+          pushError(errors, {
+            code: "INVALID_SOFT_CONSTRAINT",
+            message: `${constraint.type} group type mismatch for ${constraint.groupId}`,
+            path: "softConstraints",
+            expected: "SAME_CLEANER",
+            actual: group.type,
+          });
+        } else if (constraint.cleanerId !== group.cleanerId) {
+          pushError(errors, {
+            code: "INVALID_SOFT_CONSTRAINT",
+            message: `${constraint.type} cleanerId mismatch for ${constraint.groupId}`,
+            path: "softConstraints",
+            expected: group.cleanerId,
+            actual: constraint.cleanerId,
+          });
+        }
+        continue;
+      }
+
+      if (constraint.type === "KEEP_CLEANER_SEQUENCE") {
+        if (group.type !== "CLEANER_SEQUENCE") {
+          pushError(errors, {
+            code: "INVALID_SOFT_CONSTRAINT",
+            message: `${constraint.type} group type mismatch for ${constraint.groupId}`,
+            path: "softConstraints",
+            expected: "CLEANER_SEQUENCE",
+            actual: group.type,
+          });
+        } else if (
+          constraint.cleanerId !== group.cleanerId ||
+          constraint.orderedTaskIds.length !== group.orderedTaskIds.length ||
+          constraint.orderedTaskIds.some(
+            (taskId, index) => taskId !== group.orderedTaskIds[index]
+          )
+        ) {
+          pushError(errors, {
+            code: "INVALID_SOFT_CONSTRAINT",
+            message: `${constraint.type} sequence mismatch for ${constraint.groupId}`,
+            path: "softConstraints",
+            expected: group.orderedTaskIds,
+            actual: constraint.orderedTaskIds,
+          });
+        }
+        continue;
+      }
+
+      if (constraint.type === "KEEP_PRIORITY_COMPATIBLE_TASKS_TOGETHER") {
+        if (group.type !== "PRIORITY_COMPATIBLE") {
+          pushError(errors, {
+            code: "INVALID_SOFT_CONSTRAINT",
+            message: `${constraint.type} group type mismatch for ${constraint.groupId}`,
+            path: "softConstraints",
+            expected: "PRIORITY_COMPATIBLE",
+            actual: group.type,
+          });
+        } else if (
+          constraint.windowOverlap.startMin !== group.windowOverlap.startMin ||
+          constraint.windowOverlap.endMin !== group.windowOverlap.endMin
+        ) {
+          pushError(errors, {
+            code: "INVALID_SOFT_CONSTRAINT",
+            message: `${constraint.type} windowOverlap mismatch for ${constraint.groupId}`,
+            path: "softConstraints",
+            expected: group.windowOverlap,
+            actual: constraint.windowOverlap,
+          });
+        }
+        continue;
+      }
+
+      if (constraint.type === "KEEP_NEARBY_CLUSTER_TOGETHER") {
+        if (group.type !== "NEARBY_CLUSTER") {
+          pushError(errors, {
+            code: "INVALID_SOFT_CONSTRAINT",
+            message: `${constraint.type} group type mismatch for ${constraint.groupId}`,
+            path: "softConstraints",
+            expected: "NEARBY_CLUSTER",
+            actual: group.type,
+          });
+        } else if (constraint.maxTravelMin !== group.maxTravelMin) {
+          pushError(errors, {
+            code: "INVALID_SOFT_CONSTRAINT",
+            message: `${constraint.type} maxTravelMin mismatch for ${constraint.groupId}`,
+            path: "softConstraints",
+            expected: group.maxTravelMin,
+            actual: constraint.maxTravelMin,
+          });
+        }
+      }
+      continue;
+    }
+
+    pushError(errors, {
+      code: "INVALID_SOFT_CONSTRAINT",
+      message: `Unsupported soft constraint type ${(constraint as SoftConstraintSpec).type}`,
+      path: "softConstraints",
+      actual: constraint,
+    });
   }
 }
 
@@ -795,7 +1166,8 @@ export function validateRoutingProblemInput(
   validateDrivers(input, errors);
   const hasNodeIndexErrors = validateTasks(input, errors);
   validateHardConstraints(input, errors);
-  validateSoftConstraints(input, errors);
+  const groupsById = validateBusinessGroups(input, errors);
+  validateSoftConstraints(input, errors, groupsById);
   validateTravelMatrix(input, errors, hasNodeIndexErrors);
   validateMetadataAndWarnings(input, errors, warnings);
 

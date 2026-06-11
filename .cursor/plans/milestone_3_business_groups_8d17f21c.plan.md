@@ -4,31 +4,31 @@ overview: Implementare business groups e soft constraints KEEP_* nel pipeline lo
 todos:
   - id: contracts-weights-geo
     content: Creare group-contract.ts (maxTravelMin su nearby), group-weights.ts (100m/10min/45min), geo-utils.ts + hasCleanerAssignment helper
-    status: pending
+    status: completed
   - id: input-contract
     content: "Estendere input-contract.ts: businessGroups + 5 KEEP_* in SoftConstraintSpec (nearby usa maxTravelMin)"
-    status: pending
+    status: completed
   - id: group-builders
     content: "5 builders: coordinates 100m union-find, same-cleaner hasCleanerAssignment, sequence, priority 45min overlap comune, nearby hub 10min via travelMatrixMin"
-    status: pending
+    status: completed
   - id: orchestrator
     content: "build-business-groups.ts: buildBusinessGroups(tasks, travelMatrixMin) + buildBusinessGroupSoftConstraints"
-    status: pending
+    status: completed
   - id: pipeline
     content: "build-routing-input.ts: matrice prima di businessGroups, validation dopo merge"
-    status: pending
+    status: completed
   - id: validator
     content: validation-contract + validateBusinessGroups + KEEP_* (maxTravelMin, overlap 45, cleaner rules)
-    status: pending
+    status: completed
   - id: debug-cli
     content: debug-writer manifest, run-routing-input-debug result, CLI summary businessGroupsByType
-    status: pending
+    status: completed
   - id: tests
     content: logisticsOptimizerFinalGroups.test.ts (15 casi aggiornati) + validation + existing tests
-    status: pending
+    status: completed
   - id: verify
     content: npm test suite + debug reale 2026-06-04, verificare JSON/manifest
-    status: pending
+    status: completed
 isProject: false
 ---
 

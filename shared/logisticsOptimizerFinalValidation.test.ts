@@ -125,6 +125,35 @@ function buildMinimalValidInput(): RoutingProblemInput {
   return buildRoutingProblemInputFromSource(buildMinimalSourceData());
 }
 
+function buildTwoTaskValidInput(): RoutingProblemInput {
+  const secondTask = {
+    taskId: 102,
+    logisticCode: 5002,
+    priority: "low_priority",
+    cleaningTime: 30,
+    lat: 45.485,
+    lng: 9.18,
+    checkinDate: null,
+    checkoutDate: null,
+    checkinTime: null,
+    checkoutTime: null,
+    cleanerId: 10,
+    cleanerStartTime: "11:00",
+    cleanerTaskStartTime: "11:00",
+    cleanerSequence: 2,
+    premium: false,
+    paxIn: 1,
+    locked: false,
+    lockedReason: null,
+  };
+  const sourceData: LogisticsRoutingSourceData = {
+    ...buildMinimalSourceData(),
+    schedulableTasks: [buildMinimalSourceData().schedulableTasks[0], secondTask],
+    tasksExcludedNoCoordinatesIds: [],
+  };
+  return buildRoutingProblemInputFromSource(sourceData);
+}
+
 describe("validateRoutingProblemInput", () => {
   it("returns valid for a normal sourceData fixture", () => {
     const input = buildMinimalValidInput();
@@ -403,5 +432,165 @@ describe("validateRoutingProblemInput", () => {
       })
     );
     expect(result.errors.some((issue) => issue.code === "INVALID_TRAVEL_MATRIX_SIZE")).toBe(false);
+  });
+
+  it("flags unknown task in business group", () => {
+    const input = buildMinimalValidInput();
+    input.businessGroups.push({
+      groupId: "priority-compatible:101,999",
+      type: "PRIORITY_COMPATIBLE",
+      taskIds: [101, 999],
+      confidence: "medium",
+      windowOverlap: { startMin: 660, endMin: 720 },
+      source: "priority_window",
+    });
+
+    const result = validateRoutingProblemInput(input);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({
+        code: "UNKNOWN_TASK_IN_BUSINESS_GROUP",
+        taskId: 999,
+      })
+    );
+  });
+
+  it("flags KEEP_NEARBY_CLUSTER soft constraint with unknown group", () => {
+    const input = buildMinimalValidInput();
+    input.softConstraints.push({
+      type: "KEEP_NEARBY_CLUSTER_TOGETHER",
+      groupId: "missing-group",
+      weight: 15,
+      maxTravelMin: 10,
+    });
+
+    const result = validateRoutingProblemInput(input);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({
+        code: "UNKNOWN_BUSINESS_GROUP_IN_CONSTRAINT",
+      })
+    );
+  });
+
+  it("flags invalid nearby cluster maxTravelMin on business group", () => {
+    const input = buildMinimalValidInput();
+    input.businessGroups.push({
+      groupId: "nearby-cluster:101",
+      type: "NEARBY_CLUSTER",
+      taskIds: [101, 102],
+      confidence: "medium",
+      maxTravelMin: 0,
+      hubTaskId: 101,
+      source: "travel_matrix",
+    });
+
+    const result = validateRoutingProblemInput(input);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({
+        code: "INVALID_BUSINESS_GROUP",
+      })
+    );
+  });
+
+  it("flags nearby cluster member beyond maxTravelMin from hub", () => {
+    const input = buildTwoTaskValidInput();
+    input.businessGroups.push({
+      groupId: "nearby-cluster:101",
+      type: "NEARBY_CLUSTER",
+      taskIds: [101, 102],
+      confidence: "medium",
+      maxTravelMin: 10,
+      hubTaskId: 101,
+      source: "travel_matrix",
+    });
+
+    const result = validateRoutingProblemInput(input);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({
+        code: "INVALID_BUSINESS_GROUP",
+        taskId: 102,
+        message: expect.stringContaining("exceeds maxTravelMin"),
+      })
+    );
+  });
+
+  it("flags priority-compatible group with windowOverlap not matching task windows", () => {
+    const input = buildTwoTaskValidInput();
+    const sharedWindow = {
+      earliestStartMin: 600,
+      latestStartMin: 720,
+      latestEndMin: 780,
+      reasons: [] as string[],
+    };
+    input.tasks[0].hardWindow = { ...sharedWindow };
+    input.tasks[1].hardWindow = { ...sharedWindow };
+    input.businessGroups.push({
+      groupId: "priority-compatible:101,102",
+      type: "PRIORITY_COMPATIBLE",
+      taskIds: [101, 102],
+      confidence: "medium",
+      windowOverlap: { startMin: 600, endMin: 900 },
+      source: "priority_window",
+    });
+
+    const result = validateRoutingProblemInput(input);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({
+        code: "INVALID_BUSINESS_GROUP",
+        message: expect.stringContaining("windowOverlap does not match"),
+      })
+    );
+  });
+
+  it("flags same-cleaner group with task missing cleaner assignment", () => {
+    const input = buildTwoTaskValidInput();
+    input.tasks[1].groupingHints.cleanerSequence = null;
+    input.businessGroups.push({
+      groupId: "same-cleaner:10",
+      type: "SAME_CLEANER",
+      taskIds: [101, 102],
+      confidence: "medium",
+      cleanerId: 10,
+      source: "cleaner_id",
+    });
+
+    const result = validateRoutingProblemInput(input);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({
+        code: "INVALID_BUSINESS_GROUP",
+        taskId: 102,
+        message: expect.stringContaining("without cleaner assignment"),
+      })
+    );
+  });
+
+  it("flags unsupported soft constraint type at runtime", () => {
+    const input = buildMinimalValidInput();
+    input.softConstraints.push({
+      type: "KEEP_UNKNOWN_THING" as RoutingProblemInput["softConstraints"][number]["type"],
+      groupId: "x",
+      weight: 1,
+    } as RoutingProblemInput["softConstraints"][number]);
+
+    const result = validateRoutingProblemInput(input);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({
+        code: "INVALID_SOFT_CONSTRAINT",
+        message: expect.stringContaining("Unsupported soft constraint type"),
+      })
+    );
   });
 });
