@@ -1180,7 +1180,7 @@ Il nuovo solver, qualunque esso sia, dovrebbe restituire:
 ```ts
 interface RoutingSolution {
   workDate: string;
-  status: "OPTIMAL" | "FEASIBLE" | "PARTIAL" | "INFEASIBLE";
+  status: "FEASIBLE" | "PARTIAL" | "INFEASIBLE" | "INVALID";
   routes: Array<{
     driverId: DriverId;
     stops: Array<{
@@ -1298,13 +1298,17 @@ RoutingProblemInput
   → 02-routing-solution.json
 ```
 
+Debug dry-run (`ortools-v1`): `01-routing-input.json`, `02-routing-solution.json`, `03-ortools-payload.json`.
+
 Solver IDs: `greedy-v1` (default `run-dry`), `ortools-v1` (opt-in body `"solver": "ortools-v1"`).
 
 ### Hard constraints M5
 
 - Task time windows (`transit = service(from) + travel`)
+- `startMin` in `[earliestStartMin, latestStartMin]` and `startMin + serviceDurationMin <= latestEndMin` (explicit in Python)
 - Driver work windows
 - `REQUIRED_DRIVER_TASK` hard vehicle constraint (no disjunction)
+- Required driver not among selected drivers: pre-solver salta l'hint (`REQUIRED_DRIVER_TASK_SKIPPED`); validation segnala `UNKNOWN_DRIVER_IN_CONSTRAINT` se il vincolo arriva comunque nell'input; OR-Tools adapter fa fallback `INVALID` (`REQUIRED_DRIVER_NOT_SELECTED`) senza chiamare Python
 - Free tasks: `AddDisjunction` con penalty EO > HP > LP
 
 ### Soft GEO M5 (cost shaping locale)
@@ -1322,8 +1326,8 @@ Se OR-Tools ritorna `infeasible`, `buildRequiredInfeasibleSolution` produce `Rou
 - Soft GEO = cost shaping locale, non garanzia globale stesso veicolo per gruppo
 - Cleaner / sequence / priority soft in M5b
 - Nessun apply timeline
-- Status: `FEASIBLE` \| `PARTIAL` \| `INFEASIBLE` \| `INVALID` (no `OPTIMAL` in M5)
-- Prerequisito: `pip install ortools`
+- Status: `FEASIBLE` \| `PARTIAL` \| `INFEASIBLE` \| `INVALID` (no `OPTIMAL`)
+- Python deps: `ortools` in `pyproject.toml` (`pip install ortools` o `uv sync`); `ortools-v1` è opt-in, `greedy-v1` resta default
 
 ---
 

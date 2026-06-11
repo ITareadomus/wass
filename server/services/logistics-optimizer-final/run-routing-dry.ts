@@ -3,7 +3,8 @@ import {
   isLogisticsOptimizerFinalDebugEnabled,
   writeRoutingDryRunDebug,
 } from "./debug-writer";
-import { GREEDY_SOLVER_ID } from "./solution-contract";
+import { GREEDY_SOLVER_ID, ORTOOLS_SOLVER_ID } from "./solution-contract";
+import { buildOrToolsPayload } from "./solver/ortools/ortools-adapter";
 import { solveRouting, type RoutingSolverId } from "./solver/solve-routing";
 import type { RoutingSolution } from "./solution-contract";
 import { validateRoutingSolution } from "./solution-validation";
@@ -69,9 +70,8 @@ export async function runLogisticsRoutingDry(
     throw new RoutingInputValidationError(inputValidation);
   }
 
-  const solution = await solveRouting(input, {
-    solverId: options.solver ?? GREEDY_SOLVER_ID,
-  });
+  const solverId = options.solver ?? GREEDY_SOLVER_ID;
+  const solution = await solveRouting(input, { solverId });
   const solutionValidation = validateRoutingSolution(input, solution);
 
   const debugEnabled = isLogisticsOptimizerFinalDebugEnabled(options.debug);
@@ -83,6 +83,8 @@ export async function runLogisticsRoutingDry(
       solution,
       inputValidation,
       solutionValidation,
+      ortoolsPayload:
+        solverId === ORTOOLS_SOLVER_ID ? buildOrToolsPayload(input).payload : undefined,
     });
     console.log(`📋 Logistics optimizer final dry-run scritto in: ${debugDir}`);
   }

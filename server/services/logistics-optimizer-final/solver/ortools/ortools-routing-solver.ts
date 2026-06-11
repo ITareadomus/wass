@@ -10,7 +10,11 @@ import {
   decodeOrToolsSolution,
   type OrToolsRawSolution,
 } from "./ortools-adapter";
-import { buildRequiredInfeasibleSolution } from "./required-infeasible";
+import {
+  buildRequiredDriverNotSelectedSolution,
+  buildRequiredInfeasibleSolution,
+  findTasksWithMissingRequiredVehicle,
+} from "./required-infeasible";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -106,6 +110,14 @@ export async function solveOrToolsRouting(
   const pythonPath =
     options.ortools?.pythonPath ?? (process.platform === "win32" ? "python" : "python3");
   const scriptPath = options.ortools?.scriptPath ?? defaultScriptPath();
+
+  const missingRequiredVehicles = findTasksWithMissingRequiredVehicle(input);
+  if (missingRequiredVehicles.length > 0) {
+    return buildRequiredDriverNotSelectedSolution(input, missingRequiredVehicles, {
+      generatedAt: options.generatedAt,
+      solveDurationMs: 0,
+    });
+  }
 
   const { payload, maps } = buildOrToolsPayload(input, { timeLimitSec });
   const stdinJson = JSON.stringify(payload);

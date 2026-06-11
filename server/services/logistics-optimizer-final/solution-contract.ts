@@ -7,7 +7,6 @@ export const ORTOOLS_SOLVER_ID = "ortools-v1" as const;
 export const KNOWN_ROUTING_SOLVER_IDS = [GREEDY_SOLVER_ID, ORTOOLS_SOLVER_ID] as const;
 
 export type RoutingSolutionStatus =
-  | "OPTIMAL"
   | "FEASIBLE"
   | "PARTIAL"
   | "INFEASIBLE"

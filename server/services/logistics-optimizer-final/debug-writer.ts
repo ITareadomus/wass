@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import type { BusinessGroupType } from "./groups/group-contract";
 import type { RoutingProblemInput, SoftConstraintSpec } from "./input-contract";
+import type { OrToolsRoutingPayload } from "./solver/ortools/ortools-adapter";
 import type { RoutingSolution } from "./solution-contract";
 import type { RoutingSolutionValidationResult } from "./solution-validation-contract";
 import type { RoutingProblemValidationResult } from "./validation-contract";
@@ -104,6 +105,7 @@ export interface WriteRoutingDryRunDebugArgs {
   solution: RoutingSolution;
   inputValidation: RoutingProblemValidationResult;
   solutionValidation: RoutingSolutionValidationResult;
+  ortoolsPayload?: OrToolsRoutingPayload;
   runId?: string;
   startedAt?: string;
 }
@@ -111,7 +113,7 @@ export interface WriteRoutingDryRunDebugArgs {
 export async function writeRoutingDryRunDebug(
   args: WriteRoutingDryRunDebugArgs
 ): Promise<string> {
-  const { input, solution, inputValidation, solutionValidation } = args;
+  const { input, solution, inputValidation, solutionValidation, ortoolsPayload } = args;
   const startedAt = args.startedAt ?? new Date().toISOString();
   const runId = args.runId ?? createLogisticsOptimizerFinalRunId(new Date(startedAt));
   const dir = path.join(debugRootDir(), input.workDate, runId);
@@ -155,10 +157,12 @@ export async function writeRoutingDryRunDebug(
     solutionStatus: solution.status,
     businessGroupsByType: countBusinessGroupsByType(input.businessGroups),
     businessSoftConstraints: extractBusinessSoftConstraints(input.softConstraints),
-    files: ["01-routing-input.json", "02-routing-solution.json"],
+    files: ortoolsPayload
+      ? ["01-routing-input.json", "02-routing-solution.json", "03-ortools-payload.json"]
+      : ["01-routing-input.json", "02-routing-solution.json"],
   };
 
-  await Promise.all([
+  const writes: Promise<void>[] = [
     fs.writeFile(path.join(dir, "manifest.json"), JSON.stringify(manifest, null, 2), "utf8"),
     fs.writeFile(
       path.join(dir, "01-routing-input.json"),
@@ -170,7 +174,19 @@ export async function writeRoutingDryRunDebug(
       JSON.stringify(solution, null, 2),
       "utf8"
     ),
-  ]);
+  ];
+
+  if (ortoolsPayload) {
+    writes.push(
+      fs.writeFile(
+        path.join(dir, "03-ortools-payload.json"),
+        JSON.stringify(ortoolsPayload, null, 2),
+        "utf8"
+      )
+    );
+  }
+
+  await Promise.all(writes);
 
   return dir;
 }

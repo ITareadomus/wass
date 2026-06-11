@@ -236,7 +236,9 @@ export function buildOrToolsPayload(
       earliestStartMin: task.hardWindow.earliestStartMin,
       latestStartMin: task.hardWindow.latestStartMin,
       latestEndMin: task.hardWindow.latestEndMin,
-      ...(requiredDriverId !== undefined ? { requiredDriverId, requiredVehicleIndex } : {}),
+      ...(requiredDriverId !== undefined && requiredVehicleIndex !== undefined
+        ? { requiredDriverId, requiredVehicleIndex }
+        : {}),
       dropPenalty: getDropPenalty(task.priority),
     };
   });

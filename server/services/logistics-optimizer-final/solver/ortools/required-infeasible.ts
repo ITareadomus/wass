@@ -9,6 +9,76 @@ import { buildOrToolsMaps } from "./ortools-adapter";
 
 const DEPOT_NODE_INDEX = 0;
 
+export interface MissingRequiredVehicleTask {
+  taskId: number;
+  requiredDriverId: number;
+}
+
+export function findTasksWithMissingRequiredVehicle(
+  input: RoutingProblemInput
+): MissingRequiredVehicleTask[] {
+  const maps = buildOrToolsMaps(input);
+  const missing: MissingRequiredVehicleTask[] = [];
+
+  for (const task of input.tasks) {
+    const requiredDriverId = maps.requiredDriverByTaskId.get(task.taskId);
+    if (requiredDriverId === undefined) continue;
+    if (!maps.driverIdToVehicleIndex.has(requiredDriverId)) {
+      missing.push({ taskId: task.taskId, requiredDriverId });
+    }
+  }
+
+  return missing;
+}
+
+export function buildRequiredDriverNotSelectedSolution(
+  input: RoutingProblemInput,
+  missingTasks: MissingRequiredVehicleTask[],
+  options?: { generatedAt?: string; solveDurationMs?: number }
+): RoutingSolution {
+  const missingByTaskId = new Map(missingTasks.map((entry) => [entry.taskId, entry]));
+  const droppedTasks: RoutingDroppedTask[] = [];
+
+  for (const task of input.tasks) {
+    const missing = missingByTaskId.get(task.taskId);
+    if (missing) {
+      droppedTasks.push({
+        taskId: task.taskId,
+        reason: "REQUIRED_DRIVER_INFEASIBLE",
+        details: `REQUIRED_DRIVER_NOT_SELECTED:${missing.requiredDriverId}`,
+      });
+      continue;
+    }
+
+    droppedTasks.push({
+      taskId: task.taskId,
+      reason: "NO_FEASIBLE_DRIVER",
+      details: "Solve skipped: required driver not among selected drivers",
+    });
+  }
+
+  return {
+    schemaVersion: ROUTING_SOLUTION_SCHEMA_VERSION,
+    solverId: ORTOOLS_SOLVER_ID,
+    workDate: input.workDate,
+    status: "INVALID",
+    generatedAt: options?.generatedAt ?? new Date().toISOString(),
+    routes: [],
+    droppedTasks,
+    objectiveBreakdown: {
+      assignedTasks: 0,
+      droppedTasks: droppedTasks.length,
+      totalTravelMin: 0,
+      totalWaitMin: 0,
+    },
+    diagnostics: {
+      warnings: [],
+      notes: ["required_driver_not_selected"],
+      solveDurationMs: options?.solveDurationMs ?? 0,
+    },
+  };
+}
+
 function getTravelMin(matrix: number[][], fromNodeIndex: number, toNodeIndex: number): number | null {
   if (
     fromNodeIndex < 0 ||

@@ -9,7 +9,11 @@ import {
   DROP_PENALTY_BY_PRIORITY,
   type OrToolsRawSolution,
 } from "../server/services/logistics-optimizer-final/solver/ortools/ortools-adapter";
-import { buildRequiredInfeasibleSolution } from "../server/services/logistics-optimizer-final/solver/ortools/required-infeasible";
+import {
+  buildRequiredDriverNotSelectedSolution,
+  buildRequiredInfeasibleSolution,
+  findTasksWithMissingRequiredVehicle,
+} from "../server/services/logistics-optimizer-final/solver/ortools/required-infeasible";
 import { solveOrToolsRouting } from "../server/services/logistics-optimizer-final/solver/ortools/ortools-routing-solver";
 import { ORTOOLS_SOLVER_ID } from "../server/services/logistics-optimizer-final/solution-contract";
 import { validateRoutingSolution } from "../server/services/logistics-optimizer-final/solution-validation";
@@ -82,6 +86,17 @@ function buildMinimalInput(): RoutingProblemInput {
   return buildRoutingProblemInputFromSource(buildBaseSourceData());
 }
 
+function buildInputWithUnselectedRequiredDriver(): RoutingProblemInput {
+  const input = buildMinimalInput();
+  input.hardConstraints.push({
+    type: "REQUIRED_DRIVER_TASK",
+    taskId: 101,
+    driverId: 99,
+    source: "timeline_pre_assigned",
+  });
+  return input;
+}
+
 async function probeOrToolsPython(): Promise<boolean> {
   for (const pythonPath of ["python3", "python"]) {
     const available = await new Promise<boolean>((resolve) => {
@@ -120,6 +135,17 @@ describe("buildOrToolsPayload", () => {
       serviceDurationMin: input.serviceDurationMin,
     });
     expect(payload.vehicles.map((v) => v.driverId)).toEqual([7, 8]);
+  });
+
+  it("omits requiredVehicleIndex when required driver is not among selected drivers", () => {
+    const input = buildInputWithUnselectedRequiredDriver();
+    const { payload } = buildOrToolsPayload(input);
+
+    expect(payload.tasks[0].requiredDriverId).toBeUndefined();
+    expect(payload.tasks[0].requiredVehicleIndex).toBeUndefined();
+    expect(findTasksWithMissingRequiredVehicle(input)).toEqual([
+      { taskId: 101, requiredDriverId: 99 },
+    ]);
   });
 
   it("assigns drop penalties EO > HP > LP", () => {
@@ -302,6 +328,32 @@ describe("decodeOrToolsSolution", () => {
   });
 });
 
+describe("buildRequiredDriverNotSelectedSolution", () => {
+  it("returns INVALID when required driver is not among selected drivers", () => {
+    const input = buildInputWithUnselectedRequiredDriver();
+    const missing = findTasksWithMissingRequiredVehicle(input);
+    const solution = buildRequiredDriverNotSelectedSolution(input, missing);
+
+    expect(solution.status).toBe("INVALID");
+    expect(solution.routes).toHaveLength(0);
+    expect(solution.droppedTasks[0]).toMatchObject({
+      taskId: 101,
+      reason: "REQUIRED_DRIVER_INFEASIBLE",
+      details: "REQUIRED_DRIVER_NOT_SELECTED:99",
+    });
+    expect(solution.diagnostics?.notes).toContain("required_driver_not_selected");
+
+    const validation = validateRoutingSolution(input, solution);
+    expect(validation.valid).toBe(false);
+    expect(validation.errors).toContainEqual(
+      expect.objectContaining({
+        code: "REQUIRED_DRIVER_DROPPED",
+        taskId: 101,
+      })
+    );
+  });
+});
+
 describe("buildRequiredInfeasibleSolution", () => {
   it("returns INVALID diagnostic solution without throwing", () => {
     const input = buildRoutingProblemInputFromSource(
@@ -330,6 +382,17 @@ describe("buildRequiredInfeasibleSolution", () => {
 });
 
 describe("solveOrToolsRouting integration", () => {
+  it("skips Python when required driver is not among selected drivers", async () => {
+    const input = buildInputWithUnselectedRequiredDriver();
+    const solution = await solveOrToolsRouting(input, {
+      generatedAt: "2026-06-04T00:00:00.000Z",
+    });
+
+    expect(solution.status).toBe("INVALID");
+    expect(solution.droppedTasks[0].details).toBe("REQUIRED_DRIVER_NOT_SELECTED:99");
+    expect(solution.diagnostics?.solveDurationMs).toBe(0);
+  });
+
   it.skipIf(!ortoolsAvailable)(
     "solves a minimal feasible instance",
     async () => {

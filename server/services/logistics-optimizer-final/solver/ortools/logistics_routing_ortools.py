@@ -103,7 +103,12 @@ def solve_payload(payload):
         index = manager.NodeToIndex(node_index)
         earliest = int(task["earliestStartMin"])
         latest_start = int(task["latestStartMin"])
-        time_dimension.CumulVar(index).SetRange(earliest, latest_start)
+        service_duration = int(task["serviceDurationMin"])
+        latest_end = int(task["latestEndMin"])
+        # CumulVar = startMin; endMin = cumul + service must be <= latestEndMin.
+        max_start_by_end = latest_end - service_duration
+        max_start = min(latest_start, max_start_by_end)
+        time_dimension.CumulVar(index).SetRange(earliest, max_start)
 
         required_vehicle_index = task.get("requiredVehicleIndex")
         if required_vehicle_index is not None:
