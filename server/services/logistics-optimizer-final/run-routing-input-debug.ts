@@ -1,15 +1,24 @@
-import { buildLogisticsRoutingInput } from "./build-routing-input";
+import {
+  buildLogisticsRoutingInput,
+  type BuildLogisticsRoutingInputOptions,
+} from "./build-routing-input";
 import { isLogisticsOptimizerFinalDebugEnabled, writeRoutingProblemInputDebug } from "./debug-writer";
 import type { BusinessGroupType } from "./groups/group-contract";
 import type { RoutingProblemInput } from "./input-contract";
 
-export interface RunLogisticsRoutingInputDebugOptions {
+export interface RunLogisticsRoutingInputDebugOptions extends BuildLogisticsRoutingInputOptions {
   debug?: boolean;
 }
 
 export interface RunLogisticsRoutingInputDebugResult {
   workDate: string;
   debugDir: string | null;
+  autoConvoke: {
+    autoConvokedDriverIds: number[];
+    autoConvokedDriversCount: number;
+    autoConvokeMissingInDbDriverIds: number[];
+    autoConvokeMissingInDbDriversCount: number;
+  };
   validation: RoutingProblemInput["metadata"]["validation"];
   taskCount: number;
   driverCount: number;
@@ -28,7 +37,11 @@ export async function runLogisticsRoutingInputDebug(
   workDate: string,
   options: RunLogisticsRoutingInputDebugOptions = {}
 ): Promise<RunLogisticsRoutingInputDebugResult> {
-  const input = await buildLogisticsRoutingInput(workDate);
+  const input = await buildLogisticsRoutingInput(workDate, {
+    performedBy: options.performedBy,
+    skipAutoConvoke: options.skipAutoConvoke,
+    saveSelectedDrivers: options.saveSelectedDrivers,
+  });
   const debugEnabled = isLogisticsOptimizerFinalDebugEnabled(options.debug);
   let debugDir: string | null = null;
 
@@ -51,6 +64,12 @@ export async function runLogisticsRoutingInputDebug(
   return {
     workDate,
     debugDir,
+    autoConvoke: {
+      autoConvokedDriverIds: input.metadata.autoConvokedDriverIds,
+      autoConvokedDriversCount: input.metadata.autoConvokedDriversCount,
+      autoConvokeMissingInDbDriverIds: input.metadata.autoConvokeMissingInDbDriverIds,
+      autoConvokeMissingInDbDriversCount: input.metadata.autoConvokeMissingInDbDriversCount,
+    },
     validation: input.metadata.validation,
     taskCount: input.tasks.length,
     driverCount: input.drivers.length,

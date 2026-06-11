@@ -1177,7 +1177,7 @@ function validateMetadataAndWarnings(
     pushWarning(warnings, {
       code: "REQUIRED_DRIVER_TASK_SKIPPED",
       message:
-        "One or more timeline assignment hints were skipped because task or driver is not schedulable/selected.",
+        "One or more pre-assigned timeline hints were skipped because task or driver is not schedulable/selected.",
       path: "metadata.skippedTimelineAssignmentHintsCount",
       actual: input.metadata.skippedTimelineAssignmentHintsCount,
     });

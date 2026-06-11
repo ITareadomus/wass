@@ -10269,7 +10269,10 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           (debugEnabled ? " (debug JSON attivo)" : "")
       );
 
-      const result = await runLogisticsRoutingInputDebug(workDate, { debug: debugExplicit });
+      const result = await runLogisticsRoutingInputDebug(workDate, {
+        debug: debugExplicit,
+        performedBy: getCurrentUsername(req),
+      });
 
       return res.json({
         success: true,
@@ -10318,6 +10321,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       const result = await runLogisticsRoutingDry(workDate, {
         debug: debugExplicit,
         solver,
+        performedBy: getCurrentUsername(req),
       });
 
       return res.json({

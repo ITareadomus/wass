@@ -21,6 +21,10 @@ import {
 } from "./groups/build-business-groups";
 import { buildDepotNode, buildLocationNodes, buildTravelMatrixMin } from "./travel-matrix";
 import { buildRequiredDriverConstraints } from "./timeline-assignment-hints";
+import {
+  autoConvokeLogisticsDriversWithPreAssignedTasks,
+  type AutoConvokeLogisticsDriversResult,
+} from "./auto-convoke-logistics-drivers";
 import { validateRoutingProblemInput } from "./validation";
 import type { ValidationIssue } from "./validation-contract";
 
@@ -164,8 +168,16 @@ function buildMetadata(args: {
   sourceData: LogisticsRoutingSourceData;
   preAssignedRequiredCount: number;
   skippedTimelineAssignmentHintsCount: number;
+  autoConvokeResult?: AutoConvokeLogisticsDriversResult;
 }): RoutingProblemMetadata {
-  const { sourceData, preAssignedRequiredCount, skippedTimelineAssignmentHintsCount } = args;
+  const {
+    sourceData,
+    preAssignedRequiredCount,
+    skippedTimelineAssignmentHintsCount,
+    autoConvokeResult,
+  } = args;
+  const autoConvokedDriverIds = autoConvokeResult?.autoConvokedDriverIds ?? [];
+  const autoConvokeMissingInDbDriverIds = autoConvokeResult?.missingInDbDriverIds ?? [];
   const noCoordinateIds = sourceData.tasksExcludedNoCoordinatesIds;
   const lockedTasks = sourceData.allTaskData.filter((task) => task.locked);
   const timelineAssignmentHints = sourceData.timelineAssignmentHints;
@@ -180,6 +192,10 @@ function buildMetadata(args: {
     timelineAssignmentHintsCount: timelineAssignmentHints.length,
     preAssignedRequiredCount,
     skippedTimelineAssignmentHintsCount,
+    autoConvokedDriverIds,
+    autoConvokedDriversCount: autoConvokedDriverIds.length,
+    autoConvokeMissingInDbDriverIds,
+    autoConvokeMissingInDbDriversCount: autoConvokeMissingInDbDriverIds.length,
     lockedAssignmentsSolverIntegration: "integrated_v4b",
     excludedTasks: [
       ...lockedTasks.map((task) => ({
@@ -225,7 +241,10 @@ function mergeRequiredDriverBuildErrors(
   };
 }
 
-export function buildRoutingProblemInputFromSource(sourceData: LogisticsRoutingSourceData): RoutingProblemInput {
+export function buildRoutingProblemInputFromSource(
+  sourceData: LogisticsRoutingSourceData,
+  options?: { autoConvokeResult?: AutoConvokeLogisticsDriversResult }
+): RoutingProblemInput {
   const workDate = sourceData.workDate;
   const drivers = buildDriverNodes(sourceData);
   const { tasks, hardConstraints, softConstraints: taskSoftConstraints } = buildTaskNodes(
@@ -245,6 +264,7 @@ export function buildRoutingProblemInputFromSource(sourceData: LogisticsRoutingS
     sourceData,
     preAssignedRequiredCount: requiredDriverBuild.constraints.length,
     skippedTimelineAssignmentHintsCount: requiredDriverBuild.skippedHints.length,
+    autoConvokeResult: options?.autoConvokeResult,
   });
 
   const input: RoutingProblemInput = {
@@ -273,7 +293,24 @@ export function buildRoutingProblemInputFromSource(sourceData: LogisticsRoutingS
   return input;
 }
 
-export async function buildLogisticsRoutingInput(workDate: string): Promise<RoutingProblemInput> {
+export interface BuildLogisticsRoutingInputOptions {
+  performedBy?: string;
+  skipAutoConvoke?: boolean;
+  saveSelectedDrivers?: boolean;
+}
+
+export async function buildLogisticsRoutingInput(
+  workDate: string,
+  options?: BuildLogisticsRoutingInputOptions
+): Promise<RoutingProblemInput> {
+  let autoConvokeResult: AutoConvokeLogisticsDriversResult | undefined;
+  if (!options?.skipAutoConvoke) {
+    autoConvokeResult = await autoConvokeLogisticsDriversWithPreAssignedTasks(workDate, {
+      performedBy: options?.performedBy ?? "logistics-optimizer-final",
+      saveSelectedDrivers: options?.saveSelectedDrivers,
+    });
+  }
+
   const sourceData = await loadLogisticsRoutingSourceData(workDate);
-  return buildRoutingProblemInputFromSource(sourceData);
+  return buildRoutingProblemInputFromSource(sourceData, { autoConvokeResult });
 }

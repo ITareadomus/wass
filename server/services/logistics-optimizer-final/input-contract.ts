@@ -34,7 +34,7 @@ export interface RawLogisticsTaskInput {
   lockedReason: string | null;
 }
 
-/** Assignment attivo in timeline driver (pre-assegnato, non container-locked). */
+/** Pre-assigned: assignment attivo su logistics timeline driver (classe di dominio §22). */
 export interface TimelineAssignmentHint {
   taskId: TaskId;
   driverId: DriverId;
@@ -253,6 +253,10 @@ export interface RoutingProblemMetadata {
   timelineAssignmentHintsCount: number;
   preAssignedRequiredCount: number;
   skippedTimelineAssignmentHintsCount: number;
+  autoConvokedDriverIds: number[];
+  autoConvokedDriversCount: number;
+  autoConvokeMissingInDbDriverIds: number[];
+  autoConvokeMissingInDbDriversCount: number;
   lockedAssignmentsSolverIntegration: "integrated_v4b" | "pending";
   validation: RoutingProblemValidationResult;
 }

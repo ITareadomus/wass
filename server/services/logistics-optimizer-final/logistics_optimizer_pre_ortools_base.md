@@ -1258,11 +1258,21 @@ validation.ts
 
 ## 22. Decisioni di dominio (chiuse 2026-06-11, aggiornate Milestone 4b)
 
-### Logistics task classes (aligned with housekeeping on locks)
+### Logistics task classes (nomenclatura allineata a housekeeping)
+
+Glossario (termini di dominio):
+
+| Termine | Definizione |
+|---|---|
+| **Container-locked** | Task bloccato in container (`daily_task_locks` / `lg_containers`). Non entra in timeline, escluso da `RoutingProblemInput.tasks`. |
+| **Pre-assigned** | Task su logistics timeline driver, già assegnato a un driver. Genera `REQUIRED_DRIVER_TASK`; driver fisso, tempo/ordine flessibili in `hardWindow`. |
+| **Free** | Task in pool senza vincolo driver. |
+
+**Non esiste “locked on timeline”.** In logistics non ci sono task bloccati in timeline. Il check `task.locked === true` in `loadTimelineAssignmentHints` è solo un guard difensivo: un container-locked non dovrebbe mai comparire in timeline; se succede, l'hint viene ignorato.
 
 1. **Container-locked** (`daily_task_locks` / `lg_containers`): stay in containers, never enter timeline, excluded from `RoutingProblemInput.tasks`, never moved by solver.
 
-2. **Timeline pre-assigned** (assignment on driver timeline, not container-locked): enter `RoutingProblemInput.tasks`, generate hard `REQUIRED_DRIVER_TASK`, must stay on the same driver, may shift in time and route order within `hardWindow`.
+2. **Pre-assigned** (assignment on driver timeline): enter `RoutingProblemInput.tasks`, generate hard `REQUIRED_DRIVER_TASK`, must stay on the same driver, may shift in time and route order within `hardWindow`.
 
 3. **Free tasks**: enter `tasks[]`, no `REQUIRED_DRIVER_TASK`, any feasible driver.
 
@@ -1282,6 +1292,35 @@ Implicazioni immediate:
 - `loadTimelineAssignmentHints` + `buildRequiredDriverConstraints` sono il path ufficiale per i pre-assegnati.
 - `loadExistingLockedAssignments` resta esportato per retrocompatibilità ma non è usato dal builder 4b.
 - Required droppato o violato → solution `status: INVALID`, non `PARTIAL` accettabile.
+
+### Auto-convocazione pre-assigned (M5c)
+
+Regola operativa (allineata a housekeeping, senza readonly/rehydrate ADAM):
+
+```txt
+driver con task pre-assigned in logistics timeline
+→ implicitamente convocato
+→ prima di buildLogisticsRoutingInput / loadLogisticsRoutingSourceData
+→ REQUIRED_DRIVER_TASK non skippato per driver-not-selected
+```
+
+Implementazione:
+
+- [`auto-convoke-logistics-drivers.ts`](auto-convoke-logistics-drivers.ts): `autoConvokeLogisticsDriversWithPreAssignedTasks`
+- Parser condiviso: `parsePreAssignedTimelineEntries` in [`timeline-assignment-hints.ts`](timeline-assignment-hints.ts)
+- Hook esplicito in `buildLogisticsRoutingInput` (side effect su `lg_selected_drivers`, **non** nel loader)
+- Merge selected: ordine esistente + append nuovi driver
+- Revision action type: `AUTO_CONVOKED_PREASSIGNED`
+- Opzione `saveSelectedDrivers: false` per test (non confondere con `run-dry` optimizer)
+
+Metadata in `RoutingProblemInput.metadata`:
+
+- `autoConvokedDriverIds` / `autoConvokedDriversCount`
+- `autoConvokeMissingInDbDriverIds` / `autoConvokeMissingInDbDriversCount` (timeline cita driver assente da `lg_drivers`)
+
+`REQUIRED_DRIVER_NOT_SELECTED` (OR-Tools safety net) resta per dati corrotti / race — non flusso normale dopo auto-convoke.
+
+Fase 2 (PR separata): mutation hooks UI in `logistics-timeline-mutation-routes.ts` per parity D&D housekeeping.
 
 ---
 

@@ -78,6 +78,8 @@ export async function writeRoutingProblemInputDebug(
       businessSoftConstraints: extractBusinessSoftConstraints(input.softConstraints).length,
       timelineAssignmentHints: input.metadata.timelineAssignmentHintsCount,
       preAssignedRequiredCount: input.metadata.preAssignedRequiredCount,
+      autoConvokedDriversCount: input.metadata.autoConvokedDriversCount,
+      autoConvokeMissingInDbDriversCount: input.metadata.autoConvokeMissingInDbDriversCount,
       requiredDriverTaskConstraints: input.hardConstraints.filter(
         (constraint) => constraint.type === "REQUIRED_DRIVER_TASK"
       ).length,
@@ -149,6 +151,8 @@ export async function writeRoutingDryRunDebug(
       businessSoftConstraints: extractBusinessSoftConstraints(input.softConstraints).length,
       timelineAssignmentHints: input.metadata.timelineAssignmentHintsCount,
       preAssignedRequiredCount: input.metadata.preAssignedRequiredCount,
+      autoConvokedDriversCount: input.metadata.autoConvokedDriversCount,
+      autoConvokeMissingInDbDriversCount: input.metadata.autoConvokeMissingInDbDriversCount,
       requiredDriverTaskConstraints: input.hardConstraints.filter(
         (constraint) => constraint.type === "REQUIRED_DRIVER_TASK"
       ).length,

@@ -1,4 +1,4 @@
-import { buildLogisticsRoutingInput } from "./build-routing-input";
+import { buildLogisticsRoutingInput, type BuildLogisticsRoutingInputOptions } from "./build-routing-input";
 import {
   isLogisticsOptimizerFinalDebugEnabled,
   writeRoutingDryRunDebug,
@@ -12,14 +12,22 @@ import { validateRoutingProblemInput } from "./validation";
 import type { RoutingProblemValidationResult } from "./validation-contract";
 import type { RoutingSolutionValidationResult } from "./solution-validation-contract";
 
-export interface RunLogisticsRoutingDryOptions {
+export interface RunLogisticsRoutingDryOptions extends BuildLogisticsRoutingInputOptions {
   debug?: boolean;
   solver?: RoutingSolverId;
+}
+
+export interface RunLogisticsRoutingDryAutoConvokeSummary {
+  autoConvokedDriverIds: number[];
+  autoConvokedDriversCount: number;
+  autoConvokeMissingInDbDriverIds: number[];
+  autoConvokeMissingInDbDriversCount: number;
 }
 
 export interface RunLogisticsRoutingDryResult {
   workDate: string;
   debugDir: string | null;
+  autoConvoke: RunLogisticsRoutingDryAutoConvokeSummary;
   inputValidation: RoutingProblemValidationResult;
   solutionValidation: RoutingSolutionValidationResult;
   solution: RoutingSolution;
@@ -63,7 +71,11 @@ export async function runLogisticsRoutingDry(
   workDate: string,
   options: RunLogisticsRoutingDryOptions = {}
 ): Promise<RunLogisticsRoutingDryResult> {
-  const input = await buildLogisticsRoutingInput(workDate);
+  const input = await buildLogisticsRoutingInput(workDate, {
+    performedBy: options.performedBy,
+    skipAutoConvoke: options.skipAutoConvoke,
+    saveSelectedDrivers: options.saveSelectedDrivers,
+  });
   const inputValidation = validateRoutingProblemInput(input);
 
   if (!inputValidation.valid) {
@@ -94,6 +106,12 @@ export async function runLogisticsRoutingDry(
   return {
     workDate,
     debugDir,
+    autoConvoke: {
+      autoConvokedDriverIds: input.metadata.autoConvokedDriverIds,
+      autoConvokedDriversCount: input.metadata.autoConvokedDriversCount,
+      autoConvokeMissingInDbDriverIds: input.metadata.autoConvokeMissingInDbDriverIds,
+      autoConvokeMissingInDbDriversCount: input.metadata.autoConvokeMissingInDbDriversCount,
+    },
     inputValidation,
     solutionValidation,
     solution,

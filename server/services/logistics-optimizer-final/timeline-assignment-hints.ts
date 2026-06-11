@@ -6,33 +6,63 @@ import type {
   TimelineAssignmentHint,
 } from "./input-contract";
 
-export async function loadTimelineAssignmentHints(workDate: string): Promise<TimelineAssignmentHint[]> {
-  const timeline = await loadLogisticsTimeline(workDate);
-  if (!Array.isArray(timeline?.drivers_assignments)) return [];
+export interface PreAssignedTimelineParseResult {
+  hints: TimelineAssignmentHint[];
+  driverIdsWithPreAssignedTasks: number[];
+}
 
+export function parsePreAssignedTimelineEntries(timeline: unknown): PreAssignedTimelineParseResult {
   const hints: TimelineAssignmentHint[] = [];
-  for (const driverAssignment of timeline.drivers_assignments) {
-    const driverId = Number(driverAssignment?.driver?.id);
+  const driverIdsWithPreAssignedTasks = new Set<number>();
+
+  const driversAssignments = (timeline as { drivers_assignments?: unknown })?.drivers_assignments;
+  if (!Array.isArray(driversAssignments)) {
+    return { hints, driverIdsWithPreAssignedTasks: [] };
+  }
+
+  for (const driverAssignment of driversAssignments) {
+    const driverId = Number((driverAssignment as { driver?: { id?: unknown } })?.driver?.id);
     if (!Number.isFinite(driverId)) continue;
 
-    const tasks = Array.isArray(driverAssignment?.tasks) ? driverAssignment.tasks : [];
-    for (const task of tasks) {
-      if (task?.locked === true) continue;
+    const tasks = Array.isArray((driverAssignment as { tasks?: unknown }).tasks)
+      ? (driverAssignment as { tasks: unknown[] }).tasks
+      : [];
+    let driverHasPreAssignedTask = false;
 
-      const taskId = Number(task?.task_id);
+    for (const task of tasks) {
+      // Defensive guard only: container-locked tasks must not appear on timeline (§22).
+      // There is no separate "locked on timeline" class in logistics.
+      if ((task as { locked?: boolean })?.locked === true) continue;
+
+      const taskId = Number((task as { task_id?: unknown })?.task_id);
       if (!Number.isFinite(taskId)) continue;
 
+      driverHasPreAssignedTask = true;
       hints.push({
         taskId,
         driverId,
         source: "timeline",
-        sequence: Number.isFinite(Number(task?.sequence)) ? Number(task.sequence) : null,
-        manuallyMoved: task?.manually_moved === true,
+        sequence: Number.isFinite(Number((task as { sequence?: unknown }).sequence))
+          ? Number((task as { sequence?: unknown }).sequence)
+          : null,
+        manuallyMoved: (task as { manually_moved?: boolean })?.manually_moved === true,
       });
+    }
+
+    if (driverHasPreAssignedTask) {
+      driverIdsWithPreAssignedTasks.add(driverId);
     }
   }
 
-  return hints;
+  return {
+    hints,
+    driverIdsWithPreAssignedTasks: [...driverIdsWithPreAssignedTasks].sort((left, right) => left - right),
+  };
+}
+
+export async function loadTimelineAssignmentHints(workDate: string): Promise<TimelineAssignmentHint[]> {
+  const timeline = await loadLogisticsTimeline(workDate);
+  return parsePreAssignedTimelineEntries(timeline).hints;
 }
 
 export interface BuildRequiredDriverConstraintsArgs {
