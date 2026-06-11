@@ -10286,8 +10286,16 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
   app.post("/api/logistics-optimizer-final/run-dry", async (req, res) => {
     try {
-      const { date, debug: debugBody } = req.body || {};
+      const { date, debug: debugBody, solver: solverBody } = req.body || {};
       const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const solver =
+        solverBody === "ortools-v1" || solverBody === "greedy-v1" ? solverBody : undefined;
+      if (solverBody !== undefined && solver === undefined) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid solver. Use "greedy-v1" or "ortools-v1".',
+        });
+      }
       const hasDebugBody = Object.prototype.hasOwnProperty.call(req.body || {}, "debug");
       const debugExplicit = hasDebugBody
         ? debugBody === true ||
@@ -10307,7 +10315,10 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           (debugEnabled ? " (debug JSON attivo)" : "")
       );
 
-      const result = await runLogisticsRoutingDry(workDate, { debug: debugExplicit });
+      const result = await runLogisticsRoutingDry(workDate, {
+        debug: debugExplicit,
+        solver,
+      });
 
       return res.json({
         success: true,

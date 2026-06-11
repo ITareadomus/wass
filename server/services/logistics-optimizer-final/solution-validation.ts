@@ -1,6 +1,7 @@
 import type { RoutingProblemInput, TaskNode } from "./input-contract";
 import {
   GREEDY_SOLVER_ID,
+  KNOWN_ROUTING_SOLVER_IDS,
   ROUTING_SOLUTION_SCHEMA_VERSION,
   type RoutingSolution,
 } from "./solution-contract";
@@ -78,12 +79,12 @@ function validateSchemaAndMetadata(
     });
   }
 
-  if (solution.solverId !== GREEDY_SOLVER_ID) {
+  if (!KNOWN_ROUTING_SOLVER_IDS.includes(solution.solverId as (typeof KNOWN_ROUTING_SOLVER_IDS)[number])) {
     pushWarning(warnings, {
       code: "UNEXPECTED_SOLVER_ID",
       message: `Unexpected solverId: ${solution.solverId}`,
       path: "solverId",
-      expected: GREEDY_SOLVER_ID,
+      expected: KNOWN_ROUTING_SOLVER_IDS,
       actual: solution.solverId,
     });
   }

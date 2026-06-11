@@ -26,6 +26,10 @@ Il nuovo modulo **non** chiama `runLogisticsPhase0`, `runLogisticsPhase1` né `r
 | `bag-handling.ts` | `BagHandling` (`NO_CLEANER_CONTEXT`, `DRIVER_BRINGS_BAG`, `CLEANER_HAS_BAG`) |
 | `windows.ts` | Finestre hard/soft task |
 | `build-routing-input.ts` | `buildLogisticsRoutingInput(workDate)` |
+| `solver/solve-routing.ts` | Dispatcher `greedy-v1` \| `ortools-v1` |
+| `solver/ortools/ortools-adapter.ts` | `buildOrToolsPayload`, `decodeOrToolsSolution`, cost shaping GEO |
+| `solver/ortools/logistics_routing_ortools.py` | VRP OR-Tools (time windows, required, disjunctions) |
+| `run-routing-dry.ts` | Dry-run con `solver` opt-in (`ortools-v1`) |
 
 Flusso attuale del modulo final:
 
@@ -1278,6 +1282,48 @@ Implicazioni immediate:
 - `loadTimelineAssignmentHints` + `buildRequiredDriverConstraints` sono il path ufficiale per i pre-assegnati.
 - `loadExistingLockedAssignments` resta esportato per retrocompatibilità ma non è usato dal builder 4b.
 - Required droppato o violato → solution `status: INVALID`, non `PARTIAL` accettabile.
+
+---
+
+## 24. Milestone 5 — OR-Tools routing solver
+
+Pipeline:
+
+```txt
+RoutingProblemInput
+  → buildOrToolsPayload (travelMatrixMin + costMatrixMin shaped)
+  → logistics_routing_ortools.py
+  → decodeOrToolsSolution
+  → validateRoutingSolution
+  → 02-routing-solution.json
+```
+
+Solver IDs: `greedy-v1` (default `run-dry`), `ortools-v1` (opt-in body `"solver": "ortools-v1"`).
+
+### Hard constraints M5
+
+- Task time windows (`transit = service(from) + travel`)
+- Driver work windows
+- `REQUIRED_DRIVER_TASK` hard vehicle constraint (no disjunction)
+- Free tasks: `AddDisjunction` con penalty EO > HP > LP
+
+### Soft GEO M5 (cost shaping locale)
+
+- `KEEP_SAME_COORDINATES_BUILDING` e `KEEP_NEARBY_CLUSTER` riducono costo arco intra-gruppo in `costMatrixMin`
+- Decode e validation usano sempre `travelMatrixMin` originale
+- Non garantisce grouping globale same-vehicle (M5b per cleaner/sequence/priority)
+
+### Required infeasible
+
+Se OR-Tools ritorna `infeasible`, `buildRequiredInfeasibleSolution` produce `RoutingSolution` diagnostica (`INVALID` se required coinvolti), non errore HTTP 500.
+
+### Known limitations M5
+
+- Soft GEO = cost shaping locale, non garanzia globale stesso veicolo per gruppo
+- Cleaner / sequence / priority soft in M5b
+- Nessun apply timeline
+- Status: `FEASIBLE` \| `PARTIAL` \| `INFEASIBLE` \| `INVALID` (no `OPTIMAL` in M5)
+- Prerequisito: `pip install ortools`
 
 ---
 

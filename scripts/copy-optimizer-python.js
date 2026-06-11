@@ -11,6 +11,7 @@ const optimizerPythonFiles = [
   'server/services/optimizer/phase2_ortools.py',
   'server/services/optimizer/phase4_ortools.py',
   'server/services/optimizer/phase5_ortools.py',
+  'server/services/logistics-optimizer-final/solver/ortools/logistics_routing_ortools.py',
 ];
 
 async function copyOptimizerPythonFiles() {

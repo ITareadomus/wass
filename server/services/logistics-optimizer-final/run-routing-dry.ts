@@ -3,7 +3,8 @@ import {
   isLogisticsOptimizerFinalDebugEnabled,
   writeRoutingDryRunDebug,
 } from "./debug-writer";
-import { solveGreedyRouting } from "./solver/greedy-routing-solver";
+import { GREEDY_SOLVER_ID } from "./solution-contract";
+import { solveRouting, type RoutingSolverId } from "./solver/solve-routing";
 import type { RoutingSolution } from "./solution-contract";
 import { validateRoutingSolution } from "./solution-validation";
 import { validateRoutingProblemInput } from "./validation";
@@ -12,6 +13,7 @@ import type { RoutingSolutionValidationResult } from "./solution-validation-cont
 
 export interface RunLogisticsRoutingDryOptions {
   debug?: boolean;
+  solver?: RoutingSolverId;
 }
 
 export interface RunLogisticsRoutingDryResult {
@@ -52,7 +54,7 @@ export class RoutingInputValidationError extends Error {
 }
 
 /**
- * Dry-run routing solver: builds RoutingProblemInput, runs greedy solver,
+ * Dry-run routing solver: builds RoutingProblemInput, runs selected solver,
  * validates solution, and optionally persists debug JSON artifacts.
  * Does not apply assignments to timeline or DB.
  */
@@ -67,7 +69,9 @@ export async function runLogisticsRoutingDry(
     throw new RoutingInputValidationError(inputValidation);
   }
 
-  const solution = solveGreedyRouting(input);
+  const solution = await solveRouting(input, {
+    solverId: options.solver ?? GREEDY_SOLVER_ID,
+  });
   const solutionValidation = validateRoutingSolution(input, solution);
 
   const debugEnabled = isLogisticsOptimizerFinalDebugEnabled(options.debug);

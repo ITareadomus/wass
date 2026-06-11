@@ -2,6 +2,9 @@ import type { DriverId, Minutes, TaskId } from "./input-contract";
 
 export const ROUTING_SOLUTION_SCHEMA_VERSION = "logistics-routing-solution/v1" as const;
 export const GREEDY_SOLVER_ID = "greedy-v1" as const;
+export const ORTOOLS_SOLVER_ID = "ortools-v1" as const;
+
+export const KNOWN_ROUTING_SOLVER_IDS = [GREEDY_SOLVER_ID, ORTOOLS_SOLVER_ID] as const;
 
 export type RoutingSolutionStatus =
   | "OPTIMAL"
