@@ -370,7 +370,11 @@ function validateHardConstraints(
     const key = constraintKey(constraint);
     constraintCounts.set(key, (constraintCounts.get(key) ?? 0) + 1);
 
-    if (constraint.type === "TASK_TIME_WINDOW" || constraint.type === "TASK_REQUIRED") {
+    if (
+      constraint.type === "TASK_TIME_WINDOW" ||
+      constraint.type === "TASK_REQUIRED" ||
+      constraint.type === "REQUIRED_DRIVER_TASK"
+    ) {
       if (!taskById.has(constraint.taskId)) {
         pushError(errors, {
           code: "UNKNOWN_TASK_IN_CONSTRAINT",
@@ -442,6 +446,18 @@ function validateHardConstraints(
         });
       }
     }
+
+    if (constraint.type === "REQUIRED_DRIVER_TASK") {
+      if (!driverById.has(constraint.driverId)) {
+        pushError(errors, {
+          code: "UNKNOWN_DRIVER_IN_CONSTRAINT",
+          message: `REQUIRED_DRIVER_TASK references unknown driver ${constraint.driverId}`,
+          driverId: constraint.driverId,
+          taskId: constraint.taskId,
+          path: "hardConstraints",
+        });
+      }
+    }
   }
 
   for (const [key, count] of constraintCounts) {
@@ -449,7 +465,7 @@ function validateHardConstraints(
       const [type, id] = key.split(":");
       const numericId = Number(id);
       const issue: Omit<ValidationIssue, "severity"> = {
-        code: "DUPLICATE_HARD_CONSTRAINT",
+        code: type === "REQUIRED_DRIVER_TASK" ? "DUPLICATE_REQUIRED_DRIVER_TASK" : "DUPLICATE_HARD_CONSTRAINT",
         message: `${type} appears ${count} times (expected 1)`,
         path: "hardConstraints",
         expected: 1,
@@ -1101,15 +1117,28 @@ function validateMetadataAndWarnings(
   }
 
   if (
-    input.metadata.existingLockedAssignmentsCount !==
-    input.metadata.existingLockedAssignments.length
+    input.metadata.timelineAssignmentHintsCount !== input.metadata.timelineAssignmentHints.length
   ) {
     pushWarning(warnings, {
       code: "METADATA_CONSISTENCY_MISMATCH",
-      message: "existingLockedAssignmentsCount does not match existingLockedAssignments.length",
-      path: "metadata.existingLockedAssignmentsCount",
-      expected: input.metadata.existingLockedAssignments.length,
-      actual: input.metadata.existingLockedAssignmentsCount,
+      message: "timelineAssignmentHintsCount does not match timelineAssignmentHints.length",
+      path: "metadata.timelineAssignmentHintsCount",
+      expected: input.metadata.timelineAssignmentHints.length,
+      actual: input.metadata.timelineAssignmentHintsCount,
+    });
+  }
+
+  if (
+    input.metadata.preAssignedRequiredCount !==
+    input.hardConstraints.filter((constraint) => constraint.type === "REQUIRED_DRIVER_TASK").length
+  ) {
+    pushWarning(warnings, {
+      code: "METADATA_CONSISTENCY_MISMATCH",
+      message: "preAssignedRequiredCount does not match REQUIRED_DRIVER_TASK hardConstraints count",
+      path: "metadata.preAssignedRequiredCount",
+      expected: input.hardConstraints.filter((constraint) => constraint.type === "REQUIRED_DRIVER_TASK")
+        .length,
+      actual: input.metadata.preAssignedRequiredCount,
     });
   }
 
@@ -1144,13 +1173,13 @@ function validateMetadataAndWarnings(
     });
   }
 
-  if (input.metadata.existingLockedAssignmentsCount > 0) {
+  if (input.metadata.skippedTimelineAssignmentHintsCount > 0) {
     pushWarning(warnings, {
-      code: "LOCKED_ASSIGNMENTS_NOT_SOLVER_INTEGRATED",
+      code: "REQUIRED_DRIVER_TASK_SKIPPED",
       message:
-        "Existing locked assignments are loaded but not yet integrated as solver constraints.",
-      path: "metadata.existingLockedAssignments",
-      actual: input.metadata.existingLockedAssignmentsCount,
+        "One or more timeline assignment hints were skipped because task or driver is not schedulable/selected.",
+      path: "metadata.skippedTimelineAssignmentHintsCount",
+      actual: input.metadata.skippedTimelineAssignmentHintsCount,
     });
   }
 }

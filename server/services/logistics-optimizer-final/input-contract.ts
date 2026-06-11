@@ -34,24 +34,22 @@ export interface RawLogisticsTaskInput {
   lockedReason: string | null;
 }
 
-/** Assignment già presenti in timeline (locked/manuali). Non ancora vincoli solver in v1. */
+/** Assignment attivo in timeline driver (pre-assegnato, non container-locked). */
+export interface TimelineAssignmentHint {
+  taskId: TaskId;
+  driverId: DriverId;
+  source: "timeline";
+  sequence: number | null;
+  manuallyMoved: boolean;
+}
+
+/** @deprecated Usare `TimelineAssignmentHint`. Mantenuto per retrocompatibilità export. */
 export interface ExistingLockedAssignment {
   driverId: number;
   taskId: number;
   sequence: number | null;
   locked: boolean;
   manuallyMoved: boolean;
-}
-
-/**
- * Vincolo previsto per integrazione solver (milestone successiva).
- * Oggi gli assignment locked non entrano in `hardConstraints`.
- */
-export interface PendingLockedDriverTaskConstraint {
-  type: "LOCKED_DRIVER_TASK";
-  driverId: DriverId;
-  taskId: TaskId;
-  sequenceHint?: number;
 }
 
 export interface LocationNode {
@@ -168,6 +166,13 @@ export type HardConstraintSpec =
       type: "TASK_REQUIRED";
       taskId: TaskId;
       penaltyIfDropped?: number;
+    }
+  | {
+      type: "REQUIRED_DRIVER_TASK";
+      taskId: TaskId;
+      driverId: DriverId;
+      source: "timeline_pre_assigned";
+      manuallyMoved?: boolean;
     };
 
 export type SoftConstraintSpec =
@@ -241,10 +246,14 @@ export interface RoutingProblemMetadata {
     reason: "LOCKED" | "NO_COORDINATES";
     detail?: string | null;
   }>;
-  /** Timeline locked/manuali caricati ma non ancora tradotti in `hardConstraints`. */
-  existingLockedAssignments: ExistingLockedAssignment[];
-  existingLockedAssignmentsCount: number;
-  lockedAssignmentsSolverIntegration: "pending";
+  /** @deprecated Non popolato dal builder 4b+. Usare `timelineAssignmentHints`. */
+  existingLockedAssignments?: ExistingLockedAssignment[];
+  existingLockedAssignmentsCount?: number;
+  timelineAssignmentHints: TimelineAssignmentHint[];
+  timelineAssignmentHintsCount: number;
+  preAssignedRequiredCount: number;
+  skippedTimelineAssignmentHintsCount: number;
+  lockedAssignmentsSolverIntegration: "integrated_v4b" | "pending";
   validation: RoutingProblemValidationResult;
 }
 

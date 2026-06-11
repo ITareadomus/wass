@@ -20,7 +20,9 @@ import {
   buildBusinessGroups,
 } from "./groups/build-business-groups";
 import { buildDepotNode, buildLocationNodes, buildTravelMatrixMin } from "./travel-matrix";
+import { buildRequiredDriverConstraints } from "./timeline-assignment-hints";
 import { validateRoutingProblemInput } from "./validation";
+import type { ValidationIssue } from "./validation-contract";
 
 function buildDriverNodes(sourceData: LogisticsRoutingSourceData): DriverNode[] {
   return sourceData.selectedDrivers.map((driver) => {
@@ -158,10 +160,15 @@ function buildDriverConstraints(drivers: DriverNode[]): HardConstraintSpec[] {
   }));
 }
 
-function buildMetadata(sourceData: LogisticsRoutingSourceData): RoutingProblemMetadata {
+function buildMetadata(args: {
+  sourceData: LogisticsRoutingSourceData;
+  preAssignedRequiredCount: number;
+  skippedTimelineAssignmentHintsCount: number;
+}): RoutingProblemMetadata {
+  const { sourceData, preAssignedRequiredCount, skippedTimelineAssignmentHintsCount } = args;
   const noCoordinateIds = sourceData.tasksExcludedNoCoordinatesIds;
   const lockedTasks = sourceData.allTaskData.filter((task) => task.locked);
-  const existingLockedAssignments = sourceData.existingLockedAssignments;
+  const timelineAssignmentHints = sourceData.timelineAssignmentHints;
   return {
     generatedAt: new Date().toISOString(),
     totalLogisticsTasks: sourceData.allTaskData.length,
@@ -169,9 +176,11 @@ function buildMetadata(sourceData: LogisticsRoutingSourceData): RoutingProblemMe
     tasksExcludedNoCoordinatesCount: noCoordinateIds.length,
     tasksExcludedNoCoordinatesIds: noCoordinateIds,
     noSelectedDrivers: sourceData.selectedDrivers.length === 0,
-    existingLockedAssignments,
-    existingLockedAssignmentsCount: existingLockedAssignments.length,
-    lockedAssignmentsSolverIntegration: "pending",
+    timelineAssignmentHints,
+    timelineAssignmentHintsCount: timelineAssignmentHints.length,
+    preAssignedRequiredCount,
+    skippedTimelineAssignmentHintsCount,
+    lockedAssignmentsSolverIntegration: "integrated_v4b",
     excludedTasks: [
       ...lockedTasks.map((task) => ({
         taskId: task.taskId,
@@ -191,6 +200,31 @@ function buildMetadata(sourceData: LogisticsRoutingSourceData): RoutingProblemMe
   };
 }
 
+function mergeRequiredDriverBuildErrors(
+  validation: RoutingProblemMetadata["validation"],
+  buildErrors: ReturnType<typeof buildRequiredDriverConstraints>["errors"]
+): RoutingProblemMetadata["validation"] {
+  if (buildErrors.length === 0) return validation;
+
+  const errors: ValidationIssue[] = [...validation.errors];
+  for (const buildError of buildErrors) {
+    errors.push({
+      severity: "error",
+      code: "MULTIPLE_REQUIRED_DRIVERS_FOR_TASK",
+      message: `Task ${buildError.taskId} has multiple required drivers in timeline: ${buildError.driverIds.join(", ")}`,
+      taskId: buildError.taskId,
+      path: "hardConstraints",
+      actual: buildError.driverIds,
+    });
+  }
+
+  return {
+    ...validation,
+    valid: false,
+    errors,
+  };
+}
+
 export function buildRoutingProblemInputFromSource(sourceData: LogisticsRoutingSourceData): RoutingProblemInput {
   const workDate = sourceData.workDate;
   const drivers = buildDriverNodes(sourceData);
@@ -198,11 +232,20 @@ export function buildRoutingProblemInputFromSource(sourceData: LogisticsRoutingS
     sourceData,
     workDate
   );
+  const requiredDriverBuild = buildRequiredDriverConstraints({
+    hints: sourceData.timelineAssignmentHints,
+    schedulableTaskIds: tasks.map((task) => task.taskId),
+    selectedDriverIds: drivers.map((driver) => driver.id),
+  });
   const nodes = buildLocationNodes(tasks);
   const travelMatrixMin = buildTravelMatrixMin(nodes);
   const businessGroups = buildBusinessGroups(tasks, travelMatrixMin);
   const businessSoftConstraints = buildBusinessGroupSoftConstraints(businessGroups);
-  const metadata = buildMetadata(sourceData);
+  const metadata = buildMetadata({
+    sourceData,
+    preAssignedRequiredCount: requiredDriverBuild.constraints.length,
+    skippedTimelineAssignmentHintsCount: requiredDriverBuild.skippedHints.length,
+  });
 
   const input: RoutingProblemInput = {
     schemaVersion: "logistics-routing-input/v1",
@@ -213,13 +256,20 @@ export function buildRoutingProblemInputFromSource(sourceData: LogisticsRoutingS
     tasks,
     travelMatrixMin,
     serviceDurationMin: LOGISTICS_SERVICE_DURATION_MIN,
-    hardConstraints: [...buildDriverConstraints(drivers), ...hardConstraints],
+    hardConstraints: [
+      ...buildDriverConstraints(drivers),
+      ...hardConstraints,
+      ...requiredDriverBuild.constraints,
+    ],
     softConstraints: [...taskSoftConstraints, ...businessSoftConstraints],
     businessGroups,
     metadata,
   };
 
-  input.metadata.validation = validateRoutingProblemInput(input);
+  input.metadata.validation = mergeRequiredDriverBuildErrors(
+    validateRoutingProblemInput(input),
+    requiredDriverBuild.errors
+  );
   return input;
 }
 

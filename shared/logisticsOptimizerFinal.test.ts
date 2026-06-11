@@ -561,7 +561,7 @@ describe("buildRoutingProblemInputFromSource", () => {
         endTime: "20:00",
         endTimeSource: "default",
       }],
-      existingLockedAssignments: [],
+      timelineAssignmentHints: [],
       windowConfig: {
         source: "app_settings",
         workDate: "2026-06-04",
@@ -579,9 +579,10 @@ describe("buildRoutingProblemInputFromSource", () => {
       { taskId: 103, reason: "LOCKED", detail: "manual_lock" },
       { taskId: 102, reason: "NO_COORDINATES" },
     ]);
-    expect(input.metadata.existingLockedAssignments).toEqual([]);
-    expect(input.metadata.existingLockedAssignmentsCount).toBe(0);
-    expect(input.metadata.lockedAssignmentsSolverIntegration).toBe("pending");
+    expect(input.metadata.timelineAssignmentHints).toEqual([]);
+    expect(input.metadata.timelineAssignmentHintsCount).toBe(0);
+    expect(input.metadata.preAssignedRequiredCount).toBe(0);
+    expect(input.metadata.lockedAssignmentsSolverIntegration).toBe("integrated_v4b");
     expect(input.travelMatrixMin).toHaveLength(2);
     expect(input.travelMatrixMin[0]).toHaveLength(2);
     expect(input.tasks[0].debug?.ruleTrace).toContainEqual({ code: "EO_NO_HARD_LOWER_BOUND", value: 0 });
@@ -626,7 +627,7 @@ describe("buildRoutingProblemInputFromSource", () => {
         endTime: "20:00",
         endTimeSource: "default",
       }],
-      existingLockedAssignments: [],
+      timelineAssignmentHints: [],
       windowConfig: {
         source: "app_settings",
         workDate: "2026-06-04",

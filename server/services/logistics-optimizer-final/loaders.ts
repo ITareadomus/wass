@@ -6,10 +6,12 @@ import type {
   ExistingLockedAssignment,
   LogisticsWindowConfig,
   RawLogisticsTaskInput,
+  TimelineAssignmentHint,
 } from "./input-contract";
+import { loadTimelineAssignmentHints } from "./timeline-assignment-hints";
 import { normalizeEndTime, normalizeStartTime, toFiniteNumber } from "./normalizers";
 
-export type { RawLogisticsTaskInput, ExistingLockedAssignment };
+export type { RawLogisticsTaskInput, ExistingLockedAssignment, TimelineAssignmentHint };
 
 export interface SelectedLogisticsDriverInput {
   id: number;
@@ -32,7 +34,7 @@ export interface LogisticsRoutingSourceData {
   lockedTasksExcluded: number;
   tasksExcludedNoCoordinatesIds: number[];
   selectedDrivers: SelectedLogisticsDriverInput[];
-  existingLockedAssignments: ExistingLockedAssignment[];
+  timelineAssignmentHints: TimelineAssignmentHint[];
   windowConfig: LogisticsWindowConfig;
 }
 
@@ -217,18 +219,18 @@ export async function loadExistingLockedAssignments(workDate: string): Promise<E
 }
 
 export async function loadLogisticsRoutingSourceData(workDate: string): Promise<LogisticsRoutingSourceData> {
-  const [tasks, selectedDrivers, windowConfig, existingLockedAssignments] = await Promise.all([
+  const [tasks, selectedDrivers, windowConfig, timelineAssignmentHints] = await Promise.all([
     loadUnlockedLogisticsTasks(workDate),
     loadSelectedDrivers(workDate),
     loadWindowConfig(workDate),
-    loadExistingLockedAssignments(workDate),
+    loadTimelineAssignmentHints(workDate),
   ]);
 
   return {
     workDate,
     ...tasks,
     selectedDrivers,
-    existingLockedAssignments,
+    timelineAssignmentHints,
     windowConfig,
   };
 }

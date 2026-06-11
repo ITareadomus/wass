@@ -516,7 +516,7 @@ describe("routing input integration", () => {
           endTimeSource: "default",
         },
       ],
-      existingLockedAssignments: [],
+      timelineAssignmentHints: [],
       windowConfig: {
         source: "app_settings",
         workDate: "2026-06-04",

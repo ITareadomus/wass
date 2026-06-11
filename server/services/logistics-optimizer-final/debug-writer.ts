@@ -2,6 +2,9 @@ import fs from "fs/promises";
 import path from "path";
 import type { BusinessGroupType } from "./groups/group-contract";
 import type { RoutingProblemInput, SoftConstraintSpec } from "./input-contract";
+import type { RoutingSolution } from "./solution-contract";
+import type { RoutingSolutionValidationResult } from "./solution-validation-contract";
+import type { RoutingProblemValidationResult } from "./validation-contract";
 
 export function isLogisticsOptimizerFinalDebugEnabled(explicit?: boolean): boolean {
   if (explicit === true) return true;
@@ -72,7 +75,11 @@ export async function writeRoutingProblemInputDebug(
       softConstraints: input.softConstraints.length,
       businessGroups: input.businessGroups.length,
       businessSoftConstraints: extractBusinessSoftConstraints(input.softConstraints).length,
-      existingLockedAssignments: input.metadata.existingLockedAssignmentsCount,
+      timelineAssignmentHints: input.metadata.timelineAssignmentHintsCount,
+      preAssignedRequiredCount: input.metadata.preAssignedRequiredCount,
+      requiredDriverTaskConstraints: input.hardConstraints.filter(
+        (constraint) => constraint.type === "REQUIRED_DRIVER_TASK"
+      ).length,
       excludedTasks: input.metadata.excludedTasks.length,
     },
     businessGroupsByType: countBusinessGroupsByType(input.businessGroups),
@@ -85,6 +92,82 @@ export async function writeRoutingProblemInputDebug(
     fs.writeFile(
       path.join(dir, "01-routing-input.json"),
       JSON.stringify(input, null, 2),
+      "utf8"
+    ),
+  ]);
+
+  return dir;
+}
+
+export interface WriteRoutingDryRunDebugArgs {
+  input: RoutingProblemInput;
+  solution: RoutingSolution;
+  inputValidation: RoutingProblemValidationResult;
+  solutionValidation: RoutingSolutionValidationResult;
+  runId?: string;
+  startedAt?: string;
+}
+
+export async function writeRoutingDryRunDebug(
+  args: WriteRoutingDryRunDebugArgs
+): Promise<string> {
+  const { input, solution, inputValidation, solutionValidation } = args;
+  const startedAt = args.startedAt ?? new Date().toISOString();
+  const runId = args.runId ?? createLogisticsOptimizerFinalRunId(new Date(startedAt));
+  const dir = path.join(debugRootDir(), input.workDate, runId);
+  await fs.mkdir(dir, { recursive: true });
+
+  const assignedTasks = solution.routes.reduce((sum, route) => sum + route.stops.length, 0);
+
+  const manifest = {
+    workDate: input.workDate,
+    runId,
+    startedAt,
+    milestone: "routing-dry-run",
+    solverId: solution.solverId,
+    inputValidation: {
+      valid: inputValidation.valid,
+      errorCount: inputValidation.errors.length,
+      warningCount: inputValidation.warnings.length,
+    },
+    solutionValidation: {
+      valid: solutionValidation.valid,
+      errorCount: solutionValidation.errors.length,
+      warningCount: solutionValidation.warnings.length,
+    },
+    counts: {
+      drivers: input.drivers.length,
+      tasks: input.tasks.length,
+      routes: solution.routes.length,
+      assignedTasks,
+      droppedTasks: solution.droppedTasks.length,
+      hardConstraints: input.hardConstraints.length,
+      softConstraints: input.softConstraints.length,
+      businessGroups: input.businessGroups.length,
+      businessSoftConstraints: extractBusinessSoftConstraints(input.softConstraints).length,
+      timelineAssignmentHints: input.metadata.timelineAssignmentHintsCount,
+      preAssignedRequiredCount: input.metadata.preAssignedRequiredCount,
+      requiredDriverTaskConstraints: input.hardConstraints.filter(
+        (constraint) => constraint.type === "REQUIRED_DRIVER_TASK"
+      ).length,
+      excludedTasks: input.metadata.excludedTasks.length,
+    },
+    solutionStatus: solution.status,
+    businessGroupsByType: countBusinessGroupsByType(input.businessGroups),
+    businessSoftConstraints: extractBusinessSoftConstraints(input.softConstraints),
+    files: ["01-routing-input.json", "02-routing-solution.json"],
+  };
+
+  await Promise.all([
+    fs.writeFile(path.join(dir, "manifest.json"), JSON.stringify(manifest, null, 2), "utf8"),
+    fs.writeFile(
+      path.join(dir, "01-routing-input.json"),
+      JSON.stringify(input, null, 2),
+      "utf8"
+    ),
+    fs.writeFile(
+      path.join(dir, "02-routing-solution.json"),
+      JSON.stringify(solution, null, 2),
       "utf8"
     ),
   ]);

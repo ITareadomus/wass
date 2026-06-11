@@ -10284,6 +10284,53 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     }
   });
 
+  app.post("/api/logistics-optimizer-final/run-dry", async (req, res) => {
+    try {
+      const { date, debug: debugBody } = req.body || {};
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const hasDebugBody = Object.prototype.hasOwnProperty.call(req.body || {}, "debug");
+      const debugExplicit = hasDebugBody
+        ? debugBody === true ||
+          debugBody === 1 ||
+          String(debugBody ?? "").toLowerCase() === "true"
+        : undefined;
+
+      const { runLogisticsRoutingDry, RoutingInputValidationError } = await import(
+        "./services/logistics-optimizer-final/run-routing-dry"
+      );
+      const { isLogisticsOptimizerFinalDebugEnabled } = await import(
+        "./services/logistics-optimizer-final/debug-writer"
+      );
+      const debugEnabled = isLogisticsOptimizerFinalDebugEnabled(debugExplicit);
+      console.log(
+        `🚀 POST /api/logistics-optimizer-final/run-dry - ${workDate}` +
+          (debugEnabled ? " (debug JSON attivo)" : "")
+      );
+
+      const result = await runLogisticsRoutingDry(workDate, { debug: debugExplicit });
+
+      return res.json({
+        success: true,
+        ok: result.solutionValidation.valid,
+        ...result,
+      });
+    } catch (error: any) {
+      if (error?.name === "RoutingInputValidationError") {
+        return res.status(400).json({
+          success: false,
+          error: error.message,
+          inputValidation: error.inputValidation,
+        });
+      }
+
+      console.error("❌ Errore logistics-optimizer-final run-dry:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
   // ========== OPTIMIZER RUN-ALL ENDPOINT ==========
   
   app.post("/api/optimizer/run-all", async (req, res) => {

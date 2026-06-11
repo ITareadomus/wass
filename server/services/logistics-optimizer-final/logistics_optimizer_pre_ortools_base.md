@@ -20,7 +20,8 @@ Il nuovo modulo **non** chiama `runLogisticsPhase0`, `runLogisticsPhase1` né `r
 
 | Modulo | Ruolo |
 |---|---|
-| `loaders.ts` | `loadUnlockedLogisticsTasks`, `loadSelectedDrivers`, `loadWindowConfig`, `loadExistingLockedAssignments` |
+| `loaders.ts` | `loadUnlockedLogisticsTasks`, `loadSelectedDrivers`, `loadWindowConfig`, `loadTimelineAssignmentHints` |
+| `timeline-assignment-hints.ts` | `loadTimelineAssignmentHints`, `buildRequiredDriverConstraints` |
 | `input-contract.ts` | `RawLogisticsTaskInput`, `RoutingProblemInput`, tipi vincoli |
 | `bag-handling.ts` | `BagHandling` (`NO_CLEANER_CONTEXT`, `DRIVER_BRINGS_BAG`, `CLEANER_HAS_BAG`) |
 | `windows.ts` | Finestre hard/soft task |
@@ -37,7 +38,7 @@ input = buildRoutingProblemInputFromSource(source)
 
 **Tipi autonomi:** `RawLogisticsTaskInput` è definito in `input-contract.ts` (nessun import da `phase0.ts`).
 
-**Assignment locked in timeline:** `loadExistingLockedAssignments` li carica in `metadata.existingLockedAssignments`, ma **non** li traduce ancora in `hardConstraints`. Integrazione solver prevista come `LOCKED_DRIVER_TASK` (milestone successiva).
+**Task pre-assegnati in timeline (Milestone 4b):** `loadTimelineAssignmentHints` carica tutti gli assignment timeline; `buildRequiredDriverConstraints` genera `REQUIRED_DRIVER_TASK` in `hardConstraints`. I pre-assegnati restano in `tasks[]` con driver fisso e orario/sequenza flessibili in `hardWindow`. Distinti dai **task locked nei containers** (esclusi in `loadUnlockedLogisticsTasks`).
 
 ---
 
@@ -1251,12 +1252,32 @@ validation.ts
 
 ---
 
-## 22. Decisioni aperte prima di implementare
+## 22. Decisioni di dominio (chiuse 2026-06-11, aggiornate Milestone 4b)
 
-1. Assignment locked in timeline: integrare come `LOCKED_DRIVER_TASK` nel solver oppure preservare fuori solver e riapplicare in apply?
-2. Driver end window: esiste un orario massimo giornaliero per autista o solo finestre task?
-3. Start location: sempre depot `45.434029, 9.180008` o per driver esistono punti di partenza diversi?
-4. I task senza coordinate vanno esclusi sempre o serve geocoding/fallback?
+### Logistics task classes (aligned with housekeeping on locks)
+
+1. **Container-locked** (`daily_task_locks` / `lg_containers`): stay in containers, never enter timeline, excluded from `RoutingProblemInput.tasks`, never moved by solver.
+
+2. **Timeline pre-assigned** (assignment on driver timeline, not container-locked): enter `RoutingProblemInput.tasks`, generate hard `REQUIRED_DRIVER_TASK`, must stay on the same driver, may shift in time and route order within `hardWindow`.
+
+3. **Free tasks**: enter `tasks[]`, no `REQUIRED_DRIVER_TASK`, any feasible driver.
+
+- `manually_moved` is metadata only; it does not lock the task.
+- Logistics differs from housekeeping pre-assigned: housekeeping excludes timeline tasks from Phase1 and keeps them time-fixed; logistics keeps them in the solver pool with flexible timing on the required driver.
+- Future apply must preserve container-locked tasks and merge solver output for free/pre-assigned pool only.
+
+| # | Domanda | Decisione |
+|---|---|---|
+| 1 | Task pre-assegnati in timeline | **Integrati in 4b.** `REQUIRED_DRIVER_TASK` hard in `hardConstraints`; greedy rispetta driver mandato; drop `REQUIRED_DRIVER_INFEASIBLE` → `status: INVALID`. |
+| 2 | Driver end window | **Sì.** Ogni driver ha un orario massimo giornaliero (`endTime` / `DRIVER_WORK_WINDOW`). Già implementato in `buildDriverNodes`. |
+| 3 | Start location | **Sempre depot** (`45.434029, 9.180008`). `startLocationNodeId: "depot"` per tutti i driver. |
+| 4 | Task senza coordinate | **Sempre esclusi.** Nessun geocoding/fallback. Già implementato in `loaders.ts` → `schedulableTasks`. |
+
+Implicazioni immediate:
+
+- `loadTimelineAssignmentHints` + `buildRequiredDriverConstraints` sono il path ufficiale per i pre-assegnati.
+- `loadExistingLockedAssignments` resta esportato per retrocompatibilità ma non è usato dal builder 4b.
+- Required droppato o violato → solution `status: INVALID`, non `PARTIAL` accettabile.
 
 ---
 
