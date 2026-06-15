@@ -10,8 +10,10 @@ import type {
 } from "./input-contract";
 import type {
   RoutingProblemValidationResult,
+  ValidateRoutingProblemInputOptions,
   ValidationIssue,
   ValidationIssueCode,
+  ValidationMode,
 } from "./validation-contract";
 
 const DAY_END_MIN = 24 * 60;
@@ -1035,8 +1037,10 @@ function validateTravelMatrix(
 function validateMetadataAndWarnings(
   input: RoutingProblemInput,
   errors: ValidationIssue[],
-  warnings: ValidationIssue[]
+  warnings: ValidationIssue[],
+  mode: ValidationMode
 ): void {
+  const strictMode = mode === "solver" || mode === "apply";
   const allowedReasons = new Set(["LOCKED", "NO_COORDINATES"]);
   const seenExcludedTaskIds = new Set<number>();
 
@@ -1153,24 +1157,33 @@ function validateMetadataAndWarnings(
     });
   }
 
-  // NO_SELECTED_DRIVERS is a warning in debug mode.
-  // Future solver entrypoint must treat this as blocking
-  // (or assertRoutingProblemInputValid should support mode: "debug" | "solver").
   if (noDrivers) {
-    pushWarning(warnings, {
-      code: "NO_SELECTED_DRIVERS",
+    const issue = {
+      code: "NO_SELECTED_DRIVERS" as const,
       message: "No selected drivers in routing input",
       path: "drivers",
-    });
+    };
+    if (strictMode) {
+      pushError(errors, issue);
+    } else {
+      pushWarning(warnings, issue);
+    }
   }
 
   if (input.windowConfig.priorityWindows === null) {
-    pushWarning(warnings, {
-      code: "PRIORITY_WINDOWS_UNAVAILABLE",
-      message: "Priority windows unavailable; HP/LP/EO rules may use fallback behavior.",
+    const issue = {
+      code: "PRIORITY_WINDOWS_UNAVAILABLE" as const,
+      message: strictMode
+        ? "Priority windows unavailable; solver/apply requires configured priority windows."
+        : "Priority windows unavailable; HP/LP/EO rules may use fallback behavior.",
       path: "windowConfig.priorityWindows",
       actual: null,
-    });
+    };
+    if (strictMode) {
+      pushError(errors, issue);
+    } else {
+      pushWarning(warnings, issue);
+    }
   }
 
   if (input.metadata.skippedTimelineAssignmentHintsCount > 0) {
@@ -1185,8 +1198,10 @@ function validateMetadataAndWarnings(
 }
 
 export function validateRoutingProblemInput(
-  input: RoutingProblemInput
+  input: RoutingProblemInput,
+  options: ValidateRoutingProblemInputOptions = {}
 ): RoutingProblemValidationResult {
+  const mode = options.mode ?? "debug";
   const errors: ValidationIssue[] = [];
   const warnings: ValidationIssue[] = [];
 
@@ -1198,7 +1213,7 @@ export function validateRoutingProblemInput(
   const groupsById = validateBusinessGroups(input, errors);
   validateSoftConstraints(input, errors, groupsById);
   validateTravelMatrix(input, errors, hasNodeIndexErrors);
-  validateMetadataAndWarnings(input, errors, warnings);
+  validateMetadataAndWarnings(input, errors, warnings, mode);
 
   return {
     valid: errors.length === 0,
@@ -1207,12 +1222,21 @@ export function validateRoutingProblemInput(
   };
 }
 
-export function assertRoutingProblemInputValid(input: RoutingProblemInput): void {
-  const validation = validateRoutingProblemInput(input);
+export function assertRoutingProblemInputValid(
+  input: RoutingProblemInput,
+  options: ValidateRoutingProblemInputOptions = {}
+): void {
+  const validation = validateRoutingProblemInput(input, options);
   if (!validation.valid) {
     const summary = validation.errors.map(formatValidationIssue).join("\n");
     throw new Error(`Invalid RoutingProblemInput:\n${summary}`);
   }
 }
 
-export type { RoutingProblemValidationResult, ValidationIssue, ValidationIssueCode };
+export type {
+  RoutingProblemValidationResult,
+  ValidateRoutingProblemInputOptions,
+  ValidationIssue,
+  ValidationIssueCode,
+  ValidationMode,
+};

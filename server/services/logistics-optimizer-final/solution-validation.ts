@@ -664,6 +664,29 @@ export function validateRoutingSolution(
   };
 }
 
+export class RoutingSolutionValidationError extends Error {
+  readonly solutionValidation: RoutingSolutionValidationResult;
+
+  constructor(solutionValidation: RoutingSolutionValidationResult) {
+    const summary = solutionValidation.errors
+      .map(formatSolutionValidationIssue)
+      .join("\n");
+    super(`Invalid RoutingSolution:\n${summary}`);
+    this.name = "RoutingSolutionValidationError";
+    this.solutionValidation = solutionValidation;
+  }
+}
+
+export function assertRoutingSolutionValid(
+  input: RoutingProblemInput,
+  solution: RoutingSolution
+): void {
+  const validation = validateRoutingSolution(input, solution);
+  if (!validation.valid) {
+    throw new RoutingSolutionValidationError(validation);
+  }
+}
+
 export type {
   RoutingSolutionValidationResult,
   SolutionValidationIssue,

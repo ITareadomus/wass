@@ -117,6 +117,17 @@ def solve_payload(payload):
             penalty = int(task.get("dropPenalty", 10000))
             routing.AddDisjunction([index], penalty)
 
+    for entry in payload.get("softTimeWindows", []):
+        node_index = int(entry["nodeIndex"])
+        task_index = manager.NodeToIndex(node_index)
+        preferred_end = int(entry["preferredEndMin"])
+        penalty = int(entry.get("penaltyPerMinLate", 1))
+        time_dimension.SetCumulVarSoftUpperBound(task_index, preferred_end, penalty)
+
+    balance_weight = int(payload.get("balanceDriverLoadWeight", 0))
+    if balance_weight > 0:
+        time_dimension.SetGlobalSpanCostCoefficient(balance_weight)
+
     search_params = pywrapcp.DefaultRoutingSearchParameters()
     search_params.first_solution_strategy = (
         routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC

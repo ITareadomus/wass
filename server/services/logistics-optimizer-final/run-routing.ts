@@ -1,41 +1,54 @@
+import { applyLogisticsRoutingSolution, type ApplyRoutingSolutionResult } from "./apply-routing-solution";
 import { buildLogisticsRoutingInput, type BuildLogisticsRoutingInputOptions } from "./build-routing-input";
 import {
   isLogisticsOptimizerFinalDebugEnabled,
   writeRoutingDryRunDebug,
 } from "./debug-writer";
-import { GREEDY_SOLVER_ID, ORTOOLS_SOLVER_ID } from "./solution-contract";
+import type { RoutingProblemInput } from "./input-contract";
+import { evaluateSolutionApplyGate, type SolutionApplyGateResult } from "./solution-apply-gate";
+import { GREEDY_SOLVER_ID, ORTOOLS_SOLVER_ID, type RoutingSolution } from "./solution-contract";
+import {
+  assertRoutingSolutionValid,
+  RoutingSolutionValidationError,
+  validateRoutingSolution,
+} from "./solution-validation";
+import type { RoutingSolutionValidationResult } from "./solution-validation-contract";
 import { buildOrToolsPayload } from "./solver/ortools/ortools-adapter";
 import { solveRouting, type RoutingSolverId } from "./solver/solve-routing";
-import { evaluateSolutionApplyGate, type SolutionApplyGateResult } from "./solution-apply-gate";
-import type { RoutingSolution } from "./solution-contract";
-import { validateRoutingSolution } from "./solution-validation";
 import { diagnoseDroppedTasks, type DroppedTaskDiagnostic } from "./unassigned-diagnostics";
+import { RoutingInputValidationError } from "./run-routing-dry";
 import { validateRoutingProblemInput } from "./validation";
-import type { RoutingProblemValidationResult, ValidationMode } from "./validation-contract";
-import type { RoutingSolutionValidationResult } from "./solution-validation-contract";
+import type { RoutingProblemValidationResult } from "./validation-contract";
 
-export interface RunLogisticsRoutingDryOptions extends BuildLogisticsRoutingInputOptions {
-  debug?: boolean;
+export interface RunLogisticsRoutingOptions extends BuildLogisticsRoutingInputOptions {
   solver?: RoutingSolverId;
-  validationMode?: ValidationMode;
+  apply?: boolean;
+  allowPartial?: boolean;
+  debug?: boolean;
+  /** Allows greedy-v1 with apply for explicit debug only. */
+  allowDebugSolverApply?: boolean;
 }
 
-export interface RunLogisticsRoutingDryAutoConvokeSummary {
-  autoConvokedDriverIds: number[];
-  autoConvokedDriversCount: number;
-  autoConvokeMissingInDbDriverIds: number[];
-  autoConvokeMissingInDbDriversCount: number;
+export class GreedySolverNotAllowedForApplyError extends Error {
+  readonly code = "GREEDY_SOLVER_NOT_ALLOWED_FOR_APPLY";
+
+  constructor() {
+    super(
+      'Use solver="ortools-v1" for apply. greedy-v1 is allowed only for dry-run/debug without apply.'
+    );
+    this.name = "GreedySolverNotAllowedForApplyError";
+  }
 }
 
-export interface RunLogisticsRoutingDryResult {
+export interface RunLogisticsRoutingResult {
   workDate: string;
   debugDir: string | null;
-  autoConvoke: RunLogisticsRoutingDryAutoConvokeSummary;
   inputValidation: RoutingProblemValidationResult;
   solutionValidation: RoutingSolutionValidationResult;
   applyGate: SolutionApplyGateResult;
-  droppedDiagnostics: DroppedTaskDiagnostic[];
   solution: RoutingSolution;
+  droppedDiagnostics: DroppedTaskDiagnostic[];
+  applyResult: ApplyRoutingSolutionResult | null;
   inputSummary: {
     taskCount: number;
     driverCount: number;
@@ -48,51 +61,34 @@ export interface RunLogisticsRoutingDryResult {
     totalTravelMin: number;
     totalWaitMin: number;
   };
-  inputErrorCount: number;
-  inputWarningCount: number;
-  solutionErrorCount: number;
-  solutionWarningCount: number;
 }
 
-export class RoutingInputValidationError extends Error {
-  readonly inputValidation: RoutingProblemValidationResult;
-
-  constructor(inputValidation: RoutingProblemValidationResult) {
-    const summary = inputValidation.errors
-      .map((issue) => `${issue.code}: ${issue.message}`)
-      .join("\n");
-    super(`Invalid RoutingProblemInput:\n${summary}`);
-    this.name = "RoutingInputValidationError";
-    this.inputValidation = inputValidation;
-  }
-}
-
-/**
- * Dry-run routing solver: builds RoutingProblemInput, runs selected solver,
- * validates solution, and optionally persists debug JSON artifacts.
- * Does not apply assignments to timeline or DB.
- */
-export async function runLogisticsRoutingDry(
+export async function runLogisticsRouting(
   workDate: string,
-  options: RunLogisticsRoutingDryOptions = {}
-): Promise<RunLogisticsRoutingDryResult> {
+  options: RunLogisticsRoutingOptions = {}
+): Promise<RunLogisticsRoutingResult> {
   const input = await buildLogisticsRoutingInput(workDate, {
     performedBy: options.performedBy,
     skipAutoConvoke: options.skipAutoConvoke,
     saveSelectedDrivers: options.saveSelectedDrivers,
   });
-  const inputValidation = validateRoutingProblemInput(input, {
-    mode: options.validationMode ?? "debug",
-  });
 
+  const inputValidation = validateRoutingProblemInput(input, { mode: "solver" });
   if (!inputValidation.valid) {
     throw new RoutingInputValidationError(inputValidation);
   }
 
   const solverId = options.solver ?? ORTOOLS_SOLVER_ID;
+
+  if (options.apply === true && solverId === GREEDY_SOLVER_ID && !options.allowDebugSolverApply) {
+    throw new GreedySolverNotAllowedForApplyError();
+  }
+
   const solution = await solveRouting(input, { solverId });
   const solutionValidation = validateRoutingSolution(input, solution);
-  const applyGate = evaluateSolutionApplyGate(solution);
+  const applyGate = evaluateSolutionApplyGate(solution, {
+    allowPartial: options.allowPartial,
+  });
   const droppedDiagnostics =
     solution.droppedTasks.length > 0 ? diagnoseDroppedTasks(input, solution) : [];
 
@@ -112,7 +108,19 @@ export async function runLogisticsRoutingDry(
         droppedDiagnostics,
       },
     });
-    console.log(`📋 Logistics optimizer final dry-run scritto in: ${debugDir}`);
+  }
+
+  let applyResult: ApplyRoutingSolutionResult | null = null;
+  if (options.apply === true) {
+    assertRoutingSolutionValid(input, solution);
+    applyResult = await applyLogisticsRoutingSolution({
+      workDate,
+      input,
+      solution,
+      performedBy: options.performedBy,
+      allowPartial: options.allowPartial,
+      debugDir: debugDir ?? undefined,
+    });
   }
 
   const assignedTaskCount = solution.routes.reduce((sum, route) => sum + route.stops.length, 0);
@@ -120,17 +128,12 @@ export async function runLogisticsRoutingDry(
   return {
     workDate,
     debugDir,
-    autoConvoke: {
-      autoConvokedDriverIds: input.metadata.autoConvokedDriverIds,
-      autoConvokedDriversCount: input.metadata.autoConvokedDriversCount,
-      autoConvokeMissingInDbDriverIds: input.metadata.autoConvokeMissingInDbDriverIds,
-      autoConvokeMissingInDbDriversCount: input.metadata.autoConvokeMissingInDbDriversCount,
-    },
     inputValidation,
     solutionValidation,
     applyGate,
-    droppedDiagnostics,
     solution,
+    droppedDiagnostics,
+    applyResult,
     inputSummary: {
       taskCount: input.tasks.length,
       driverCount: input.drivers.length,
@@ -143,9 +146,7 @@ export async function runLogisticsRoutingDry(
       totalTravelMin: solution.objectiveBreakdown?.totalTravelMin ?? 0,
       totalWaitMin: solution.objectiveBreakdown?.totalWaitMin ?? 0,
     },
-    inputErrorCount: inputValidation.errors.length,
-    inputWarningCount: inputValidation.warnings.length,
-    solutionErrorCount: solutionValidation.errors.length,
-    solutionWarningCount: solutionValidation.warnings.length,
   };
 }
+
+export type { RoutingProblemInput };

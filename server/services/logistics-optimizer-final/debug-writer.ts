@@ -108,6 +108,7 @@ export interface WriteRoutingDryRunDebugArgs {
   inputValidation: RoutingProblemValidationResult;
   solutionValidation: RoutingSolutionValidationResult;
   ortoolsPayload?: OrToolsRoutingPayload;
+  extra?: Record<string, unknown>;
   runId?: string;
   startedAt?: string;
 }
@@ -115,7 +116,7 @@ export interface WriteRoutingDryRunDebugArgs {
 export async function writeRoutingDryRunDebug(
   args: WriteRoutingDryRunDebugArgs
 ): Promise<string> {
-  const { input, solution, inputValidation, solutionValidation, ortoolsPayload } = args;
+  const { input, solution, inputValidation, solutionValidation, ortoolsPayload, extra } = args;
   const startedAt = args.startedAt ?? new Date().toISOString();
   const runId = args.runId ?? createLogisticsOptimizerFinalRunId(new Date(startedAt));
   const dir = path.join(debugRootDir(), input.workDate, runId);
@@ -166,6 +167,11 @@ export async function writeRoutingDryRunDebug(
       : ["01-routing-input.json", "02-routing-solution.json"],
   };
 
+  if (extra && Object.keys(extra).length > 0) {
+    (manifest as Record<string, unknown>).extra = Object.keys(extra);
+    manifest.files.push("04-run-extra.json");
+  }
+
   const writes: Promise<void>[] = [
     fs.writeFile(path.join(dir, "manifest.json"), JSON.stringify(manifest, null, 2), "utf8"),
     fs.writeFile(
@@ -185,6 +191,16 @@ export async function writeRoutingDryRunDebug(
       fs.writeFile(
         path.join(dir, "03-ortools-payload.json"),
         JSON.stringify(ortoolsPayload, null, 2),
+        "utf8"
+      )
+    );
+  }
+
+  if (extra && Object.keys(extra).length > 0) {
+    writes.push(
+      fs.writeFile(
+        path.join(dir, "04-run-extra.json"),
+        JSON.stringify(extra, null, 2),
         "utf8"
       )
     );

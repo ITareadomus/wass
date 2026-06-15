@@ -593,4 +593,73 @@ describe("validateRoutingProblemInput", () => {
       })
     );
   });
+
+  it("warns on NO_SELECTED_DRIVERS in debug mode", () => {
+    const input = buildMinimalValidInput();
+    input.drivers = [];
+    input.hardConstraints = input.hardConstraints.filter(
+      (constraint) => constraint.type !== "DRIVER_WORK_WINDOW"
+    );
+    input.metadata.noSelectedDrivers = true;
+
+    const result = validateRoutingProblemInput(input, { mode: "debug" });
+
+    expect(result.valid).toBe(true);
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({ code: "NO_SELECTED_DRIVERS" })
+    );
+    expect(result.errors.some((issue) => issue.code === "NO_SELECTED_DRIVERS")).toBe(false);
+  });
+
+  it("errors on NO_SELECTED_DRIVERS in solver mode", () => {
+    const input = buildMinimalValidInput();
+    input.drivers = [];
+    input.hardConstraints = input.hardConstraints.filter(
+      (constraint) => constraint.type !== "DRIVER_WORK_WINDOW"
+    );
+    input.metadata.noSelectedDrivers = true;
+
+    const result = validateRoutingProblemInput(input, { mode: "solver" });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({ code: "NO_SELECTED_DRIVERS" })
+    );
+  });
+
+  it("warns on PRIORITY_WINDOWS_UNAVAILABLE in debug mode", () => {
+    const input = buildMinimalValidInput();
+    input.windowConfig = {
+      source: "unavailable",
+      workDate: input.workDate,
+      priorityWindows: null,
+      fallbackUsed: false,
+      error: "config missing",
+    };
+
+    const result = validateRoutingProblemInput(input, { mode: "debug" });
+
+    expect(result.valid).toBe(true);
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({ code: "PRIORITY_WINDOWS_UNAVAILABLE" })
+    );
+  });
+
+  it("errors on PRIORITY_WINDOWS_UNAVAILABLE in apply mode", () => {
+    const input = buildMinimalValidInput();
+    input.windowConfig = {
+      source: "unavailable",
+      workDate: input.workDate,
+      priorityWindows: null,
+      fallbackUsed: false,
+      error: "config missing",
+    };
+
+    const result = validateRoutingProblemInput(input, { mode: "apply" });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({ code: "PRIORITY_WINDOWS_UNAVAILABLE" })
+    );
+  });
 });

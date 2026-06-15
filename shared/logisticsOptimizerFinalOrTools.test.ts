@@ -238,6 +238,24 @@ describe("buildOrToolsPayload", () => {
 
     expect(payload.costMatrixMin[node1][node2]).toBeLessThan(payload.travelMatrixMin[node1][node2]);
   });
+
+  it("includes EO preferred soft time windows and balance weight", () => {
+    const input = buildMinimalInput();
+    const { payload } = buildOrToolsPayload(input);
+
+    expect(payload.schemaVersion).toBe("logistics-ortools-payload/v2");
+    expect(payload.balanceDriverLoadWeight).toBeGreaterThan(0);
+
+    const eoTask = input.tasks.find((task) => task.priority === "EO");
+    expect(eoTask).toBeDefined();
+
+    const preferred = payload.softTimeWindows.find((entry) => entry.taskId === eoTask!.taskId);
+    expect(preferred).toMatchObject({
+      nodeIndex: eoTask!.nodeIndex,
+      penaltyPerMinLate: expect.any(Number),
+    });
+    expect(preferred!.preferredEndMin).toBeGreaterThan(0);
+  });
 });
 
 const ortoolsAvailable = await probeOrToolsPython();
@@ -485,4 +503,18 @@ describe("solveOrToolsRouting integration", () => {
     },
     15000
   );
+});
+
+describe("probeOrToolsAvailability", () => {
+  it("finds the routing script on disk", async () => {
+    const { defaultOrToolsScriptPath, probeOrToolsAvailability } = await import(
+      "../server/services/logistics-optimizer-final/solver/ortools/ortools-availability"
+    );
+    const scriptPath = defaultOrToolsScriptPath();
+    const probe = await probeOrToolsAvailability({ scriptPath });
+    expect(probe.scriptPath).toBe(scriptPath);
+    if (!probe.available) {
+      expect(probe.reason).toBeTruthy();
+    }
+  });
 });

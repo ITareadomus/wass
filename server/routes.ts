@@ -10338,7 +10338,132 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         });
       }
 
+      if (error?.name === "OrToolsUnavailableError" || error?.code === "ORTOOLS_UNAVAILABLE") {
+        return res.status(503).json({
+          success: false,
+          error: "ORTOOLS_UNAVAILABLE",
+          message: error.message,
+          reason: error.reason,
+        });
+      }
+
       console.error("❌ Errore logistics-optimizer-final run-dry:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  app.post("/api/logistics-optimizer-final/run", async (req, res) => {
+    try {
+      const {
+        date,
+        debug: debugBody,
+        solver: solverBody,
+        apply: applyBody,
+        allowPartial: allowPartialBody,
+      } = req.body || {};
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const solver =
+        solverBody === "ortools-v1" || solverBody === "greedy-v1" ? solverBody : undefined;
+      if (solverBody !== undefined && solver === undefined) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid solver. Use "greedy-v1" or "ortools-v1".',
+        });
+      }
+      const hasDebugBody = Object.prototype.hasOwnProperty.call(req.body || {}, "debug");
+      const debugExplicit = hasDebugBody
+        ? debugBody === true ||
+          debugBody === 1 ||
+          String(debugBody ?? "").toLowerCase() === "true"
+        : undefined;
+      const apply =
+        applyBody === true || applyBody === 1 || String(applyBody ?? "").toLowerCase() === "true";
+      const allowPartial =
+        allowPartialBody === true ||
+        allowPartialBody === 1 ||
+        String(allowPartialBody ?? "").toLowerCase() === "true";
+
+      const { runLogisticsRouting } = await import(
+        "./services/logistics-optimizer-final/run-routing"
+      );
+      const { RoutingInputValidationError } = await import(
+        "./services/logistics-optimizer-final/run-routing-dry"
+      );
+
+      console.log(
+        `🚀 POST /api/logistics-optimizer-final/run - ${workDate}` +
+          (apply ? " (apply)" : "") +
+          (allowPartial ? " (allowPartial)" : "")
+      );
+
+      const result = await runLogisticsRouting(workDate, {
+        debug: debugExplicit,
+        solver,
+        apply,
+        allowPartial,
+        performedBy: getCurrentUsername(req),
+      });
+
+      return res.json({
+        success: true,
+        ok: result.solutionValidation.valid && result.applyGate.canApply,
+        validation: {
+          input: result.inputValidation,
+          solution: result.solutionValidation,
+        },
+        applyGate: result.applyGate,
+        apply: result.applyResult,
+        droppedDiagnostics: result.droppedDiagnostics,
+        solutionSummary: result.solutionSummary,
+        debugDir: result.debugDir,
+        solution: result.solution,
+      });
+    } catch (error: any) {
+      if (error?.name === "RoutingInputValidationError") {
+        return res.status(400).json({
+          success: false,
+          error: error.message,
+          inputValidation: error.inputValidation,
+        });
+      }
+
+      if (error?.name === "OrToolsUnavailableError" || error?.code === "ORTOOLS_UNAVAILABLE") {
+        return res.status(503).json({
+          success: false,
+          error: "ORTOOLS_UNAVAILABLE",
+          message: error.message,
+          reason: error.reason,
+        });
+      }
+
+      if (error?.name === "SolutionCannotBeAppliedError") {
+        return res.status(409).json({
+          success: false,
+          error: error.message,
+          applyGate: error.gate,
+        });
+      }
+
+      if (error?.name === "RoutingSolutionValidationError") {
+        return res.status(409).json({
+          success: false,
+          error: error.message,
+          solutionValidation: error.solutionValidation,
+        });
+      }
+
+      if (error?.name === "GreedySolverNotAllowedForApplyError" || error?.code === "GREEDY_SOLVER_NOT_ALLOWED_FOR_APPLY") {
+        return res.status(400).json({
+          success: false,
+          error: "GREEDY_SOLVER_NOT_ALLOWED_FOR_APPLY",
+          message: error.message,
+        });
+      }
+
+      console.error("❌ Errore logistics-optimizer-final run:", error);
       return res.status(500).json({
         success: false,
         error: error.message,

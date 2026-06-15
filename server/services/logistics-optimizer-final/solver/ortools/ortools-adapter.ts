@@ -1,4 +1,4 @@
-import type { DriverNode, RoutingProblemInput, SoftConstraintSpec, TaskNode } from "../../input-contract";
+import type { DriverNode, RoutingProblemInput, TaskNode } from "../../input-contract";
 import {
   ORTOOLS_SOLVER_ID,
   ROUTING_SOLUTION_SCHEMA_VERSION,
@@ -16,8 +16,27 @@ export const DROP_PENALTY_BY_PRIORITY = {
   default: 10_000,
 } as const;
 
+export interface OrToolsSoftTimeWindow {
+  taskId: number;
+  nodeIndex: number;
+  preferredEndMin: number;
+  penaltyPerMinLate: number;
+}
+
+export interface OrToolsSoftGroupEntry {
+  groupId: string;
+  taskIds: number[];
+  weight: number;
+}
+
+export interface OrToolsCleanerSequenceGroup {
+  groupId: string;
+  orderedTaskIds: number[];
+  weight: number;
+}
+
 export interface OrToolsRoutingPayload {
-  schemaVersion: "logistics-ortools-payload/v1";
+  schemaVersion: "logistics-ortools-payload/v2";
   workDate: string;
   travelMatrixMin: number[][];
   costMatrixMin: number[][];
@@ -40,15 +59,15 @@ export interface OrToolsRoutingPayload {
     requiredVehicleIndex?: number;
     dropPenalty: number;
   }>;
-  softGeo: {
-    sameBuildingGroups: Array<{ groupId: string; taskIds: number[]; weight: number }>;
-    nearbyClusterGroups: Array<{
-      groupId: string;
-      taskIds: number[];
-      weight: number;
-      maxTravelMin: number;
-    }>;
+  softGroups: {
+    sameBuildingGroups: OrToolsSoftGroupEntry[];
+    nearbyClusterGroups: Array<OrToolsSoftGroupEntry & { maxTravelMin: number }>;
+    sameCleanerGroups: OrToolsSoftGroupEntry[];
+    priorityCompatibleGroups: OrToolsSoftGroupEntry[];
+    cleanerSequenceGroups: OrToolsCleanerSequenceGroup[];
   };
+  softTimeWindows: OrToolsSoftTimeWindow[];
+  balanceDriverLoadWeight: number;
   options: { timeLimitSec: number };
 }
 
@@ -87,74 +106,189 @@ function getDropPenalty(priority: TaskNode["priority"]): number {
   return DROP_PENALTY_BY_PRIORITY.default;
 }
 
-function extractSoftGeo(input: RoutingProblemInput): OrToolsRoutingPayload["softGeo"] {
-  const sameBuildingGroups: OrToolsRoutingPayload["softGeo"]["sameBuildingGroups"] = [];
-  const nearbyClusterGroups: OrToolsRoutingPayload["softGeo"]["nearbyClusterGroups"] = [];
+interface ExtractedSoftConstraints {
+  softGroups: OrToolsRoutingPayload["softGroups"];
+  softTimeWindows: OrToolsSoftTimeWindow[];
+  balanceDriverLoadWeight: number;
+}
+
+function extractSoftConstraints(input: RoutingProblemInput): ExtractedSoftConstraints {
+  const softGroups: OrToolsRoutingPayload["softGroups"] = {
+    sameBuildingGroups: [],
+    nearbyClusterGroups: [],
+    sameCleanerGroups: [],
+    priorityCompatibleGroups: [],
+    cleanerSequenceGroups: [],
+  };
+  const softTimeWindows: OrToolsSoftTimeWindow[] = [];
+  let balanceDriverLoadWeight = 0;
 
   const groupById = new Map(input.businessGroups.map((group) => [group.groupId, group]));
+  const taskIdToNodeIndex = new Map(input.tasks.map((task) => [task.taskId, task.nodeIndex]));
 
   for (const constraint of input.softConstraints) {
+    if (constraint.type === "MINIMIZE_TOTAL_TRAVEL") continue;
+
+    if (constraint.type === "BALANCE_DRIVER_LOAD") {
+      balanceDriverLoadWeight = Math.max(balanceDriverLoadWeight, constraint.weight);
+      continue;
+    }
+
+    if (constraint.type === "PREFERRED_PRIORITY_WINDOW") {
+      const nodeIndex = taskIdToNodeIndex.get(constraint.taskId);
+      const preferredEndMin = constraint.endMin ?? constraint.startMin;
+      if (nodeIndex !== undefined && Number.isFinite(preferredEndMin)) {
+        softTimeWindows.push({
+          taskId: constraint.taskId,
+          nodeIndex,
+          preferredEndMin,
+          penaltyPerMinLate: constraint.penaltyPerMinOutside,
+        });
+      }
+      continue;
+    }
+
     if (constraint.type === "KEEP_SAME_COORDINATES_BUILDING_TOGETHER") {
       const group = groupById.get(constraint.groupId);
       if (group && group.type === "SAME_COORDINATES_BUILDING") {
-        sameBuildingGroups.push({
+        softGroups.sameBuildingGroups.push({
           groupId: constraint.groupId,
           taskIds: [...group.taskIds],
           weight: constraint.weight,
         });
       }
+      continue;
     }
 
     if (constraint.type === "KEEP_NEARBY_CLUSTER_TOGETHER") {
       const group = groupById.get(constraint.groupId);
       if (group && group.type === "NEARBY_CLUSTER") {
-        nearbyClusterGroups.push({
+        softGroups.nearbyClusterGroups.push({
           groupId: constraint.groupId,
           taskIds: [...group.taskIds],
           weight: constraint.weight,
           maxTravelMin: constraint.maxTravelMin,
         });
       }
+      continue;
+    }
+
+    if (constraint.type === "KEEP_SAME_CLEANER_TASKS_TOGETHER") {
+      const group = groupById.get(constraint.groupId);
+      if (group && group.type === "SAME_CLEANER") {
+        softGroups.sameCleanerGroups.push({
+          groupId: constraint.groupId,
+          taskIds: [...group.taskIds],
+          weight: constraint.weight,
+        });
+      }
+      continue;
+    }
+
+    if (constraint.type === "KEEP_PRIORITY_COMPATIBLE_TASKS_TOGETHER") {
+      const group = groupById.get(constraint.groupId);
+      if (group && group.type === "PRIORITY_COMPATIBLE") {
+        softGroups.priorityCompatibleGroups.push({
+          groupId: constraint.groupId,
+          taskIds: [...group.taskIds],
+          weight: constraint.weight,
+        });
+      }
+      continue;
+    }
+
+    if (constraint.type === "KEEP_CLEANER_SEQUENCE") {
+      const group = groupById.get(constraint.groupId);
+      if (group && group.type === "CLEANER_SEQUENCE") {
+        softGroups.cleanerSequenceGroups.push({
+          groupId: constraint.groupId,
+          orderedTaskIds: [...group.orderedTaskIds],
+          weight: constraint.weight,
+        });
+      }
     }
   }
 
-  return { sameBuildingGroups, nearbyClusterGroups };
+  return { softGroups, softTimeWindows, balanceDriverLoadWeight };
+}
+
+function applyIntraGroupCostBonus(
+  cost: number[][],
+  travelMatrixMin: number[][],
+  nodeIndices: number[],
+  weight: number,
+  maxBonus: number,
+  maxTravelMin?: number
+): void {
+  const bonus = Math.max(1, Math.min(maxBonus, Math.floor(weight / 5)));
+
+  for (const from of nodeIndices) {
+    for (const to of nodeIndices) {
+      if (from === to) continue;
+      if (maxTravelMin !== undefined) {
+        const travel = travelMatrixMin[from]?.[to];
+        if (!Number.isFinite(travel) || travel > maxTravelMin) continue;
+      }
+      cost[from][to] = Math.max(0, cost[from][to] - bonus);
+    }
+  }
 }
 
 export function buildCostMatrixMin(
   travelMatrixMin: number[][],
-  softGeo: OrToolsRoutingPayload["softGeo"],
+  softGroups: OrToolsRoutingPayload["softGroups"],
   taskIdToNodeIndex: Map<number, number>
 ): number[][] {
   const size = travelMatrixMin.length;
   const cost = travelMatrixMin.map((row) => [...row]);
 
-  for (const group of softGeo.sameBuildingGroups) {
+  for (const group of softGroups.sameBuildingGroups) {
     const nodeIndices = group.taskIds
       .map((taskId) => taskIdToNodeIndex.get(taskId))
       .filter((nodeIndex): nodeIndex is number => nodeIndex !== undefined);
-    const bonus = Math.max(1, Math.min(20, Math.floor(group.weight / 5)));
-
-    for (const from of nodeIndices) {
-      for (const to of nodeIndices) {
-        if (from === to) continue;
-        cost[from][to] = Math.max(0, cost[from][to] - bonus);
-      }
-    }
+    applyIntraGroupCostBonus(cost, travelMatrixMin, nodeIndices, group.weight, 20);
   }
 
-  for (const group of softGeo.nearbyClusterGroups) {
+  for (const group of softGroups.nearbyClusterGroups) {
     const nodeIndices = group.taskIds
       .map((taskId) => taskIdToNodeIndex.get(taskId))
       .filter((nodeIndex): nodeIndex is number => nodeIndex !== undefined);
-    const bonus = Math.max(1, Math.min(10, Math.floor(group.weight / 2)));
+    applyIntraGroupCostBonus(
+      cost,
+      travelMatrixMin,
+      nodeIndices,
+      group.weight,
+      10,
+      group.maxTravelMin
+    );
+  }
 
-    for (const from of nodeIndices) {
-      for (const to of nodeIndices) {
-        if (from === to) continue;
-        const travel = travelMatrixMin[from]?.[to];
-        if (!Number.isFinite(travel) || travel > group.maxTravelMin) continue;
-        cost[from][to] = Math.max(0, cost[from][to] - bonus);
+  for (const group of softGroups.sameCleanerGroups) {
+    const nodeIndices = group.taskIds
+      .map((taskId) => taskIdToNodeIndex.get(taskId))
+      .filter((nodeIndex): nodeIndex is number => nodeIndex !== undefined);
+    applyIntraGroupCostBonus(cost, travelMatrixMin, nodeIndices, group.weight, 15);
+  }
+
+  for (const group of softGroups.priorityCompatibleGroups) {
+    const nodeIndices = group.taskIds
+      .map((taskId) => taskIdToNodeIndex.get(taskId))
+      .filter((nodeIndex): nodeIndex is number => nodeIndex !== undefined);
+    applyIntraGroupCostBonus(cost, travelMatrixMin, nodeIndices, group.weight, 12);
+  }
+
+  for (const group of softGroups.cleanerSequenceGroups) {
+    const bonus = Math.max(1, Math.min(15, Math.floor(group.weight / 3)));
+    const reversePenalty = Math.max(1, Math.floor(bonus / 2));
+
+    for (let index = 0; index < group.orderedTaskIds.length - 1; index += 1) {
+      const fromNode = taskIdToNodeIndex.get(group.orderedTaskIds[index]);
+      const toNode = taskIdToNodeIndex.get(group.orderedTaskIds[index + 1]);
+      if (fromNode === undefined || toNode === undefined) continue;
+
+      cost[fromNode][toNode] = Math.max(0, cost[fromNode][toNode] - bonus);
+      if (fromNode !== toNode) {
+        cost[toNode][fromNode] = cost[toNode][fromNode] + reversePenalty;
       }
     }
   }
@@ -201,9 +335,9 @@ export function buildOrToolsPayload(
 ): { payload: OrToolsRoutingPayload; maps: OrToolsAdapterMaps } {
   const maps = buildOrToolsMaps(input);
   const sortedDrivers = sortDrivers(input.drivers);
-  const softGeo = extractSoftGeo(input);
+  const { softGroups, softTimeWindows, balanceDriverLoadWeight } = extractSoftConstraints(input);
   const travelMatrixMin = input.travelMatrixMin;
-  const costMatrixMin = buildCostMatrixMin(travelMatrixMin, softGeo, maps.taskIdToNodeIndex);
+  const costMatrixMin = buildCostMatrixMin(travelMatrixMin, softGroups, maps.taskIdToNodeIndex);
 
   const nodes = [
     { nodeIndex: DEPOT_NODE_INDEX, kind: "DEPOT" as const },
@@ -246,14 +380,16 @@ export function buildOrToolsPayload(
   return {
     maps,
     payload: {
-      schemaVersion: "logistics-ortools-payload/v1",
+      schemaVersion: "logistics-ortools-payload/v2",
       workDate: input.workDate,
       travelMatrixMin,
       costMatrixMin,
       nodes,
       vehicles,
       tasks,
-      softGeo,
+      softGroups,
+      softTimeWindows,
+      balanceDriverLoadWeight,
       options: { timeLimitSec: options?.timeLimitSec ?? 30 },
     },
   };

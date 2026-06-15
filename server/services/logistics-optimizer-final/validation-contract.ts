@@ -1,5 +1,12 @@
 export type ValidationSeverity = "error" | "warning";
 
+/** debug = permissive warnings; solver/apply = blocking production rules */
+export type ValidationMode = "debug" | "solver" | "apply";
+
+export interface ValidateRoutingProblemInputOptions {
+  mode?: ValidationMode;
+}
+
 export type ValidationIssueCode =
   | "UNSUPPORTED_SCHEMA_VERSION"
   | "NO_SELECTED_DRIVERS"

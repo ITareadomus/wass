@@ -9,6 +9,11 @@ import {
   type RoutingSolution,
 } from "../server/services/logistics-optimizer-final/solution-contract";
 import { validateRoutingSolution } from "../server/services/logistics-optimizer-final/solution-validation";
+import {
+  assertSolutionCanBeApplied,
+  evaluateSolutionApplyGate,
+  SolutionCannotBeAppliedError,
+} from "../server/services/logistics-optimizer-final/solution-apply-gate";
 import type { PriorityWindows } from "../server/services/optimizer/priorityWindows";
 
 const priorityWindows: PriorityWindows = {
@@ -432,6 +437,52 @@ describe("validateRoutingSolution", () => {
       expect.objectContaining({
         code: "UNSUPPORTED_SCHEMA_VERSION",
       })
+    );
+  });
+});
+
+describe("evaluateSolutionApplyGate", () => {
+  function buildSolution(status: RoutingSolution["status"], droppedCount = 0): RoutingSolution {
+    return {
+      schemaVersion: ROUTING_SOLUTION_SCHEMA_VERSION,
+      solverId: GREEDY_SOLVER_ID,
+      workDate: "2026-06-04",
+      status,
+      generatedAt: "2026-06-04T00:00:00.000Z",
+      routes: status === "INFEASIBLE" ? [] : [{ driverId: 7, startMin: 570, endMin: 615, totalServiceMin: 15, totalTravelMin: 0, totalWaitMin: 0, stops: [] }],
+      droppedTasks: Array.from({ length: droppedCount }, (_, index) => ({
+        taskId: 200 + index,
+        reason: "NO_FEASIBLE_DRIVER" as const,
+      })),
+    };
+  }
+
+  it("allows FEASIBLE solutions", () => {
+    expect(evaluateSolutionApplyGate(buildSolution("FEASIBLE"))).toEqual({
+      canApply: true,
+      reason: "OK",
+      droppedTaskCount: 0,
+    });
+  });
+
+  it("blocks PARTIAL unless allowPartial", () => {
+    expect(evaluateSolutionApplyGate(buildSolution("PARTIAL", 1))).toEqual({
+      canApply: false,
+      reason: "PARTIAL_REQUIRES_ALLOW_PARTIAL",
+      droppedTaskCount: 1,
+    });
+    expect(evaluateSolutionApplyGate(buildSolution("PARTIAL", 1), { allowPartial: true })).toEqual({
+      canApply: true,
+      reason: "OK",
+      droppedTaskCount: 1,
+    });
+  });
+
+  it("blocks INVALID and INFEASIBLE", () => {
+    expect(evaluateSolutionApplyGate(buildSolution("INVALID")).canApply).toBe(false);
+    expect(evaluateSolutionApplyGate(buildSolution("INFEASIBLE")).canApply).toBe(false);
+    expect(() => assertSolutionCanBeApplied(buildSolution("INFEASIBLE"))).toThrow(
+      SolutionCannotBeAppliedError
     );
   });
 });
