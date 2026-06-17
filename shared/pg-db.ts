@@ -3,6 +3,14 @@ import { databaseConfig } from '../config/database';
 
 const env = process.env.NODE_ENV || 'development';
 const pgConfig = databaseConfig.postgres;
+const missingPgKeys = databaseConfig.getPostgresMissingKeys();
+
+if (missingPgKeys.length > 0) {
+  throw new Error(
+    `❌ PostgreSQL config missing: ${missingPgKeys.join(", ")}. ` +
+    `Resolved host=${pgConfig.host || "<empty>"} port=${pgConfig.port} database=${pgConfig.database || "<empty>"}`
+  );
+}
 
 if (env !== 'production' && pgConfig.database === 'defaultdb') {
   throw new Error(

@@ -264,15 +264,18 @@ async function loadPhase3Schedules(runId: string, workDate: string): Promise<Cle
   }
 
   const cleanerCapabilities = await loadCleanerCapabilitiesFromAll(allSelectedCleanerIds, workDate);
-  const cleanerStartTimes = await loadCleanerStartTimesFromAll(allSelectedCleanerIds, workDate);
+  const cleanerShiftTimes = await loadCleanerShiftTimesFromAll(allSelectedCleanerIds, workDate);
 
   const schedules: CleanerSchedule[] = [];
   cleanerMap.forEach((data, cleanerId) => {
     const caps = cleanerCapabilities.get(cleanerId);
-    const startTimeStr = cleanerStartTimes.get(cleanerId) || '09:00';
-    const endTimeMinutes = data.maxEndTime 
-      ? data.maxEndTime.getUTCHours() * 60 + data.maxEndTime.getUTCMinutes()
-      : 540;
+    const shift = cleanerShiftTimes.get(cleanerId) || { startTime: "10:00", endTime: "20:00" };
+    const startTimeStr = shift.startTime;
+    const [endH, endM] = shift.endTime.split(":").map((x: string) => parseInt(x, 10));
+    const shiftEndMinutes = Number.isFinite(endH) && Number.isFinite(endM) ? (endH * 60 + endM) : 1200;
+    const endTimeMinutes = data.maxEndTime
+      ? Math.max(data.maxEndTime.getUTCHours() * 60 + data.maxEndTime.getUTCMinutes(), shiftEndMinutes)
+      : shiftEndMinutes;
     
     // Calcola totalWorkMinutes dalla somma delle durate dei task già assegnati
     // (per fairness scoring)
@@ -285,6 +288,7 @@ async function loadPhase3Schedules(runId: string, workDate: string): Promise<Cle
       cleanerId,
       cleanerName: caps?.name || `Cleaner ${cleanerId}`,
       startTime: startTimeStr,
+      endTime: shift.endTime,
       tasks: data.tasks,
       endTimeMinutes,
       totalTravel: data.totalTravel,
@@ -333,20 +337,26 @@ async function loadCleanerCapabilitiesFromAll(cleanerIds: number[], workDate: st
   return map;
 }
 
-async function loadCleanerStartTimesFromAll(cleanerIds: number[], workDate: string): Promise<Map<number, string>> {
+async function loadCleanerShiftTimesFromAll(
+  cleanerIds: number[],
+  workDate: string
+): Promise<Map<number, { startTime: string; endTime: string }>> {
   if (cleanerIds.length === 0) return new Map();
 
   const timesResult = await pool.query(`
-    SELECT cleaner_id, start_time
+    SELECT cleaner_id, start_time, end_time
     FROM cleaners
     WHERE cleaner_id = ANY($1::int[])
       AND work_date = $2
     ORDER BY cleaner_id
   `, [cleanerIds, workDate]);
 
-  const map = new Map<number, string>();
+  const map = new Map<number, { startTime: string; endTime: string }>();
   for (const row of timesResult.rows) {
-    map.set(row.cleaner_id, row.start_time || '09:00');
+    map.set(row.cleaner_id, {
+      startTime: row.start_time || "10:00",
+      endTime: row.end_time || "20:00",
+    });
   }
   return map;
 }

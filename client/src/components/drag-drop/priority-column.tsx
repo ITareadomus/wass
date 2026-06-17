@@ -1,5 +1,6 @@
 import { Droppable } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
+import { isWorkDateHistoricallyLocked } from "@shared/work-date-access";
 import TaskCard from "./task-card";
 import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -53,7 +54,7 @@ export default function PriorityColumn({
   operationsScope = "housekeeping",
 }: PriorityColumnProps) {
   const [isAssigning, setIsAssigning] = useState(false);
-  const [isDateInPast, setIsDateInPast] = useState(false);
+  const [isHistoricalDateLocked, setIsHistoricalDateLocked] = useState(false);
   const { toast } = useToast();
   
   // Usa lo stato passato dal parent
@@ -81,26 +82,22 @@ export default function PriorityColumn({
 
   // Verifica se la data selezionata è nel passato
   useEffect(() => {
-    const checkIfDateInPast = () => {
+    const checkIfDateLocked = () => {
       const savedDate = localStorage.getItem('selected_work_date');
       if (!savedDate) {
-        setIsDateInPast(false);
+        setIsHistoricalDateLocked(false);
         return;
       }
 
       const [year, month, day] = savedDate.split('-').map(Number);
       const selectedDate = new Date(year, month - 1, day);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      selectedDate.setHours(0, 0, 0, 0);
-
-      setIsDateInPast(selectedDate < today);
+      setIsHistoricalDateLocked(isWorkDateHistoricallyLocked(selectedDate));
     };
 
-    checkIfDateInPast();
+    checkIfDateLocked();
 
     // Ricontrolla quando cambia la data
-    const interval = setInterval(checkIfDateInPast, 1000);
+    const interval = setInterval(checkIfDateLocked, 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -364,7 +361,7 @@ export default function PriorityColumn({
             variant={isMultiSelectMode ? "default" : "outline"}
             size="sm"
             onClick={toggleMode}
-            disabled={tasks.length === 0 || isDateInPast || disableToolbar}
+            disabled={tasks.length === 0 || isHistoricalDateLocked || disableToolbar}
             className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
             title={isMultiSelectMode ? "Disattiva selezione multipla" : "Attiva selezione multipla"}
             data-testid="button-toggle-multiselect"
@@ -380,7 +377,7 @@ export default function PriorityColumn({
               !assignAction ||
               assignButtonDisabled ||
               tasks.length === 0 ||
-              isDateInPast ||
+              isHistoricalDateLocked ||
               isAssigning ||
               disableToolbar
             }
@@ -430,8 +427,8 @@ export default function PriorityColumn({
                               allTasks={orderedTasks}
                               currentContainer={droppableId}
                               isDuplicate={true}
-                              isDragDisabled={isDragDisabled || isDateInPast}
-                              isReadOnly={isDateInPast}
+                              isDragDisabled={isDragDisabled || isHistoricalDateLocked}
+                              isReadOnly={isHistoricalDateLocked}
                               multiSelectContext={multiSelectCtx}
                               isHighlighted={isHighlighted}
                               operationsScope={operationsScope}
@@ -460,8 +457,8 @@ export default function PriorityColumn({
                           allTasks={orderedTasks}
                           currentContainer={droppableId}
                           isDuplicate={true}
-                          isDragDisabled={isDragDisabled || isDateInPast}
-                          isReadOnly={isDateInPast}
+                          isDragDisabled={isDragDisabled || isHistoricalDateLocked}
+                          isReadOnly={isHistoricalDateLocked}
                           multiSelectContext={multiSelectCtx}
                           isHighlighted={isHighlighted}
                           operationsScope={operationsScope}
@@ -485,8 +482,8 @@ export default function PriorityColumn({
                     allTasks={orderedTasks}
                     currentContainer={droppableId}
                     isDuplicate={false}
-                    isDragDisabled={isDragDisabled || isDateInPast}
-                    isReadOnly={isDateInPast}
+                    isDragDisabled={isDragDisabled || isHistoricalDateLocked}
+                    isReadOnly={isHistoricalDateLocked}
                     multiSelectContext={multiSelectCtx}
                     isHighlighted={isHighlighted}
                     operationsScope={operationsScope}

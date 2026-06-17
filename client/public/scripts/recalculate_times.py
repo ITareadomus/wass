@@ -12,13 +12,15 @@ from math import radians, cos, sin, asin, sqrt
 
 
 WORK_START_TIME = "10:00"
-WORK_END_TIME = "19:00"
+WORK_END_TIME = "20:00"
 MAX_DISTANCE_KM = 50.0
+WORK_START_MIN = int(WORK_START_TIME.split(":")[0]) * 60 + int(WORK_START_TIME.split(":")[1])
 
 DEFAULT_PRIORITY_WINDOWS = {
-    "EO": {"start_min": 600},   # 10:00
-    "HP": {"start_min": 660},   # 11:00
-    "LP": {"start_min": 660},   # 11:00
+    # Fallback only: real values should be injected from app_settings by backend callers.
+    "EO": {"start_min": WORK_START_MIN},
+    "HP": {"start_min": WORK_START_MIN},
+    "LP": {"start_min": WORK_START_MIN},
 }
 
 PRIORITY_ALIASES = {
@@ -172,9 +174,12 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
     cleaner_start_time = cleaner.get("start_time", WORK_START_TIME)
     if not cleaner_start_time:
         cleaner_start_time = WORK_START_TIME
+    cleaner_end_time = cleaner.get("end_time", WORK_END_TIME)
+    if not cleaner_end_time:
+        cleaner_end_time = WORK_END_TIME
     
     work_start_min = time_to_minutes(cleaner_start_time)
-    work_end_min = time_to_minutes(WORK_END_TIME)
+    work_end_min = time_to_minutes(cleaner_end_time)
 
     current_time_min = work_start_min
     prev_lat: Optional[float] = None

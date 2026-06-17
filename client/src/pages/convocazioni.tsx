@@ -14,6 +14,7 @@ import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from 'wouter';
+import { isTaskLocked } from "@/lib/taskValidation";
 
 const OFFICE_SCOPE_ENABLED = false;
 
@@ -39,6 +40,7 @@ interface Cleaner {
   preferred_customers: number[];
   telegram_id: number | null;
   start_time: string | null;
+  end_time?: string | null;
   show_plus_one?: boolean;
   assigned_vehicle_id?: number | null;
   assigned_vehicle_name?: string | null;
@@ -349,18 +351,45 @@ export default function Convocazioni() {
 
   const loadTaskStats = async (dateStr: string, driversMode: boolean) => {
     try {
-      const statsUrl = driversMode
+      const containersUrl = driversMode
         ? `/api/logistics-containers?date=${encodeURIComponent(dateStr)}`
         : withScope(`/api/containers?date=${encodeURIComponent(dateStr)}`);
-      const res = await fetch(statsUrl);
-      if (!res.ok) throw new Error('Errore durante il caricamento dei containers');
-      const data = await res.json();
+      const timelineUrl = driversMode
+        ? `/api/logistics-timeline?date=${encodeURIComponent(dateStr)}`
+        : withScope(`/api/timeline?date=${encodeURIComponent(dateStr)}`);
+
+      const [containersRes, timelineRes] = await Promise.all([
+        fetch(containersUrl),
+        fetch(timelineUrl),
+      ]);
+
+      if (!containersRes.ok) throw new Error('Errore durante il caricamento dei containers');
+      const data = await containersRes.json();
       const c = data.containers || {};
-      const allTasks = [
+      const containerTasks = [
         ...(c.early_out?.tasks || []),
         ...(c.high_priority?.tasks || []),
         ...(c.low_priority?.tasks || []),
       ];
+
+      const timelinePayload = timelineRes.ok ? await timelineRes.json() : {};
+      const timelineRows = driversMode
+        ? (Array.isArray((timelinePayload as any)?.drivers_assignments) ? (timelinePayload as any).drivers_assignments : [])
+        : (Array.isArray((timelinePayload as any)?.cleaners_assignments) ? (timelinePayload as any).cleaners_assignments : []);
+      const timelineTasks = timelineRows.flatMap((row: any) => (Array.isArray(row?.tasks) ? row.tasks : []));
+
+      const assignedTaskIds = new Set<string>(
+        timelineTasks
+          .map((task: any) => String(task?.task_id ?? task?.id ?? "").trim())
+          .filter(Boolean)
+      );
+
+      const unassignedContainerTasks = containerTasks.filter((task: any) => {
+        const taskId = String(task?.task_id ?? task?.id ?? "").trim();
+        return !taskId || !assignedTaskIds.has(taskId);
+      });
+
+      const allTasks = [...unassignedContainerTasks, ...timelineTasks];
       let total = 0, premium = 0, standard = 0, straordinarie = 0, officeInternal = 0, logistics = 0;
       let logisticsOperationIds = new Set<number>();
       if (driversMode) {
@@ -385,6 +414,7 @@ export default function Convocazioni() {
       }
       for (const t of allTasks) {
         const opId = Number((t as any).operation_id);
+        const isLocked = isTaskLocked(t);
         const isStraordinaria =
           t.straordinaria === true ||
           (t as any).is_straordinaria === true ||
@@ -392,12 +422,14 @@ export default function Convocazioni() {
           opId === 37;
         const isPremium = t.premium === true || t.premium === 1 || t.premium === "1";
         const isOfficeInternal = Number((t as any).operation_id) === 15;
-        total += 1;
-        if (isStraordinaria) straordinarie += 1;
-        else if (isPremium) premium += 1;
-        else standard += 1;
-        if (isOfficeInternal) officeInternal += 1;
-        if (driversMode && Number.isFinite(opId) && logisticsOperationIds.has(opId)) logistics += 1;
+        if (!isLocked) {
+          total += 1;
+          if (isStraordinaria) straordinarie += 1;
+          else if (isPremium) premium += 1;
+          else standard += 1;
+          if (isOfficeInternal) officeInternal += 1;
+          if (driversMode && Number.isFinite(opId) && logisticsOperationIds.has(opId)) logistics += 1;
+        }
       }
       setTaskStats({ total, premium, standard, straordinarie, officeInternal, logistics });
     } catch (error) {
@@ -648,6 +680,10 @@ export default function Convocazioni() {
           }),
         });
         if (!response.ok) throw new Error("Errore nel salvataggio dei cleaners");
+        sessionStorage.setItem(
+          "refreshAssignmentsAfterConvocations",
+          JSON.stringify({ date: dateStr, scope: scopeValue, savedAt: Date.now() })
+        );
         toast({
           variant: "success",
           title: `${selectedCleanersData.length} cleaner salvati con successo!`,
@@ -793,6 +829,10 @@ export default function Convocazioni() {
           }),
         });
         if (!response.ok) throw new Error("Errore nel salvataggio");
+        sessionStorage.setItem(
+          "refreshAssignmentsAfterConvocations",
+          JSON.stringify({ date: dateStr, scope: scopeValue, savedAt: Date.now() })
+        );
         if (newCleaners.length === 0) {
           toast({
             variant: "success",
@@ -1152,6 +1192,58 @@ export default function Convocazioni() {
                           ));
                           setFilteredCleaners(prev => prev.map(c => 
                             c.id === cleaner.id ? { ...c, start_time: newTime } : c
+                          ));
+                        }}
+                      >
+                        <span className="text-base font-bold">+</span>
+                      </Button>
+                    </div>
+                    <div className={`flex items-center gap-1 bg-background border-2 rounded-lg px-3 py-1 ${borderColor}`}>
+                      <span className="text-xs font-semibold text-foreground mr-2">End Time:</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 hover:bg-red-100 dark:hover:bg-red-900"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const currentTime = cleaner.end_time || "20:00";
+                          const [hours, minutes] = currentTime.split(':').map(Number);
+                          let totalMinutes = hours * 60 + minutes - 30;
+                          if (totalMinutes < 0) totalMinutes += 24 * 60;
+                          const newHours = Math.floor(totalMinutes / 60);
+                          const newMinutes = totalMinutes % 60;
+                          const newTime = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
+                          setCleaners(prev => prev.map(c =>
+                            c.id === cleaner.id ? { ...c, end_time: newTime } : c
+                          ));
+                          setFilteredCleaners(prev => prev.map(c =>
+                            c.id === cleaner.id ? { ...c, end_time: newTime } : c
+                          ));
+                        }}
+                      >
+                        <span className="text-base font-bold">−</span>
+                      </Button>
+                      <span className="text-sm font-mono font-bold min-w-[45px] text-center">
+                        {cleaner.end_time || "20:00"}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-900"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const currentTime = cleaner.end_time || "20:00";
+                          const [hours, minutes] = currentTime.split(':').map(Number);
+                          let totalMinutes = hours * 60 + minutes + 30;
+                          if (totalMinutes >= 24 * 60) totalMinutes -= 24 * 60;
+                          const newHours = Math.floor(totalMinutes / 60);
+                          const newMinutes = totalMinutes % 60;
+                          const newTime = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}`;
+                          setCleaners(prev => prev.map(c =>
+                            c.id === cleaner.id ? { ...c, end_time: newTime } : c
+                          ));
+                          setFilteredCleaners(prev => prev.map(c =>
+                            c.id === cleaner.id ? { ...c, end_time: newTime } : c
                           ));
                         }}
                       >

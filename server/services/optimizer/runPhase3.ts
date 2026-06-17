@@ -39,23 +39,29 @@ async function loadSelectedCleanerIds(workDate: string): Promise<number[]> {
     .map((x: any) => Number(x))
     .filter((n: number) => Number.isFinite(n));
   // Determinismo: normalizza ordine cleaners
-  ids.sort((a, b) => a - b);
+  ids.sort((a: number, b: number) => a - b);
   return ids;
 }
 
-async function loadCleanerStartTimes(workDate: string, cleanerIds: number[]): Promise<Map<number, string>> {
+async function loadCleanerShiftTimes(
+  workDate: string,
+  cleanerIds: number[]
+): Promise<Map<number, { startTime: string; endTime: string }>> {
   if (cleanerIds.length === 0) return new Map();
   
   const result = await pool.query(`
-    SELECT cleaner_id, name, start_time
+    SELECT cleaner_id, name, start_time, end_time
     FROM cleaners
     WHERE work_date = $1 AND cleaner_id = ANY($2::int[])
     ORDER BY cleaner_id
   `, [workDate, cleanerIds]);
   
-  const map = new Map<number, string>();
+  const map = new Map<number, { startTime: string; endTime: string }>();
   for (const row of result.rows) {
-    map.set(row.cleaner_id, row.start_time || '09:00');
+    map.set(row.cleaner_id, {
+      startTime: row.start_time || '10:00',
+      endTime: row.end_time || '20:00',
+    });
   }
   return map;
 }
@@ -287,8 +293,8 @@ export async function runPhase3(
     }
 
     const cleanerIdsWithAssignments = Array.from(phase2Assignments.keys());
-    const [startTimes, cleanerNames] = await Promise.all([
-      loadCleanerStartTimes(workDate, cleanerIdsWithAssignments),
+    const [shiftTimes, cleanerNames] = await Promise.all([
+      loadCleanerShiftTimes(workDate, cleanerIdsWithAssignments),
       loadCleanerNames(workDate, cleanerIdsWithAssignments)
     ]);
 
@@ -299,7 +305,8 @@ export async function runPhase3(
       const cg: CleanerGroups = {
         cleanerId,
         cleanerName: cleanerNames.get(cleanerId) || `Cleaner ${cleanerId}`,
-        startTime: startTimes.get(cleanerId) || '09:00',
+        startTime: shiftTimes.get(cleanerId)?.startTime || '10:00',
+        endTime: shiftTimes.get(cleanerId)?.endTime || '20:00',
         groups
       };
 

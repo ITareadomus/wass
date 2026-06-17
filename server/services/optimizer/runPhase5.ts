@@ -98,28 +98,32 @@ async function loadSchedulesFromAssignments(runId: string, workDate: string): Pr
   const capsResult = await pool.query(`
     SELECT cleaner_id, name, COALESCE(role, 'Standard') as role,
            COALESCE(contract_type, 'C') as contract_type,
-           COALESCE(start_time, '09:00') as start_time
+           COALESCE(start_time, '10:00') as start_time,
+           COALESCE(end_time, '20:00') as end_time
     FROM cleaners
     WHERE cleaner_id = ANY($1::int[]) AND work_date = $2
     ORDER BY cleaner_id
   `, [allCleanerIds, workDate]);
 
-  const caps = new Map<number, { name: string; role: string; contractType: string; startTime: string }>();
+  const caps = new Map<number, { name: string; role: string; contractType: string; startTime: string; endTime: string }>();
   for (const row of capsResult.rows) {
     caps.set(row.cleaner_id, {
       name: row.name || `Cleaner ${row.cleaner_id}`,
       role: row.role,
       contractType: row.contract_type,
-      startTime: row.start_time
+      startTime: row.start_time,
+      endTime: row.end_time,
     });
   }
 
   const schedules: CleanerSchedule[] = [];
   cleanerMap.forEach((data, cleanerId) => {
     const cap = caps.get(cleanerId);
+    const [endH, endM] = String(cap?.endTime || "20:00").split(":").map((x: string) => parseInt(x, 10));
+    const shiftEndMin = Number.isFinite(endH) && Number.isFinite(endM) ? (endH * 60 + endM) : 1200;
     const endMin = data.maxEndTime
-      ? data.maxEndTime.getUTCHours() * 60 + data.maxEndTime.getUTCMinutes()
-      : 540;
+      ? Math.max(data.maxEndTime.getUTCHours() * 60 + data.maxEndTime.getUTCMinutes(), shiftEndMin)
+      : shiftEndMin;
 
     const totalWorkMinutes = data.tasks.reduce(
       (sum: number, t: any) => sum + (t.cleaningTimeMinutes ?? 60), 0
@@ -128,7 +132,8 @@ async function loadSchedulesFromAssignments(runId: string, workDate: string): Pr
     schedules.push({
       cleanerId,
       cleanerName: cap?.name || `Cleaner ${cleanerId}`,
-      startTime: cap?.startTime || '09:00',
+      startTime: cap?.startTime || '10:00',
+      endTime: cap?.endTime || "20:00",
       tasks: data.tasks,
       endTimeMinutes: endMin,
       totalTravel: data.totalTravel,

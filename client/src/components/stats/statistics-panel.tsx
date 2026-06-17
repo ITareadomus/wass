@@ -1,6 +1,6 @@
 import { TaskType as Task } from "@shared/schema";
 import { BarChart3 } from "lucide-react";
-import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
+import { isContinuazioneStraordinariaTask, isTaskLocked } from "@/lib/taskValidation";
 
 interface StatisticsPanelProps {
   tasks: Task[];
@@ -10,18 +10,21 @@ export default function StatisticsPanel({ tasks }: StatisticsPanelProps) {
   const isEquivalentStraordinariaTask = (task: any): boolean =>
     Boolean(task?.straordinaria) || isContinuazioneStraordinariaTask(task);
 
-  const earlyOutCount = tasks.filter(task => task.priority === "early-out").length;
-  const highPriorityCount = tasks.filter(task => task.priority === "high").length;
-  const lowPriorityCount = tasks.filter(task => task.priority === "low").length;
+  const unlockedTasks = tasks.filter((task) => !isTaskLocked(task));
+
+  const earlyOutCount = unlockedTasks.filter(task => task.priority === "early-out").length;
+  const highPriorityCount = unlockedTasks.filter(task => task.priority === "high").length;
+  const lowPriorityCount = unlockedTasks.filter(task => task.priority === "low").length;
   const unassignedCount = tasks.filter(task => !task.priority).length;
+  const unassignedUnlockedCount = unlockedTasks.filter(task => !task.priority).length;
   
   // Conteggio corretto: straordinarie hanno priorità assoluta
-  const straordinarieCount = tasks.filter(task => isEquivalentStraordinariaTask(task)).length;
-  const premiumCount = tasks.filter(task => !isEquivalentStraordinariaTask(task) && (task as any).premium === true).length;
-  const standardCount = tasks.filter(task => !isEquivalentStraordinariaTask(task) && (task as any).premium !== true).length;
+  const straordinarieCount = unlockedTasks.filter(task => isEquivalentStraordinariaTask(task)).length;
+  const premiumCount = unlockedTasks.filter(task => !isEquivalentStraordinariaTask(task) && (task as any).premium === true).length;
+  const standardCount = unlockedTasks.filter(task => !isEquivalentStraordinariaTask(task) && (task as any).premium !== true).length;
   
-  const totalTasks = tasks.length;
-  const assignedTasks = totalTasks - unassignedCount;
+  const totalTasks = unlockedTasks.length;
+  const assignedTasks = totalTasks - unassignedUnlockedCount;
   const completionPercentage = totalTasks > 0 ? Math.round((assignedTasks / totalTasks) * 100) : 0;
 
   return (

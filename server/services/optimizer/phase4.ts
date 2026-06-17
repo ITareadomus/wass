@@ -71,6 +71,7 @@ export interface CleanerSchedule {
   cleanerId: number;
   cleanerName: string;
   startTime: string;
+  endTime: string;
   tasks: ScheduleRow[];
   endTimeMinutes: number;
   totalTravel: number;
@@ -772,6 +773,7 @@ function applyInsertion(
     cleanerId: schedule.cleanerId,
     cleanerName: schedule.cleanerName,
     startTime: schedule.startTime,
+    endTime: schedule.endTime,
     tasks: simResult.scheduleRows,
     endTimeMinutes: simResult.endTime ? dateToMinutes(simResult.endTime) : schedule.endTimeMinutes,
     totalTravel: simResult.totalTravel,
@@ -930,6 +932,7 @@ function trySwapForTask(
               cleanerId: schedule.cleanerId,
               cleanerName: schedule.cleanerName,
               startTime: schedule.startTime,
+              endTime: schedule.endTime,
               tasks: simResult.scheduleRows,
               endTimeMinutes: simResult.endTime ? dateToMinutes(simResult.endTime) : schedule.endTimeMinutes,
               totalTravel: simResult.totalTravel,
