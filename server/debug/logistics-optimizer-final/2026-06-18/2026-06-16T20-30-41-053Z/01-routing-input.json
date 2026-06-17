@@ -1,0 +1,3853 @@
+{
+  "schemaVersion": "logistics-routing-input/v1",
+  "workDate": "2026-06-18",
+  "windowConfig": {
+    "source": "app_settings",
+    "workDate": "2026-06-18",
+    "priorityWindows": {
+      "EO": {
+        "startMin": 0,
+        "endMin": 659,
+        "graceMin": 0
+      },
+      "HP": {
+        "startMin": 660,
+        "endMin": 930,
+        "graceMin": 0
+      },
+      "LP": {
+        "startMin": 660,
+        "endMin": null,
+        "graceMin": 0
+      }
+    },
+    "fallbackUsed": false
+  },
+  "depot": {
+    "nodeId": "depot",
+    "nodeIndex": 0,
+    "kind": "DEPOT",
+    "lat": 45.434029,
+    "lng": 9.180008
+  },
+  "drivers": [
+    {
+      "id": 737,
+      "startLocationNodeId": "depot",
+      "workWindow": {
+        "startMin": 600,
+        "endMin": 1200,
+        "startSource": "driver_row",
+        "endSource": "driver_row"
+      },
+      "selected": true
+    },
+    {
+      "id": 1078,
+      "startLocationNodeId": "depot",
+      "workWindow": {
+        "startMin": 600,
+        "endMin": 1200,
+        "startSource": "driver_row",
+        "endSource": "driver_row"
+      },
+      "selected": true
+    }
+  ],
+  "tasks": [
+    {
+      "taskId": 223810,
+      "logisticCode": 1741,
+      "nodeIndex": 1,
+      "location": {
+        "lat": 45.4342758,
+        "lng": 9.1803654,
+        "addressGroupId": null
+      },
+      "priority": "LP",
+      "bagHandling": "NO_CLEANER_CONTEXT",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": null,
+        "checkinTime": null,
+        "cleanerStartTime": null,
+        "cleanerTaskStartTime": null
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 1185,
+        "latestEndMin": 1200,
+        "reasons": [
+          "LP_CONFIGURED_START"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "NO_CLEANER_CONTEXT",
+            "value": {
+              "cleanerId": null,
+              "cleanerSequence": null
+            }
+          },
+          {
+            "code": "LP_CONFIGURED_START",
+            "value": 660
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": null,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": null,
+        "cleanerSequence": null,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1741
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 223960,
+      "logisticCode": 1741,
+      "nodeIndex": 2,
+      "location": {
+        "lat": 45.4342758,
+        "lng": 9.1803654,
+        "addressGroupId": null
+      },
+      "priority": "LP",
+      "bagHandling": "NO_CLEANER_CONTEXT",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": null,
+        "checkinTime": null,
+        "cleanerStartTime": null,
+        "cleanerTaskStartTime": null
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 1185,
+        "latestEndMin": 1200,
+        "reasons": [
+          "LP_CONFIGURED_START"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "NO_CLEANER_CONTEXT",
+            "value": {
+              "cleanerId": null,
+              "cleanerSequence": null
+            }
+          },
+          {
+            "code": "LP_CONFIGURED_START",
+            "value": 660
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": null,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": null,
+        "cleanerSequence": null,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1741
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 225570,
+      "logisticCode": 1637,
+      "nodeIndex": 3,
+      "location": {
+        "lat": 45.4709651,
+        "lng": 9.1566484,
+        "addressGroupId": null
+      },
+      "priority": "LP",
+      "bagHandling": "NO_CLEANER_CONTEXT",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": null,
+        "checkinTime": null,
+        "cleanerStartTime": null,
+        "cleanerTaskStartTime": null
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 1185,
+        "latestEndMin": 1200,
+        "reasons": [
+          "LP_CONFIGURED_START"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "NO_CLEANER_CONTEXT",
+            "value": {
+              "cleanerId": null,
+              "cleanerSequence": null
+            }
+          },
+          {
+            "code": "LP_CONFIGURED_START",
+            "value": 660
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": null,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": null,
+        "cleanerSequence": null,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1637
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 225782,
+      "logisticCode": 1637,
+      "nodeIndex": 4,
+      "location": {
+        "lat": 45.4709651,
+        "lng": 9.1566484,
+        "addressGroupId": null
+      },
+      "priority": "LP",
+      "bagHandling": "NO_CLEANER_CONTEXT",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": null,
+        "checkinTime": null,
+        "cleanerStartTime": null,
+        "cleanerTaskStartTime": null
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 1185,
+        "latestEndMin": 1200,
+        "reasons": [
+          "LP_CONFIGURED_START"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "NO_CLEANER_CONTEXT",
+            "value": {
+              "cleanerId": null,
+              "cleanerSequence": null
+            }
+          },
+          {
+            "code": "LP_CONFIGURED_START",
+            "value": 660
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": null,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": null,
+        "cleanerSequence": null,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1637
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 225996,
+      "logisticCode": 1637,
+      "nodeIndex": 5,
+      "location": {
+        "lat": 45.4709651,
+        "lng": 9.1566484,
+        "addressGroupId": null
+      },
+      "priority": "LP",
+      "bagHandling": "NO_CLEANER_CONTEXT",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": null,
+        "checkinTime": null,
+        "cleanerStartTime": null,
+        "cleanerTaskStartTime": null
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 1185,
+        "latestEndMin": 1200,
+        "reasons": [
+          "LP_CONFIGURED_START"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "NO_CLEANER_CONTEXT",
+            "value": {
+              "cleanerId": null,
+              "cleanerSequence": null
+            }
+          },
+          {
+            "code": "LP_CONFIGURED_START",
+            "value": 660
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": null,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": null,
+        "cleanerSequence": null,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1637
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 227684,
+      "logisticCode": 229,
+      "nodeIndex": 6,
+      "location": {
+        "lat": 45.4510472,
+        "lng": 9.1910628,
+        "addressGroupId": null
+      },
+      "priority": "LP",
+      "bagHandling": "DRIVER_BRINGS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": "2026-06-22",
+        "checkinTime": null,
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "12:38"
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 798,
+        "latestEndMin": 813,
+        "reasons": [
+          "LP_CONFIGURED_START",
+          "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "DRIVER_BRINGS_BAG_REQUIRED",
+            "value": {
+              "cleanerSequence": 2,
+              "isPremium": false,
+              "paxIn": 1
+            }
+          },
+          {
+            "code": "LP_CONFIGURED_START",
+            "value": 660
+          },
+          {
+            "code": "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE",
+            "value": {
+              "cleanerTaskStartMin": 758,
+              "cleaningTimeMin": 60,
+              "toleranceMin": 40,
+              "latestStartMin": 798
+            }
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": 758,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 987,
+        "cleanerSequence": 2,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 229
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231165,
+      "logisticCode": 273,
+      "nodeIndex": 7,
+      "location": {
+        "lat": 45.4510412,
+        "lng": 9.1910662,
+        "addressGroupId": null
+      },
+      "priority": "LP",
+      "bagHandling": "DRIVER_BRINGS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": "2026-06-19",
+        "checkinTime": "19:00",
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "13:43"
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 863,
+        "latestEndMin": 878,
+        "reasons": [
+          "LP_CONFIGURED_START",
+          "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "DRIVER_BRINGS_BAG_REQUIRED",
+            "value": {
+              "cleanerSequence": 3,
+              "isPremium": false,
+              "paxIn": 2
+            }
+          },
+          {
+            "code": "LP_CONFIGURED_START",
+            "value": 660
+          },
+          {
+            "code": "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE",
+            "value": {
+              "cleanerTaskStartMin": 823,
+              "cleaningTimeMin": 60,
+              "toleranceMin": 40,
+              "latestStartMin": 863
+            }
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": 823,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 987,
+        "cleanerSequence": 3,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 273
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231292,
+      "logisticCode": 1530,
+      "nodeIndex": 8,
+      "location": {
+        "lat": 45.461049,
+        "lng": 9.175446,
+        "addressGroupId": null
+      },
+      "priority": "HP",
+      "bagHandling": "DRIVER_BRINGS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": "11:15",
+        "checkinDate": "2026-06-18",
+        "checkinTime": "14:00",
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "11:15"
+      },
+      "hardWindow": {
+        "earliestStartMin": 675,
+        "latestStartMin": 715,
+        "latestEndMin": 730,
+        "reasons": [
+          "CUSTOMER_CHECKOUT_MIGRATED",
+          "CHECKIN_DEADLINE",
+          "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "DRIVER_BRINGS_BAG_REQUIRED",
+            "value": {
+              "cleanerSequence": 1,
+              "isPremium": true,
+              "paxIn": 4
+            }
+          },
+          {
+            "code": "CUSTOMER_CHECKOUT_MIGRATED",
+            "value": 675
+          },
+          {
+            "code": "CUSTOMER_CHECKIN_DEADLINE",
+            "value": 840
+          },
+          {
+            "code": "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE",
+            "value": {
+              "cleanerTaskStartMin": 675,
+              "cleaningTimeMin": 60,
+              "toleranceMin": 40,
+              "latestStartMin": 715
+            }
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": 675,
+          "cleanerTaskStartMin": 675,
+          "customerCheckinMin": 840
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 1064,
+        "cleanerSequence": 1,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1530
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231747,
+      "logisticCode": 1681,
+      "nodeIndex": 9,
+      "location": {
+        "lat": 45.462448,
+        "lng": 9.1811314,
+        "addressGroupId": null
+      },
+      "priority": "HP",
+      "bagHandling": "DRIVER_BRINGS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": "2026-06-18",
+        "checkinTime": "16:00",
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "11:00"
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 900,
+        "latestEndMin": 915,
+        "reasons": [
+          "HP_CONFIGURED_START",
+          "CHECKIN_DEADLINE",
+          "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "DRIVER_BRINGS_BAG_REQUIRED",
+            "value": {
+              "cleanerSequence": 1,
+              "isPremium": true,
+              "paxIn": 6
+            }
+          },
+          {
+            "code": "HP_CONFIGURED_START",
+            "value": 660
+          },
+          {
+            "code": "CUSTOMER_CHECKIN_DEADLINE",
+            "value": 960
+          },
+          {
+            "code": "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE",
+            "value": {
+              "cleanerTaskStartMin": 660,
+              "cleaningTimeMin": 360,
+              "toleranceMin": 240,
+              "latestStartMin": 900
+            }
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": 660,
+          "customerCheckinMin": 960
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 1045,
+        "cleanerSequence": 1,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1681
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231748,
+      "logisticCode": 623,
+      "nodeIndex": 10,
+      "location": {
+        "lat": 45.4518038,
+        "lng": 9.1768031,
+        "addressGroupId": null
+      },
+      "priority": "EO",
+      "bagHandling": "CLEANER_HAS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": "2026-06-19",
+        "checkinTime": "18:30",
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "10:00"
+      },
+      "hardWindow": {
+        "earliestStartMin": 0,
+        "latestStartMin": 1185,
+        "latestEndMin": 1200,
+        "reasons": [
+          "EO_NO_HARD_LOWER_BOUND"
+        ]
+      },
+      "softWindows": [
+        {
+          "type": "preferred_start",
+          "startMin": 0,
+          "endMin": 659,
+          "penaltyPerMin": 1,
+          "reason": "EO_CAN_START_BEFORE_HP_START_SOFT_PREFERENCE"
+        }
+      ],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "CLEANER_HAS_BAG_FLEXIBLE_PICKUP",
+            "value": {
+              "cleanerSequence": 1,
+              "isPremium": false,
+              "paxIn": 3
+            }
+          },
+          {
+            "code": "EO_NO_HARD_LOWER_BOUND",
+            "value": 0
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": null,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 596,
+        "cleanerSequence": 1,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 623
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231750,
+      "logisticCode": 1381,
+      "nodeIndex": 11,
+      "location": {
+        "lat": 45.4901211,
+        "lng": 9.2057682,
+        "addressGroupId": null
+      },
+      "priority": "EO",
+      "bagHandling": "DRIVER_BRINGS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": "2026-06-19",
+        "checkinTime": "19:00",
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "13:45"
+      },
+      "hardWindow": {
+        "earliestStartMin": 0,
+        "latestStartMin": 885,
+        "latestEndMin": 900,
+        "reasons": [
+          "EO_NO_HARD_LOWER_BOUND",
+          "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+        ]
+      },
+      "softWindows": [
+        {
+          "type": "preferred_start",
+          "startMin": 0,
+          "endMin": 659,
+          "penaltyPerMin": 1,
+          "reason": "EO_CAN_START_BEFORE_HP_START_SOFT_PREFERENCE"
+        }
+      ],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "DRIVER_BRINGS_BAG_REQUIRED",
+            "value": {
+              "cleanerSequence": 3,
+              "isPremium": false,
+              "paxIn": 4
+            }
+          },
+          {
+            "code": "EO_NO_HARD_LOWER_BOUND",
+            "value": 0
+          },
+          {
+            "code": "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE",
+            "value": {
+              "cleanerTaskStartMin": 825,
+              "cleaningTimeMin": 90,
+              "toleranceMin": 60,
+              "latestStartMin": 885
+            }
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": 825,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 249,
+        "cleanerSequence": 3,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1381
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231752,
+      "logisticCode": 714,
+      "nodeIndex": 12,
+      "location": {
+        "lat": 45.4668897,
+        "lng": 9.1272539,
+        "addressGroupId": null
+      },
+      "priority": "EO",
+      "bagHandling": "CLEANER_HAS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": "2026-06-20",
+        "checkinTime": "17:00",
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "10:00"
+      },
+      "hardWindow": {
+        "earliestStartMin": 0,
+        "latestStartMin": 1185,
+        "latestEndMin": 1200,
+        "reasons": [
+          "EO_NO_HARD_LOWER_BOUND"
+        ]
+      },
+      "softWindows": [
+        {
+          "type": "preferred_start",
+          "startMin": 0,
+          "endMin": 659,
+          "penaltyPerMin": 1,
+          "reason": "EO_CAN_START_BEFORE_HP_START_SOFT_PREFERENCE"
+        }
+      ],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "CLEANER_HAS_BAG_FLEXIBLE_PICKUP",
+            "value": {
+              "cleanerSequence": 1,
+              "isPremium": false,
+              "paxIn": 2
+            }
+          },
+          {
+            "code": "EO_NO_HARD_LOWER_BOUND",
+            "value": 0
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": null,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 24,
+        "cleanerSequence": 1,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 714
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231753,
+      "logisticCode": 840,
+      "nodeIndex": 13,
+      "location": {
+        "lat": 45.4498056,
+        "lng": 9.1372543,
+        "addressGroupId": null
+      },
+      "priority": "EO",
+      "bagHandling": "DRIVER_BRINGS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": "2026-06-19",
+        "checkinTime": null,
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "11:20"
+      },
+      "hardWindow": {
+        "earliestStartMin": 0,
+        "latestStartMin": 720,
+        "latestEndMin": 735,
+        "reasons": [
+          "EO_NO_HARD_LOWER_BOUND",
+          "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+        ]
+      },
+      "softWindows": [
+        {
+          "type": "preferred_start",
+          "startMin": 0,
+          "endMin": 659,
+          "penaltyPerMin": 1,
+          "reason": "EO_CAN_START_BEFORE_HP_START_SOFT_PREFERENCE"
+        }
+      ],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "DRIVER_BRINGS_BAG_REQUIRED",
+            "value": {
+              "cleanerSequence": 2,
+              "isPremium": false,
+              "paxIn": 2
+            }
+          },
+          {
+            "code": "EO_NO_HARD_LOWER_BOUND",
+            "value": 0
+          },
+          {
+            "code": "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE",
+            "value": {
+              "cleanerTaskStartMin": 680,
+              "cleaningTimeMin": 60,
+              "toleranceMin": 40,
+              "latestStartMin": 720
+            }
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": 680,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 24,
+        "cleanerSequence": 2,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 840
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231754,
+      "logisticCode": 1634,
+      "nodeIndex": 14,
+      "location": {
+        "lat": 45.475911,
+        "lng": 9.1710371,
+        "addressGroupId": null
+      },
+      "priority": "HP",
+      "bagHandling": "CLEANER_HAS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": "2026-06-18",
+        "checkinTime": "15:00",
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "11:00"
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 885,
+        "latestEndMin": 900,
+        "reasons": [
+          "HP_CONFIGURED_START",
+          "CHECKIN_DEADLINE"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "CLEANER_HAS_BAG_FLEXIBLE_PICKUP",
+            "value": {
+              "cleanerSequence": 1,
+              "isPremium": false,
+              "paxIn": 4
+            }
+          },
+          {
+            "code": "HP_CONFIGURED_START",
+            "value": 660
+          },
+          {
+            "code": "CUSTOMER_CHECKIN_DEADLINE",
+            "value": 900
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": null,
+          "customerCheckinMin": 900
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 1034,
+        "cleanerSequence": 1,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1634
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231755,
+      "logisticCode": 504,
+      "nodeIndex": 15,
+      "location": {
+        "lat": 45.5034283,
+        "lng": 9.221111,
+        "addressGroupId": null
+      },
+      "priority": "EO",
+      "bagHandling": "CLEANER_HAS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": "2026-06-23",
+        "checkinTime": null,
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "10:00"
+      },
+      "hardWindow": {
+        "earliestStartMin": 0,
+        "latestStartMin": 1185,
+        "latestEndMin": 1200,
+        "reasons": [
+          "EO_NO_HARD_LOWER_BOUND"
+        ]
+      },
+      "softWindows": [
+        {
+          "type": "preferred_start",
+          "startMin": 0,
+          "endMin": 659,
+          "penaltyPerMin": 1,
+          "reason": "EO_CAN_START_BEFORE_HP_START_SOFT_PREFERENCE"
+        }
+      ],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "CLEANER_HAS_BAG_FLEXIBLE_PICKUP",
+            "value": {
+              "cleanerSequence": 1,
+              "isPremium": false,
+              "paxIn": 1
+            }
+          },
+          {
+            "code": "EO_NO_HARD_LOWER_BOUND",
+            "value": 0
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": null,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 132,
+        "cleanerSequence": 1,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 504
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231756,
+      "logisticCode": 1729,
+      "nodeIndex": 16,
+      "location": {
+        "lat": 45.486673,
+        "lng": 9.1883911,
+        "addressGroupId": null
+      },
+      "priority": "LP",
+      "bagHandling": "DRIVER_BRINGS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": "2026-06-19",
+        "checkinTime": "20:00",
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "11:23"
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 723,
+        "latestEndMin": 738,
+        "reasons": [
+          "LP_CONFIGURED_START",
+          "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "DRIVER_BRINGS_BAG_REQUIRED",
+            "value": {
+              "cleanerSequence": 2,
+              "isPremium": false,
+              "paxIn": 3
+            }
+          },
+          {
+            "code": "LP_CONFIGURED_START",
+            "value": 660
+          },
+          {
+            "code": "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE",
+            "value": {
+              "cleanerTaskStartMin": 683,
+              "cleaningTimeMin": 60,
+              "toleranceMin": 40,
+              "latestStartMin": 723
+            }
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": 683,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 469,
+        "cleanerSequence": 2,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1729
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231757,
+      "logisticCode": 1051,
+      "nodeIndex": 17,
+      "location": {
+        "lat": 45.4581403,
+        "lng": 9.1462786,
+        "addressGroupId": null
+      },
+      "priority": "EO",
+      "bagHandling": "DRIVER_BRINGS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": "2026-06-21",
+        "checkinTime": null,
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "12:50"
+      },
+      "hardWindow": {
+        "earliestStartMin": 0,
+        "latestStartMin": 830,
+        "latestEndMin": 845,
+        "reasons": [
+          "EO_NO_HARD_LOWER_BOUND",
+          "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+        ]
+      },
+      "softWindows": [
+        {
+          "type": "preferred_start",
+          "startMin": 0,
+          "endMin": 659,
+          "penaltyPerMin": 1,
+          "reason": "EO_CAN_START_BEFORE_HP_START_SOFT_PREFERENCE"
+        }
+      ],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "DRIVER_BRINGS_BAG_REQUIRED",
+            "value": {
+              "cleanerSequence": 2,
+              "isPremium": false,
+              "paxIn": 1
+            }
+          },
+          {
+            "code": "EO_NO_HARD_LOWER_BOUND",
+            "value": 0
+          },
+          {
+            "code": "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE",
+            "value": {
+              "cleanerTaskStartMin": 770,
+              "cleaningTimeMin": 90,
+              "toleranceMin": 60,
+              "latestStartMin": 830
+            }
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": 770,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 326,
+        "cleanerSequence": 2,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1051
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231758,
+      "logisticCode": 1662,
+      "nodeIndex": 18,
+      "location": {
+        "lat": 45.4889546,
+        "lng": 9.147833,
+        "addressGroupId": null
+      },
+      "priority": "LP",
+      "bagHandling": "DRIVER_BRINGS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": "2026-06-19",
+        "checkinTime": "15:00",
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "12:52"
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 852,
+        "latestEndMin": 867,
+        "reasons": [
+          "LP_CONFIGURED_START",
+          "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "DRIVER_BRINGS_BAG_REQUIRED",
+            "value": {
+              "cleanerSequence": 2,
+              "isPremium": false,
+              "paxIn": 3
+            }
+          },
+          {
+            "code": "LP_CONFIGURED_START",
+            "value": 660
+          },
+          {
+            "code": "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE",
+            "value": {
+              "cleanerTaskStartMin": 772,
+              "cleaningTimeMin": 120,
+              "toleranceMin": 80,
+              "latestStartMin": 852
+            }
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": 772,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 1034,
+        "cleanerSequence": 2,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1662
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231759,
+      "logisticCode": 1679,
+      "nodeIndex": 19,
+      "location": {
+        "lat": 45.4464229,
+        "lng": 9.1816155,
+        "addressGroupId": null
+      },
+      "priority": "LP",
+      "bagHandling": "DRIVER_BRINGS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": "2026-06-19",
+        "checkinTime": null,
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "12:33"
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 793,
+        "latestEndMin": 808,
+        "reasons": [
+          "LP_CONFIGURED_START",
+          "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "DRIVER_BRINGS_BAG_REQUIRED",
+            "value": {
+              "cleanerSequence": 2,
+              "isPremium": false,
+              "paxIn": 3
+            }
+          },
+          {
+            "code": "LP_CONFIGURED_START",
+            "value": 660
+          },
+          {
+            "code": "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE",
+            "value": {
+              "cleanerTaskStartMin": 753,
+              "cleaningTimeMin": 60,
+              "toleranceMin": 40,
+              "latestStartMin": 793
+            }
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": 753,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 1064,
+        "cleanerSequence": 2,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1679
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231760,
+      "logisticCode": 1744,
+      "nodeIndex": 20,
+      "location": {
+        "lat": 45.466036,
+        "lng": 9.1521474,
+        "addressGroupId": null
+      },
+      "priority": "LP",
+      "bagHandling": "CLEANER_HAS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": "2026-06-20",
+        "checkinTime": "15:00",
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "11:00"
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 1185,
+        "latestEndMin": 1200,
+        "reasons": [
+          "LP_CONFIGURED_START"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "CLEANER_HAS_BAG_FLEXIBLE_PICKUP",
+            "value": {
+              "cleanerSequence": 1,
+              "isPremium": false,
+              "paxIn": 4
+            }
+          },
+          {
+            "code": "LP_CONFIGURED_START",
+            "value": 660
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": null,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 326,
+        "cleanerSequence": 1,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1744
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231775,
+      "logisticCode": 782,
+      "nodeIndex": 21,
+      "location": {
+        "lat": 45.4814018,
+        "lng": 9.1909154,
+        "addressGroupId": null
+      },
+      "priority": "HP",
+      "bagHandling": "DRIVER_BRINGS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": "11:00",
+        "checkinDate": "2026-06-18",
+        "checkinTime": "14:00",
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "11:30"
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 730,
+        "latestEndMin": 745,
+        "reasons": [
+          "CUSTOMER_CHECKOUT_MIGRATED",
+          "CHECKIN_DEADLINE",
+          "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "DRIVER_BRINGS_BAG_REQUIRED",
+            "value": {
+              "cleanerSequence": 2,
+              "isPremium": false,
+              "paxIn": 4
+            }
+          },
+          {
+            "code": "CUSTOMER_CHECKOUT_MIGRATED",
+            "value": 660
+          },
+          {
+            "code": "CUSTOMER_CHECKIN_DEADLINE",
+            "value": 840
+          },
+          {
+            "code": "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE",
+            "value": {
+              "cleanerTaskStartMin": 690,
+              "cleaningTimeMin": 60,
+              "toleranceMin": 40,
+              "latestStartMin": 730
+            }
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": 660,
+          "cleanerTaskStartMin": 690,
+          "customerCheckinMin": 840
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 132,
+        "cleanerSequence": 2,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 782
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231776,
+      "logisticCode": 771,
+      "nodeIndex": 22,
+      "location": {
+        "lat": 45.4549994,
+        "lng": 9.2049206,
+        "addressGroupId": null
+      },
+      "priority": "HP",
+      "bagHandling": "DRIVER_BRINGS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": "11:00",
+        "checkinDate": "2026-06-18",
+        "checkinTime": "14:00",
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "11:22"
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 722,
+        "latestEndMin": 737,
+        "reasons": [
+          "CUSTOMER_CHECKOUT_MIGRATED",
+          "CHECKIN_DEADLINE",
+          "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "DRIVER_BRINGS_BAG_REQUIRED",
+            "value": {
+              "cleanerSequence": 2,
+              "isPremium": false,
+              "paxIn": 2
+            }
+          },
+          {
+            "code": "CUSTOMER_CHECKOUT_MIGRATED",
+            "value": 660
+          },
+          {
+            "code": "CUSTOMER_CHECKIN_DEADLINE",
+            "value": 840
+          },
+          {
+            "code": "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE",
+            "value": {
+              "cleanerTaskStartMin": 682,
+              "cleaningTimeMin": 60,
+              "toleranceMin": 40,
+              "latestStartMin": 722
+            }
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": 660,
+          "cleanerTaskStartMin": 682,
+          "customerCheckinMin": 840
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 596,
+        "cleanerSequence": 2,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 771
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231777,
+      "logisticCode": 1050,
+      "nodeIndex": 23,
+      "location": {
+        "lat": 45.4506703,
+        "lng": 9.1779826,
+        "addressGroupId": null
+      },
+      "priority": "HP",
+      "bagHandling": "CLEANER_HAS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": "11:00",
+        "checkinDate": "2026-06-18",
+        "checkinTime": "14:00",
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "11:00"
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 825,
+        "latestEndMin": 840,
+        "reasons": [
+          "CUSTOMER_CHECKOUT_MIGRATED",
+          "CHECKIN_DEADLINE"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "CLEANER_HAS_BAG_FLEXIBLE_PICKUP",
+            "value": {
+              "cleanerSequence": 1,
+              "isPremium": false,
+              "paxIn": 2
+            }
+          },
+          {
+            "code": "CUSTOMER_CHECKOUT_MIGRATED",
+            "value": 660
+          },
+          {
+            "code": "CUSTOMER_CHECKIN_DEADLINE",
+            "value": 840
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": 660,
+          "cleanerTaskStartMin": null,
+          "customerCheckinMin": 840
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 445,
+        "cleanerSequence": 1,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1050
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231778,
+      "logisticCode": 795,
+      "nodeIndex": 24,
+      "location": {
+        "lat": 45.4829072,
+        "lng": 9.2150899,
+        "addressGroupId": null
+      },
+      "priority": "HP",
+      "bagHandling": "CLEANER_HAS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": "11:00",
+        "checkinDate": "2026-06-18",
+        "checkinTime": "14:00",
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "11:00"
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 825,
+        "latestEndMin": 840,
+        "reasons": [
+          "CUSTOMER_CHECKOUT_MIGRATED",
+          "CHECKIN_DEADLINE"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "CLEANER_HAS_BAG_FLEXIBLE_PICKUP",
+            "value": {
+              "cleanerSequence": 1,
+              "isPremium": false,
+              "paxIn": 4
+            }
+          },
+          {
+            "code": "CUSTOMER_CHECKOUT_MIGRATED",
+            "value": 660
+          },
+          {
+            "code": "CUSTOMER_CHECKIN_DEADLINE",
+            "value": 840
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": 660,
+          "cleanerTaskStartMin": null,
+          "customerCheckinMin": 840
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 249,
+        "cleanerSequence": 1,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 795
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231800,
+      "logisticCode": 410,
+      "nodeIndex": 25,
+      "location": {
+        "lat": 45.4529136,
+        "lng": 9.1823451,
+        "addressGroupId": null
+      },
+      "priority": "LP",
+      "bagHandling": "DRIVER_BRINGS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": null,
+        "checkinDate": null,
+        "checkinTime": null,
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "12:09"
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 789,
+        "latestEndMin": 804,
+        "reasons": [
+          "LP_CONFIGURED_START",
+          "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "DRIVER_BRINGS_BAG_REQUIRED",
+            "value": {
+              "cleanerSequence": 2,
+              "isPremium": false,
+              "paxIn": 0
+            }
+          },
+          {
+            "code": "LP_CONFIGURED_START",
+            "value": 660
+          },
+          {
+            "code": "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE",
+            "value": {
+              "cleanerTaskStartMin": 729,
+              "cleaningTimeMin": 90,
+              "toleranceMin": 60,
+              "latestStartMin": 789
+            }
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": null,
+          "cleanerTaskStartMin": 729,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 445,
+        "cleanerSequence": 2,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 410
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231831,
+      "logisticCode": 1715,
+      "nodeIndex": 26,
+      "location": {
+        "lat": 45.465,
+        "lng": 9.185,
+        "addressGroupId": null
+      },
+      "priority": "EO",
+      "bagHandling": "CLEANER_HAS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": "10:00",
+        "checkinDate": "2026-06-23",
+        "checkinTime": "15:00",
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "10:00"
+      },
+      "hardWindow": {
+        "earliestStartMin": 600,
+        "latestStartMin": 1185,
+        "latestEndMin": 1200,
+        "reasons": [
+          "CUSTOMER_CHECKOUT_MIGRATED"
+        ]
+      },
+      "softWindows": [
+        {
+          "type": "preferred_start",
+          "startMin": 0,
+          "endMin": 659,
+          "penaltyPerMin": 1,
+          "reason": "EO_CAN_START_BEFORE_HP_START_SOFT_PREFERENCE"
+        }
+      ],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "CLEANER_HAS_BAG_FLEXIBLE_PICKUP",
+            "value": {
+              "cleanerSequence": 1,
+              "isPremium": false,
+              "paxIn": 4
+            }
+          },
+          {
+            "code": "CUSTOMER_CHECKOUT_MIGRATED",
+            "value": 600
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": 600,
+          "cleanerTaskStartMin": null,
+          "customerCheckinMin": null
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 469,
+        "cleanerSequence": 1,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1715
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231850,
+      "logisticCode": 1516,
+      "nodeIndex": 27,
+      "location": {
+        "lat": 45.4507041,
+        "lng": 9.1959097,
+        "addressGroupId": null
+      },
+      "priority": "HP",
+      "bagHandling": "CLEANER_HAS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": "11:00",
+        "checkinDate": "2026-06-18",
+        "checkinTime": "15:00",
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "11:00"
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 885,
+        "latestEndMin": 900,
+        "reasons": [
+          "CUSTOMER_CHECKOUT_MIGRATED",
+          "CHECKIN_DEADLINE"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "CLEANER_HAS_BAG_FLEXIBLE_PICKUP",
+            "value": {
+              "cleanerSequence": 1,
+              "isPremium": false,
+              "paxIn": 2
+            }
+          },
+          {
+            "code": "CUSTOMER_CHECKOUT_MIGRATED",
+            "value": 660
+          },
+          {
+            "code": "CUSTOMER_CHECKIN_DEADLINE",
+            "value": 900
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": 660,
+          "cleanerTaskStartMin": null,
+          "customerCheckinMin": 900
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 987,
+        "cleanerSequence": 1,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1516
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    },
+    {
+      "taskId": 231903,
+      "logisticCode": 1032,
+      "nodeIndex": 28,
+      "location": {
+        "lat": 45.4662468,
+        "lng": 9.2045849,
+        "addressGroupId": null
+      },
+      "priority": "HP",
+      "bagHandling": "DRIVER_BRINGS_BAG",
+      "serviceDurationMin": 15,
+      "rawTimes": {
+        "checkoutDate": "2026-06-18",
+        "checkoutTime": "11:00",
+        "checkinDate": "2026-06-18",
+        "checkinTime": "14:00",
+        "cleanerStartTime": "10:00",
+        "cleanerTaskStartTime": "12:20"
+      },
+      "hardWindow": {
+        "earliestStartMin": 660,
+        "latestStartMin": 780,
+        "latestEndMin": 795,
+        "reasons": [
+          "CUSTOMER_CHECKOUT_MIGRATED",
+          "CHECKIN_DEADLINE",
+          "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+        ]
+      },
+      "softWindows": [],
+      "debug": {
+        "ruleTrace": [
+          {
+            "code": "DRIVER_BRINGS_BAG_REQUIRED",
+            "value": {
+              "cleanerSequence": 2,
+              "isPremium": false,
+              "paxIn": 2
+            }
+          },
+          {
+            "code": "CUSTOMER_CHECKOUT_MIGRATED",
+            "value": 660
+          },
+          {
+            "code": "CUSTOMER_CHECKIN_DEADLINE",
+            "value": 840
+          },
+          {
+            "code": "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE",
+            "value": {
+              "cleanerTaskStartMin": 740,
+              "cleaningTimeMin": 60,
+              "toleranceMin": 40,
+              "latestStartMin": 780
+            }
+          }
+        ],
+        "sourceTimes": {
+          "customerCheckoutMin": 660,
+          "cleanerTaskStartMin": 740,
+          "customerCheckinMin": 840
+        }
+      },
+      "groupingHints": {
+        "cleanerId": 249,
+        "cleanerSequence": 2,
+        "addressGroupId": null,
+        "sameLogisticCodeGroup": 1032
+      },
+      "eligibility": {
+        "schedulable": true,
+        "exclusionReasons": []
+      }
+    }
+  ],
+  "travelMatrixMin": [
+    [
+      0,
+      3,
+      3,
+      13,
+      13,
+      13,
+      7,
+      7,
+      9,
+      10,
+      7,
+      17,
+      15,
+      11,
+      13,
+      21,
+      16,
+      11,
+      17,
+      6,
+      12,
+      14,
+      10,
+      7,
+      16,
+      8,
+      10,
+      8,
+      12
+    ],
+    [
+      3,
+      0,
+      3,
+      13,
+      13,
+      13,
+      7,
+      7,
+      9,
+      10,
+      7,
+      17,
+      15,
+      11,
+      13,
+      21,
+      16,
+      11,
+      17,
+      6,
+      12,
+      14,
+      9,
+      7,
+      16,
+      7,
+      10,
+      8,
+      12
+    ],
+    [
+      3,
+      3,
+      0,
+      13,
+      13,
+      13,
+      7,
+      7,
+      9,
+      10,
+      7,
+      17,
+      15,
+      11,
+      13,
+      21,
+      16,
+      11,
+      17,
+      6,
+      12,
+      14,
+      9,
+      7,
+      16,
+      7,
+      10,
+      8,
+      12
+    ],
+    [
+      13,
+      13,
+      13,
+      0,
+      3,
+      3,
+      10,
+      10,
+      7,
+      8,
+      9,
+      12,
+      8,
+      9,
+      6,
+      16,
+      9,
+      7,
+      8,
+      10,
+      4,
+      9,
+      12,
+      9,
+      13,
+      9,
+      8,
+      11,
+      11
+    ],
+    [
+      13,
+      13,
+      13,
+      3,
+      0,
+      3,
+      10,
+      10,
+      7,
+      8,
+      9,
+      12,
+      8,
+      9,
+      6,
+      16,
+      9,
+      7,
+      8,
+      10,
+      4,
+      9,
+      12,
+      9,
+      13,
+      9,
+      8,
+      11,
+      11
+    ],
+    [
+      13,
+      13,
+      13,
+      3,
+      3,
+      0,
+      10,
+      10,
+      7,
+      8,
+      9,
+      12,
+      8,
+      9,
+      6,
+      16,
+      9,
+      7,
+      8,
+      10,
+      4,
+      9,
+      12,
+      9,
+      13,
+      9,
+      8,
+      11,
+      11
+    ],
+    [
+      7,
+      7,
+      7,
+      10,
+      10,
+      10,
+      0,
+      3,
+      7,
+      6,
+      5,
+      13,
+      14,
+      12,
+      10,
+      16,
+      12,
+      11,
+      15,
+      5,
+      10,
+      10,
+      6,
+      5,
+      12,
+      5,
+      6,
+      4,
+      7
+    ],
+    [
+      7,
+      7,
+      7,
+      10,
+      10,
+      10,
+      3,
+      0,
+      7,
+      6,
+      5,
+      13,
+      14,
+      12,
+      10,
+      16,
+      12,
+      11,
+      15,
+      5,
+      10,
+      10,
+      6,
+      5,
+      12,
+      5,
+      6,
+      4,
+      7
+    ],
+    [
+      9,
+      9,
+      9,
+      7,
+      7,
+      7,
+      7,
+      7,
+      0,
+      4,
+      5,
+      12,
+      11,
+      10,
+      7,
+      16,
+      9,
+      8,
+      11,
+      7,
+      7,
+      8,
+      8,
+      6,
+      11,
+      5,
+      5,
+      7,
+      8
+    ],
+    [
+      10,
+      10,
+      10,
+      8,
+      8,
+      8,
+      6,
+      6,
+      4,
+      0,
+      6,
+      11,
+      12,
+      11,
+      7,
+      15,
+      9,
+      9,
+      11,
+      7,
+      8,
+      8,
+      7,
+      6,
+      10,
+      5,
+      4,
+      7,
+      7
+    ],
+    [
+      7,
+      7,
+      7,
+      9,
+      9,
+      9,
+      5,
+      5,
+      5,
+      6,
+      0,
+      13,
+      12,
+      10,
+      9,
+      17,
+      12,
+      8,
+      13,
+      5,
+      8,
+      10,
+      8,
+      3,
+      13,
+      4,
+      6,
+      6,
+      9
+    ],
+    [
+      17,
+      17,
+      17,
+      12,
+      12,
+      12,
+      13,
+      13,
+      12,
+      11,
+      13,
+      0,
+      17,
+      18,
+      10,
+      7,
+      6,
+      16,
+      13,
+      14,
+      14,
+      6,
+      11,
+      13,
+      5,
+      13,
+      10,
+      13,
+      9
+    ],
+    [
+      15,
+      15,
+      15,
+      8,
+      8,
+      8,
+      14,
+      14,
+      11,
+      12,
+      12,
+      17,
+      0,
+      7,
+      11,
+      21,
+      14,
+      7,
+      9,
+      13,
+      7,
+      14,
+      16,
+      12,
+      18,
+      13,
+      13,
+      15,
+      16
+    ],
+    [
+      11,
+      11,
+      11,
+      9,
+      9,
+      9,
+      12,
+      12,
+      10,
+      11,
+      10,
+      18,
+      7,
+      0,
+      11,
+      22,
+      15,
+      5,
+      12,
+      10,
+      8,
+      15,
+      14,
+      10,
+      18,
+      11,
+      12,
+      13,
+      15
+    ],
+    [
+      13,
+      13,
+      13,
+      6,
+      6,
+      6,
+      10,
+      10,
+      7,
+      7,
+      9,
+      10,
+      11,
+      11,
+      0,
+      14,
+      7,
+      9,
+      8,
+      10,
+      7,
+      7,
+      11,
+      9,
+      11,
+      9,
+      6,
+      10,
+      9
+    ],
+    [
+      21,
+      21,
+      21,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      15,
+      17,
+      7,
+      21,
+      22,
+      14,
+      0,
+      10,
+      20,
+      16,
+      18,
+      18,
+      10,
+      15,
+      17,
+      8,
+      17,
+      14,
+      16,
+      12
+    ],
+    [
+      16,
+      16,
+      16,
+      9,
+      9,
+      9,
+      12,
+      12,
+      9,
+      9,
+      12,
+      6,
+      14,
+      15,
+      7,
+      10,
+      0,
+      13,
+      10,
+      13,
+      11,
+      4,
+      11,
+      12,
+      8,
+      11,
+      8,
+      12,
+      9
+    ],
+    [
+      11,
+      11,
+      11,
+      7,
+      7,
+      7,
+      11,
+      11,
+      8,
+      9,
+      8,
+      16,
+      7,
+      5,
+      9,
+      20,
+      13,
+      0,
+      10,
+      10,
+      5,
+      12,
+      13,
+      9,
+      16,
+      9,
+      10,
+      11,
+      13
+    ],
+    [
+      17,
+      17,
+      17,
+      8,
+      8,
+      8,
+      15,
+      15,
+      11,
+      11,
+      13,
+      13,
+      9,
+      12,
+      8,
+      16,
+      10,
+      10,
+      0,
+      15,
+      9,
+      10,
+      16,
+      13,
+      14,
+      13,
+      11,
+      15,
+      14
+    ],
+    [
+      6,
+      6,
+      6,
+      10,
+      10,
+      10,
+      5,
+      5,
+      7,
+      7,
+      5,
+      14,
+      13,
+      10,
+      10,
+      18,
+      13,
+      10,
+      15,
+      0,
+      10,
+      11,
+      7,
+      4,
+      13,
+      5,
+      7,
+      6,
+      9
+    ],
+    [
+      12,
+      12,
+      12,
+      4,
+      4,
+      4,
+      10,
+      10,
+      7,
+      8,
+      8,
+      14,
+      7,
+      8,
+      7,
+      18,
+      11,
+      5,
+      9,
+      10,
+      0,
+      10,
+      12,
+      9,
+      14,
+      9,
+      8,
+      11,
+      12
+    ],
+    [
+      14,
+      14,
+      14,
+      9,
+      9,
+      9,
+      10,
+      10,
+      8,
+      8,
+      10,
+      6,
+      14,
+      15,
+      7,
+      10,
+      4,
+      12,
+      10,
+      11,
+      10,
+      0,
+      10,
+      11,
+      7,
+      10,
+      7,
+      10,
+      7
+    ],
+    [
+      10,
+      9,
+      9,
+      12,
+      12,
+      12,
+      6,
+      6,
+      8,
+      7,
+      8,
+      11,
+      16,
+      14,
+      11,
+      15,
+      11,
+      13,
+      16,
+      7,
+      12,
+      10,
+      0,
+      8,
+      10,
+      7,
+      7,
+      5,
+      6
+    ],
+    [
+      7,
+      7,
+      7,
+      9,
+      9,
+      9,
+      5,
+      5,
+      6,
+      6,
+      3,
+      13,
+      12,
+      10,
+      9,
+      17,
+      12,
+      9,
+      13,
+      4,
+      9,
+      11,
+      8,
+      0,
+      13,
+      4,
+      7,
+      6,
+      9
+    ],
+    [
+      16,
+      16,
+      16,
+      13,
+      13,
+      13,
+      12,
+      12,
+      11,
+      10,
+      13,
+      5,
+      18,
+      18,
+      11,
+      8,
+      8,
+      16,
+      14,
+      13,
+      14,
+      7,
+      10,
+      13,
+      0,
+      12,
+      10,
+      11,
+      7
+    ],
+    [
+      8,
+      7,
+      7,
+      9,
+      9,
+      9,
+      5,
+      5,
+      5,
+      5,
+      4,
+      13,
+      13,
+      11,
+      9,
+      17,
+      11,
+      9,
+      13,
+      5,
+      9,
+      10,
+      7,
+      4,
+      12,
+      0,
+      6,
+      5,
+      8
+    ],
+    [
+      10,
+      10,
+      10,
+      8,
+      8,
+      8,
+      6,
+      6,
+      5,
+      4,
+      6,
+      10,
+      13,
+      12,
+      6,
+      14,
+      8,
+      10,
+      11,
+      7,
+      8,
+      7,
+      7,
+      7,
+      10,
+      6,
+      0,
+      7,
+      6
+    ],
+    [
+      8,
+      8,
+      8,
+      11,
+      11,
+      11,
+      4,
+      4,
+      7,
+      7,
+      6,
+      13,
+      15,
+      13,
+      10,
+      16,
+      12,
+      11,
+      15,
+      6,
+      11,
+      10,
+      5,
+      6,
+      11,
+      5,
+      7,
+      0,
+      7
+    ],
+    [
+      12,
+      12,
+      12,
+      11,
+      11,
+      11,
+      7,
+      7,
+      8,
+      7,
+      9,
+      9,
+      16,
+      15,
+      9,
+      12,
+      9,
+      13,
+      14,
+      9,
+      12,
+      7,
+      6,
+      9,
+      7,
+      8,
+      6,
+      7,
+      0
+    ]
+  ],
+  "serviceDurationMin": 15,
+  "hardConstraints": [
+    {
+      "type": "DRIVER_WORK_WINDOW",
+      "driverId": 737,
+      "startMin": 600,
+      "endMin": 1200
+    },
+    {
+      "type": "DRIVER_WORK_WINDOW",
+      "driverId": 1078,
+      "startMin": 600,
+      "endMin": 1200
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 223810,
+      "earliestStartMin": 660,
+      "latestStartMin": 1185,
+      "latestEndMin": 1200,
+      "sourceRules": [
+        "LP_CONFIGURED_START"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 223810
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 223960,
+      "earliestStartMin": 660,
+      "latestStartMin": 1185,
+      "latestEndMin": 1200,
+      "sourceRules": [
+        "LP_CONFIGURED_START"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 223960
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 225570,
+      "earliestStartMin": 660,
+      "latestStartMin": 1185,
+      "latestEndMin": 1200,
+      "sourceRules": [
+        "LP_CONFIGURED_START"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 225570
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 225782,
+      "earliestStartMin": 660,
+      "latestStartMin": 1185,
+      "latestEndMin": 1200,
+      "sourceRules": [
+        "LP_CONFIGURED_START"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 225782
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 225996,
+      "earliestStartMin": 660,
+      "latestStartMin": 1185,
+      "latestEndMin": 1200,
+      "sourceRules": [
+        "LP_CONFIGURED_START"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 225996
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 227684,
+      "earliestStartMin": 660,
+      "latestStartMin": 798,
+      "latestEndMin": 813,
+      "sourceRules": [
+        "LP_CONFIGURED_START",
+        "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 227684
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231165,
+      "earliestStartMin": 660,
+      "latestStartMin": 863,
+      "latestEndMin": 878,
+      "sourceRules": [
+        "LP_CONFIGURED_START",
+        "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231165
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231292,
+      "earliestStartMin": 675,
+      "latestStartMin": 715,
+      "latestEndMin": 730,
+      "sourceRules": [
+        "CUSTOMER_CHECKOUT_MIGRATED",
+        "CHECKIN_DEADLINE",
+        "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231292
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231747,
+      "earliestStartMin": 660,
+      "latestStartMin": 900,
+      "latestEndMin": 915,
+      "sourceRules": [
+        "HP_CONFIGURED_START",
+        "CHECKIN_DEADLINE",
+        "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231747
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231748,
+      "earliestStartMin": 0,
+      "latestStartMin": 1185,
+      "latestEndMin": 1200,
+      "sourceRules": [
+        "EO_NO_HARD_LOWER_BOUND"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231748
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231750,
+      "earliestStartMin": 0,
+      "latestStartMin": 885,
+      "latestEndMin": 900,
+      "sourceRules": [
+        "EO_NO_HARD_LOWER_BOUND",
+        "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231750
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231752,
+      "earliestStartMin": 0,
+      "latestStartMin": 1185,
+      "latestEndMin": 1200,
+      "sourceRules": [
+        "EO_NO_HARD_LOWER_BOUND"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231752
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231753,
+      "earliestStartMin": 0,
+      "latestStartMin": 720,
+      "latestEndMin": 735,
+      "sourceRules": [
+        "EO_NO_HARD_LOWER_BOUND",
+        "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231753
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231754,
+      "earliestStartMin": 660,
+      "latestStartMin": 885,
+      "latestEndMin": 900,
+      "sourceRules": [
+        "HP_CONFIGURED_START",
+        "CHECKIN_DEADLINE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231754
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231755,
+      "earliestStartMin": 0,
+      "latestStartMin": 1185,
+      "latestEndMin": 1200,
+      "sourceRules": [
+        "EO_NO_HARD_LOWER_BOUND"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231755
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231756,
+      "earliestStartMin": 660,
+      "latestStartMin": 723,
+      "latestEndMin": 738,
+      "sourceRules": [
+        "LP_CONFIGURED_START",
+        "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231756
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231757,
+      "earliestStartMin": 0,
+      "latestStartMin": 830,
+      "latestEndMin": 845,
+      "sourceRules": [
+        "EO_NO_HARD_LOWER_BOUND",
+        "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231757
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231758,
+      "earliestStartMin": 660,
+      "latestStartMin": 852,
+      "latestEndMin": 867,
+      "sourceRules": [
+        "LP_CONFIGURED_START",
+        "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231758
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231759,
+      "earliestStartMin": 660,
+      "latestStartMin": 793,
+      "latestEndMin": 808,
+      "sourceRules": [
+        "LP_CONFIGURED_START",
+        "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231759
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231760,
+      "earliestStartMin": 660,
+      "latestStartMin": 1185,
+      "latestEndMin": 1200,
+      "sourceRules": [
+        "LP_CONFIGURED_START"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231760
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231775,
+      "earliestStartMin": 660,
+      "latestStartMin": 730,
+      "latestEndMin": 745,
+      "sourceRules": [
+        "CUSTOMER_CHECKOUT_MIGRATED",
+        "CHECKIN_DEADLINE",
+        "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231775
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231776,
+      "earliestStartMin": 660,
+      "latestStartMin": 722,
+      "latestEndMin": 737,
+      "sourceRules": [
+        "CUSTOMER_CHECKOUT_MIGRATED",
+        "CHECKIN_DEADLINE",
+        "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231776
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231777,
+      "earliestStartMin": 660,
+      "latestStartMin": 825,
+      "latestEndMin": 840,
+      "sourceRules": [
+        "CUSTOMER_CHECKOUT_MIGRATED",
+        "CHECKIN_DEADLINE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231777
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231778,
+      "earliestStartMin": 660,
+      "latestStartMin": 825,
+      "latestEndMin": 840,
+      "sourceRules": [
+        "CUSTOMER_CHECKOUT_MIGRATED",
+        "CHECKIN_DEADLINE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231778
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231800,
+      "earliestStartMin": 660,
+      "latestStartMin": 789,
+      "latestEndMin": 804,
+      "sourceRules": [
+        "LP_CONFIGURED_START",
+        "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231800
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231831,
+      "earliestStartMin": 600,
+      "latestStartMin": 1185,
+      "latestEndMin": 1200,
+      "sourceRules": [
+        "CUSTOMER_CHECKOUT_MIGRATED"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231831
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231850,
+      "earliestStartMin": 660,
+      "latestStartMin": 885,
+      "latestEndMin": 900,
+      "sourceRules": [
+        "CUSTOMER_CHECKOUT_MIGRATED",
+        "CHECKIN_DEADLINE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231850
+    },
+    {
+      "type": "TASK_TIME_WINDOW",
+      "taskId": 231903,
+      "earliestStartMin": 660,
+      "latestStartMin": 780,
+      "latestEndMin": 795,
+      "sourceRules": [
+        "CUSTOMER_CHECKOUT_MIGRATED",
+        "CHECKIN_DEADLINE",
+        "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+      ]
+    },
+    {
+      "type": "TASK_REQUIRED",
+      "taskId": 231903
+    }
+  ],
+  "softConstraints": [
+    {
+      "type": "MINIMIZE_TOTAL_TRAVEL",
+      "weight": 1
+    },
+    {
+      "type": "BALANCE_DRIVER_LOAD",
+      "weight": 1
+    },
+    {
+      "type": "PREFERRED_PRIORITY_WINDOW",
+      "taskId": 231748,
+      "startMin": 0,
+      "endMin": 659,
+      "penaltyPerMinOutside": 1
+    },
+    {
+      "type": "PREFERRED_PRIORITY_WINDOW",
+      "taskId": 231750,
+      "startMin": 0,
+      "endMin": 659,
+      "penaltyPerMinOutside": 1
+    },
+    {
+      "type": "PREFERRED_PRIORITY_WINDOW",
+      "taskId": 231752,
+      "startMin": 0,
+      "endMin": 659,
+      "penaltyPerMinOutside": 1
+    },
+    {
+      "type": "PREFERRED_PRIORITY_WINDOW",
+      "taskId": 231753,
+      "startMin": 0,
+      "endMin": 659,
+      "penaltyPerMinOutside": 1
+    },
+    {
+      "type": "PREFERRED_PRIORITY_WINDOW",
+      "taskId": 231755,
+      "startMin": 0,
+      "endMin": 659,
+      "penaltyPerMinOutside": 1
+    },
+    {
+      "type": "PREFERRED_PRIORITY_WINDOW",
+      "taskId": 231757,
+      "startMin": 0,
+      "endMin": 659,
+      "penaltyPerMinOutside": 1
+    },
+    {
+      "type": "PREFERRED_PRIORITY_WINDOW",
+      "taskId": 231831,
+      "startMin": 0,
+      "endMin": 659,
+      "penaltyPerMinOutside": 1
+    },
+    {
+      "type": "KEEP_SAME_COORDINATES_BUILDING_TOGETHER",
+      "groupId": "same-coordinates:223810,223960",
+      "weight": 100,
+      "toleranceMeters": 100
+    },
+    {
+      "type": "KEEP_SAME_COORDINATES_BUILDING_TOGETHER",
+      "groupId": "same-coordinates:225570,225782,225996",
+      "weight": 100,
+      "toleranceMeters": 100
+    },
+    {
+      "type": "KEEP_SAME_COORDINATES_BUILDING_TOGETHER",
+      "groupId": "same-coordinates:227684,231165",
+      "weight": 100,
+      "toleranceMeters": 100
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:24",
+      "weight": 30,
+      "cleanerId": 24
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:132",
+      "weight": 30,
+      "cleanerId": 132
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:249",
+      "weight": 30,
+      "cleanerId": 249
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:326",
+      "weight": 30,
+      "cleanerId": 326
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:445",
+      "weight": 30,
+      "cleanerId": 445
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:469",
+      "weight": 30,
+      "cleanerId": 469
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:596",
+      "weight": 30,
+      "cleanerId": 596
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:987",
+      "weight": 30,
+      "cleanerId": 987
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:1034",
+      "weight": 30,
+      "cleanerId": 1034
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:1064",
+      "weight": 30,
+      "cleanerId": 1064
+    },
+    {
+      "type": "KEEP_CLEANER_SEQUENCE",
+      "groupId": "cleaner-sequence:249",
+      "weight": 40,
+      "cleanerId": 249,
+      "orderedTaskIds": [
+        231903,
+        231750
+      ]
+    },
+    {
+      "type": "KEEP_CLEANER_SEQUENCE",
+      "groupId": "cleaner-sequence:987",
+      "weight": 40,
+      "cleanerId": 987,
+      "orderedTaskIds": [
+        227684,
+        231165
+      ]
+    },
+    {
+      "type": "KEEP_CLEANER_SEQUENCE",
+      "groupId": "cleaner-sequence:1064",
+      "weight": 40,
+      "cleanerId": 1064,
+      "orderedTaskIds": [
+        231292,
+        231759
+      ]
+    },
+    {
+      "type": "KEEP_PRIORITY_COMPATIBLE_TASKS_TOGETHER",
+      "groupId": "priority-compatible:223810,223960,225570,225782,225996,227684,231165,231747,231748,231750,231752,231753,231754,231755,231756,231757,231758,231759,231760,231775,231776,231777,231778,231800,231831,231850,231903",
+      "weight": 20,
+      "windowOverlap": {
+        "startMin": 660,
+        "endMin": 720
+      }
+    },
+    {
+      "type": "KEEP_NEARBY_CLUSTER_TOGETHER",
+      "groupId": "nearby-cluster:223810",
+      "weight": 15,
+      "maxTravelMin": 10
+    },
+    {
+      "type": "KEEP_NEARBY_CLUSTER_TOGETHER",
+      "groupId": "nearby-cluster:225570",
+      "weight": 15,
+      "maxTravelMin": 10
+    },
+    {
+      "type": "KEEP_NEARBY_CLUSTER_TOGETHER",
+      "groupId": "nearby-cluster:231750",
+      "weight": 15,
+      "maxTravelMin": 10
+    }
+  ],
+  "businessGroups": [
+    {
+      "groupId": "same-coordinates:223810,223960",
+      "type": "SAME_COORDINATES_BUILDING",
+      "taskIds": [
+        223810,
+        223960
+      ],
+      "confidence": "high",
+      "toleranceMeters": 100,
+      "centroid": {
+        "lat": 45.4342758,
+        "lng": 9.1803654
+      },
+      "source": "coordinates"
+    },
+    {
+      "groupId": "same-coordinates:225570,225782,225996",
+      "type": "SAME_COORDINATES_BUILDING",
+      "taskIds": [
+        225570,
+        225782,
+        225996
+      ],
+      "confidence": "high",
+      "toleranceMeters": 100,
+      "centroid": {
+        "lat": 45.4709651,
+        "lng": 9.1566484
+      },
+      "source": "coordinates"
+    },
+    {
+      "groupId": "same-coordinates:227684,231165",
+      "type": "SAME_COORDINATES_BUILDING",
+      "taskIds": [
+        227684,
+        231165
+      ],
+      "confidence": "high",
+      "toleranceMeters": 100,
+      "centroid": {
+        "lat": 45.4510442,
+        "lng": 9.1910645
+      },
+      "source": "coordinates"
+    },
+    {
+      "groupId": "same-cleaner:24",
+      "type": "SAME_CLEANER",
+      "taskIds": [
+        231752,
+        231753
+      ],
+      "confidence": "medium",
+      "cleanerId": 24,
+      "source": "cleaner_id"
+    },
+    {
+      "groupId": "same-cleaner:132",
+      "type": "SAME_CLEANER",
+      "taskIds": [
+        231755,
+        231775
+      ],
+      "confidence": "medium",
+      "cleanerId": 132,
+      "source": "cleaner_id"
+    },
+    {
+      "groupId": "same-cleaner:249",
+      "type": "SAME_CLEANER",
+      "taskIds": [
+        231750,
+        231778,
+        231903
+      ],
+      "confidence": "medium",
+      "cleanerId": 249,
+      "source": "cleaner_id"
+    },
+    {
+      "groupId": "same-cleaner:326",
+      "type": "SAME_CLEANER",
+      "taskIds": [
+        231757,
+        231760
+      ],
+      "confidence": "medium",
+      "cleanerId": 326,
+      "source": "cleaner_id"
+    },
+    {
+      "groupId": "same-cleaner:445",
+      "type": "SAME_CLEANER",
+      "taskIds": [
+        231777,
+        231800
+      ],
+      "confidence": "medium",
+      "cleanerId": 445,
+      "source": "cleaner_id"
+    },
+    {
+      "groupId": "same-cleaner:469",
+      "type": "SAME_CLEANER",
+      "taskIds": [
+        231756,
+        231831
+      ],
+      "confidence": "medium",
+      "cleanerId": 469,
+      "source": "cleaner_id"
+    },
+    {
+      "groupId": "same-cleaner:596",
+      "type": "SAME_CLEANER",
+      "taskIds": [
+        231748,
+        231776
+      ],
+      "confidence": "medium",
+      "cleanerId": 596,
+      "source": "cleaner_id"
+    },
+    {
+      "groupId": "same-cleaner:987",
+      "type": "SAME_CLEANER",
+      "taskIds": [
+        227684,
+        231165,
+        231850
+      ],
+      "confidence": "medium",
+      "cleanerId": 987,
+      "source": "cleaner_id"
+    },
+    {
+      "groupId": "same-cleaner:1034",
+      "type": "SAME_CLEANER",
+      "taskIds": [
+        231754,
+        231758
+      ],
+      "confidence": "medium",
+      "cleanerId": 1034,
+      "source": "cleaner_id"
+    },
+    {
+      "groupId": "same-cleaner:1064",
+      "type": "SAME_CLEANER",
+      "taskIds": [
+        231292,
+        231759
+      ],
+      "confidence": "medium",
+      "cleanerId": 1064,
+      "source": "cleaner_id"
+    },
+    {
+      "groupId": "cleaner-sequence:249",
+      "type": "CLEANER_SEQUENCE",
+      "taskIds": [
+        231903,
+        231750
+      ],
+      "orderedTaskIds": [
+        231903,
+        231750
+      ],
+      "confidence": "high",
+      "cleanerId": 249,
+      "source": "cleaner_task_start_time"
+    },
+    {
+      "groupId": "cleaner-sequence:987",
+      "type": "CLEANER_SEQUENCE",
+      "taskIds": [
+        227684,
+        231165
+      ],
+      "orderedTaskIds": [
+        227684,
+        231165
+      ],
+      "confidence": "high",
+      "cleanerId": 987,
+      "source": "cleaner_task_start_time"
+    },
+    {
+      "groupId": "cleaner-sequence:1064",
+      "type": "CLEANER_SEQUENCE",
+      "taskIds": [
+        231292,
+        231759
+      ],
+      "orderedTaskIds": [
+        231292,
+        231759
+      ],
+      "confidence": "high",
+      "cleanerId": 1064,
+      "source": "cleaner_task_start_time"
+    },
+    {
+      "groupId": "priority-compatible:223810,223960,225570,225782,225996,227684,231165,231747,231748,231750,231752,231753,231754,231755,231756,231757,231758,231759,231760,231775,231776,231777,231778,231800,231831,231850,231903",
+      "type": "PRIORITY_COMPATIBLE",
+      "taskIds": [
+        223810,
+        223960,
+        225570,
+        225782,
+        225996,
+        227684,
+        231165,
+        231747,
+        231748,
+        231750,
+        231752,
+        231753,
+        231754,
+        231755,
+        231756,
+        231757,
+        231758,
+        231759,
+        231760,
+        231775,
+        231776,
+        231777,
+        231778,
+        231800,
+        231831,
+        231850,
+        231903
+      ],
+      "confidence": "medium",
+      "windowOverlap": {
+        "startMin": 660,
+        "endMin": 720
+      },
+      "source": "priority_window"
+    },
+    {
+      "groupId": "nearby-cluster:223810",
+      "type": "NEARBY_CLUSTER",
+      "taskIds": [
+        223810,
+        223960,
+        227684,
+        231165,
+        231292,
+        231747,
+        231748,
+        231759,
+        231776,
+        231777,
+        231800,
+        231831,
+        231850
+      ],
+      "confidence": "medium",
+      "maxTravelMin": 10,
+      "hubTaskId": 223810,
+      "source": "travel_matrix"
+    },
+    {
+      "groupId": "nearby-cluster:225570",
+      "type": "NEARBY_CLUSTER",
+      "taskIds": [
+        225570,
+        225782,
+        225996,
+        231752,
+        231753,
+        231754,
+        231756,
+        231757,
+        231758,
+        231760,
+        231775
+      ],
+      "confidence": "medium",
+      "maxTravelMin": 10,
+      "hubTaskId": 225570,
+      "source": "travel_matrix"
+    },
+    {
+      "groupId": "nearby-cluster:231750",
+      "type": "NEARBY_CLUSTER",
+      "taskIds": [
+        231750,
+        231755,
+        231778,
+        231903
+      ],
+      "confidence": "medium",
+      "maxTravelMin": 10,
+      "hubTaskId": 231750,
+      "source": "travel_matrix"
+    }
+  ],
+  "metadata": {
+    "generatedAt": "2026-06-16T20:30:10.433Z",
+    "totalLogisticsTasks": 28,
+    "lockedTasksExcluded": 0,
+    "tasksExcludedNoCoordinatesCount": 0,
+    "tasksExcludedNoCoordinatesIds": [],
+    "noSelectedDrivers": false,
+    "timelineAssignmentHints": [],
+    "timelineAssignmentHintsCount": 0,
+    "preAssignedRequiredCount": 0,
+    "skippedTimelineAssignmentHintsCount": 0,
+    "autoConvokedDriverIds": [],
+    "autoConvokedDriversCount": 0,
+    "autoConvokeMissingInDbDriverIds": [],
+    "autoConvokeMissingInDbDriversCount": 0,
+    "lockedAssignmentsSolverIntegration": "integrated_v4b",
+    "excludedTasks": [],
+    "validation": {
+      "valid": true,
+      "errors": [],
+      "warnings": []
+    }
+  }
+}

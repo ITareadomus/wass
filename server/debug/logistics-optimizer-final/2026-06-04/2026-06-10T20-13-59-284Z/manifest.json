@@ -1,0 +1,84 @@
+{
+  "workDate": "2026-06-04",
+  "runId": "2026-06-10T20-13-59-284Z",
+  "startedAt": "2026-06-10T20:13:59.284Z",
+  "milestone": "routing-input-only",
+  "validation": {
+    "valid": true,
+    "errorCount": 0,
+    "warningCount": 1
+  },
+  "counts": {
+    "drivers": 0,
+    "tasks": 26,
+    "hardConstraints": 52,
+    "softConstraints": 20,
+    "businessGroups": 8,
+    "businessSoftConstraints": 8,
+    "existingLockedAssignments": 0,
+    "excludedTasks": 0
+  },
+  "businessGroupsByType": {
+    "SAME_COORDINATES_BUILDING": 4,
+    "SAME_CLEANER": 0,
+    "CLEANER_SEQUENCE": 0,
+    "PRIORITY_COMPATIBLE": 1,
+    "NEARBY_CLUSTER": 3
+  },
+  "businessSoftConstraints": [
+    {
+      "type": "KEEP_SAME_COORDINATES_BUILDING_TOGETHER",
+      "groupId": "same-coordinates:223796,223946",
+      "weight": 100,
+      "toleranceMeters": 100
+    },
+    {
+      "type": "KEEP_SAME_COORDINATES_BUILDING_TOGETHER",
+      "groupId": "same-coordinates:225556,225768,225982",
+      "weight": 100,
+      "toleranceMeters": 100
+    },
+    {
+      "type": "KEEP_SAME_COORDINATES_BUILDING_TOGETHER",
+      "groupId": "same-coordinates:230969,231108",
+      "weight": 100,
+      "toleranceMeters": 100
+    },
+    {
+      "type": "KEEP_SAME_COORDINATES_BUILDING_TOGETHER",
+      "groupId": "same-coordinates:231005,231006",
+      "weight": 100,
+      "toleranceMeters": 100
+    },
+    {
+      "type": "KEEP_PRIORITY_COMPATIBLE_TASKS_TOGETHER",
+      "groupId": "priority-compatible:223796,223946,225556,225768,225982,230284,230767,230819,230965,230966,230967,230968,230969,230970,230971,230972,230973,230980,230981,231005,231006,231012,231061,231062,231074,231108",
+      "weight": 20,
+      "windowOverlap": {
+        "startMin": 780,
+        "endMin": 825
+      }
+    },
+    {
+      "type": "KEEP_NEARBY_CLUSTER_TOGETHER",
+      "groupId": "nearby-cluster:223796",
+      "weight": 15,
+      "maxTravelMin": 10
+    },
+    {
+      "type": "KEEP_NEARBY_CLUSTER_TOGETHER",
+      "groupId": "nearby-cluster:225556",
+      "weight": 15,
+      "maxTravelMin": 10
+    },
+    {
+      "type": "KEEP_NEARBY_CLUSTER_TOGETHER",
+      "groupId": "nearby-cluster:230767",
+      "weight": 15,
+      "maxTravelMin": 10
+    }
+  ],
+  "files": [
+    "01-routing-input.json"
+  ]
+}
