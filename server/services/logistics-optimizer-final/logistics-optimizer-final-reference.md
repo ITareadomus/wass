@@ -1,52 +1,117 @@
-﻿# Logistics Optimizer — studio legacy e base `logistics-optimizer-final`
+﻿# Logistics Optimizer Final — reference
 
-Data analisi: 2026-06-04  
-Modulo legacy in produzione: `server/services/logistics-optimizer`  
-Modulo nuovo pre-OR-Tools: `server/services/logistics-optimizer-final`
+> **Nome file:** `logistics-optimizer-final-reference.md`  
+> **Modulo:** `server/services/logistics-optimizer-final`  
+> **Ultimo aggiornamento:** 2026-06-17  
+> **Stato:** in produzione (`POST /api/logistics-optimizer-final/run`)
+
+Documento di riferimento per l'optimizer logistics attuale: architettura, contratti dati, regole di dominio e confronto con il modulo legacy.
+
+Le sezioni **2–20** descrivono il comportamento del vecchio `logistics-optimizer` (archivio utile per capire le migrazioni). Le sezioni **1, 21–25** descrivono l'implementazione corrente.
 
 ## 1. Obiettivo di questo file
 
-Documentare il comportamento del vecchio optimizer e il contratto del nuovo pre-solver, separando tre responsabilità:
+Documentare il modulo `logistics-optimizer-final` e il suo rapporto col legacy, separando tre responsabilità — tutte oggi nel modulo final:
 
-1. **Data preparation / pre-optimizer** (`logistics-optimizer-final`)
-2. **Decision engine** (legacy: `phase2.ts`; target: OR-Tools)
-3. **Apply / persistenza** (legacy `index.ts`, da riusare invariato nella milestone solver)
+1. **Data preparation / pre-solver** — loader, finestre, vincoli, `RoutingProblemInput`
+2. **Decision engine** — `greedy-v1` (debug) \| `ortools-v1` (produzione)
+3. **Apply / persistenza** — `apply-routing-solution.ts` (timeline + containers)
 
-Il nuovo modulo **non** chiama `runLogisticsPhase0`, `runLogisticsPhase1` né `runLogisticsPhase2`. Usa loader puri e produce solo `RoutingProblemInput`.
+Il modulo **non** chiama `runLogisticsPhase0`, `runLogisticsPhase1` né `runLogisticsPhase2`. Usa loader puri, risolve il VRP e applica `RoutingSolution`.
 
 ---
 
-## 1.1 Stato implementato in `logistics-optimizer-final`
+## 1.1 Moduli implementati
+
+### Pre-solver e contratti
 
 | Modulo | Ruolo |
 |---|---|
-| `loaders.ts` | `loadUnlockedLogisticsTasks`, `loadSelectedDrivers`, `loadWindowConfig`, `loadTimelineAssignmentHints` |
-| `timeline-assignment-hints.ts` | `loadTimelineAssignmentHints`, `buildRequiredDriverConstraints` |
-| `input-contract.ts` | `RawLogisticsTaskInput`, `RoutingProblemInput`, tipi vincoli |
-| `bag-handling.ts` | `BagHandling` (`NO_CLEANER_CONTEXT`, `DRIVER_BRINGS_BAG`, `CLEANER_HAS_BAG`) |
-| `windows.ts` | Finestre hard/soft task |
-| `build-routing-input.ts` | `buildLogisticsRoutingInput(workDate)` |
+| `loaders.ts` | `loadUnlockedLogisticsTasks`, `loadSelectedDrivers`, `loadWindowConfig`, `loadLogisticsRoutingSourceData` |
+| `timeline-assignment-hints.ts` | `parsePreAssignedTimelineEntries`, `loadTimelineAssignmentHints`, `buildRequiredDriverConstraints` |
+| `auto-convoke-logistics-drivers.ts` | `autoConvokeLogisticsDriversWithPreAssignedTasks` (M5c) |
+| `input-contract.ts` | `RawLogisticsTaskInput`, `RoutingProblemInput`, `HardConstraintSpec`, `SoftConstraintSpec` |
+| `bag-handling.ts` | `BagHandling`, `computeBagHandling`, `requiresDriverBeforeCleaner` |
+| `business-rules.ts` | Regole tracciate EO/HP/LP, checkout, cleaner 2/3 |
+| `windows.ts` | `buildTaskWindow` — finestre hard/soft per task |
+| `normalizers.ts` | Normalizzazione driver e priority |
+| `travel-matrix.ts` | Depot, nodi, `buildTravelMatrixMin` |
+| `build-routing-input.ts` | `buildLogisticsRoutingInput`, `buildRoutingProblemInputFromSource` |
+| `validation.ts` | `validateRoutingProblemInput` (modalità `debug` \| `solver` \| `apply`) |
+| `groups/*` | Business groups M5b (same-building, nearby, cleaner, sequence, priority) |
+
+### Solver
+
+| Modulo | Ruolo |
+|---|---|
 | `solver/solve-routing.ts` | Dispatcher `greedy-v1` \| `ortools-v1` |
-| `solver/ortools/ortools-adapter.ts` | `buildOrToolsPayload`, `decodeOrToolsSolution`, cost shaping GEO |
+| `solver/greedy-routing-solver.ts` | Solver greedy per debug/regressione |
+| `solver/ortools/ortools-adapter.ts` | `buildOrToolsPayload`, `decodeOrToolsSolution`, cost shaping GEO/M5b |
+| `solver/ortools/ortools-routing-solver.ts` | Invocazione subprocess Python |
 | `solver/ortools/logistics_routing_ortools.py` | VRP OR-Tools (time windows, required, disjunctions) |
-| `run-routing-dry.ts` | Dry-run con `solver` opt-in (`ortools-v1`) |
+| `solver/ortools/required-infeasible.ts` | Diagnostica `INVALID` su required infeasible |
 
-Flusso attuale del modulo final:
+### Solution, apply, orchestrazione
 
-```ts
-source = loadLogisticsRoutingSourceData(workDate)
-input = buildRoutingProblemInputFromSource(source)
+| Modulo | Ruolo |
+|---|---|
+| `solution-contract.ts` | `RoutingSolution`, status, solver IDs |
+| `solution-validation.ts` | `validateRoutingSolution` post-solver |
+| `solution-apply-gate.ts` | Gate apply (`INVALID` / `INFEASIBLE` / `PARTIAL`) |
+| `apply-routing-solution.ts` | Apply timeline + containers (M6) |
+| `unassigned-diagnostics.ts` | Diagnostica task droppati |
+| `run-routing-dry.ts` | Dry-run senza apply |
+| `run-routing.ts` | Pipeline completa con apply opzionale |
+| `run-routing-input-debug.ts` | Solo `RoutingProblemInput` + debug JSON |
+| `debug-writer.ts` | Artefatti in `server/debug/logistics-optimizer-final/` |
+| `index.ts` | Re-export pubblico del modulo |
+
+### Pipeline produzione
+
+```txt
+autoConvokeLogisticsDriversWithPreAssignedTasks   # side effect su lg_selected_drivers
+  → loadLogisticsRoutingSourceData(workDate)
+  → buildRoutingProblemInputFromSource(source)
+  → validateRoutingProblemInput (mode: solver)
+  → solveRouting(input, { solverId })             # default: ortools-v1
+  → validateRoutingSolution
+  → evaluateSolutionApplyGate
+  → applyLogisticsRoutingSolution (se apply=true)
 ```
 
-**Non fa:** assegnazione driver, bande geografiche, grouping greedy, apply timeline.
+**Non fa (rispetto al legacy):** bande latitudinali, competitive grouping greedy, repair insertion, scoring progressivo in Phase 2.
 
-**Tipi autonomi:** `RawLogisticsTaskInput` è definito in `input-contract.ts` (nessun import da `phase0.ts`).
+**Tipi autonomi:** `RawLogisticsTaskInput` in `input-contract.ts` (nessun import da `phase0.ts`).
 
-**Task pre-assegnati in timeline (Milestone 4b):** `loadTimelineAssignmentHints` carica tutti gli assignment timeline; `buildRequiredDriverConstraints` genera `REQUIRED_DRIVER_TASK` in `hardConstraints`. I pre-assegnati restano in `tasks[]` con driver fisso e orario/sequenza flessibili in `hardWindow`. Distinti dai **task locked nei containers** (esclusi in `loadUnlockedLogisticsTasks`).
+**Classi task (§22):**
+
+- **Container-locked** — esclusi in `loadUnlockedLogisticsTasks`, mai in `tasks[]`
+- **Pre-assigned** — in `tasks[]` + `REQUIRED_DRIVER_TASK`; driver fisso, tempo/ordine flessibili
+- **Free** — in `tasks[]`, nessun vincolo driver
+
+### API HTTP
+
+| Endpoint | Apply | Note |
+|---|---|---|
+| `GET /api/logistics-optimizer-final/precheck` | No | Controlli pre-run |
+| `POST /api/logistics-optimizer-final/routing-input-debug` | No | Solo input JSON |
+| `POST /api/logistics-optimizer-final/run-dry` | No | Solver + debug artifacts |
+| `POST /api/logistics-optimizer-final/run` | Opzionale (`apply: true`) | Produzione |
+| `POST /api/logistics-optimizer/run` | — | **410** — redirect al modulo final |
+
+UI: `client/src/pages/generate-logistics-assignments.tsx` chiama `/run` con `apply: true`, `solver: "ortools-v1"`.
+
+### Test
+
+Suite in `shared/logisticsOptimizerFinal*.test.ts` — **123 test** su pre-solver, validation, timeline hints, auto-convoke, OR-Tools adapter, greedy, solution validation, business groups, diagnostics.
+
+**Gap noto:** nessun test unitario su `applyLogisticsRoutingSolution` (save timeline, rimozione containers, preserve).
 
 ---
 
-## 2. Mappa file legacy (`logistics-optimizer`)
+## 2. Mappa file legacy (`logistics-optimizer`) — archivio
+
+> **Nota:** il modulo legacy è disabilitato (HTTP 410). Questa sezione resta come riferimento storico per le migrazioni.
 
 | File | Ruolo attuale |
 |---|---|
@@ -671,6 +736,9 @@ Interpretazione:
 
 ## 12. Come applica il risultato finale
 
+> **Implementazione attuale:** `apply-routing-solution.ts` (`applyLogisticsRoutingSolution`).  
+> Il flusso sotto descrive il legacy `index.ts`; il modulo final replica la stessa semantica partendo da `RoutingSolution`.
+
 File: `index.ts`, funzione `applyLogisticsOptimizerResult`.
 
 Passi:
@@ -840,21 +908,11 @@ type Priority = "EO" | "HP" | "LP" | null;
 
 ```ts
 interface LogisticsWindowConfig {
-  source: "db" | "app_settings" | "fallback";
+  source: "app_settings" | "unavailable";
   workDate: string;
-  priorityWindows: {
-    EO: PriorityWindowConfig;
-    HP: PriorityWindowConfig;
-    LP: PriorityWindowConfig;
-  };
+  priorityWindows: PriorityWindows | null;
   fallbackUsed: boolean;
-  rawConfig?: unknown;
-}
-
-interface PriorityWindowConfig {
-  startMin: Minutes;
-  endMin?: Minutes;
-  label: "EO" | "HP" | "LP";
+  error?: string;
 }
 ```
 
@@ -874,6 +932,7 @@ interface RoutingProblemInput {
   serviceDurationMin: number;
   hardConstraints: HardConstraintSpec[];
   softConstraints: SoftConstraintSpec[];
+  businessGroups: RoutingBusinessGroup[];  // M5b
   metadata: RoutingProblemMetadata;
 }
 ```
@@ -883,18 +942,15 @@ interface RoutingProblemInput {
 ```ts
 interface DriverNode {
   id: DriverId;
-  name: string;
-  startLocationNodeId: string; // di solito depot, ma estendibile
+  startLocationNodeId: string; // sempre "depot"
   endLocationNodeId?: string;
   workWindow: {
     startMin: Minutes;
     endMin: Minutes;
-    source: "driver_row" | "default" | "manual_override";
+    startSource: "driver_row" | "default";
+    endSource: "driver_row" | "default";
   };
   selected: true;
-  lockedRoutePrefix?: TaskId[];
-  lockedRouteTasks?: TaskId[];
-  capabilities?: string[];
 }
 ```
 
@@ -968,7 +1024,7 @@ type HardConstraintSpec =
       earliestStartMin: Minutes;
       latestStartMin: Minutes;
       latestEndMin: Minutes;
-      sourceRules: string[];
+      sourceRules?: string[];
     }
   | {
       type: "DRIVER_WORK_WINDOW";
@@ -982,45 +1038,38 @@ type HardConstraintSpec =
       penaltyIfDropped?: number;
     }
   | {
-      type: "LOCKED_TASK_PRESERVE";
+      type: "REQUIRED_DRIVER_TASK";       // M4b — pre-assigned timeline
       taskId: TaskId;
-      driverId?: DriverId;
-      sequence?: number;
+      driverId: DriverId;
+      source: "timeline_pre_assigned";
+      manuallyMoved?: boolean;
     };
 ```
+
+`LOCKED_TASK_PRESERVE` del piano originale non è usato: i container-locked sono esclusi dal loader, non entrano in `tasks[]`.
 
 ## 16.6 Soft constraints esplicite
 
 ```ts
 type SoftConstraintSpec =
-  | {
-      type: "MINIMIZE_TOTAL_TRAVEL";
-      weight: number;
-    }
-  | {
-      type: "BALANCE_DRIVER_LOAD";
-      weight: number;
-    }
-  | {
-      type: "KEEP_SAME_ADDRESS_TOGETHER";
-      addressGroupId: number;
-      taskIds: TaskId[];
-      penaltyIfSplit: number;
-    }
-  | {
-      type: "KEEP_CLEANER_SEQUENCE";
-      cleanerId: number;
-      orderedTaskIds: TaskId[];
-      penaltyIfBroken: number;
-    }
+  | { type: "MINIMIZE_TOTAL_TRAVEL"; weight: number }
+  | { type: "BALANCE_DRIVER_LOAD"; weight: number }
   | {
       type: "PREFERRED_PRIORITY_WINDOW";
       taskId: TaskId;
       startMin: Minutes;
       endMin?: Minutes;
       penaltyPerMinOutside: number;
-    };
+    }
+  // M5b — business groups (cost shaping in ortools-adapter)
+  | { type: "KEEP_SAME_COORDINATES_BUILDING_TOGETHER"; groupId: string; weight: number; toleranceMeters: number }
+  | { type: "KEEP_NEARBY_CLUSTER_TOGETHER"; groupId: string; weight: number; maxTravelMin: number }
+  | { type: "KEEP_CLEANER_SEQUENCE"; groupId: string; weight: number; cleanerId: number; orderedTaskIds: TaskId[] }
+  | { type: "KEEP_SAME_CLEANER_TASKS_TOGETHER"; groupId: string; weight: number; cleanerId: number }
+  | { type: "KEEP_PRIORITY_COMPATIBLE_TASKS_TOGETHER"; groupId: string; weight: number; windowOverlap: { startMin: Minutes; endMin: Minutes } };
 ```
+
+I nomi `KEEP_SAME_ADDRESS_TOGETHER` del piano originale sono stati sostituiti dai tipi `KEEP_*` sopra, generati da `groups/build-business-groups.ts`.
 
 ---
 
@@ -1173,86 +1222,103 @@ Da trasformare:
 
 ---
 
-## 20. Output solver da prevedere per apply
+## 20. Output solver (`RoutingSolution`)
 
-Il nuovo solver, qualunque esso sia, dovrebbe restituire:
+Implementato in `solution-contract.ts`. L'apply dipende solo da questa struttura.
 
 ```ts
 interface RoutingSolution {
+  schemaVersion: "logistics-routing-solution/v1";
+  solverId: "greedy-v1" | "ortools-v1";
   workDate: string;
   status: "FEASIBLE" | "PARTIAL" | "INFEASIBLE" | "INVALID";
+  generatedAt: string;
   routes: Array<{
     driverId: DriverId;
+    startMin: Minutes;
+    endMin: Minutes;
+    totalServiceMin: Minutes;
+    totalTravelMin: Minutes;
+    totalWaitMin: Minutes;
     stops: Array<{
-      taskId: TaskId;
       sequence: number;
+      taskId: TaskId;
       arrivalMin: Minutes;
       startMin: Minutes;
       endMin: Minutes;
+      serviceDurationMin: Minutes;
       travelFromPreviousMin: Minutes;
       waitMin: Minutes;
-      appliedWindowReasons: string[];
+      previousTaskId?: TaskId | null;
     }>;
-    totalTravelMin: Minutes;
-    totalServiceMin: Minutes;
-    totalWaitMin: Minutes;
   }>;
   droppedTasks: Array<{
     taskId: TaskId;
-    reason: string;
-    diagnostics?: unknown;
+    reason: RoutingDroppedTaskReason;
+    details?: string;
   }>;
-  objectiveBreakdown: Record<string, number>;
+  objectiveBreakdown?: {
+    assignedTasks: number;
+    droppedTasks: number;
+    totalTravelMin: Minutes;
+    totalWaitMin: Minutes;
+    softConstraintScore?: number;
+    penalties?: Record<string, number>;
+  };
+  diagnostics?: { warnings: string[]; notes?: string[]; solveDurationMs?: number };
 }
 ```
 
-L'apply dovrebbe dipendere solo da questa struttura, non dai dettagli interni del solver.
-
 ---
 
-## 21. Checklist implementativa consigliata
+## 21. Checklist implementativa
 
-1. Cartella implementata:
+### Completato
 
 ```txt
 server/services/logistics-optimizer-final/
+  loaders.ts
+  normalizers.ts
+  bag-handling.ts          # era bag-policy.ts nel piano originale
+  windows.ts
+  business-rules.ts
+  travel-matrix.ts
+  groups/*                 # era address-groups.ts nel piano originale
+  input-contract.ts
+  build-routing-input.ts
+  timeline-assignment-hints.ts
+  auto-convoke-logistics-drivers.ts
+  validation.ts
+  solution-contract.ts
+  solution-validation.ts
+  solution-apply-gate.ts
+  apply-routing-solution.ts
+  solver/solve-routing.ts
+  solver/greedy-routing-solver.ts
+  solver/ortools/*
+  run-routing-dry.ts
+  run-routing.ts
+  run-routing-input-debug.ts
+  debug-writer.ts
+  unassigned-diagnostics.ts
+  index.ts
 ```
 
-2. Moduli:
+| Milestone | Stato |
+|---|---|
+| M4 — `RoutingProblemInput` JSON + validator | ✅ |
+| M4b — pre-assigned + `REQUIRED_DRIVER_TASK` | ✅ |
+| M5 — OR-Tools VRP + greedy debug | ✅ |
+| M5b — business groups + soft cost shaping | ✅ |
+| M5c — auto-convoke pre-assigned | ✅ |
+| M6 — apply timeline + containers | ✅ |
 
-```txt
-loaders.ts              // DB raw data
-normalizers.ts          // parse, default, type safety
-bag-policy.ts           // policy unica, testata
-windows.ts              // finestre task/driver
-address-groups.ts       // same address / same logistic code
-travel-matrix.ts        // matrix builder
-input-contract.ts       // tipi RoutingProblemInput
-build-routing-input.ts  // orchestration pre-OR-Tools
-solution-contract.ts    // tipi RoutingSolution
-apply-routing-solution.ts
-validation.ts
-```
+### Aperto / follow-up
 
-3. Prima milestone:
-
-- produrre `RoutingProblemInput` JSON per una data;
-- salvarlo in debug;
-- nessuna assegnazione ancora.
-
-4. Seconda milestone:
-
-- creare validator che controlla:
-  - tutti i task hanno coordinate;
-  - finestre coerenti (`earliest <= latest`);
-  - driver window presente;
-  - matrice travel dimensionata correttamente;
-  - reason su ogni esclusione.
-
-5. Terza milestone:
-
-- collegare OR-Tools o altro solver solo dopo aver stabilizzato input/output.
-- durante la stabilizzazione sostituire la vecchia nomenclatura `BagPolicy` con `BagHandling`, senza vincolarsi ai debug legacy.
+- Test unitari su `applyLogisticsRoutingSolution`
+- Mutation hooks UI in `logistics-timeline-mutation-routes.ts` (auto-convoke su D&D timeline — PR separata)
+- Allineare `bag_policy` in apply (`bag-rule.ts` legacy) con `BagHandling` del pre-solver, o documentare il confine
+- `task.location.addressGroupId` non popolato; grouping in `businessGroups`
 
 ---
 
@@ -1278,7 +1344,7 @@ Glossario (termini di dominio):
 
 - `manually_moved` is metadata only; it does not lock the task.
 - Logistics differs from housekeeping pre-assigned: housekeeping excludes timeline tasks from Phase1 and keeps them time-fixed; logistics keeps them in the solver pool with flexible timing on the required driver.
-- Future apply must preserve container-locked tasks and merge solver output for free/pre-assigned pool only.
+- Apply preserva task fuori dal pool solver e merge solver output per free/pre-assigned (`apply-routing-solution.ts`).
 
 | # | Domanda | Decisione |
 |---|---|---|
@@ -1326,7 +1392,7 @@ Fase 2 (PR separata): mutation hooks UI in `logistics-timeline-mutation-routes.t
 
 ## 24. Milestone 5 — OR-Tools routing solver
 
-Pipeline:
+### Pipeline
 
 ```txt
 RoutingProblemInput
@@ -1334,65 +1400,139 @@ RoutingProblemInput
   → logistics_routing_ortools.py
   → decodeOrToolsSolution
   → validateRoutingSolution
-  → 02-routing-solution.json
+  → evaluateSolutionApplyGate
+  → (opz.) applyLogisticsRoutingSolution
 ```
 
-Debug dry-run (`ortools-v1`): `01-routing-input.json`, `02-routing-solution.json`, `03-ortools-payload.json`.
+Debug artifacts (`server/debug/logistics-optimizer-final/`):
 
-Solver IDs: `greedy-v1` (default `run-dry`), `ortools-v1` (opt-in body `"solver": "ortools-v1"`).
+- `01-routing-input.json`
+- `02-routing-solution.json`
+- `03-ortools-payload.json` (solo con `ortools-v1`)
 
-### Hard constraints M5
+### Solver IDs
+
+| ID | Ruolo | Default |
+|---|---|---|
+| `ortools-v1` | Produzione + dry-run | **Sì** (`run-routing`, `run-routing-dry`, `solveRouting`) |
+| `greedy-v1` | Debug/regressione | Opt-in (`"solver": "greedy-v1"`) |
+
+`greedy-v1` con `apply: true` è bloccato (`GreedySolverNotAllowedForApplyError`); la UI produzione usa esplicitamente `ortools-v1`.
+
+### Hard constraints
 
 - Task time windows (`transit = service(from) + travel`)
-- `startMin` in `[earliestStartMin, latestStartMin]` and `startMin + serviceDurationMin <= latestEndMin` (explicit in Python)
+- `startMin ∈ [earliestStartMin, latestStartMin]` e `startMin + serviceDurationMin ≤ latestEndMin` (esplicito in Python)
 - Driver work windows
-- `REQUIRED_DRIVER_TASK` hard vehicle constraint (no disjunction)
-- Required driver not among selected drivers: pre-solver salta l'hint (`REQUIRED_DRIVER_TASK_SKIPPED`); validation segnala `UNKNOWN_DRIVER_IN_CONSTRAINT` se il vincolo arriva comunque nell'input; OR-Tools adapter fa fallback `INVALID` (`REQUIRED_DRIVER_NOT_SELECTED`) senza chiamare Python
-- Free tasks: `AddDisjunction` con penalty EO > HP > LP
+- `REQUIRED_DRIVER_TASK` → vincolo veicolo hard (no disjunction)
+- Driver required non tra i selected: hint skippato in pre-solver; safety net adapter → `INVALID` (`REQUIRED_DRIVER_NOT_SELECTED`) senza chiamare Python
+- Task liberi → `AddDisjunction` con penalty **EO 100k > HP 50k > LP 25k**
 
-### Soft GEO M5 (cost shaping locale)
+### Soft constraints (cost shaping)
 
-- `KEEP_SAME_COORDINATES_BUILDING` e `KEEP_NEARBY_CLUSTER` riducono costo arco intra-gruppo in `costMatrixMin`
-- Decode e validation usano sempre `travelMatrixMin` originale
-- Non garantisce grouping globale same-vehicle (M5b per cleaner/sequence/priority)
+**M5 GEO** — `KEEP_SAME_COORDINATES_BUILDING_TOGETHER`, `KEEP_NEARBY_CLUSTER_TOGETHER`: riduzione costo arco intra-gruppo in `costMatrixMin`.
+
+**M5b** — `KEEP_CLEANER_SEQUENCE`, `KEEP_SAME_CLEANER_TASKS_TOGETHER`, `KEEP_PRIORITY_COMPATIBLE_TASKS_TOGETHER`: bonus/penalty su archi in `ortools-adapter.ts`; `softTimeWindows` e load balance in Python.
+
+Decode e validation usano sempre `travelMatrixMin` originale. Il cost shaping non garantisce grouping globale sullo stesso veicolo.
 
 ### Required infeasible
 
-Se OR-Tools ritorna `infeasible`, `buildRequiredInfeasibleSolution` produce `RoutingSolution` diagnostica (`INVALID` se required coinvolti), non errore HTTP 500.
+Se OR-Tools ritorna `infeasible` con task required coinvolti, `buildRequiredInfeasibleSolution` produce `RoutingSolution` con `status: INVALID` — non errore HTTP 500.
 
-### Known limitations M5
+### Status solution
 
-- Soft GEO = cost shaping locale, non garanzia globale stesso veicolo per gruppo
-- Cleaner / sequence / priority soft in M5b
-- Nessun apply timeline
-- Status: `FEASIBLE` \| `PARTIAL` \| `INFEASIBLE` \| `INVALID` (no `OPTIMAL`)
-- Python deps: `ortools` in `pyproject.toml` (`pip install ortools` o `uv sync`); `ortools-v1` è opt-in, `greedy-v1` resta default
+`FEASIBLE` \| `PARTIAL` \| `INFEASIBLE` \| `INVALID` (no `OPTIMAL`).
+
+### Dipendenze
+
+`ortools` in `pyproject.toml` (`pip install ortools` o `uv sync`). Se non disponibile: HTTP 503 `ORTOOLS_UNAVAILABLE`.
 
 ---
 
-## 23. Sintesi finale
+## 25. Milestone 6 — Apply timeline
 
-L'attuale algoritmo è robusto nel generare cluster locali perché conosce bene:
+File: `apply-routing-solution.ts` — `applyLogisticsRoutingSolution`.
 
-- cleaner sequence;
-- stesso indirizzo;
-- vicinanza geografica;
-- checkout/check-in;
-- borsone.
+### Gate apply
 
-Il suo limite principale è che queste informazioni vengono usate dentro un loop greedy con scoring progressivo. Per il nuovo sistema conviene spostare tutta la conoscenza di dominio nel pre-OR-Tools e consegnare al solver un problema già pulito:
+`evaluateSolutionApplyGate` / `assertSolutionCanBeApplied`:
 
-- task con finestre temporali esplicite;
+| Status | Apply default | Con `allowPartial: true` |
+|---|---|---|
+| `FEASIBLE` | ✅ | ✅ |
+| `PARTIAL` | ❌ | ✅ |
+| `INFEASIBLE` | ❌ | ❌ |
+| `INVALID` | ❌ | ❌ |
+
+### Passi apply
+
+1. Validazione input (`mode: "apply"`) + assert solution gate
+2. Carica driver selezionati, containers, timeline corrente
+3. Costruisce route da `RoutingSolution` per driver
+4. Preserva task timeline fuori dal pool solver / non rischedulati
+5. Re-sequence progressiva, `followup`, `bag_policy` (via legacy `computeBagPolicy` in `bag-rule.ts`)
+6. `recalculateLogisticsTimeline` → `buildFinalTimelineValidation` → assert check-in
+7. Salva timeline + history containers + rimuove task assegnati dai containers
+
+### Output
+
+```ts
+{
+  applied: boolean;
+  insertedTasks: number;
+  removedFromContainers: number;
+  totalTasksOnTimeline: number;
+  preservedOutsideSolverInputTasks: number;
+  preservedUnassignedRoutingTasks: number;
+  finalValidation: LogisticsFinalTimelineValidation;
+}
+```
+
+### Confine bag policy
+
+Il pre-solver usa `BagHandling` (`bag-handling.ts`). L'apply persiste `bag_policy` con `computeBagPolicy` legacy (`NORMAL_TASK` / `DRIVER_BRINGS_BAG` / `CLEANER_HAS_BAG`). Le regole coincidono nella maggior parte dei casi; il caso premium + pax basso può differire — vedi §5 e `bag-handling.ts`.
+
+### Known limitations
+
+- Apply non coperto da test unitari dedicati
+- Mutation hooks UI per auto-convoke su D&D timeline non ancora implementati (optimizer corretto al run; UI può restare incoerente fino al prossimo run)
+
+---
+
+## 23. Sintesi
+
+### Legacy (`logistics-optimizer`)
+
+Robusto su cluster locali (cleaner sequence, stesso indirizzo, vicinanza, checkout/check-in, borsone), ma debole globalmente: loop greedy con scoring progressivo, repair e penalty come patch.
+
+### Attuale (`logistics-optimizer-final`)
+
+La conoscenza di dominio è nel pre-solver; il solver decide globalmente:
+
+- task con finestre temporali esplicite (`hardWindow` + `softWindows`);
 - driver con work window esplicita;
 - matrice travel completa;
-- hard constraints separati;
-- soft constraints pesate e dichiarative;
-- debug input/output serializzabile.
+- hard constraints separati (`TASK_TIME_WINDOW`, `DRIVER_WORK_WINDOW`, `REQUIRED_DRIVER_TASK`);
+- soft constraints dichiarative + `businessGroups` con cost shaping OR-Tools;
+- debug input/output serializzabile;
+- apply su `RoutingSolution` indipendente dal solver interno.
+
+**Migrazione completata** per il flusso produzione: legacy disabilitato, UI su `/api/logistics-optimizer-final/run`.
 
 
 ---
 
-## 23. Aggiornamenti del 2026-06-04
+## 26. Changelog documentazione
+
+### 2026-06-17
+
+- Rinominato da `logistics_optimizer_pre_ortools_base.md` → `logistics-optimizer-final-reference.md`
+- Aggiornate §1, §1.1, §21, §24; aggiunta §25 (M6 apply)
+- Allineato default solver (`ortools-v1`), pipeline produzione, API, test
+- Sezioni 2–20 marcate come archivio legacy
+
+### 2026-06-04
 
 ### Finestre EO/HP/LP configurabili
 

@@ -11,6 +11,8 @@ import {
   CalendarIcon,
   RefreshCw,
   Search,
+  Map as MapIcon,
+  X,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -42,6 +44,21 @@ function getCurrentUsername(): string {
   }
   return "unknown";
 }
+
+const getDefaultTimelineMapPanel = () => {
+  const size = 360;
+  const bottomGap = 88;
+  const rightGap = 104;
+  const viewportHeight =
+    typeof window !== "undefined" ? window.innerHeight : 720;
+
+  return {
+    top: Math.max(96, viewportHeight - size - bottomGap),
+    right: rightGap,
+    width: size,
+    height: size,
+  };
+};
 
 interface LogisticsSummaryState {
   early_out: number;
@@ -228,14 +245,28 @@ function convertLogisticsTimelineTaskToMapTask(task: any, driverId: number): Tas
 }
 
 /** Stessa logica di evidenziazione ricerca usata in generate-assignments (PriorityColumn + TaskCard). */
-function highlightedIdsForSearch(tasks: TaskType[], searchTask: string): Set<string> {
+function highlightedIdsForSearch(
+  tasks: TaskType[],
+  searchTask: string,
+  containerHighlightTaskId?: string | null
+): Set<string> {
   const result = new Set<string>();
+
+  if (containerHighlightTaskId) {
+    const matchingTask = tasks.find((task) =>
+      String((task as any).id || (task as any).task_id || "") === containerHighlightTaskId
+    );
+    if (matchingTask) {
+      result.add(containerHighlightTaskId);
+    }
+  }
+
   const q = searchTask.trim();
   if (!q) return result;
   const lowerSearch = q.toLowerCase();
   for (const task of tasks) {
-    const taskId = String(task.id);
-    const logisticCode = String(task.name || "");
+    const taskId = String((task as any).id || (task as any).task_id || "");
+    const logisticCode = String((task as any).logisticCode || (task as any).logistic_code || task.name || "");
     const address = String(task.address || "");
     const customerName = String(task.customer_name || "");
     const alias = String(task.alias || "");
@@ -351,6 +382,21 @@ export default function GenerateLogisticsAssignments() {
     return new Date();
   });
   const [searchTask, setSearchTask] = useState("");
+  const [isTimelineMapOpen, setIsTimelineMapOpen] = useState(false);
+  const [timelineMapPanel, setTimelineMapPanel] = useState(getDefaultTimelineMapPanel);
+  const timelineMapPanelInteractionRef = useRef<{
+    mode: "drag" | "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+    pointerId: number;
+    startX: number;
+    startY: number;
+    startTop: number;
+    startRight: number;
+    startWidth: number;
+    startHeight: number;
+  } | null>(null);
+  const [containerHighlightTaskId, setContainerHighlightTaskId] = useState<string | null>(null);
+  const containerHighlightRef = useRef<string | null>(null);
+
   /** Solo sul pulsante refresh (come generate-assignments), nessun overlay pagina */
   const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
   const [isRunningLogisticsOptimizer, setIsRunningLogisticsOptimizer] = useState(false);
@@ -385,6 +431,87 @@ export default function GenerateLogisticsAssignments() {
   useEffect(() => {
     localStorage.setItem("selected_work_date", format(selectedDate, "yyyy-MM-dd"));
   }, [selectedDate]);
+
+  useEffect(() => {
+    const checkContainerHighlight = setInterval(() => {
+      const newHighlight = (window as any).containerHighlightTaskId ?? null;
+      if (newHighlight !== containerHighlightRef.current) {
+        containerHighlightRef.current = newHighlight;
+        setContainerHighlightTaskId(newHighlight);
+      }
+    }, 200);
+
+    return () => clearInterval(checkContainerHighlight);
+  }, []);
+
+  const handleTimelineMapPanelPointerDown = useCallback((
+    event: React.PointerEvent<HTMLDivElement>,
+    mode: "drag" | "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw"
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    timelineMapPanelInteractionRef.current = {
+      mode,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startTop: timelineMapPanel.top,
+      startRight: timelineMapPanel.right,
+      startWidth: timelineMapPanel.width,
+      startHeight: timelineMapPanel.height,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, [timelineMapPanel]);
+
+  const handleTimelineMapPanelPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const interaction = timelineMapPanelInteractionRef.current;
+    if (!interaction || interaction.pointerId !== event.pointerId) return;
+
+    const dx = event.clientX - interaction.startX;
+    const dy = event.clientY - interaction.startY;
+
+    if (interaction.mode === "drag") {
+      setTimelineMapPanel((prev) => ({
+        ...prev,
+        top: Math.max(0, interaction.startTop + dy),
+        right: Math.max(0, interaction.startRight - dx),
+      }));
+      return;
+    }
+
+    const minSize = 260;
+    const maxSize = 760;
+    const resizesNorth = interaction.mode.includes("n");
+    const resizesSouth = interaction.mode.includes("s");
+    const resizesEast = interaction.mode.includes("e");
+    const resizesWest = interaction.mode.includes("w");
+
+    let nextWidth = interaction.startWidth;
+    let nextHeight = interaction.startHeight;
+    if (resizesWest) nextWidth = interaction.startWidth - dx;
+    if (resizesEast) nextWidth = interaction.startWidth + dx;
+    if (resizesNorth) nextHeight = interaction.startHeight - dy;
+    if (resizesSouth) nextHeight = interaction.startHeight + dy;
+
+    nextWidth = Math.max(minSize, Math.min(maxSize, nextWidth));
+    nextHeight = Math.max(minSize, Math.min(maxSize, nextHeight));
+
+    setTimelineMapPanel((prev) => ({
+      ...prev,
+      width: nextWidth,
+      height: nextHeight,
+      top: resizesNorth ? interaction.startTop + (interaction.startHeight - nextHeight) : prev.top,
+      right: resizesEast ? interaction.startRight - (nextWidth - interaction.startWidth) : prev.right,
+    }));
+  }, []);
+
+  const handleTimelineMapPanelPointerEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const interaction = timelineMapPanelInteractionRef.current;
+    if (!interaction || interaction.pointerId !== event.pointerId) return;
+
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    timelineMapPanelInteractionRef.current = null;
+  }, []);
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
@@ -848,16 +975,16 @@ export default function GenerateLogisticsAssignments() {
   }, [mapTasks]);
 
   const highlightedEarlyOut = useMemo(
-    () => highlightedIdsForSearch(earlyOutTasks, searchTask),
-    [earlyOutTasks, searchTask]
+    () => highlightedIdsForSearch(earlyOutTasks, searchTask, containerHighlightTaskId),
+    [earlyOutTasks, searchTask, containerHighlightTaskId]
   );
   const highlightedHighPriority = useMemo(
-    () => highlightedIdsForSearch(highPriorityTasks, searchTask),
-    [highPriorityTasks, searchTask]
+    () => highlightedIdsForSearch(highPriorityTasks, searchTask, containerHighlightTaskId),
+    [highPriorityTasks, searchTask, containerHighlightTaskId]
   );
   const highlightedLowPriority = useMemo(
-    () => highlightedIdsForSearch(lowPriorityTasks, searchTask),
-    [lowPriorityTasks, searchTask]
+    () => highlightedIdsForSearch(lowPriorityTasks, searchTask, containerHighlightTaskId),
+    [lowPriorityTasks, searchTask, containerHighlightTaskId]
   );
 
   const allTasksWithAssignments = useMemo(() => {
@@ -1229,23 +1356,102 @@ export default function GenerateLogisticsAssignments() {
             />
           </div>
 
-          <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="mt-0 grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-3">
-              <LogisticsTimelineView
-                workDate={format(selectedDate, "yyyy-MM-dd")}
-                drivers={logisticsDrivers}
-                driversAssignments={logisticsDriversAssignments}
-                searchTask={searchTask}
-                isReadOnly={isTimelineReadOnly}
-                isLoadingOverlay={isLoadingDragDrop}
-                onRefresh={reloadLogisticsPage}
-              />
+              <div className="relative">
+                <LogisticsTimelineView
+                  workDate={format(selectedDate, "yyyy-MM-dd")}
+                  drivers={logisticsDrivers}
+                  driversAssignments={logisticsDriversAssignments}
+                  searchTask={searchTask}
+                  isReadOnly={isTimelineReadOnly}
+                  isLoadingOverlay={isLoadingDragDrop}
+                  onRefresh={reloadLogisticsPage}
+                />
+                {!isTimelineMapOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setIsTimelineMapOpen(true)}
+                    className="absolute right-0 top-1/2 z-30 inline-flex -translate-y-1/2 translate-x-1/2 rounded-l-lg border-2 border-custom-blue bg-background px-2 py-3 text-custom-blue shadow-lg transition-colors hover:bg-accent"
+                    aria-label="Mostra mappa"
+                    title="Mostra mappa"
+                    style={{ writingMode: "vertical-rl" }}
+                  >
+                    <MapIcon className="h-4 w-4" />
+                  </button>
+                )}
+                {isTimelineMapOpen && (
+                  <div
+                    className="fixed z-30 block"
+                    style={{
+                      top: `${timelineMapPanel.top}px`,
+                      right: `${timelineMapPanel.right}px`,
+                      width: `${timelineMapPanel.width}px`,
+                      height: `${timelineMapPanel.height}px`,
+                    }}
+                  >
+                    <div className="relative h-full w-full">
+                      <div
+                        className="absolute inset-x-0 top-0 z-30 h-9 cursor-move rounded-t-lg"
+                        onPointerDown={(event) => handleTimelineMapPanelPointerDown(event, "drag")}
+                        onPointerMove={handleTimelineMapPanelPointerMove}
+                        onPointerUp={handleTimelineMapPanelPointerEnd}
+                        onPointerCancel={handleTimelineMapPanelPointerEnd}
+                        title="Trascina mappa"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsTimelineMapOpen(false);
+                          setTimelineMapPanel(getDefaultTimelineMapPanel());
+                        }}
+                        className="absolute right-2 top-2 z-40 inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background/95 text-foreground shadow-md transition-colors hover:bg-accent"
+                        aria-label="Nascondi mappa"
+                        title="Nascondi mappa"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                      <MapSection
+                        tasks={mapTasks}
+                        compact
+                        className="h-full bg-background/95 backdrop-blur-sm"
+                        bodyClassName="flex flex-col"
+                        mapClassName="h-full flex-1"
+                        mapMinHeight={0}
+                      />
+                      {[
+                        { key: "n", className: "inset-x-3 top-0 h-2 cursor-n-resize" },
+                        { key: "s", className: "inset-x-3 bottom-0 h-2 cursor-s-resize" },
+                        { key: "e", className: "inset-y-3 right-0 w-2 cursor-e-resize" },
+                        { key: "w", className: "inset-y-3 left-0 w-2 cursor-w-resize" },
+                        { key: "ne", className: "right-0 top-0 h-4 w-4 cursor-ne-resize" },
+                        { key: "nw", className: "left-0 top-0 h-4 w-4 cursor-nw-resize" },
+                        { key: "se", className: "bottom-0 right-0 h-4 w-4 cursor-se-resize" },
+                        { key: "sw", className: "bottom-0 left-0 h-4 w-4 cursor-sw-resize" },
+                      ].map((handle) => (
+                        <div
+                          key={handle.key}
+                          className={cn("absolute z-40", handle.className)}
+                          onPointerDown={(event) =>
+                            handleTimelineMapPanelPointerDown(
+                              event,
+                              handle.key as "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw"
+                            )
+                          }
+                          onPointerMove={handleTimelineMapPanelPointerMove}
+                          onPointerUp={handleTimelineMapPanelPointerEnd}
+                          onPointerCancel={handleTimelineMapPanelPointerEnd}
+                          title="Ridimensiona mappa"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="hidden space-y-6">
-            <div className="min-h-[200px] rounded-lg border-2 border-border bg-card shadow-sm flex items-center justify-center text-muted-foreground text-sm">
-              Mappa (in arrivo)
-            </div>
+            <MapSection tasks={mapTasks} />
 
             <div className="bg-card rounded-lg border shadow-sm">
               <div className="p-4 border-b border-border">
