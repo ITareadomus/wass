@@ -10193,56 +10193,83 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     }
   });
 
-  app.post("/api/logistics-optimizer/run", async (req, res) => {
+  app.get("/api/logistics-optimizer-final/precheck", async (req, res) => {
+    let connection: mysql.Connection | null = null;
     try {
-      const { date, debug: debugBody, competitiveGrouping: competitiveGroupingBody } = req.body || {};
-      const workDate = date || format(new Date(), "yyyy-MM-dd");
-      const debugExplicit =
-        debugBody === true || debugBody === 1 || String(debugBody ?? "").toLowerCase() === "true";
-      const competitiveGroupingExplicit =
-        competitiveGroupingBody === undefined
-          ? true
-          : competitiveGroupingBody === true ||
-            competitiveGroupingBody === 1 ||
-            String(competitiveGroupingBody ?? "").toLowerCase() === "true";
-
-      const { isLogisticsOptimizerDebugEnabled, runLogisticsOptimizer } = await import(
-        "./services/logistics-optimizer"
-      );
-      const debugEnabled = isLogisticsOptimizerDebugEnabled(debugExplicit);
-      console.log(
-        `🚀 POST /api/logistics-optimizer/run - Avvio logistics-optimizer per ${workDate}` +
-          (debugEnabled ? " (debug JSON attivo)" : "") +
-          (competitiveGroupingExplicit == null
-            ? ""
-            : competitiveGroupingExplicit
-              ? " (competitive-grouping=ON)"
-              : " (competitive-grouping=OFF)")
-      );
-
-      const result = await runLogisticsOptimizer(workDate, {
-        debug: debugExplicit,
-        competitiveGrouping: competitiveGroupingExplicit,
+      const workDate = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      connection = await mysql.createConnection({
+        host: databaseConfig.mysql.host,
+        port: databaseConfig.mysql.port,
+        user: databaseConfig.mysql.user,
+        password: databaseConfig.mysql.password,
+        database: databaseConfig.mysql.database,
       });
 
-      if (!result.canRun) {
-        return res.status(400).json({
-          success: false,
-          ...result,
-        });
-      }
+      const [rows]: any = await connection.execute(
+        `
+          SELECT
+            h.id AS task_id,
+            s.logistic_code AS logistic_code
+          FROM app_housekeeping h
+          JOIN app_structures s
+            ON s.id = h.structure_id
+          LEFT JOIN app_structure_operation o
+            ON o.id = h.operation_id
+          WHERE h.checkout = ?
+            AND h.deleted_at IS NULL
+            AND h.deleted_at_client IS NULL
+            AND s.lat IS NOT NULL
+            AND s.lng IS NOT NULL
+            AND s.lat != ''
+            AND s.lng != ''
+            AND s.lat != '0'
+            AND s.lng != '0'
+            AND COALESCE(o.enable_wass_route, 0) = 1
+            AND (h.cleaned_by_us IS NULL OR h.cleaned_by_us <= 0)
+          ORDER BY h.id ASC
+        `,
+        [workDate]
+      );
+
+      const list = Array.isArray(rows) ? rows : [];
+      const taskCodes = Array.from(
+        new Set(
+          list
+            .map((row: any) => row?.logistic_code)
+            .filter((value: any) => value !== null && value !== undefined && String(value).trim() !== "")
+            .map((value: any) => String(value).trim())
+        )
+      );
 
       return res.json({
         success: true,
-        ...result,
+        date: workDate,
+        count: list.length,
+        taskCodes,
       });
     } catch (error: any) {
-      console.error("❌ Errore logistics-optimizer:", error);
+      console.error("❌ Errore logistics-optimizer-final precheck:", error);
       return res.status(500).json({
         success: false,
         error: error.message,
       });
+    } finally {
+      if (connection) {
+        try {
+          await connection.end();
+        } catch {
+          /* ignore */
+        }
+      }
     }
+  });
+
+  app.post("/api/logistics-optimizer/run", async (req, res) => {
+    return res.status(410).json({
+      success: false,
+      error: "LEGACY_LOGISTICS_OPTIMIZER_DISABLED",
+      message: "Legacy logistics optimizer disabled. Use /api/logistics-optimizer-final/run.",
+    });
   });
 
   // ========== LOGISTICS OPTIMIZER FINAL (pre-solver routing input debug) ==========

@@ -690,28 +690,40 @@ export default function GenerateLogisticsAssignments() {
     const dateStr = format(selectedDate, "yyyy-MM-dd");
     setIsRunningLogisticsOptimizer(true);
     try {
-      const response = await fetch("/api/logistics-optimizer/run", {
+      const response = await fetch("/api/logistics-optimizer-final/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: dateStr, debug: true }),
+        body: JSON.stringify({
+          date: dateStr,
+          apply: true,
+          solver: "ortools-v1",
+          debug: true,
+        }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data?.success) {
-        throw new Error(data?.error || data?.blockedReason || "Esecuzione logistics-optimizer fallita");
+        throw new Error(
+          data?.message ||
+            data?.error ||
+            data?.blockedReason ||
+            "Esecuzione logistics-optimizer-final fallita"
+        );
       }
       const assignedCount = Number(
-        data?.apply?.insertedTasks ?? data?.phase2?.tasksAssigned ?? 0
+        data?.apply?.insertedTasks ?? data?.solutionSummary?.assignedTaskCount ?? 0
       );
-      const unassignedCount = Number(data?.phase2?.tasksUnassigned ?? 0);
-      const debugDir = typeof data?.debugDir === "string" ? data.debugDir : data?.phase2?.debugDir;
+      const unassignedCount = Number(
+        data?.solutionSummary?.droppedTaskCount ?? data?.solution?.droppedTasks?.length ?? 0
+      );
+      const debugDir = typeof data?.debugDir === "string" ? data.debugDir : null;
       if (debugDir) {
-        console.info("[logistics-optimizer] Debug JSON:", debugDir);
+        console.info("[logistics-optimizer-final] Debug JSON:", debugDir);
       }
       toast({
         variant: "success",
         title: "Assegnazione completata",
         description: debugDir
-          ? `${assignedCount} task assegnate, ${unassignedCount} non assegnate. Debug: server/debug/logistics-optimizer/… (vedi console)`
+          ? `${assignedCount} task assegnate, ${unassignedCount} non assegnate. Debug: server/debug/logistics-optimizer-final/… (vedi console)`
           : `${assignedCount} task assegnate, ${unassignedCount} non assegnate`,
       });
       await reloadLogisticsPage();
@@ -732,7 +744,7 @@ export default function GenerateLogisticsAssignments() {
     setIsRunningLogisticsOptimizer(true);
     try {
       const precheckRes = await fetch(
-        `/api/logistics-optimizer/precheck?date=${encodeURIComponent(dateStr)}`,
+        `/api/logistics-optimizer-final/precheck?date=${encodeURIComponent(dateStr)}`,
         {
           cache: "no-store",
           headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
