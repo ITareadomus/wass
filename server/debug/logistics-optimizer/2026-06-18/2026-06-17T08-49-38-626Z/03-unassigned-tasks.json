@@ -1,0 +1,26 @@
+{
+  "workDate": "2026-06-18",
+  "runId": "2026-06-17T08-49-38-626Z",
+  "total": 2,
+  "tasks": [
+    {
+      "taskId": 231756,
+      "logisticCode": 1729,
+      "reasonCode": "ROUTE_CAPACITY_OR_ORDERING_CONFLICT",
+      "driverFailures": [],
+      "feasibleAloneOnDriverIds": [
+        737,
+        1078
+      ],
+      "trulyImpossible": false
+    },
+    {
+      "taskId": 231777,
+      "logisticCode": 1050,
+      "reasonCode": "TRULY_IMPOSSIBLE",
+      "driverFailures": [],
+      "feasibleAloneOnDriverIds": [],
+      "trulyImpossible": true
+    }
+  ]
+}

@@ -8,6 +8,11 @@ import { getCleanerHexColor } from "@/lib/cleaner-colors";
 
 interface MapSectionProps {
   tasks: Task[];
+  className?: string;
+  bodyClassName?: string;
+  mapClassName?: string;
+  mapMinHeight?: string | number;
+  compact?: boolean;
 }
 
 declare global {
@@ -17,7 +22,14 @@ declare global {
   }
 }
 
-export default function MapSection({ tasks }: MapSectionProps) {
+export default function MapSection({
+  tasks,
+  className,
+  bodyClassName,
+  mapClassName,
+  mapMinHeight,
+  compact = false,
+}: MapSectionProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const googleMapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
@@ -159,6 +171,22 @@ export default function MapSection({ tasks }: MapSectionProps) {
     });
 
     googleMapRef.current = map;
+  }, [isMapLoaded]);
+
+  // Google Maps calcola i tile in base alle dimensioni del container.
+  // Nel pannello overlay la mappa può essere montata/ridimensionata dopo l'init.
+  useEffect(() => {
+    if (!isMapLoaded || !mapRef.current || !googleMapRef.current || !window.google?.maps) return;
+
+    const resizeMap = () => {
+      window.google.maps.event.trigger(googleMapRef.current, "resize");
+    };
+
+    resizeMap();
+    const observer = new ResizeObserver(resizeMap);
+    observer.observe(mapRef.current);
+
+    return () => observer.disconnect();
   }, [isMapLoaded]);
 
   // Aggiorna i marker quando cambiano le task, cleaners o filtro
@@ -558,8 +586,8 @@ export default function MapSection({ tasks }: MapSectionProps) {
   }, [tasks, isMapLoaded, cleaners, filteredCleanerId, filteredTaskId]);
 
   return (
-    <div className="bg-card rounded-lg border-2 border-border shadow-sm box-border overflow-hidden">
-      <div className="p-4 border-b border-border">
+    <div className={cn("bg-card rounded-lg border-2 border-border shadow-sm box-border overflow-hidden", compact && "flex flex-col", className)}>
+      <div className={cn("border-b border-border", compact ? "px-3 py-2" : "p-4")}>
         <h3 className="font-semibold text-foreground flex items-center">
           <svg 
             className="w-5 h-5 mr-2 text-custom-blue" 
@@ -583,11 +611,11 @@ export default function MapSection({ tasks }: MapSectionProps) {
           Mappa Appartamenti
         </h3>
       </div>
-      <div className="p-4 relative">
+      <div className={cn("relative", compact ? "min-h-0 flex-1 p-2" : "p-4", bodyClassName)}>
         <div 
           ref={mapRef} 
-          className="relative w-full h-[400px] rounded-lg bg-muted"
-          style={{ minHeight: '400px' }}
+          className={cn("relative w-full rounded-lg bg-muted", mapClassName || "h-[400px]")}
+          style={{ minHeight: mapMinHeight ?? '400px' }}
         >
           {!isMapLoaded && (
             <div className="absolute inset-0 z-[1] flex items-center justify-center rounded-lg bg-muted">

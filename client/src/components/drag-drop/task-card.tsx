@@ -1017,27 +1017,25 @@ const displayClickableInputClass =
 
   const getTaskTypeStyle = (isStraord: boolean, isPrem: boolean) => {
     if (isStraord) {
-      return { label: "STRAORDINARIA", colorClass: "task-straordinaria" };
+      return { label: "STRAORDINARIA" };
     }
     if (isPrem) {
-      return { label: "PREMIUM", colorClass: "task-premium" };
+      return { label: "PREMIUM" };
     }
-    return { label: "STANDARD", colorClass: "task-standard" };
+    return { label: "STANDARD" };
   };
 
-  const { label: typeLabel, colorClass: baseCardColorClass } =
-    getTaskTypeStyle(cardIsStraordinaria, cardIsPremium);
+  const categoryStripeClass = cardIsStraordinaria
+    ? "bg-red-500"
+    : cardIsPremium
+      ? "bg-yellow-500"
+      : "bg-green-500";
 
-  const ripassoCardColorClass = (() => {
-    if (!isRipassoOperation(taskWithPendingEdits)) return null;
-    if (cardIsStraordinaria) return "task-straordinaria-ripasso";
-    if (cardIsPremium) return "task-premium-ripasso";
-    return "task-standard-ripasso";
-  })();
-  const resolvedCardTypeColor = ripassoCardColorClass ?? baseCardColorClass;
+  // Card neutra come le card elenco cleaner; categoria indicata dalla striscia laterale.
+  const cardSurfaceClass = isLocked && !isInTimeline
+    ? "bg-gray-100 dark:bg-gray-500/80 border-border/60 opacity-70"
+    : "bg-custom-blue-light border-border/60";
 
-  // Se la task è bloccata, usa grigio invece del colore normale
-  const cardColorClass = isLocked && !isInTimeline ? "bg-gray-100 opacity-70 dark:bg-gray-500 dark:opacity-90" : resolvedCardTypeColor;
   useEffect(() => {
     if (!isModalOpen) return;
     const taskObj = displayTask as any;
@@ -2598,9 +2596,9 @@ const displayClickableInputClass =
                 <TooltipTrigger asChild>
                   <div
                     className={`
-                      ${cardColorClass}
-                      rounded-sm border px-2 py-1 transition-all duration-200
-                      ${snapshot.isDragging ? "shadow-lg" : "shadow-sm"}
+                      ${cardSurfaceClass}
+                      rounded-md border px-2 py-1 transition-colors duration-200
+                      ${snapshot.isDragging ? "shadow-lg" : ""}
                       ${
                         isSelected && isMultiSelectMode && !isInTimeline
                           ? "z-[1] ring-2 ring-sky-500 ring-inset"
@@ -2610,7 +2608,7 @@ const displayClickableInputClass =
                       ${isPriorityWindowViolation && isInTimeline ? "animate-blink-orange" : ""}
                       ${!snapshot.isDragging && isMapFiltered ? "task-border-map-filtered" : ""}
                       ${!snapshot.isDragging && !isMapFiltered && isHighlighted ? "task-border-search-highlighted" : ""}
-                      hover:shadow-md cursor-pointer
+                      cursor-pointer
                       flex-shrink-0 relative group
                     `}
                     style={{
@@ -2630,6 +2628,10 @@ const displayClickableInputClass =
                       }
                     }}
                   >
+                    <div
+                      className={`absolute left-[2px] top-[2px] bottom-[2px] w-1.5 rounded-sm ${categoryStripeClass}`}
+                      aria-hidden="true"
+                    />
                     {operationsScope === "logistics" && isInTimeline ? (
                       <div className="flex h-full min-h-[40px] w-full items-center justify-center text-[#ff0000] font-extrabold text-[13px]">
                         {seq}
@@ -2768,18 +2770,16 @@ const displayClickableInputClass =
                         );
                       })()}
 
-                    <div
-                      className="flex flex-col items-start justify-start h-full gap-0 p-[0.5px] pl-0 overflow-visible"
-                    >
+                    <div className="flex flex-col items-start justify-center h-full gap-0 p-[0.5px] pl-2 overflow-visible">
                       <div className="flex items-center gap-1 w-full min-w-0 overflow-visible">
                         <span
-                          className="text-[#ff0000] font-extrabold text-[13px] shrink-0"
+                          className="text-foreground font-extrabold text-[13px] shrink-0"
                           data-testid={`task-name-${getTaskKey(task)}`}
                         >
                           {task.name}
                         </span>
                         {(task as any).customer_reference && (
-                          <span className="text-[#ff0000] font-bold text-[11px] whitespace-nowrap">
+                          <span className="text-red-600 dark:text-red-400 font-bold text-[11px] whitespace-nowrap">
                             ({(task as any).customer_reference})
                           </span>
                         )}
@@ -2790,7 +2790,7 @@ const displayClickableInputClass =
                         )}
                       </div>
                       {task.alias && (
-                        <span className="opacity-70 leading-none mt-0.5 text-[#000000] font-bold text-[9px] whitespace-nowrap">
+                        <span className="opacity-80 leading-none mt-0.5 text-foreground font-semibold text-[9px] whitespace-nowrap">
                           {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                         </span>
                       )}

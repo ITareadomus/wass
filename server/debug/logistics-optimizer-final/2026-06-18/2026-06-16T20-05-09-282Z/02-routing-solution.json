@@ -1,0 +1,354 @@
+{
+  "schemaVersion": "logistics-routing-solution/v1",
+  "solverId": "ortools-v1",
+  "workDate": "2026-06-18",
+  "status": "FEASIBLE",
+  "generatedAt": "2026-06-16T20:05:09.281Z",
+  "routes": [
+    {
+      "driverId": 737,
+      "startMin": 600,
+      "endMin": 892,
+      "totalServiceMin": 210,
+      "totalTravelMin": 82,
+      "totalWaitMin": 0,
+      "stops": [
+        {
+          "sequence": 1,
+          "taskId": 231831,
+          "arrivalMin": 610,
+          "startMin": 610,
+          "endMin": 625,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 10,
+          "waitMin": 0,
+          "previousTaskId": null
+        },
+        {
+          "sequence": 2,
+          "taskId": 231750,
+          "arrivalMin": 635,
+          "startMin": 635,
+          "endMin": 650,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 10,
+          "waitMin": 0,
+          "previousTaskId": 231831
+        },
+        {
+          "sequence": 3,
+          "taskId": 231755,
+          "arrivalMin": 657,
+          "startMin": 657,
+          "endMin": 672,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 7,
+          "waitMin": 0,
+          "previousTaskId": 231750
+        },
+        {
+          "sequence": 4,
+          "taskId": 231778,
+          "arrivalMin": 680,
+          "startMin": 680,
+          "endMin": 695,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 8,
+          "waitMin": 0,
+          "previousTaskId": 231755
+        },
+        {
+          "sequence": 5,
+          "taskId": 231903,
+          "arrivalMin": 702,
+          "startMin": 702,
+          "endMin": 717,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 7,
+          "waitMin": 0,
+          "previousTaskId": 231778
+        },
+        {
+          "sequence": 6,
+          "taskId": 231776,
+          "arrivalMin": 723,
+          "startMin": 723,
+          "endMin": 738,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 6,
+          "waitMin": 0,
+          "previousTaskId": 231903
+        },
+        {
+          "sequence": 7,
+          "taskId": 231850,
+          "arrivalMin": 743,
+          "startMin": 743,
+          "endMin": 758,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 5,
+          "waitMin": 0,
+          "previousTaskId": 231776
+        },
+        {
+          "sequence": 8,
+          "taskId": 231165,
+          "arrivalMin": 762,
+          "startMin": 762,
+          "endMin": 777,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 4,
+          "waitMin": 0,
+          "previousTaskId": 231850
+        },
+        {
+          "sequence": 9,
+          "taskId": 227684,
+          "arrivalMin": 780,
+          "startMin": 780,
+          "endMin": 795,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 3,
+          "waitMin": 0,
+          "previousTaskId": 231165
+        },
+        {
+          "sequence": 10,
+          "taskId": 231800,
+          "arrivalMin": 800,
+          "startMin": 800,
+          "endMin": 815,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 5,
+          "waitMin": 0,
+          "previousTaskId": 227684
+        },
+        {
+          "sequence": 11,
+          "taskId": 231777,
+          "arrivalMin": 819,
+          "startMin": 819,
+          "endMin": 834,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 4,
+          "waitMin": 0,
+          "previousTaskId": 231800
+        },
+        {
+          "sequence": 12,
+          "taskId": 231759,
+          "arrivalMin": 838,
+          "startMin": 838,
+          "endMin": 853,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 4,
+          "waitMin": 0,
+          "previousTaskId": 231777
+        },
+        {
+          "sequence": 13,
+          "taskId": 223960,
+          "arrivalMin": 859,
+          "startMin": 859,
+          "endMin": 874,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 6,
+          "waitMin": 0,
+          "previousTaskId": 231759
+        },
+        {
+          "sequence": 14,
+          "taskId": 223810,
+          "arrivalMin": 877,
+          "startMin": 877,
+          "endMin": 892,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 3,
+          "waitMin": 0,
+          "previousTaskId": 223960
+        }
+      ]
+    },
+    {
+      "driverId": 1078,
+      "startMin": 600,
+      "endMin": 892,
+      "totalServiceMin": 210,
+      "totalTravelMin": 82,
+      "totalWaitMin": 0,
+      "stops": [
+        {
+          "sequence": 1,
+          "taskId": 231748,
+          "arrivalMin": 607,
+          "startMin": 607,
+          "endMin": 622,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 7,
+          "waitMin": 0,
+          "previousTaskId": null
+        },
+        {
+          "sequence": 2,
+          "taskId": 231757,
+          "arrivalMin": 630,
+          "startMin": 630,
+          "endMin": 645,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 8,
+          "waitMin": 0,
+          "previousTaskId": 231748
+        },
+        {
+          "sequence": 3,
+          "taskId": 231753,
+          "arrivalMin": 650,
+          "startMin": 650,
+          "endMin": 665,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 5,
+          "waitMin": 0,
+          "previousTaskId": 231757
+        },
+        {
+          "sequence": 4,
+          "taskId": 231752,
+          "arrivalMin": 672,
+          "startMin": 672,
+          "endMin": 687,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 7,
+          "waitMin": 0,
+          "previousTaskId": 231753
+        },
+        {
+          "sequence": 5,
+          "taskId": 231760,
+          "arrivalMin": 694,
+          "startMin": 694,
+          "endMin": 709,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 7,
+          "waitMin": 0,
+          "previousTaskId": 231752
+        },
+        {
+          "sequence": 6,
+          "taskId": 225996,
+          "arrivalMin": 713,
+          "startMin": 713,
+          "endMin": 728,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 4,
+          "waitMin": 0,
+          "previousTaskId": 231760
+        },
+        {
+          "sequence": 7,
+          "taskId": 225782,
+          "arrivalMin": 731,
+          "startMin": 731,
+          "endMin": 746,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 3,
+          "waitMin": 0,
+          "previousTaskId": 225996
+        },
+        {
+          "sequence": 8,
+          "taskId": 225570,
+          "arrivalMin": 749,
+          "startMin": 749,
+          "endMin": 764,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 3,
+          "waitMin": 0,
+          "previousTaskId": 225782
+        },
+        {
+          "sequence": 9,
+          "taskId": 231292,
+          "arrivalMin": 771,
+          "startMin": 771,
+          "endMin": 786,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 7,
+          "waitMin": 0,
+          "previousTaskId": 225570
+        },
+        {
+          "sequence": 10,
+          "taskId": 231747,
+          "arrivalMin": 790,
+          "startMin": 790,
+          "endMin": 805,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 4,
+          "waitMin": 0,
+          "previousTaskId": 231292
+        },
+        {
+          "sequence": 11,
+          "taskId": 231775,
+          "arrivalMin": 813,
+          "startMin": 813,
+          "endMin": 828,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 8,
+          "waitMin": 0,
+          "previousTaskId": 231747
+        },
+        {
+          "sequence": 12,
+          "taskId": 231756,
+          "arrivalMin": 832,
+          "startMin": 832,
+          "endMin": 847,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 4,
+          "waitMin": 0,
+          "previousTaskId": 231775
+        },
+        {
+          "sequence": 13,
+          "taskId": 231754,
+          "arrivalMin": 854,
+          "startMin": 854,
+          "endMin": 869,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 7,
+          "waitMin": 0,
+          "previousTaskId": 231756
+        },
+        {
+          "sequence": 14,
+          "taskId": 231758,
+          "arrivalMin": 877,
+          "startMin": 877,
+          "endMin": 892,
+          "serviceDurationMin": 15,
+          "travelFromPreviousMin": 8,
+          "waitMin": 0,
+          "previousTaskId": 231754
+        }
+      ]
+    }
+  ],
+  "droppedTasks": [],
+  "objectiveBreakdown": {
+    "assignedTasks": 28,
+    "droppedTasks": 0,
+    "totalTravelMin": 164,
+    "totalWaitMin": 0,
+    "penalties": {
+      "ortoolsObjective": 343
+    }
+  },
+  "diagnostics": {
+    "warnings": [],
+    "notes": [
+      "ortoolsStatus=ROUTING_SUCCESS"
+    ],
+    "solveDurationMs": 30021
+  }
+}

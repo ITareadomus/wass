@@ -353,12 +353,88 @@ export default function TimelineView({
 
   // Larghezza della timeline in pixel per calcolo larghezze task
   const [timelineWidthPx, setTimelineWidthPx] = useState<number>(0);
-  const timelineRowRef = useRef<HTMLDivElement>(null);
+  const [timelineScrollLeft, setTimelineScrollLeft] = useState(0);
+  const timelineRowRef = useRef<HTMLDivElement | null>(null);
+  const timelineScrollRefs = useRef<HTMLDivElement[]>([]);
+  const isSyncingTimelineScrollRef = useRef(false);
+  const timelineScrollDragRef = useRef<{
+    scrollContainer: HTMLDivElement;
+    pointerId: number;
+    startX: number;
+    startScrollLeft: number;
+  } | null>(null);
+  const timelineWidthScale = 1.06;
+  const timelineScaledWidth = `${timelineWidthScale * 100}%`;
+  const timelineTaskWidthPx = timelineWidthPx * timelineWidthScale;
 
   // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
   // DEVE essere definito PRIMA di allCleanersToShow che lo usa
   const [timelineCleaners, setTimelineCleaners] = useState<any[]>([]);
 
+  const registerTimelineScrollRef = React.useCallback((node: HTMLDivElement | null) => {
+    if (node && !timelineScrollRefs.current.includes(node)) {
+      timelineScrollRefs.current.push(node);
+    }
+  }, []);
+
+  const handleTimelineScroll = React.useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    if (isSyncingTimelineScrollRef.current) return;
+
+    const source = event.currentTarget;
+    setTimelineScrollLeft(source.scrollLeft);
+    isSyncingTimelineScrollRef.current = true;
+    timelineScrollRefs.current = timelineScrollRefs.current.filter((node) => node.isConnected);
+    timelineScrollRefs.current.forEach((node) => {
+      if (node !== source) {
+        node.scrollLeft = source.scrollLeft;
+      }
+    });
+    requestAnimationFrame(() => {
+      isSyncingTimelineScrollRef.current = false;
+    });
+  }, []);
+
+  const canStartTimelinePan = React.useCallback((target: EventTarget | null) => {
+    const element = target instanceof HTMLElement ? target : null;
+    if (!element) return false;
+
+    return !element.closest(
+      '[data-rbd-draggable-id], [data-rbd-drag-handle-draggable-id], button, input, textarea, select, a, [role="button"]'
+    );
+  }, []);
+
+  const handleTimelinePointerDown = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const scrollContainer = event.currentTarget;
+    if (event.button !== 0 || !canStartTimelinePan(event.target)) return;
+    if (scrollContainer.scrollWidth <= scrollContainer.clientWidth) return;
+
+    timelineScrollDragRef.current = {
+      scrollContainer,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startScrollLeft: scrollContainer.scrollLeft,
+    };
+    scrollContainer.setPointerCapture(event.pointerId);
+    scrollContainer.classList.add("is-panning");
+    event.preventDefault();
+  }, [canStartTimelinePan]);
+
+  const handleTimelinePointerMove = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const dragState = timelineScrollDragRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+    dragState.scrollContainer.scrollLeft = dragState.startScrollLeft - (event.clientX - dragState.startX);
+    event.preventDefault();
+  }, []);
+
+  const stopTimelinePan = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const dragState = timelineScrollDragRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+    dragState.scrollContainer.releasePointerCapture(event.pointerId);
+    dragState.scrollContainer.classList.remove("is-panning");
+    timelineScrollDragRef.current = null;
+  }, []);
   const normalizeCleanerRole = (rawRole: string | undefined | null) => {
     const role = String(rawRole ?? "").trim();
     if (!role) return "";
@@ -1619,10 +1695,10 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     }, 0);
 
     // Formula: larghezza base + (caratteri * pixel per carattere)
-    // Aggiungi spazio extra per il badge
-    const baseWidth = 60; // padding e margini
-    const charWidth = 7.5; // circa 7.5px per carattere con font bold 13px
-    const badgeSpace = 30; // spazio per il badge P/F
+    // Mantiene la colonna dinamica sul nome più lungo, evitando spazio vuoto eccessivo.
+    const baseWidth = 44; // padding e margini
+    const charWidth = 7; // circa 7px per carattere con font bold 13px
+    const badgeSpace = 20; // spazio per il badge P/F
 
     return Math.max(128, baseWidth + (maxLength * charWidth) + badgeSpace);
   };
@@ -2144,19 +2220,27 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             </div>
           </div>
         </div>
-        <div className="px-4 pt-4 pb-4 overflow-x-auto">
+        <div className="px-1 pt-4 pb-4 overflow-hidden">
 
 {/* Graffe fasce orarie (EO / HP / LP) sopra gli orari */}
-<div className="flex items-stretch mb-0 px-4 h-[26px]">
+<div className="flex items-stretch mb-0 px-1 h-[40px]">
   {/* colonna pulsante / nome cleaner (vuota per allineamento) */}
   <div
     className="flex-shrink-0 h-full print:hidden"
     style={{ width: `${cleanerColumnWidth}px` }}
   />
   {/* area timeline (stessa larghezza della griglia orari) */}
-  <div className="flex-1 h-full relative">
+  <div
+    ref={registerTimelineScrollRef}
+    onScroll={handleTimelineScroll}
+    onPointerDown={handleTimelinePointerDown}
+    onPointerMove={handleTimelinePointerMove}
+    onPointerUp={stopTimelinePan}
+    onPointerCancel={stopTimelinePan}
+    className="timeline-center-scroll min-w-0 flex-1 h-full"
+  >
     {priorityWindows && (
-    <div className="absolute inset-0">
+    <div className="relative h-full" style={{ width: timelineScaledWidth, minWidth: "100%" }}>
       {(() => {
         const hpStartMin = timeToMinutes(priorityWindows.hpStart);
         const hpEndMin = timeToMinutes(priorityWindows.hpEnd);
@@ -2170,8 +2254,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
         // Due piani:
         // - LP più su (top più piccolo)
         // - EO + HP più giù (top più grande)
-        const TOP_LP = -2;   // LP abbassato leggermente per pareggiare il gap superiore/inferiore
-        const TOP_MAIN = 16; // EO/HP abbassati leggermente per allineamento visivo con gli orari
+        const TOP_LP = 2;    // LP resta nel contenitore scrollabile senza essere tagliato
+        const TOP_MAIN = 18; // EO/HP restano allineati ma completamente visibili
 
         // EO deve seguire sempre l'inizio visibile della timeline:
         // se la timeline si estende verso sinistra, anche il bracket EO si estende.
@@ -2238,7 +2322,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 </div>
 
           {/* Header con orari - unico per tutti i cleaner */}
-          <div className="flex items-stretch my-0.5 px-4 h-[40px]">
+          <div className="flex items-stretch my-0.5 px-1 h-[40px]">
             <div
               className="relative flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden translate-y-2"
               style={{ width: `${cleanerColumnWidth}px` }}
@@ -2282,31 +2366,55 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 <UserMinus className="w-4 h-4" />
               </Button>
             </div>
-            <div
-              ref={timelineRowRef}
-              className="flex-1 h-full relative overflow-visible translate-y-1"
-              style={{ display: 'grid', gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
-            >
-              {globalTimeSlots.map((slot, idx) => (
-                <div
-                  key={idx}
-                  className="relative h-full"
+            <div className="relative min-w-0 flex-1 h-full overflow-visible">
+              {globalTimeSlots[0] && (
+                <span
+                  className={cn(
+                    "pointer-events-none absolute left-0 top-[14px] z-30 inline-flex -translate-x-1/2 flex-col items-center gap-0.5 rounded bg-custom-blue-light px-1 text-[13px] font-medium tabular-nums leading-none text-foreground whitespace-nowrap",
+                    timelineScrollLeft > 0 && "invisible"
+                  )}
                 >
-                  <span
-                    className="absolute top-[14px] inline-flex flex-col items-center gap-0.5 text-[13px] font-medium tabular-nums leading-none text-foreground whitespace-nowrap"
-                    style={{
-                      left: "0px",
-                      transform: "translateX(-50%)",
-                    }}
-                  >
-                    <span>{slot}</span>
-                  </span>
+                  <span>{globalTimeSlots[0]}</span>
+                </span>
+              )}
+              <div
+                ref={(node) => {
+                  timelineRowRef.current = node;
+                  registerTimelineScrollRef(node);
+                }}
+                onScroll={handleTimelineScroll}
+                onPointerDown={handleTimelinePointerDown}
+                onPointerMove={handleTimelinePointerMove}
+                onPointerUp={stopTimelinePan}
+                onPointerCancel={stopTimelinePan}
+                className="timeline-center-scroll h-full w-full"
+              >
+                <div
+                  className="relative h-full grid"
+                  style={{ width: timelineScaledWidth, gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
+                >
+                {globalTimeSlots.map((slot, idx) => (
                   <div
-                    className="absolute top-[30px] h-[8px] border-l border-slate-500/60 dark:border-white/60 z-10"
-                    style={{ left: "0px" }}
-                  />
+                    key={idx}
+                    className="relative h-full"
+                  >
+                    <span
+                      className={cn(
+                        "absolute top-[14px] z-30 inline-flex flex-col items-center gap-0.5 rounded bg-custom-blue-light px-1 text-[13px] font-medium tabular-nums leading-none text-foreground whitespace-nowrap",
+                        idx === 0 ? "invisible -translate-x-1/2" : "-translate-x-1/2"
+                      )}
+                      style={{ left: "0px" }}
+                    >
+                      <span>{slot}</span>
+                    </span>
+                    <div
+                      className="absolute top-[30px] h-[8px] border-l border-slate-500/60 dark:border-white/60 z-10"
+                      style={{ left: "0px" }}
+                    />
+                  </div>
+                ))}
                 </div>
-              ))}
+              </div>
             </div>
             <div className="flex-shrink-0 w-20 h-full text-center text-[13px] font-medium text-foreground border-l border-border/70 px-1 flex items-center justify-center">
               Ore lavorate
@@ -2314,7 +2422,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           </div>
 
           {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
-          <div className="flex-1 overflow-auto px-4 pb-4 pt-2">
+          <div className="flex-1 overflow-auto px-1 pb-1 pt-0">
             {allCleanersToShow.length === 0 && !isReadOnly ? (
               <div className="flex items-center justify-center h-64 bg-yellow-100 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
                 <div className="text-center p-6">
@@ -2375,7 +2483,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   <div key={cleaner.id} className="flex mb-0.5 h-[50px]">
                     {/* Info cleaner */}
                     <div
-                      className="flex-shrink-0 flex items-center h-[50px] overflow-hidden rounded-md border border-border/60 bg-background/95 cursor-pointer hover:bg-muted/35 transition-colors"
+                      className="flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-custom-blue-light cursor-pointer hover:bg-muted/35 transition-colors"
                       style={{
                         width: `${cleanerColumnWidth}px`,
                         boxShadow: hasIncompatibleTasks && !isRemoved
@@ -2462,11 +2570,19 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     >
                       {(provided, snapshot) => (
                         <div
-                          ref={provided.innerRef}
                           {...provided.droppableProps}
                           data-testid={`timeline-cleaner-${cleaner.id}`}
                           data-cleaner-id={cleaner.id}
-                          className={`relative h-[50px] min-h-[50px] flex-1 border-l border-border transition-colors duration-200 ${
+                          ref={(node) => {
+                            provided.innerRef(node);
+                            registerTimelineScrollRef(node);
+                          }}
+                          onScroll={handleTimelineScroll}
+                          onPointerDown={handleTimelinePointerDown}
+                          onPointerMove={handleTimelinePointerMove}
+                          onPointerUp={stopTimelinePan}
+                          onPointerCancel={stopTimelinePan}
+                          className={`timeline-center-scroll relative min-w-0 min-h-[45px] flex-1 border-l border-border transition-colors duration-200 ${
                             snapshot.isDraggingOver
                               ? 'bg-blue-200/40 dark:bg-blue-900/40 border-l-2 border-blue-400 dark:border-blue-600'
                               : 'bg-background'
@@ -2476,7 +2592,10 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           }}
                         >
                           {/* Griglia oraria di sfondo (solo visiva) con alternanza colori */}
-                          <div className="absolute inset-0 pointer-events-none" style={{ display: 'grid', gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}>
+                          <div
+                            className="absolute inset-y-0 left-0 pointer-events-none"
+                            style={{ width: timelineScaledWidth, display: 'grid', gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
+                          >
                             {globalTimeSlots.map((slot, idx) => {
                               const isEvenHour = idx % 2 === 0;
                               return (
@@ -2494,7 +2613,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           </div>
 
                           {/* Task posizionate in sequenza con indicatori di travel time */}
-                          <div className="relative z-10 flex items-center h-full" style={{ minHeight: '50px' }}>
+                          <div className="relative z-10 flex items-center h-full" style={{ minHeight: '45px', width: timelineScaledWidth, minWidth: "100%" }}>
                             {(() => {
                               // Calcola l'array delle task per questo cleaner una sola volta
                               const cleanerTasks = tasks
@@ -2576,7 +2695,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     // Usa la stessa base di calcolo dei task (slot * 60 minuti virtuali)
                                     const effectiveTravelMinutes = seq >= 2 && travelTime > 0 && !snapshot.isDraggingOver ? travelTime : 0;
                                     const virtualMinutes = globalTimeSlots.length * 60;
-                                    const timelineWidth = timelineWidthPx || 0;
+                                    const timelineWidth = timelineTaskWidthPx || 0;
                                     const travelWidthPx = effectiveTravelMinutes > 0 && virtualMinutes > 0 && timelineWidth > 0
                                       ? (effectiveTravelMinutes / virtualMinutes) * timelineWidth
                                       : 0;
@@ -2695,8 +2814,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           allTasks={cleanerTasks}
                                           isDragDisabled={isTimelineInteractionDisabled}
                                           isReadOnly={isReadOnly}
-                                          timelineWidthPx={timelineWidthPx}
-                                          isHighlighted={effectiveHighlightedTaskIds.has(String(task.id))}
+                                          timelineWidthPx={timelineTaskWidthPx}
+                                          isHighlighted={highlightedTaskIds.has(String(task.id))}
                                           cleanerId={cleaner.id}
                                           isPriorityWindowViolation={isPriorityWindowViolation(task)}
                                         />

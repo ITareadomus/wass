@@ -1,0 +1,400 @@
+﻿{
+    "success":  true,
+    "ok":  true,
+    "validation":  {
+                       "input":  {
+                                     "valid":  true,
+                                     "errors":  [
+
+                                                ],
+                                     "warnings":  [
+
+                                                  ]
+                                 },
+                       "solution":  {
+                                        "valid":  true,
+                                        "errors":  [
+
+                                                   ],
+                                        "warnings":  [
+
+                                                     ]
+                                    }
+                   },
+    "applyGate":  {
+                      "canApply":  true,
+                      "reason":  "OK",
+                      "droppedTaskCount":  0
+                  },
+    "apply":  null,
+    "droppedDiagnostics":  [
+
+                           ],
+    "solutionSummary":  {
+                            "status":  "FEASIBLE",
+                            "routeCount":  2,
+                            "assignedTaskCount":  28,
+                            "droppedTaskCount":  0,
+                            "totalTravelMin":  183,
+                            "totalWaitMin":  0
+                        },
+    "debugDir":  "C:\\Users\\asus\\Desktop\\wass\\server\\debug\\logistics-optimizer-final\\2026-06-18\\2026-06-16T20-30-41-053Z",
+    "solution":  {
+                     "schemaVersion":  "logistics-routing-solution/v1",
+                     "solverId":  "ortools-v1",
+                     "workDate":  "2026-06-18",
+                     "status":  "FEASIBLE",
+                     "generatedAt":  "2026-06-16T20:30:41.052Z",
+                     "routes":  [
+                                    {
+                                        "driverId":  737,
+                                        "startMin":  600,
+                                        "endMin":  902,
+                                        "totalServiceMin":  210,
+                                        "totalTravelMin":  92,
+                                        "totalWaitMin":  0,
+                                        "stops":  [
+                                                      {
+                                                          "sequence":  1,
+                                                          "taskId":  231753,
+                                                          "arrivalMin":  611,
+                                                          "startMin":  611,
+                                                          "endMin":  626,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  11,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  null
+                                                      },
+                                                      {
+                                                          "sequence":  2,
+                                                          "taskId":  231752,
+                                                          "arrivalMin":  633,
+                                                          "startMin":  633,
+                                                          "endMin":  648,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231753
+                                                      },
+                                                      {
+                                                          "sequence":  3,
+                                                          "taskId":  231757,
+                                                          "arrivalMin":  655,
+                                                          "startMin":  655,
+                                                          "endMin":  670,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231752
+                                                      },
+                                                      {
+                                                          "sequence":  4,
+                                                          "taskId":  231292,
+                                                          "arrivalMin":  678,
+                                                          "startMin":  678,
+                                                          "endMin":  693,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  8,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231757
+                                                      },
+                                                      {
+                                                          "sequence":  5,
+                                                          "taskId":  231759,
+                                                          "arrivalMin":  700,
+                                                          "startMin":  700,
+                                                          "endMin":  715,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231292
+                                                      },
+                                                      {
+                                                          "sequence":  6,
+                                                          "taskId":  231776,
+                                                          "arrivalMin":  722,
+                                                          "startMin":  722,
+                                                          "endMin":  737,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231759
+                                                      },
+                                                      {
+                                                          "sequence":  7,
+                                                          "taskId":  231800,
+                                                          "arrivalMin":  744,
+                                                          "startMin":  744,
+                                                          "endMin":  759,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231776
+                                                      },
+                                                      {
+                                                          "sequence":  8,
+                                                          "taskId":  231747,
+                                                          "arrivalMin":  764,
+                                                          "startMin":  764,
+                                                          "endMin":  779,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  5,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231800
+                                                      },
+                                                      {
+                                                          "sequence":  9,
+                                                          "taskId":  231754,
+                                                          "arrivalMin":  786,
+                                                          "startMin":  786,
+                                                          "endMin":  801,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231747
+                                                      },
+                                                      {
+                                                          "sequence":  10,
+                                                          "taskId":  231758,
+                                                          "arrivalMin":  809,
+                                                          "startMin":  809,
+                                                          "endMin":  824,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  8,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231754
+                                                      },
+                                                      {
+                                                          "sequence":  11,
+                                                          "taskId":  225782,
+                                                          "arrivalMin":  832,
+                                                          "startMin":  832,
+                                                          "endMin":  847,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  8,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231758
+                                                      },
+                                                      {
+                                                          "sequence":  12,
+                                                          "taskId":  225996,
+                                                          "arrivalMin":  850,
+                                                          "startMin":  850,
+                                                          "endMin":  865,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  3,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  225782
+                                                      },
+                                                      {
+                                                          "sequence":  13,
+                                                          "taskId":  225570,
+                                                          "arrivalMin":  868,
+                                                          "startMin":  868,
+                                                          "endMin":  883,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  3,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  225996
+                                                      },
+                                                      {
+                                                          "sequence":  14,
+                                                          "taskId":  231760,
+                                                          "arrivalMin":  887,
+                                                          "startMin":  887,
+                                                          "endMin":  902,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  4,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  225570
+                                                      }
+                                                  ]
+                                    },
+                                    {
+                                        "driverId":  1078,
+                                        "startMin":  600,
+                                        "endMin":  901,
+                                        "totalServiceMin":  210,
+                                        "totalTravelMin":  91,
+                                        "totalWaitMin":  0,
+                                        "stops":  [
+                                                      {
+                                                          "sequence":  1,
+                                                          "taskId":  231748,
+                                                          "arrivalMin":  607,
+                                                          "startMin":  607,
+                                                          "endMin":  622,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  null
+                                                      },
+                                                      {
+                                                          "sequence":  2,
+                                                          "taskId":  231831,
+                                                          "arrivalMin":  628,
+                                                          "startMin":  628,
+                                                          "endMin":  643,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  6,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231748
+                                                      },
+                                                      {
+                                                          "sequence":  3,
+                                                          "taskId":  231750,
+                                                          "arrivalMin":  653,
+                                                          "startMin":  653,
+                                                          "endMin":  668,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  10,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231831
+                                                      },
+                                                      {
+                                                          "sequence":  4,
+                                                          "taskId":  231755,
+                                                          "arrivalMin":  675,
+                                                          "startMin":  675,
+                                                          "endMin":  690,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231750
+                                                      },
+                                                      {
+                                                          "sequence":  5,
+                                                          "taskId":  231775,
+                                                          "arrivalMin":  700,
+                                                          "startMin":  700,
+                                                          "endMin":  715,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  10,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231755
+                                                      },
+                                                      {
+                                                          "sequence":  6,
+                                                          "taskId":  231756,
+                                                          "arrivalMin":  719,
+                                                          "startMin":  719,
+                                                          "endMin":  734,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  4,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231775
+                                                      },
+                                                      {
+                                                          "sequence":  7,
+                                                          "taskId":  231778,
+                                                          "arrivalMin":  742,
+                                                          "startMin":  742,
+                                                          "endMin":  757,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  8,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231756
+                                                      },
+                                                      {
+                                                          "sequence":  8,
+                                                          "taskId":  231903,
+                                                          "arrivalMin":  764,
+                                                          "startMin":  764,
+                                                          "endMin":  779,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231778
+                                                      },
+                                                      {
+                                                          "sequence":  9,
+                                                          "taskId":  227684,
+                                                          "arrivalMin":  786,
+                                                          "startMin":  786,
+                                                          "endMin":  801,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231903
+                                                      },
+                                                      {
+                                                          "sequence":  10,
+                                                          "taskId":  231777,
+                                                          "arrivalMin":  806,
+                                                          "startMin":  806,
+                                                          "endMin":  821,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  5,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  227684
+                                                      },
+                                                      {
+                                                          "sequence":  11,
+                                                          "taskId":  231850,
+                                                          "arrivalMin":  827,
+                                                          "startMin":  827,
+                                                          "endMin":  842,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  6,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231777
+                                                      },
+                                                      {
+                                                          "sequence":  12,
+                                                          "taskId":  231165,
+                                                          "arrivalMin":  846,
+                                                          "startMin":  846,
+                                                          "endMin":  861,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  4,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231850
+                                                      },
+                                                      {
+                                                          "sequence":  13,
+                                                          "taskId":  223960,
+                                                          "arrivalMin":  868,
+                                                          "startMin":  868,
+                                                          "endMin":  883,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231165
+                                                      },
+                                                      {
+                                                          "sequence":  14,
+                                                          "taskId":  223810,
+                                                          "arrivalMin":  886,
+                                                          "startMin":  886,
+                                                          "endMin":  901,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  3,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  223960
+                                                      }
+                                                  ]
+                                    }
+                                ],
+                     "droppedTasks":  [
+
+                                      ],
+                     "objectiveBreakdown":  {
+                                                "assignedTasks":  28,
+                                                "droppedTasks":  0,
+                                                "totalTravelMin":  183,
+                                                "totalWaitMin":  0,
+                                                "penalties":  {
+                                                                  "ortoolsObjective":  361
+                                                              }
+                                            },
+                     "diagnostics":  {
+                                         "warnings":  [
+
+                                                      ],
+                                         "notes":  [
+                                                       "ortoolsStatus=ROUTING_SUCCESS"
+                                                   ],
+                                         "solveDurationMs":  30012
+                                     }
+                 }
+}

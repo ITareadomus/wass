@@ -1,0 +1,8 @@
+{
+  "applyGate": {
+    "canApply": true,
+    "reason": "OK",
+    "droppedTaskCount": 0
+  },
+  "droppedDiagnostics": []
+}

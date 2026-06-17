@@ -1,0 +1,851 @@
+﻿{
+    "success":  true,
+    "ok":  true,
+    "validation":  {
+                       "input":  {
+                                     "valid":  true,
+                                     "errors":  [
+
+                                                ],
+                                     "warnings":  [
+
+                                                  ]
+                                 },
+                       "solution":  {
+                                        "valid":  true,
+                                        "errors":  [
+
+                                                   ],
+                                        "warnings":  [
+
+                                                     ]
+                                    }
+                   },
+    "applyGate":  {
+                      "canApply":  true,
+                      "reason":  "OK",
+                      "droppedTaskCount":  0
+                  },
+    "apply":  {
+                  "applied":  true,
+                  "insertedTasks":  28,
+                  "totalTasksOnTimeline":  28,
+                  "removedFromContainers":  28,
+                  "preservedOutsideSolverInputTasks":  0,
+                  "preservedUnassignedRoutingTasks":  0,
+                  "preservedContainerLockedTasks":  0,
+                  "finalValidation":  {
+                                          "workDate":  "2026-06-18",
+                                          "checkinViolations":  [
+
+                                                                ],
+                                          "checkoutWaitExceeded":  [
+
+                                                                   ],
+                                          "finalDriverPlans":  [
+                                                                   {
+                                                                       "driverId":  737,
+                                                                       "driverName":  "CHRISTOPHER JASON SANTOS",
+                                                                       "tasks":  [
+                                                                                     {
+                                                                                         "taskId":  231753,
+                                                                                         "logisticCode":  840,
+                                                                                         "sequence":  1,
+                                                                                         "startTime":  "10:11",
+                                                                                         "endTime":  "10:26",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  null,
+                                                                                         "checkinDate":  "2026-06-19",
+                                                                                         "travelTime":  11,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231752,
+                                                                                         "logisticCode":  714,
+                                                                                         "sequence":  2,
+                                                                                         "startTime":  "10:33",
+                                                                                         "endTime":  "10:48",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  "17:00",
+                                                                                         "checkinDate":  "2026-06-20",
+                                                                                         "travelTime":  7,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231757,
+                                                                                         "logisticCode":  1051,
+                                                                                         "sequence":  3,
+                                                                                         "startTime":  "10:55",
+                                                                                         "endTime":  "11:10",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  null,
+                                                                                         "checkinDate":  "2026-06-21",
+                                                                                         "travelTime":  7,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231292,
+                                                                                         "logisticCode":  1530,
+                                                                                         "sequence":  4,
+                                                                                         "startTime":  "11:18",
+                                                                                         "endTime":  "11:33",
+                                                                                         "checkoutTime":  "11:15",
+                                                                                         "checkinTime":  "14:00",
+                                                                                         "checkinDate":  "2026-06-18",
+                                                                                         "travelTime":  8,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231759,
+                                                                                         "logisticCode":  1679,
+                                                                                         "sequence":  5,
+                                                                                         "startTime":  "11:40",
+                                                                                         "endTime":  "11:55",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  null,
+                                                                                         "checkinDate":  "2026-06-19",
+                                                                                         "travelTime":  7,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231776,
+                                                                                         "logisticCode":  771,
+                                                                                         "sequence":  6,
+                                                                                         "startTime":  "12:02",
+                                                                                         "endTime":  "12:17",
+                                                                                         "checkoutTime":  "11:00",
+                                                                                         "checkinTime":  "14:00",
+                                                                                         "checkinDate":  "2026-06-18",
+                                                                                         "travelTime":  7,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231800,
+                                                                                         "logisticCode":  410,
+                                                                                         "sequence":  7,
+                                                                                         "startTime":  "12:24",
+                                                                                         "endTime":  "12:39",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  null,
+                                                                                         "checkinDate":  null,
+                                                                                         "travelTime":  7,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231747,
+                                                                                         "logisticCode":  1681,
+                                                                                         "sequence":  8,
+                                                                                         "startTime":  "12:44",
+                                                                                         "endTime":  "12:59",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  "16:00",
+                                                                                         "checkinDate":  "2026-06-18",
+                                                                                         "travelTime":  5,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231754,
+                                                                                         "logisticCode":  1634,
+                                                                                         "sequence":  9,
+                                                                                         "startTime":  "13:06",
+                                                                                         "endTime":  "13:21",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  "15:00",
+                                                                                         "checkinDate":  "2026-06-18",
+                                                                                         "travelTime":  7,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231758,
+                                                                                         "logisticCode":  1662,
+                                                                                         "sequence":  10,
+                                                                                         "startTime":  "13:29",
+                                                                                         "endTime":  "13:44",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  "15:00",
+                                                                                         "checkinDate":  "2026-06-19",
+                                                                                         "travelTime":  8,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  225782,
+                                                                                         "logisticCode":  1637,
+                                                                                         "sequence":  11,
+                                                                                         "startTime":  "13:52",
+                                                                                         "endTime":  "14:07",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  null,
+                                                                                         "checkinDate":  null,
+                                                                                         "travelTime":  8,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  225996,
+                                                                                         "logisticCode":  1637,
+                                                                                         "sequence":  12,
+                                                                                         "startTime":  "14:10",
+                                                                                         "endTime":  "14:25",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  null,
+                                                                                         "checkinDate":  null,
+                                                                                         "travelTime":  3,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  225570,
+                                                                                         "logisticCode":  1637,
+                                                                                         "sequence":  13,
+                                                                                         "startTime":  "14:28",
+                                                                                         "endTime":  "14:43",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  null,
+                                                                                         "checkinDate":  null,
+                                                                                         "travelTime":  3,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231760,
+                                                                                         "logisticCode":  1744,
+                                                                                         "sequence":  14,
+                                                                                         "startTime":  "14:47",
+                                                                                         "endTime":  "15:02",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  "15:00",
+                                                                                         "checkinDate":  "2026-06-20",
+                                                                                         "travelTime":  4,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     }
+                                                                                 ]
+                                                                   },
+                                                                   {
+                                                                       "driverId":  1078,
+                                                                       "driverName":  "ALA ABD EL HADY",
+                                                                       "tasks":  [
+                                                                                     {
+                                                                                         "taskId":  231748,
+                                                                                         "logisticCode":  623,
+                                                                                         "sequence":  1,
+                                                                                         "startTime":  "10:07",
+                                                                                         "endTime":  "10:22",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  "18:30",
+                                                                                         "checkinDate":  "2026-06-19",
+                                                                                         "travelTime":  7,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231831,
+                                                                                         "logisticCode":  1715,
+                                                                                         "sequence":  2,
+                                                                                         "startTime":  "10:28",
+                                                                                         "endTime":  "10:43",
+                                                                                         "checkoutTime":  "10:00",
+                                                                                         "checkinTime":  "15:00",
+                                                                                         "checkinDate":  "2026-06-23",
+                                                                                         "travelTime":  6,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231750,
+                                                                                         "logisticCode":  1381,
+                                                                                         "sequence":  3,
+                                                                                         "startTime":  "10:53",
+                                                                                         "endTime":  "11:08",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  "19:00",
+                                                                                         "checkinDate":  "2026-06-19",
+                                                                                         "travelTime":  10,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231755,
+                                                                                         "logisticCode":  504,
+                                                                                         "sequence":  4,
+                                                                                         "startTime":  "11:15",
+                                                                                         "endTime":  "11:30",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  null,
+                                                                                         "checkinDate":  "2026-06-23",
+                                                                                         "travelTime":  7,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231775,
+                                                                                         "logisticCode":  782,
+                                                                                         "sequence":  5,
+                                                                                         "startTime":  "11:40",
+                                                                                         "endTime":  "11:55",
+                                                                                         "checkoutTime":  "11:00",
+                                                                                         "checkinTime":  "14:00",
+                                                                                         "checkinDate":  "2026-06-18",
+                                                                                         "travelTime":  10,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231756,
+                                                                                         "logisticCode":  1729,
+                                                                                         "sequence":  6,
+                                                                                         "startTime":  "11:59",
+                                                                                         "endTime":  "12:14",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  "20:00",
+                                                                                         "checkinDate":  "2026-06-19",
+                                                                                         "travelTime":  4,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231778,
+                                                                                         "logisticCode":  795,
+                                                                                         "sequence":  7,
+                                                                                         "startTime":  "12:22",
+                                                                                         "endTime":  "12:37",
+                                                                                         "checkoutTime":  "11:00",
+                                                                                         "checkinTime":  "14:00",
+                                                                                         "checkinDate":  "2026-06-18",
+                                                                                         "travelTime":  8,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231903,
+                                                                                         "logisticCode":  1032,
+                                                                                         "sequence":  8,
+                                                                                         "startTime":  "12:44",
+                                                                                         "endTime":  "12:59",
+                                                                                         "checkoutTime":  "11:00",
+                                                                                         "checkinTime":  "14:00",
+                                                                                         "checkinDate":  "2026-06-18",
+                                                                                         "travelTime":  7,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  227684,
+                                                                                         "logisticCode":  229,
+                                                                                         "sequence":  9,
+                                                                                         "startTime":  "13:06",
+                                                                                         "endTime":  "13:21",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  null,
+                                                                                         "checkinDate":  "2026-06-22",
+                                                                                         "travelTime":  7,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231777,
+                                                                                         "logisticCode":  1050,
+                                                                                         "sequence":  10,
+                                                                                         "startTime":  "13:26",
+                                                                                         "endTime":  "13:41",
+                                                                                         "checkoutTime":  "11:00",
+                                                                                         "checkinTime":  "14:00",
+                                                                                         "checkinDate":  "2026-06-18",
+                                                                                         "travelTime":  5,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231850,
+                                                                                         "logisticCode":  1516,
+                                                                                         "sequence":  11,
+                                                                                         "startTime":  "13:47",
+                                                                                         "endTime":  "14:02",
+                                                                                         "checkoutTime":  "11:00",
+                                                                                         "checkinTime":  "15:00",
+                                                                                         "checkinDate":  "2026-06-18",
+                                                                                         "travelTime":  6,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  231165,
+                                                                                         "logisticCode":  273,
+                                                                                         "sequence":  12,
+                                                                                         "startTime":  "14:06",
+                                                                                         "endTime":  "14:21",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  "19:00",
+                                                                                         "checkinDate":  "2026-06-19",
+                                                                                         "travelTime":  4,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  223960,
+                                                                                         "logisticCode":  1741,
+                                                                                         "sequence":  13,
+                                                                                         "startTime":  "14:28",
+                                                                                         "endTime":  "14:43",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  null,
+                                                                                         "checkinDate":  null,
+                                                                                         "travelTime":  7,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     },
+                                                                                     {
+                                                                                         "taskId":  223810,
+                                                                                         "logisticCode":  1741,
+                                                                                         "sequence":  14,
+                                                                                         "startTime":  "14:46",
+                                                                                         "endTime":  "15:01",
+                                                                                         "checkoutTime":  null,
+                                                                                         "checkinTime":  null,
+                                                                                         "checkinDate":  null,
+                                                                                         "travelTime":  3,
+                                                                                         "checkoutWaitMinutes":  0,
+                                                                                         "checkinViolated":  false,
+                                                                                         "startAtOrAfterCheckin":  false,
+                                                                                         "checkoutWaitExceeded":  false
+                                                                                     }
+                                                                                 ]
+                                                                   }
+                                                               ]
+                                      }
+              },
+    "droppedDiagnostics":  [
+
+                           ],
+    "solutionSummary":  {
+                            "status":  "FEASIBLE",
+                            "routeCount":  2,
+                            "assignedTaskCount":  28,
+                            "droppedTaskCount":  0,
+                            "totalTravelMin":  183,
+                            "totalWaitMin":  0
+                        },
+    "debugDir":  "C:\\Users\\asus\\Desktop\\wass\\server\\debug\\logistics-optimizer-final\\2026-06-18\\2026-06-16T20-31-34-369Z",
+    "solution":  {
+                     "schemaVersion":  "logistics-routing-solution/v1",
+                     "solverId":  "ortools-v1",
+                     "workDate":  "2026-06-18",
+                     "status":  "FEASIBLE",
+                     "generatedAt":  "2026-06-16T20:31:34.369Z",
+                     "routes":  [
+                                    {
+                                        "driverId":  737,
+                                        "startMin":  600,
+                                        "endMin":  902,
+                                        "totalServiceMin":  210,
+                                        "totalTravelMin":  92,
+                                        "totalWaitMin":  0,
+                                        "stops":  [
+                                                      {
+                                                          "sequence":  1,
+                                                          "taskId":  231753,
+                                                          "arrivalMin":  611,
+                                                          "startMin":  611,
+                                                          "endMin":  626,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  11,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  null
+                                                      },
+                                                      {
+                                                          "sequence":  2,
+                                                          "taskId":  231752,
+                                                          "arrivalMin":  633,
+                                                          "startMin":  633,
+                                                          "endMin":  648,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231753
+                                                      },
+                                                      {
+                                                          "sequence":  3,
+                                                          "taskId":  231757,
+                                                          "arrivalMin":  655,
+                                                          "startMin":  655,
+                                                          "endMin":  670,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231752
+                                                      },
+                                                      {
+                                                          "sequence":  4,
+                                                          "taskId":  231292,
+                                                          "arrivalMin":  678,
+                                                          "startMin":  678,
+                                                          "endMin":  693,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  8,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231757
+                                                      },
+                                                      {
+                                                          "sequence":  5,
+                                                          "taskId":  231759,
+                                                          "arrivalMin":  700,
+                                                          "startMin":  700,
+                                                          "endMin":  715,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231292
+                                                      },
+                                                      {
+                                                          "sequence":  6,
+                                                          "taskId":  231776,
+                                                          "arrivalMin":  722,
+                                                          "startMin":  722,
+                                                          "endMin":  737,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231759
+                                                      },
+                                                      {
+                                                          "sequence":  7,
+                                                          "taskId":  231800,
+                                                          "arrivalMin":  744,
+                                                          "startMin":  744,
+                                                          "endMin":  759,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231776
+                                                      },
+                                                      {
+                                                          "sequence":  8,
+                                                          "taskId":  231747,
+                                                          "arrivalMin":  764,
+                                                          "startMin":  764,
+                                                          "endMin":  779,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  5,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231800
+                                                      },
+                                                      {
+                                                          "sequence":  9,
+                                                          "taskId":  231754,
+                                                          "arrivalMin":  786,
+                                                          "startMin":  786,
+                                                          "endMin":  801,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231747
+                                                      },
+                                                      {
+                                                          "sequence":  10,
+                                                          "taskId":  231758,
+                                                          "arrivalMin":  809,
+                                                          "startMin":  809,
+                                                          "endMin":  824,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  8,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231754
+                                                      },
+                                                      {
+                                                          "sequence":  11,
+                                                          "taskId":  225782,
+                                                          "arrivalMin":  832,
+                                                          "startMin":  832,
+                                                          "endMin":  847,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  8,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231758
+                                                      },
+                                                      {
+                                                          "sequence":  12,
+                                                          "taskId":  225996,
+                                                          "arrivalMin":  850,
+                                                          "startMin":  850,
+                                                          "endMin":  865,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  3,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  225782
+                                                      },
+                                                      {
+                                                          "sequence":  13,
+                                                          "taskId":  225570,
+                                                          "arrivalMin":  868,
+                                                          "startMin":  868,
+                                                          "endMin":  883,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  3,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  225996
+                                                      },
+                                                      {
+                                                          "sequence":  14,
+                                                          "taskId":  231760,
+                                                          "arrivalMin":  887,
+                                                          "startMin":  887,
+                                                          "endMin":  902,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  4,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  225570
+                                                      }
+                                                  ]
+                                    },
+                                    {
+                                        "driverId":  1078,
+                                        "startMin":  600,
+                                        "endMin":  901,
+                                        "totalServiceMin":  210,
+                                        "totalTravelMin":  91,
+                                        "totalWaitMin":  0,
+                                        "stops":  [
+                                                      {
+                                                          "sequence":  1,
+                                                          "taskId":  231748,
+                                                          "arrivalMin":  607,
+                                                          "startMin":  607,
+                                                          "endMin":  622,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  null
+                                                      },
+                                                      {
+                                                          "sequence":  2,
+                                                          "taskId":  231831,
+                                                          "arrivalMin":  628,
+                                                          "startMin":  628,
+                                                          "endMin":  643,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  6,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231748
+                                                      },
+                                                      {
+                                                          "sequence":  3,
+                                                          "taskId":  231750,
+                                                          "arrivalMin":  653,
+                                                          "startMin":  653,
+                                                          "endMin":  668,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  10,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231831
+                                                      },
+                                                      {
+                                                          "sequence":  4,
+                                                          "taskId":  231755,
+                                                          "arrivalMin":  675,
+                                                          "startMin":  675,
+                                                          "endMin":  690,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231750
+                                                      },
+                                                      {
+                                                          "sequence":  5,
+                                                          "taskId":  231775,
+                                                          "arrivalMin":  700,
+                                                          "startMin":  700,
+                                                          "endMin":  715,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  10,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231755
+                                                      },
+                                                      {
+                                                          "sequence":  6,
+                                                          "taskId":  231756,
+                                                          "arrivalMin":  719,
+                                                          "startMin":  719,
+                                                          "endMin":  734,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  4,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231775
+                                                      },
+                                                      {
+                                                          "sequence":  7,
+                                                          "taskId":  231778,
+                                                          "arrivalMin":  742,
+                                                          "startMin":  742,
+                                                          "endMin":  757,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  8,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231756
+                                                      },
+                                                      {
+                                                          "sequence":  8,
+                                                          "taskId":  231903,
+                                                          "arrivalMin":  764,
+                                                          "startMin":  764,
+                                                          "endMin":  779,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231778
+                                                      },
+                                                      {
+                                                          "sequence":  9,
+                                                          "taskId":  227684,
+                                                          "arrivalMin":  786,
+                                                          "startMin":  786,
+                                                          "endMin":  801,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231903
+                                                      },
+                                                      {
+                                                          "sequence":  10,
+                                                          "taskId":  231777,
+                                                          "arrivalMin":  806,
+                                                          "startMin":  806,
+                                                          "endMin":  821,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  5,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  227684
+                                                      },
+                                                      {
+                                                          "sequence":  11,
+                                                          "taskId":  231850,
+                                                          "arrivalMin":  827,
+                                                          "startMin":  827,
+                                                          "endMin":  842,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  6,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231777
+                                                      },
+                                                      {
+                                                          "sequence":  12,
+                                                          "taskId":  231165,
+                                                          "arrivalMin":  846,
+                                                          "startMin":  846,
+                                                          "endMin":  861,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  4,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231850
+                                                      },
+                                                      {
+                                                          "sequence":  13,
+                                                          "taskId":  223960,
+                                                          "arrivalMin":  868,
+                                                          "startMin":  868,
+                                                          "endMin":  883,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  7,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  231165
+                                                      },
+                                                      {
+                                                          "sequence":  14,
+                                                          "taskId":  223810,
+                                                          "arrivalMin":  886,
+                                                          "startMin":  886,
+                                                          "endMin":  901,
+                                                          "serviceDurationMin":  15,
+                                                          "travelFromPreviousMin":  3,
+                                                          "waitMin":  0,
+                                                          "previousTaskId":  223960
+                                                      }
+                                                  ]
+                                    }
+                                ],
+                     "droppedTasks":  [
+
+                                      ],
+                     "objectiveBreakdown":  {
+                                                "assignedTasks":  28,
+                                                "droppedTasks":  0,
+                                                "totalTravelMin":  183,
+                                                "totalWaitMin":  0,
+                                                "penalties":  {
+                                                                  "ortoolsObjective":  361
+                                                              }
+                                            },
+                     "diagnostics":  {
+                                         "warnings":  [
+
+                                                      ],
+                                         "notes":  [
+                                                       "ortoolsStatus=ROUTING_SUCCESS"
+                                                   ],
+                                         "solveDurationMs":  30016
+                                     }
+                 }
+}
