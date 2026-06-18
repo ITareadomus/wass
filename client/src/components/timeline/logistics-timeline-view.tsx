@@ -354,6 +354,13 @@ export default function LogisticsTimelineView({
   }>({ open: false, driverId: null, driverName: "" });
   const [pendingEditStartTime, setPendingEditStartTime] = useState("10:00");
   const [isSavingDriverStartTime, setIsSavingDriverStartTime] = useState(false);
+  const [editDriverEndDialog, setEditDriverEndDialog] = useState<{
+    open: boolean;
+    driverId: number | null;
+    driverName: string;
+  }>({ open: false, driverId: null, driverName: "" });
+  const [pendingEditEndTime, setPendingEditEndTime] = useState("20:00");
+  const [isSavingDriverEndTime, setIsSavingDriverEndTime] = useState(false);
   const [confirmRemoveDriverId, setConfirmRemoveDriverId] = useState<number | null>(null);
   const [selectedSwapDriver, setSelectedSwapDriver] = useState<string>("");
   const [filteredDriverIdForMap, setFilteredDriverIdForMap] = useState<number | null>(null);
@@ -1065,6 +1072,61 @@ export default function LogisticsTimelineView({
       });
     } finally {
       setIsSavingDriverStartTime(false);
+    }
+  };
+
+  const handleOpenEditDriverEndTime = (d: LogisticsDriverRow) => {
+    setPendingEditEndTime(d.end_time || "20:00");
+    setEditDriverEndDialog({
+      open: true,
+      driverId: d.id,
+      driverName: `${d.name ?? ""} ${d.lastname ?? ""}`.trim() || `ID ${d.id}`,
+    });
+  };
+
+  const handleSaveEditedDriverEndTime = async () => {
+    if (editDriverEndDialog.driverId == null) return;
+    if (!/^\d{2}:\d{2}$/.test(pendingEditEndTime)) {
+      toast({
+        variant: "destructive",
+        title: "Formato orario non valido",
+        description: "Usa HH:mm (es. 20:00)",
+      });
+      return;
+    }
+    setIsSavingDriverEndTime(true);
+    try {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const response = await fetch("/api/update-logistics-driver-end-time", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          driverId: editDriverEndDialog.driverId,
+          endTime: pendingEditEndTime,
+          date: workDate,
+          modified_by: user.username || "unknown",
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.message || "Aggiornamento end time fallito");
+      }
+      await onRefresh();
+      setSelectedDriverForDetails((prev) =>
+        prev && prev.id === editDriverEndDialog.driverId
+          ? { ...prev, end_time: pendingEditEndTime }
+          : prev
+      );
+      toast({ title: "End time aggiornato", variant: "success" });
+      setEditDriverEndDialog({ open: false, driverId: null, driverName: "" });
+    } catch (e: any) {
+      toast({
+        title: "Errore",
+        description: e?.message || "Impossibile salvare",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDriverEndTime(false);
     }
   };
 
@@ -2104,15 +2166,6 @@ export default function LogisticsTimelineView({
                   </p>
                 </div>
 
-                <div className="col-span-2">
-                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">
-                    End Time
-                  </p>
-                  <p className="text-sm p-2 rounded border border-border">
-                    {selectedDriverForDetails.end_time || "20:00"}
-                  </p>
-                </div>
-
                 <div className="col-span-1">
                   <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">Nome</p>
                   <Input
@@ -2165,7 +2218,7 @@ export default function LogisticsTimelineView({
                   />
                 </div>
 
-                <div className="col-span-2">
+                <div className="col-span-1">
                   <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1 flex items-center gap-1">
                     Start Time
                     {!isReadOnly && (
@@ -2183,6 +2236,27 @@ export default function LogisticsTimelineView({
                     }}
                   >
                     {selectedDriverForDetails.start_time || "10:00"}
+                  </p>
+                </div>
+
+                <div className="col-span-1">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1 flex items-center gap-1">
+                    End Time
+                    {!isReadOnly && (
+                      <Pencil className="w-3 h-3 text-gray-700 dark:text-muted-foreground/60" />
+                    )}
+                  </p>
+                  <p
+                    className={cn(
+                      "text-sm p-2 rounded border border-border",
+                      !isReadOnly && "cursor-pointer hover:bg-muted/50 hover:border-custom-blue"
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isReadOnly) handleOpenEditDriverEndTime(selectedDriverForDetails);
+                    }}
+                  >
+                    {selectedDriverForDetails.end_time || "20:00"}
                   </p>
                 </div>
 
@@ -2447,6 +2521,97 @@ export default function LogisticsTimelineView({
               className="border-2 border-custom-blue"
             >
               {isSavingDriverStartTime ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Salvataggio…
+                </>
+              ) : (
+                "Salva"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editDriverEndDialog.open}
+        onOpenChange={(open) => !open && setEditDriverEndDialog({ open: false, driverId: null, driverName: "" })}
+      >
+        <DialogContent
+          className="sm:max-w-md"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>Modifica end time</DialogTitle>
+            <DialogDescription>
+              Orario di fine per <strong>{editDriverEndDialog.driverName}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <span className="text-sm font-semibold text-muted-foreground mb-2 block">End time</span>
+              <div className="flex items-center justify-center gap-1 bg-background border-2 border-custom-blue rounded-lg px-3 py-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const [hours, minutes] = pendingEditEndTime.split(":").map(Number);
+                    let totalMinutes = hours * 60 + minutes - 30;
+                    if (totalMinutes < 0) totalMinutes += 24 * 60;
+                    const newHours = Math.floor(totalMinutes / 60);
+                    const newMinutes = totalMinutes % 60;
+                    setPendingEditEndTime(
+                      `${String(newHours).padStart(2, "0")}:${String(newMinutes).padStart(2, "0")}`
+                    );
+                  }}
+                >
+                  <span className="text-lg font-bold">−</span>
+                </Button>
+                <span className="text-lg font-mono font-bold min-w-[60px] text-center">{pendingEditEndTime}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-900"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const [hours, minutes] = pendingEditEndTime.split(":").map(Number);
+                    let totalMinutes = hours * 60 + minutes + 30;
+                    if (totalMinutes >= 24 * 60) totalMinutes -= 24 * 60;
+                    const newHours = Math.floor(totalMinutes / 60);
+                    const newMinutes = totalMinutes % 60;
+                    setPendingEditEndTime(
+                      `${String(newHours).padStart(2, "0")}:${String(newMinutes).padStart(2, "0")}`
+                    );
+                  }}
+                >
+                  <span className="text-lg font-bold">+</span>
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 text-center">Intervalli di 30 minuti (+ / −)</p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditDriverEndDialog({ open: false, driverId: null, driverName: "" })}
+              className="border-2 border-custom-blue"
+              disabled={isSavingDriverEndTime}
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleSaveEditedDriverEndTime()}
+              disabled={isSavingDriverEndTime}
+              className="border-2 border-custom-blue"
+            >
+              {isSavingDriverEndTime ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Salvataggio…

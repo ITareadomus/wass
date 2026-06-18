@@ -298,6 +298,9 @@ export default function TimelineView({
   const [editingStartTime, setEditingStartTime] = useState<string>("10:00");
   const [startTimeEditDialog, setStartTimeEditDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
   const [isSavingStartTime, setIsSavingStartTime] = useState(false);
+  const [editingEndTime, setEditingEndTime] = useState<string>("20:00");
+  const [endTimeEditDialog, setEndTimeEditDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
+  const [isSavingEndTime, setIsSavingEndTime] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isTransferringToAdam, setIsTransferringToAdam] = useState(false);
   const [showOptimizerDialog, setShowOptimizerDialog] = useState(false);
@@ -1690,6 +1693,16 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     });
   };
 
+  const handleOpenEndTimeDialog = (cleaner: Cleaner) => {
+    const currentEndTime = cleaner.end_time || "20:00";
+    setEditingEndTime(currentEndTime);
+    setEndTimeEditDialog({
+      open: true,
+      cleanerId: cleaner.id,
+      cleanerName: `${cleaner.name} ${cleaner.lastname}`
+    });
+  };
+
   // Salva l'alias modificato
   const handleSaveAlias = async () => {
     if (!aliasDialog.cleanerId) return;
@@ -1799,6 +1812,70 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       });
     } finally {
       setIsSavingStartTime(false);
+    }
+  };
+
+  const handleSaveEndTime = async () => {
+    if (!endTimeEditDialog.cleanerId) return;
+
+    if (!/^\d{2}:\d{2}$/.test(editingEndTime)) {
+      toast({
+        variant: "destructive",
+        title: "⚠️ Formato orario non valido",
+        description: "Inserisci un orario nel formato HH:mm (es. 20:00)"
+      });
+      return;
+    }
+
+    setIsSavingEndTime(true);
+    try {
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const response = await fetch('/api/update-cleaner-end-time', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cleanerId: endTimeEditDialog.cleanerId,
+          endTime: editingEndTime,
+          date: workDate,
+          scope: scopeValue,
+          modified_by: currentUser.username || 'unknown'
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.message || 'Errore nel salvataggio dell\'end time');
+      }
+
+      setCleaners(prev => prev.map(c =>
+        c.id === endTimeEditDialog.cleanerId ? { ...c, end_time: editingEndTime } : c
+      ));
+
+      if (selectedCleaner && selectedCleaner.id === endTimeEditDialog.cleanerId) {
+        setSelectedCleaner({ ...selectedCleaner, end_time: editingEndTime });
+      }
+
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
+
+      toast({
+        title: "End Time salvato",
+        description: `Orario di fine aggiornato a ${editingEndTime}`,
+        variant: "success",
+      });
+
+      setEndTimeEditDialog({ open: false, cleanerId: null, cleanerName: '' });
+
+    } catch (error: any) {
+      console.error("Errore nel salvataggio dell'end time:", error);
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile salvare l'end time",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingEndTime(false);
     }
   };
 
@@ -3243,33 +3320,61 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
       {/* Start Time Edit Dialog */}
       <Dialog open={startTimeEditDialog.open} onOpenChange={(open) => !open && setStartTimeEditDialog({ open: false, cleanerId: null, cleanerName: '' })}>
-        <DialogContent className="sm:max-md" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <DialogContent
+          className="sm:max-w-md"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Pencil className="w-5 h-5 text-custom-blue" />
-              Modifica Start Time
-            </DialogTitle>
+            <DialogTitle>Modifica start time</DialogTitle>
             <DialogDescription>
-              Stai modificando l'orario di inizio di <strong>{startTimeEditDialog.cleanerName}</strong>
+              Orario di inizio per <strong>{startTimeEditDialog.cleanerName}</strong>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <div>
-              <label className="text-sm font-semibold text-muted-foreground mb-2 block">
-                Nuovo Start Time
-              </label>
-              <Input
-                type="time"
-                value={editingStartTime}
-                onChange={(e) => setEditingStartTime(e.target.value)}
-                placeholder="Inserisci orario (HH:mm)"
-                className="w-full"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSaveStartTime();
-                  }
-                }}
-              />
+              <span className="text-sm font-semibold text-muted-foreground mb-2 block">Start time</span>
+              <div className="flex items-center justify-center gap-1 bg-background border-2 border-custom-blue rounded-lg px-3 py-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const [hours, minutes] = editingStartTime.split(":").map(Number);
+                    let totalMinutes = hours * 60 + minutes - 30;
+                    if (totalMinutes < 0) totalMinutes += 24 * 60;
+                    const newHours = Math.floor(totalMinutes / 60);
+                    const newMinutes = totalMinutes % 60;
+                    setEditingStartTime(
+                      `${String(newHours).padStart(2, "0")}:${String(newMinutes).padStart(2, "0")}`
+                    );
+                  }}
+                >
+                  <span className="text-lg font-bold">−</span>
+                </Button>
+                <span className="text-lg font-mono font-bold min-w-[60px] text-center">{editingStartTime}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-900"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const [hours, minutes] = editingStartTime.split(":").map(Number);
+                    let totalMinutes = hours * 60 + minutes + 30;
+                    if (totalMinutes >= 24 * 60) totalMinutes -= 24 * 60;
+                    const newHours = Math.floor(totalMinutes / 60);
+                    const newMinutes = totalMinutes % 60;
+                    setEditingStartTime(
+                      `${String(newHours).padStart(2, "0")}:${String(newMinutes).padStart(2, "0")}`
+                    );
+                  }}
+                >
+                  <span className="text-lg font-bold">+</span>
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 text-center">Intervalli di 30 minuti (+ / −)</p>
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-6">
@@ -3277,28 +3382,114 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               variant="outline"
               size="sm"
               onClick={() => setStartTimeEditDialog({ open: false, cleanerId: null, cleanerName: '' })}
-              disabled={isSavingStartTime}
               className="border-2 border-custom-blue"
+              disabled={isSavingStartTime}
             >
               Annulla
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={handleSaveStartTime}
+              onClick={() => void handleSaveStartTime()}
               disabled={isSavingStartTime}
               className="border-2 border-custom-blue"
             >
               {isSavingStartTime ? (
                 <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Salvataggio...
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Salvataggio…
                 </>
               ) : (
+                "Salva"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* End Time Edit Dialog */}
+      <Dialog open={endTimeEditDialog.open} onOpenChange={(open) => !open && setEndTimeEditDialog({ open: false, cleanerId: null, cleanerName: '' })}>
+        <DialogContent
+          className="sm:max-w-md"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>Modifica end time</DialogTitle>
+            <DialogDescription>
+              Orario di fine per <strong>{endTimeEditDialog.cleanerName}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <span className="text-sm font-semibold text-muted-foreground mb-2 block">End time</span>
+              <div className="flex items-center justify-center gap-1 bg-background border-2 border-custom-blue rounded-lg px-3 py-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const [hours, minutes] = editingEndTime.split(":").map(Number);
+                    let totalMinutes = hours * 60 + minutes - 30;
+                    if (totalMinutes < 0) totalMinutes += 24 * 60;
+                    const newHours = Math.floor(totalMinutes / 60);
+                    const newMinutes = totalMinutes % 60;
+                    setEditingEndTime(
+                      `${String(newHours).padStart(2, "0")}:${String(newMinutes).padStart(2, "0")}`
+                    );
+                  }}
+                >
+                  <span className="text-lg font-bold">−</span>
+                </Button>
+                <span className="text-lg font-mono font-bold min-w-[60px] text-center">{editingEndTime}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-900"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const [hours, minutes] = editingEndTime.split(":").map(Number);
+                    let totalMinutes = hours * 60 + minutes + 30;
+                    if (totalMinutes >= 24 * 60) totalMinutes -= 24 * 60;
+                    const newHours = Math.floor(totalMinutes / 60);
+                    const newMinutes = totalMinutes % 60;
+                    setEditingEndTime(
+                      `${String(newHours).padStart(2, "0")}:${String(newMinutes).padStart(2, "0")}`
+                    );
+                  }}
+                >
+                  <span className="text-lg font-bold">+</span>
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 text-center">Intervalli di 30 minuti (+ / −)</p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEndTimeEditDialog({ open: false, cleanerId: null, cleanerName: '' })}
+              className="border-2 border-custom-blue"
+              disabled={isSavingEndTime}
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleSaveEndTime()}
+              disabled={isSavingEndTime}
+              className="border-2 border-custom-blue"
+            >
+              {isSavingEndTime ? (
                 <>
-                  <Save className="w-4 h-4 mr-2" />
-                  Salva
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Salvataggio…
                 </>
+              ) : (
+                "Salva"
               )}
             </Button>
           </div>
@@ -3760,8 +3951,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   />
                 </div>
 
-                {/* Start Time (2/4) */}
-                <div className="col-span-2">
+                {/* Start Time (1/4) + End Time (1/4) — metà sinistra */}
+                <div className="col-span-1">
                   <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1 flex items-center gap-1">
                     Start Time
                     {!isReadOnly && <Pencil className="w-3 h-3 text-gray-700 dark:text-muted-foreground/60" />}
@@ -3779,16 +3970,25 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   </p>
                 </div>
 
-                <div className="col-span-2">
-                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">
+                <div className="col-span-1">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1 flex items-center gap-1">
                     End Time
+                    {!isReadOnly && <Pencil className="w-3 h-3 text-gray-700 dark:text-muted-foreground/60" />}
                   </p>
-                  <p className="text-sm p-2 rounded border border-border">
+                  <p
+                    className={`text-sm p-2 rounded border ${
+                      !isReadOnly ? "cursor-pointer hover:bg-muted/50 border-border hover:border-custom-blue" : "border-border"
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isReadOnly) handleOpenEndTimeDialog(selectedCleaner);
+                    }}
+                  >
                     {selectedCleaner.end_time || "20:00"}
                   </p>
                 </div>
 
-                {/* Tipo contratto (2/4) */}
+                {/* Tipo contratto (2/4) — metà destra */}
                 <div className="col-span-2">
                   <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">Tipo contratto</p>
                   <Input
