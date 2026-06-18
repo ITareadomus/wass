@@ -1,5 +1,11 @@
 import * as workspaceFiles from "./workspace-files";
 import { parseHmToMinutes } from "../../shared/logistics-scheduling-constraints";
+import { estimateLogisticsReturnToDepotMinutes } from "../../shared/logistics-travel-estimate";
+export {
+  estimateLogisticsCarTravelMinutes as estimateCarTravelMinutes,
+  LOGISTICS_DEPOT_LAT,
+  LOGISTICS_DEPOT_LNG,
+} from "../../shared/logistics-travel-estimate";
 import {
   buildLogisticsScheduleForDriver,
   type LogisticsScheduleTaskInput,
@@ -9,39 +15,6 @@ import {
   mapPriorityType,
   type PriorityWindows,
 } from "./optimizer/priorityWindows";
-
-const EARTH_RADIUS_M = 6371000;
-const DEFAULT_AVG_SPEED_KMH = 28;
-const BASE_MINUTES = 3;
-const MIN_LEG_MIN = 2;
-const MAX_LEG_MIN = 180;
-/** Primo tratto dalla base (Via Barrili 31, Milano). */
-export const LOGISTICS_DEPOT_LAT = 45.434029;
-export const LOGISTICS_DEPOT_LNG = 9.180008;
-
-function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const r1 = (lat1 * Math.PI) / 180;
-  const r2 = (lat2 * Math.PI) / 180;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(r1) * Math.cos(r2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return EARTH_RADIUS_M * c;
-}
-
-export function estimateCarTravelMinutes(
-  a: { lat: number; lng: number },
-  b: { lat: number; lng: number },
-  avgSpeedKmh: number = DEFAULT_AVG_SPEED_KMH
-): number {
-  const meters = haversineMeters(a.lat, a.lng, b.lat, b.lng);
-  const km = meters / 1000;
-  const hours = km / avgSpeedKmh;
-  const minutes = BASE_MINUTES + hours * 60;
-  return Math.round(Math.max(MIN_LEG_MIN, Math.min(MAX_LEG_MIN, minutes)));
-}
 
 export async function getDriverStartTime(driverId: number, workDate: string): Promise<string | null> {
   try {
@@ -126,6 +99,7 @@ export async function recalculateLogisticsDriverTimes(
   const tasks: any[] = Array.isArray(entry.tasks) ? entry.tasks : [];
   if (tasks.length === 0) {
     entry.tasks = [];
+    entry.return_travel_time = 0;
     return entry;
   }
 
@@ -164,6 +138,8 @@ export async function recalculateLogisticsDriverTimes(
   }
 
   entry.tasks = tasks;
+  const lastTask = tasks[tasks.length - 1];
+  entry.return_travel_time = estimateLogisticsReturnToDepotMinutes(lastTask);
   return entry;
 }
 

@@ -36,6 +36,7 @@ import {
   computeLogisticsCheckoutWaitGap,
   parseHmToMinutes,
 } from "@shared/logistics-scheduling-constraints";
+import { estimateLogisticsReturnToDepotMinutes } from "@shared/logistics-travel-estimate";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -92,11 +93,49 @@ export interface LogisticsDriverRow {
 interface LogisticsTimelineViewProps {
   workDate: string;
   drivers: LogisticsDriverRow[];
-  driversAssignments: Array<{ driver: LogisticsDriverRow; tasks: any[] }>;
+  driversAssignments: Array<{ driver: LogisticsDriverRow; tasks: any[]; return_travel_time?: number }>;
   searchTask: string;
   isReadOnly?: boolean;
   isLoadingOverlay?: boolean;
   onRefresh: () => Promise<void>;
+}
+
+function minutesToTimelineWidthPx(
+  minutes: number,
+  virtualMinutes: number,
+  timelineWidth: number
+): number {
+  if (minutes <= 0 || virtualMinutes <= 0 || timelineWidth <= 0) return 0;
+  return (minutes / virtualMinutes) * timelineWidth;
+}
+
+function LogisticsRouteLineSegment({
+  widthPx,
+  title,
+  showEndCap = false,
+}: {
+  widthPx: number;
+  title?: string;
+  showEndCap?: boolean;
+}) {
+  if (widthPx <= 0) return null;
+  return (
+    <div
+      className="flex flex-shrink-0 items-center"
+      style={{ width: `${widthPx}px`, minHeight: "50px" }}
+      title={title}
+    >
+      <div className="relative flex w-full items-center">
+        <div aria-hidden className="h-0.5 flex-1 bg-slate-500/55 dark:bg-slate-400/40" />
+        {showEndCap && (
+          <div
+            aria-hidden
+            className="h-3 w-0.5 shrink-0 rounded-full bg-orange-500 dark:bg-orange-400"
+          />
+        )}
+      </div>
+    </div>
+  );
 }
 
 function priorityUiFromTask(t: any): "early-out" | "high" | "low" {
@@ -506,8 +545,12 @@ export default function LogisticsTimelineView({
   };
 
   const assignmentByDriver = new Map<number, any[]>();
+  const returnTravelByDriver = new Map<number, number>();
   for (const row of driversAssignments) {
     assignmentByDriver.set(row.driver.id, row.tasks || []);
+    if (row.return_travel_time != null && Number.isFinite(Number(row.return_travel_time))) {
+      returnTravelByDriver.set(row.driver.id, Number(row.return_travel_time));
+    }
   }
 
   const hasTasksInTimeline = driversAssignments.some((r) => (r.tasks?.length || 0) > 0);
@@ -1411,13 +1454,31 @@ export default function LogisticsTimelineView({
                             ))}
                           </div>
                           <div className="relative z-10 flex items-center h-full min-h-[45px] px-0 gap-0 flex-wrap">
+                            {(() => {
+                              const virtualMinutes = globalTimeSlots.length * 60;
+                              const timelineWidth = timelineWidthPx || 0;
+                              const lastRawTask =
+                                rawTasks.length > 0 ? rawTasks[rawTasks.length - 1] : null;
+                              const returnTravelMinutes =
+                                returnTravelByDriver.get(driver.id) ??
+                                (lastRawTask
+                                  ? estimateLogisticsReturnToDepotMinutes(lastRawTask)
+                                  : 0);
+                              const returnTravelWidthPx = minutesToTimelineWidthPx(
+                                returnTravelMinutes,
+                                virtualMinutes,
+                                timelineWidth
+                              );
+
+                              return (
+                                <>
                             {tasks.map((task, index) => {
                               const tid = Number(task.id);
                               const raw = rawByTaskId.get(tid) as any;
                               const prevRaw = index > 0 ? rawTasks[index - 1] : null;
                               const seq = Number(raw?.sequence ?? index + 1);
                               const travelTime =
-                                index > 0 && raw?.travel_time != null ? Number(raw.travel_time) : 0;
+                                raw?.travel_time != null ? Number(raw.travel_time) : 0;
                               const checkoutWait = computeLogisticsCheckoutWaitGap({
                                 workDate,
                                 sequence: seq,
@@ -1429,59 +1490,46 @@ export default function LogisticsTimelineView({
                                 prevEndTime: prevRaw?.end_time,
                                 prevCheckinDate: prevRaw?.checkin_date,
                               });
-                              const virtualMinutes = globalTimeSlots.length * 60;
-                              const timelineWidth = timelineWidthPx || 0;
-                              const travelWidthPx =
-                                index > 0 && travelTime > 0 && virtualMinutes > 0 && timelineWidth > 0
-                                  ? (travelTime / virtualMinutes) * timelineWidth
-                                  : 0;
-                              const waitingGapWidthPx =
-                                checkoutWait > 0 && virtualMinutes > 0 && timelineWidth > 0
-                                  ? (checkoutWait / virtualMinutes) * timelineWidth
-                                  : 0;
-                              let initialOffsetWidthPx = 0;
-                              if (seq === 1 && raw?.start_time && virtualMinutes > 0 && timelineWidth > 0) {
+                              const travelWidthPx = minutesToTimelineWidthPx(
+                                travelTime,
+                                virtualMinutes,
+                                timelineWidth
+                              );
+                              const waitingGapWidthPx = minutesToTimelineWidthPx(
+                                checkoutWait,
+                                virtualMinutes,
+                                timelineWidth
+                              );
+                              let initialIdleOffsetPx = 0;
+                              if (seq === 1 && virtualMinutes > 0 && timelineWidth > 0) {
                                 const gridStartMinutes = timeToMinutes(globalTimeSlots[0] || "10:00");
-                                const taskStartMinutes = parseHmToMinutes(raw.start_time, null);
-                                const driverStartMinutes = parseHmToMinutes(driver.start_time, null);
-                                const firstBlockStartMinutes =
-                                  taskStartMinutes ?? driverStartMinutes ?? gridStartMinutes;
-                                if (
-                                  firstBlockStartMinutes != null &&
-                                  firstBlockStartMinutes > gridStartMinutes
-                                ) {
-                                  initialOffsetWidthPx =
-                                    ((firstBlockStartMinutes - gridStartMinutes) / virtualMinutes) *
-                                    timelineWidth;
+                                const taskStartMinutes = parseHmToMinutes(raw?.start_time, null);
+                                const driverStartMinutes =
+                                  parseHmToMinutes(driver.start_time, null) ?? gridStartMinutes;
+                                let routeStartMinutes = driverStartMinutes;
+                                if (taskStartMinutes != null) {
+                                  routeStartMinutes = taskStartMinutes - checkoutWait - travelTime;
                                 }
+                                const idleMinutes = Math.max(0, routeStartMinutes - gridStartMinutes);
+                                initialIdleOffsetPx = minutesToTimelineWidthPx(
+                                  idleMinutes,
+                                  virtualMinutes,
+                                  timelineWidth
+                                );
                               }
                               return (
                                 <Fragment key={`${task.id}-${driver.id}-frag`}>
-                                  {seq === 1 && initialOffsetWidthPx > 0 && (
+                                  {seq === 1 && initialIdleOffsetPx > 0 && (
                                     <div
                                       className="flex-shrink-0"
-                                      style={{ width: `${initialOffsetWidthPx}px`, minHeight: "50px" }}
+                                      style={{ width: `${initialIdleOffsetPx}px`, minHeight: "50px" }}
                                       aria-hidden
                                     />
                                   )}
-                                  {index > 0 && travelTime > 0 && travelWidthPx > 0 && (
-                                    <div
-                                      className="flex items-center justify-center flex-shrink-0 py-3"
-                                      style={{ width: `${travelWidthPx}px`, minHeight: "50px" }}
-                                      title={`${travelTime} min`}
-                                    >
-                                      <svg
-                                        width="20"
-                                        height="20"
-                                        viewBox="0 0 24 24"
-                                        fill="currentColor"
-                                        className="flex-shrink-0"
-                                        style={{ color: getCleanerHexColor(driver.id) }}
-                                      >
-                                        <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7" />
-                                      </svg>
-                                    </div>
-                                  )}
+                                  <LogisticsRouteLineSegment
+                                    widthPx={travelWidthPx}
+                                    title={travelTime > 0 ? `${travelTime} min` : undefined}
+                                  />
                                   {checkoutWait > 0 && waitingGapWidthPx > 0 && raw?.checkout_time && (
                                     <div
                                       className="flex items-center justify-center flex-shrink-0 py-3 bg-amber-100/50 dark:bg-amber-900/20 border-y border-dashed border-amber-400"
@@ -1521,6 +1569,18 @@ export default function LogisticsTimelineView({
                                 </Fragment>
                               );
                             })}
+                            <LogisticsRouteLineSegment
+                              widthPx={returnTravelWidthPx}
+                              title={
+                                returnTravelMinutes > 0
+                                  ? `Rientro in magazzino: ${returnTravelMinutes} min`
+                                  : undefined
+                              }
+                              showEndCap
+                            />
+                                </>
+                              );
+                            })()}
                             {provided.placeholder}
                           </div>
                         </div>

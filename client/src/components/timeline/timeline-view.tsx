@@ -2766,20 +2766,14 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                         {/* Travel time marker - FUORI dal Draggable (solo per sequence >= 2) */}
                                         {seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
                                           <div
-                                            className="flex items-center justify-center flex-shrink-0 py-3"
+                                            className="flex flex-shrink-0 items-center"
                                             style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
                                             title={`${travelTime} min`}
                                           >
-                                            <svg
-                                              width="20"
-                                              height="20"
-                                              viewBox="0 0 24 24"
-                                              fill="currentColor"
-                                              className="flex-shrink-0"
-                                              style={{ color: getCleanerHexColor(cleaner.id) }}
-                                            >
-                                              <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
-                                            </svg>
+                                            <div
+                                              aria-hidden
+                                              className="h-0.5 w-full bg-slate-500/55 dark:bg-slate-400/40"
+                                            />
                                           </div>
                                         )}
 

@@ -125,6 +125,9 @@ function getNormalizedLogisticsTimeline(data: any): any {
   cloned.drivers_assignments = cloned.drivers_assignments.map((entry: any) => ({
     driver: getNormalizedDriver(entry.driver),
     tasks: (entry.tasks || []).map((task: any) => getNormalizedTask(task)),
+    ...(entry.return_travel_time != null
+      ? { return_travel_time: Number(entry.return_travel_time) }
+      : {}),
   }));
   return cloned;
 }
