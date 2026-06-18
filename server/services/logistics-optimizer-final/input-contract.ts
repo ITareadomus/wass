@@ -1,3 +1,4 @@
+import type { LogisticsTaskKind } from "../../../shared/logistics-task-kind";
 import type { Priority, PriorityWindows } from "../optimizer/priorityWindows";
 import type { RuleTrace } from "./business-rules";
 import type { RoutingBusinessGroup } from "./groups/group-contract";
@@ -6,11 +7,6 @@ import type { RoutingProblemValidationResult } from "./validation-contract";
 export type Minutes = number;
 export type TaskId = number;
 export type DriverId = number;
-
-export type BagHandling =
-  | "NO_CLEANER_CONTEXT"
-  | "DRIVER_BRINGS_BAG"
-  | "CLEANER_HAS_BAG";
 
 /** Task grezzo da DB, indipendente da `logistics-optimizer/phase0`. */
 export interface RawLogisticsTaskInput {
@@ -30,6 +26,8 @@ export interface RawLogisticsTaskInput {
   cleanerSequence: number | null;
   premium: boolean;
   paxIn: number | null;
+  logisticsTaskKind?: LogisticsTaskKind | string | null;
+  logisticsTaskKindSource?: "auto" | "manual" | string | null;
   locked: boolean;
   lockedReason: string | null;
 }
@@ -115,7 +113,7 @@ export interface TaskNode {
     addressGroupId?: number | null;
   };
   priority: Priority | null;
-  bagHandling: BagHandling;
+  logisticsTaskKind: LogisticsTaskKind | null;
   serviceDurationMin: Minutes;
   rawTimes: {
     checkoutDate: string | null;

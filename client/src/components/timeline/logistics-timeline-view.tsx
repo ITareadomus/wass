@@ -134,8 +134,8 @@ function timelineTaskToTask(t: any, driverId: number): Task {
     checkout_time: t.checkout_time != null ? String(t.checkout_time) : undefined,
     checkin_date: t.checkin_date != null ? String(t.checkin_date) : undefined,
     checkin_time: t.checkin_time != null ? String(t.checkin_time) : undefined,
-    pax_in: typeof t.pax_in === "number" ? t.pax_in : undefined,
-    pax_out: typeof t.pax_out === "number" ? t.pax_out : undefined,
+    pax_in: t.pax_in != null && t.pax_in !== "" ? Number(t.pax_in) : undefined,
+    pax_out: t.pax_out != null && t.pax_out !== "" ? Number(t.pax_out) : undefined,
     operation_id: typeof t.operation_id === "number" ? t.operation_id : undefined,
     customer_name: t.customer_name != null ? String(t.customer_name) : undefined,
     customer_reference: t.customer_reference != null ? String(t.customer_reference) : undefined,
@@ -149,6 +149,10 @@ function timelineTaskToTask(t: any, driverId: number): Task {
     locked_reason: t.locked_reason != null ? String(t.locked_reason) : undefined,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    ...(t.logistics_task_kind != null ? { logistics_task_kind: String(t.logistics_task_kind) } : {}),
+    ...(t.logistics_task_kind_source != null
+      ? { logistics_task_kind_source: String(t.logistics_task_kind_source) }
+      : {}),
     ...( { assignedCleaner: driverId, sequence: t.sequence } as any ),
   };
 }
@@ -1512,6 +1516,7 @@ export default function LogisticsTimelineView({
                                     operationsScope="logistics"
                                     isHighlighted={hi.has(String(task.id))}
                                     timelineRowStaffDisplayLabel={driverRowDisplayLabel}
+                                    onLogisticsTimelineMutated={onRefresh}
                                   />
                                 </Fragment>
                               );

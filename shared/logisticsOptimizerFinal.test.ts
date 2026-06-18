@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  computeBagHandling,
-  isCleanerHasBag,
-  resolveBagHandlingModeWithTrace,
+  computeLogisticsTaskKind,
+  resolveLogisticsTaskKindModeWithTrace,
 } from "../server/services/logistics-optimizer-final/bag-handling";
 import {
   resolveDriverBringsBagLatestStartMin,
@@ -83,19 +82,20 @@ describe("priority scheduling windows", () => {
   });
 });
 
-describe("computeBagHandling", () => {
-  it("separates no-cleaner tasks from driver and cleaner bag handling", () => {
-    expect(computeBagHandling({ cleanerId: null, sequence: null, premium: false, paxIn: 2 })).toBe(
-      "NO_CLEANER_CONTEXT"
+describe("computeLogisticsTaskKind", () => {
+  it("separates no-cleaner tasks from D&P and pick-up", () => {
+    expect(computeLogisticsTaskKind({ cleanerId: null, sequence: null, premium: false, paxIn: 2 })).toBeNull();
+    expect(computeLogisticsTaskKind({ cleanerId: 10, sequence: 1, premium: false, paxIn: 2 })).toBe(
+      "pick-up"
     );
-    expect(computeBagHandling({ cleanerId: 10, sequence: 1, premium: false, paxIn: 5 })).toBe(
-      "CLEANER_HAS_BAG"
+    expect(computeLogisticsTaskKind({ cleanerId: 10, sequence: 1, premium: false, paxIn: 5 })).toBe(
+      "delivery/pick-up"
     );
-    expect(computeBagHandling({ cleanerId: 10, sequence: 1, premium: true, paxIn: 5 })).toBe(
-      "DRIVER_BRINGS_BAG"
+    expect(computeLogisticsTaskKind({ cleanerId: 10, sequence: 1, premium: true, paxIn: 2 })).toBe(
+      "delivery/pick-up"
     );
-    expect(computeBagHandling({ cleanerId: 10, sequence: 2, premium: false, paxIn: 2 })).toBe(
-      "DRIVER_BRINGS_BAG"
+    expect(computeLogisticsTaskKind({ cleanerId: 10, sequence: 2, premium: false, paxIn: 2 })).toBe(
+      "delivery/pick-up"
     );
   });
 });
@@ -182,52 +182,42 @@ describe("business rules", () => {
     });
   });
 
-  it("resolves bag handling mode with trace", () => {
+  it("resolves logistics task kind with trace", () => {
     expect(
-      resolveBagHandlingModeWithTrace({
+      resolveLogisticsTaskKindModeWithTrace({
         cleanerId: null,
         cleanerSequence: null,
         isPremium: false,
         paxIn: 2,
       })
     ).toMatchObject({
-      value: "NO_CLEANER_CONTEXT",
+      value: null,
       trace: [{ code: "NO_CLEANER_CONTEXT" }],
     });
 
     expect(
-      resolveBagHandlingModeWithTrace({
+      resolveLogisticsTaskKindModeWithTrace({
         cleanerId: 10,
         cleanerSequence: 1,
         isPremium: true,
-        paxIn: 5,
+        paxIn: 2,
       })
     ).toMatchObject({
-      value: "DRIVER_BRINGS_BAG",
+      value: "delivery/pick-up",
       trace: [{ code: "DRIVER_BRINGS_BAG_REQUIRED" }],
     });
 
     expect(
-      resolveBagHandlingModeWithTrace({
+      resolveLogisticsTaskKindModeWithTrace({
         cleanerId: 10,
         cleanerSequence: 1,
         isPremium: false,
-        paxIn: 5,
+        paxIn: 2,
       })
     ).toMatchObject({
-      value: "CLEANER_HAS_BAG",
+      value: "pick-up",
       trace: [{ code: "CLEANER_HAS_BAG_FLEXIBLE_PICKUP" }],
     });
-  });
-});
-
-describe("isCleanerHasBag", () => {
-  it("uses sequence 1 and non-premium or low pax-in", () => {
-    expect(isCleanerHasBag({ cleanerSequence: 1, isPremium: false, paxIn: 5 })).toBe(true);
-    expect(isCleanerHasBag({ cleanerSequence: 1, isPremium: true, paxIn: 3 })).toBe(true);
-    expect(isCleanerHasBag({ cleanerSequence: 1, isPremium: false, paxIn: 3 })).toBe(true);
-    expect(isCleanerHasBag({ cleanerSequence: 1, isPremium: true, paxIn: 5 })).toBe(false);
-    expect(isCleanerHasBag({ cleanerSequence: 2, isPremium: false, paxIn: 3 })).toBe(false);
   });
 });
 
@@ -245,7 +235,7 @@ describe("buildTaskWindow", () => {
     const eo = buildTaskWindow({
       taskId: 1,
       priority: "EO",
-      bagHandling: "NO_CLEANER_CONTEXT",
+      logisticsTaskKind: null,
       workDate: "2026-06-04",
       cleaningTime: null,
       checkoutDate: null,
@@ -259,7 +249,7 @@ describe("buildTaskWindow", () => {
     const hp = buildTaskWindow({
       taskId: 2,
       priority: "HP",
-      bagHandling: "NO_CLEANER_CONTEXT",
+      logisticsTaskKind: null,
       workDate: "2026-06-04",
       cleaningTime: null,
       checkoutDate: null,
@@ -280,7 +270,7 @@ describe("buildTaskWindow", () => {
     const result = buildTaskWindow({
       taskId: 20,
       priority: "EO",
-      bagHandling: "NO_CLEANER_CONTEXT",
+      logisticsTaskKind: null,
       workDate: "2026-06-04",
       cleaningTime: null,
       checkoutDate: null,
@@ -307,7 +297,7 @@ describe("buildTaskWindow", () => {
       LP: { startMin: 630, endMin: null, graceMin: 0 },
     };
     const base = {
-      bagHandling: "NO_CLEANER_CONTEXT" as const,
+      logisticsTaskKind: null,
       workDate: "2026-06-04",
       cleaningTime: null,
       checkoutDate: null,
@@ -332,7 +322,7 @@ describe("buildTaskWindow", () => {
     const result = buildTaskWindow({
       taskId: 23,
       priority: "EO",
-      bagHandling: "NO_CLEANER_CONTEXT",
+      logisticsTaskKind: null,
       workDate: "2026-06-04",
       cleaningTime: null,
       checkoutDate: "2026-06-04",
@@ -359,7 +349,7 @@ describe("buildTaskWindow", () => {
       LP: { startMin: 630, endMin: null, graceMin: 0 },
     };
     const base = {
-      bagHandling: "NO_CLEANER_CONTEXT" as const,
+      logisticsTaskKind: null,
       workDate: "2026-06-04",
       cleaningTime: null,
       checkoutDate: "2026-06-04",
@@ -386,7 +376,7 @@ describe("buildTaskWindow", () => {
     const checkout = buildTaskWindow({
       taskId: 3,
       priority: null,
-      bagHandling: "NO_CLEANER_CONTEXT",
+      logisticsTaskKind: null,
       workDate: "2026-06-04",
       cleaningTime: null,
       checkoutDate: "2026-06-04",
@@ -400,7 +390,7 @@ describe("buildTaskWindow", () => {
     const cleaner = buildTaskWindow({
       taskId: 4,
       priority: null,
-      bagHandling: "DRIVER_BRINGS_BAG",
+      logisticsTaskKind: "delivery/pick-up" as const,
       workDate: "2026-06-04",
       cleaningTime: 60,
       checkoutDate: null,

@@ -1,3 +1,10 @@
+/**
+ * @deprecated Legacy comparison script for the old bag_policy vocabulary.
+ *
+ * The active model is now `logistics_task_kind`
+ * (`pick-up` / `delivery` / `delivery/pick-up` / null).
+ * Keep this script only as historical diagnostics for legacy `phase2.ts`.
+ */
 import { parseHmToMinutes } from "../shared/logistics-scheduling-constraints";
 import pool from "../shared/pg-db";
 import { computeBagHandling } from "../server/services/logistics-optimizer-final/bag-handling";
@@ -111,12 +118,12 @@ async function main() {
         premium,
         paxIn,
       });
-      const bagHandling = computeBagHandling({
+      const bagHandling = String(computeBagHandling({
         cleanerId,
         sequence: cleanerSequence,
         premium,
         paxIn,
-      });
+      }) ?? "NO_CLEANER_CONTEXT");
 
       if (cleanerId != null && cleanerSequence != null) {
         summary.withCleanerContext += 1;

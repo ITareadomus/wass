@@ -2,7 +2,7 @@ import { runLogisticsPhase0, LogisticsPhase0Result } from "./phase0";
 import { runLogisticsPhase1, LogisticsPhase1Result } from "./phase1";
 import { LogisticsPhase2Result, runLogisticsPhase2 } from "./phase2";
 import { isLogisticsOptimizerDebugEnabled, LogisticsPhase2DebugCollector } from "./phase2-debug";
-import { computeBagPolicy } from "./bag-rule";
+import { enrichLogisticsTimelineTask } from "../logistics-task-kind-enrichment";
 import { pgDailyAssignmentsService } from "../pg-daily-assignments-service";
 import {
   loadLogisticsContainers,
@@ -252,17 +252,15 @@ async function applyLogisticsOptimizerResult(
       const taskId = Number(task?.task_id);
       const cleanerId = resolveTaskCleanerId(taskId, task, driverId, cleanerIdByTaskId);
       const cleanerSequence = resolveTaskCleanerSequence(taskId, task, cleanerSequenceByTaskId);
-      return {
-        ...task,
-        sequence,
-        followup: idx > 0,
-        bag_policy: computeBagPolicy({
-          cleanerId,
-          sequence: cleanerSequence,
-          premium: task?.premium === true,
-          paxIn: task?.pax_in,
-        }),
-      };
+      return enrichLogisticsTimelineTask(
+        {
+          ...task,
+          sequence,
+          followup: idx > 0,
+        },
+        cleanerId,
+        cleanerSequence
+      );
     });
 
     if (combined.length > 0) {
@@ -287,17 +285,15 @@ async function applyLogisticsOptimizerResult(
             const taskId = Number(task?.task_id);
             const cleanerId = resolveTaskCleanerId(taskId, task, driverId, cleanerIdByTaskId);
             const cleanerSequence = resolveTaskCleanerSequence(taskId, task, cleanerSequenceByTaskId);
-            return {
-              ...task,
-              sequence,
-              followup: idx > 0,
-              bag_policy: computeBagPolicy({
-                cleanerId,
-                sequence: cleanerSequence,
-                premium: task?.premium === true,
-                paxIn: task?.pax_in,
-              }),
-            };
+            return enrichLogisticsTimelineTask(
+              {
+                ...task,
+                sequence,
+                followup: idx > 0,
+              },
+              cleanerId,
+              cleanerSequence
+            );
           }),
       });
     }

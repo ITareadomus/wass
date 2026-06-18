@@ -36,6 +36,8 @@ interface PriorityColumnProps {
   flushDropZone?: boolean;
   /** Passato a TaskCard per caricare i nomi operazione (enable_wass vs enable_wass_route). */
   operationsScope?: "housekeeping" | "logistics";
+  /** Dopo mutazione tipologia logistica (container o timeline). */
+  onLogisticsTimelineMutated?: () => void;
 }
 
 export default function PriorityColumn({
@@ -52,6 +54,7 @@ export default function PriorityColumn({
   disableToolbar = false,
   flushDropZone = false,
   operationsScope = "housekeeping",
+  onLogisticsTimelineMutated,
 }: PriorityColumnProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isHistoricalDateLocked, setIsHistoricalDateLocked] = useState(false);
@@ -432,6 +435,7 @@ export default function PriorityColumn({
                               multiSelectContext={multiSelectCtx}
                               isHighlighted={isHighlighted}
                               operationsScope={operationsScope}
+                              onLogisticsTimelineMutated={onLogisticsTimelineMutated}
                             />
                           </div>
                         );
@@ -462,6 +466,7 @@ export default function PriorityColumn({
                           multiSelectContext={multiSelectCtx}
                           isHighlighted={isHighlighted}
                           operationsScope={operationsScope}
+                          onLogisticsTimelineMutated={onLogisticsTimelineMutated}
                         />
                       </div>
                     </div>
@@ -487,6 +492,7 @@ export default function PriorityColumn({
                     multiSelectContext={multiSelectCtx}
                     isHighlighted={isHighlighted}
                     operationsScope={operationsScope}
+                    onLogisticsTimelineMutated={onLogisticsTimelineMutated}
                   />
                 );
               }

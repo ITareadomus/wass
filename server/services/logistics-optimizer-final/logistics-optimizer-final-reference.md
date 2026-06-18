@@ -254,55 +254,33 @@ A ogni candidate Phase 1 vengono riattaccati:
 
 ---
 
-## 5. Bag policy attuale
+## 5. Tipologia task logistico attiva
 
-File: `bag-rule.ts`
+File: `shared/logistics-task-kind.ts`
 
 ```ts
-NORMAL_TASK
-DRIVER_BRINGS_BAG
-CLEANER_HAS_BAG
+type LogisticsTaskKind = "pick-up" | "delivery" | "delivery/pick-up";
+// null = non determinato
 ```
 
-Regole:
+Regole auto:
 
-| Policy | Condizione |
+| Tipologia | Condizione |
 |---|---|
-| `NORMAL_TASK` | Nessun cleaner/sequence, oppure `sequence !== 1`. |
-| `DRIVER_BRINGS_BAG` | `sequence === 1` e (`premium === true` oppure `pax_in > 4`). |
-| `CLEANER_HAS_BAG` | `sequence === 1`, non premium, `pax_in <= 4`. |
+| `null` | Nessun cleaner/sequence. |
+| `pick-up` | `sequence === 1`, non premium, `pax_in <= 4`. |
+| `delivery/pick-up` | Cleaner presente e (`sequence !== 1` oppure premium oppure `pax_in > 4`). |
+| `delivery` | Solo manuale; dotazione/materiale, non regola borsone. |
 
 Funzione chiave:
 
 ```ts
-requiresDriverBeforeCleaner(policy)
+requiresDriverBeforeCleaner(kind)
 ```
 
-Ritorna `true` per:
+Ritorna `true` solo per `delivery/pick-up`.
 
-- `NORMAL_TASK`
-- `DRIVER_BRINGS_BAG`
-
-Ritorna `false` per:
-
-- `CLEANER_HAS_BAG`
-
-Nota importante: oggi `filterTasksByBagRule` non esclude nessun task. La bag policy influenza vincoli, deadline e scoring, non l'ingresso nel problema.
-
-Nota per il nuovo pre-OR-Tools: conviene rinominare questa informazione in `BagHandling`, distinguendo il significato operativo dal vincolo effettivo del solver:
-
-```ts
-type BagHandling =
-  | "NO_CLEANER_CONTEXT"
-  | "DRIVER_BRINGS_BAG"
-  | "CLEANER_HAS_BAG";
-```
-
-- `NO_CLEANER_CONTEXT`: task senza cleaner/sequence utile; nessun vincolo borsone verso cleaner.
-- `DRIVER_BRINGS_BAG`: il driver deve provare ad arrivare prima dello start cleaner; e' ammesso uno start logistico fino a `cleanerTaskStartTime + ceil(cleaningTime * 2 / 3)`.
-- `CLEANER_HAS_BAG`: il cleaner ha già il borsone; vale con `sequence === 1` e (`!premium` oppure `pax_in < 4`). Il driver può passare per ritiro sporco rispettando gli altri vincoli.
-
-I debug verranno rifatti in seguito, quindi questa migrazione non deve preservare la nomenclatura storica `NORMAL_TASK` se crea ambiguità.
+Nota importante: la tipologia non esclude task dall'optimizer. Influenza finestre, deadline e scoring. I nomi legacy `NORMAL_TASK`, `DRIVER_BRINGS_BAG`, `CLEANER_HAS_BAG` restano ammessi solo in trace/debug o nel legacy optimizer disabilitato.
 
 ---
 
@@ -1471,7 +1449,7 @@ File: `apply-routing-solution.ts` — `applyLogisticsRoutingSolution`.
 2. Carica driver selezionati, containers, timeline corrente
 3. Costruisce route da `RoutingSolution` per driver
 4. Preserva task timeline fuori dal pool solver / non rischedulati
-5. Re-sequence progressiva, `followup`, `bag_policy` (via legacy `computeBagPolicy` in `bag-rule.ts`)
+5. Re-sequence progressiva, `followup`, `logistics_task_kind` / `logistics_task_kind_source`
 6. `recalculateLogisticsTimeline` → `buildFinalTimelineValidation` → assert check-in
 7. Salva timeline + history containers + rimuove task assegnati dai containers
 
@@ -1489,9 +1467,9 @@ File: `apply-routing-solution.ts` — `applyLogisticsRoutingSolution`.
 }
 ```
 
-### Confine bag policy
+### Confine tipologia logistica
 
-Il pre-solver usa `BagHandling` (`bag-handling.ts`). L'apply persiste `bag_policy` con `computeBagPolicy` legacy (`NORMAL_TASK` / `DRIVER_BRINGS_BAG` / `CLEANER_HAS_BAG`). Le regole coincidono nella maggior parte dei casi; il caso premium + pax basso può differire — vedi §5 e `bag-handling.ts`.
+Il pre-solver e l'apply usano `LogisticsTaskKind` (`pick-up`, `delivery`, `delivery/pick-up`, `null`) da `shared/logistics-task-kind.ts`. `delivery/pick-up` è l'unico tipo che attiva il vincolo “driver prima del cleaner”; `delivery` è solo manuale e non applica regole borsone.
 
 ### Known limitations
 

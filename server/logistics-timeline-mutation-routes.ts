@@ -5,6 +5,7 @@ import {
   hydrateTasksFromLogisticsContainers,
   recalculateLogisticsDriverTimes,
 } from "./services/logistics-timeline-utils";
+import { enrichDriverTasksWithLogisticsKind } from "./services/logistics-task-kind-enrichment";
 
 type Deps = {
   getCurrentUsername: (req?: any) => string;
@@ -185,6 +186,12 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
           t.sequence = i + 1;
           t.followup = i > 0;
         });
+      }
+
+      try {
+        await enrichDriverTasksWithLogisticsKind(driverEntry, workDate);
+      } catch {
+        /* kind enrichment is best-effort */
       }
 
       const modifyingUser = req.body.modified_by || req.body.created_by || currentUsername;

@@ -1,5 +1,5 @@
 import { minutesToHm } from "../../../shared/logistics-scheduling-constraints";
-import { computeBagPolicy } from "../logistics-optimizer/bag-rule";
+import { enrichLogisticsTimelineTask } from "../logistics-task-kind-enrichment";
 import {
   assertLogisticsTimelineValidAfterRecalc,
   buildFinalTimelineValidation,
@@ -153,6 +153,23 @@ function buildTimelineTaskFromStop(args: {
     travel_time: Number(stop.travelFromPreviousMin || 0),
     checkout_wait_minutes: Number(stop.waitMin || 0),
     manually_moved: false,
+    ...(containerTask.logistics_task_kind != null
+      ? {
+          logistics_task_kind: String(containerTask.logistics_task_kind),
+          logistics_task_kind_source:
+            containerTask.logistics_task_kind_source != null
+              ? String(containerTask.logistics_task_kind_source)
+              : null,
+        }
+      : inputTask?.logisticsTaskKind != null
+        ? {
+            logistics_task_kind: String(inputTask.logisticsTaskKind),
+            logistics_task_kind_source:
+              inputTask.logisticsTaskKindSource != null
+                ? String(inputTask.logisticsTaskKindSource)
+                : null,
+          }
+        : {}),
   };
 }
 
@@ -278,17 +295,15 @@ export async function applyLogisticsRoutingSolution(
       const taskId = Number(task?.task_id);
       const cleanerId = resolveTaskCleanerId(taskId, task, driverId, cleanerIdByTaskId);
       const cleanerSequence = resolveTaskCleanerSequence(taskId, task, cleanerSequenceByTaskId);
-      return {
-        ...task,
-        sequence,
-        followup: idx > 0,
-        bag_policy: computeBagPolicy({
-          cleanerId,
-          sequence: cleanerSequence,
-          premium: task?.premium === true,
-          paxIn: task?.pax_in,
-        }),
-      };
+      return enrichLogisticsTimelineTask(
+        {
+          ...task,
+          sequence,
+          followup: idx > 0,
+        },
+        cleanerId,
+        cleanerSequence
+      );
     });
 
     if (combined.length > 0) {
@@ -312,17 +327,15 @@ export async function applyLogisticsRoutingSolution(
             const taskId = Number(task?.task_id);
             const cleanerId = resolveTaskCleanerId(taskId, task, driverId, cleanerIdByTaskId);
             const cleanerSequence = resolveTaskCleanerSequence(taskId, task, cleanerSequenceByTaskId);
-            return {
-              ...task,
-              sequence,
-              followup: idx > 0,
-              bag_policy: computeBagPolicy({
-                cleanerId,
-                sequence: cleanerSequence,
-                premium: task?.premium === true,
-                paxIn: task?.pax_in,
-              }),
-            };
+            return enrichLogisticsTimelineTask(
+              {
+                ...task,
+                sequence,
+                followup: idx > 0,
+              },
+              cleanerId,
+              cleanerSequence
+            );
           }),
       });
     }

@@ -1,7 +1,11 @@
-import type { BagHandling } from "./input-contract";
+import {
+  resolveAutoLogisticsTaskKind,
+  requiresDriverBeforeCleaner,
+  type LogisticsTaskKind,
+} from "../../../shared/logistics-task-kind";
 import type { RuleResult } from "./business-rules";
 
-export interface ComputeBagHandlingInput {
+export interface ComputeLogisticsTaskKindInput {
   cleanerId?: number | null;
   sequence?: number | null;
   premium?: boolean | null;
@@ -14,40 +18,33 @@ function toFiniteNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function isCleanerHasBag(params: {
-  cleanerSequence: number | null;
-  isPremium: boolean;
-  paxIn: number | null;
-}): boolean {
-  return (
-    params.cleanerSequence === 1 &&
-    (!params.isPremium || (params.paxIn !== null && params.paxIn < 4))
-  );
-}
-
-export function computeBagHandling(input: ComputeBagHandlingInput): BagHandling {
-  const cleanerId = toFiniteNumber(input.cleanerId);
-  const sequence = toFiniteNumber(input.sequence);
-  const paxIn = toFiniteNumber(input.paxIn);
-  const isPremium = input.premium === true;
-
-  return resolveBagHandlingModeWithTrace({
-    cleanerId,
-    cleanerSequence: sequence,
-    isPremium,
-    paxIn,
+export function computeLogisticsTaskKind(
+  input: ComputeLogisticsTaskKindInput
+): Exclude<LogisticsTaskKind, "delivery"> | null {
+  return resolveLogisticsTaskKindModeWithTrace({
+    cleanerId: toFiniteNumber(input.cleanerId),
+    cleanerSequence: toFiniteNumber(input.sequence),
+    isPremium: input.premium === true,
+    paxIn: toFiniteNumber(input.paxIn),
   }).value;
 }
 
-export function resolveBagHandlingModeWithTrace(params: {
+export function resolveLogisticsTaskKindModeWithTrace(params: {
   cleanerId: number | null;
   cleanerSequence: number | null;
   isPremium: boolean;
   paxIn: number | null;
-}): RuleResult<BagHandling> {
-  if (params.cleanerId === null || params.cleanerSequence === null) {
+}): RuleResult<Exclude<LogisticsTaskKind, "delivery"> | null> {
+  const autoKind = resolveAutoLogisticsTaskKind({
+    cleanerId: params.cleanerId,
+    cleanerSequence: params.cleanerSequence,
+    premium: params.isPremium,
+    paxIn: params.paxIn,
+  });
+
+  if (autoKind === null) {
     return {
-      value: "NO_CLEANER_CONTEXT",
+      value: null,
       trace: [
         {
           code: "NO_CLEANER_CONTEXT",
@@ -60,15 +57,9 @@ export function resolveBagHandlingModeWithTrace(params: {
     };
   }
 
-  const cleanerHasBag = isCleanerHasBag({
-    cleanerSequence: params.cleanerSequence,
-    isPremium: params.isPremium,
-    paxIn: params.paxIn,
-  });
-
-  if (cleanerHasBag) {
+  if (autoKind === "pick-up") {
     return {
-      value: "CLEANER_HAS_BAG",
+      value: "pick-up",
       trace: [
         {
           code: "CLEANER_HAS_BAG_FLEXIBLE_PICKUP",
@@ -83,7 +74,7 @@ export function resolveBagHandlingModeWithTrace(params: {
   }
 
   return {
-    value: "DRIVER_BRINGS_BAG",
+    value: "delivery/pick-up",
     trace: [
       {
         code: "DRIVER_BRINGS_BAG_REQUIRED",
@@ -97,6 +88,11 @@ export function resolveBagHandlingModeWithTrace(params: {
   };
 }
 
-export function requiresDriverBeforeCleaner(bagHandling: BagHandling): boolean {
-  return bagHandling === "DRIVER_BRINGS_BAG";
-}
+/** @deprecated Use `computeLogisticsTaskKind`. */
+export const computeBagHandling = computeLogisticsTaskKind;
+
+/** @deprecated Use `resolveLogisticsTaskKindModeWithTrace`. */
+export const resolveBagHandlingModeWithTrace = resolveLogisticsTaskKindModeWithTrace;
+
+/** @deprecated Use `requiresDriverBeforeCleaner` from shared/logistics-task-kind. */
+export { requiresDriverBeforeCleaner };

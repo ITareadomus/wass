@@ -2561,6 +2561,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           tasks.sort((a: any, b: any) => (a.sequence ?? 9999) - (b.sequence ?? 9999));
         }
         await recalculateLogisticsTimeline(timeline, workDate);
+        const { enrichDriverTasksWithLogisticsKind } = await import(
+          "./services/logistics-task-kind-enrichment"
+        );
+        for (const entry of timeline.drivers_assignments) {
+          if (entry?.tasks?.length) {
+            await enrichDriverTasksWithLogisticsKind(entry, workDate);
+          }
+        }
       }
       res.json(timeline);
     } catch (error: any) {
@@ -2602,6 +2610,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("POST /api/logistics-timeline:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/update-logistics-task-kind", async (req, res) => {
+    try {
+      const { date, taskId, kind, modified_by: modifiedByBody } = req.body ?? {};
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const normalizedTaskId = Number(taskId);
+      if (!Number.isFinite(normalizedTaskId)) {
+        return res.status(400).json({ success: false, error: "taskId required" });
+      }
+
+      const { buildManualLogisticsTaskKindPayload, normalizeLogisticsTaskKind } = await import(
+        "../shared/logistics-task-kind"
+      );
+      const normalizedKind = normalizeLogisticsTaskKind(kind, "manual");
+      if (!normalizedKind) {
+        return res.status(400).json({ success: false, error: "Invalid logistics task kind" });
+      }
+
+      const kindPayload = buildManualLogisticsTaskKindPayload(normalizedKind);
+      const currentUsername = modifiedByBody || getCurrentUsername(req);
+
+      const timeline = await workspaceFiles.loadLogisticsTimeline(workDate);
+      let previousKind: string | null = null;
+      let foundInTimeline = false;
+
+      if (timeline?.drivers_assignments?.length) {
+        for (const entry of timeline.drivers_assignments) {
+          for (const task of entry.tasks || []) {
+            if (Number(task?.task_id) !== normalizedTaskId) continue;
+            previousKind = task.logistics_task_kind != null ? String(task.logistics_task_kind) : null;
+            Object.assign(task, kindPayload);
+            foundInTimeline = true;
+            break;
+          }
+          if (foundInTimeline) break;
+        }
+      }
+
+      if (foundInTimeline) {
+        const saved = await workspaceFiles.saveLogisticsTimeline(
+          workDate,
+          timeline,
+          false,
+          currentUsername,
+          "manual",
+          {
+            editedField: "logistics_task_kind",
+            oldValue: previousKind ?? "",
+            newValue: normalizedKind,
+          }
+        );
+
+        if (!saved) {
+          return res.status(500).json({ success: false, error: "Failed to save logistics timeline" });
+        }
+
+        return res.json({
+          success: true,
+          taskId: normalizedTaskId,
+          location: "timeline",
+          ...kindPayload,
+        });
+      }
+
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const containerUpdate = await pgDailyAssignmentsService.updateLogisticsContainerTaskKind(
+        workDate,
+        normalizedTaskId,
+        kindPayload.logistics_task_kind,
+        kindPayload.logistics_task_kind_source,
+        currentUsername
+      );
+
+      if (!containerUpdate.success) {
+        return res.status(404).json({
+          success: false,
+          error: "Task not found in logistics timeline or containers",
+        });
+      }
+
+      res.json({
+        success: true,
+        taskId: normalizedTaskId,
+        location: "container",
+        ...kindPayload,
+      });
+    } catch (error: any) {
+      console.error("POST /api/update-logistics-task-kind:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });

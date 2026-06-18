@@ -1,4 +1,9 @@
 import { LOGISTICS_SERVICE_DURATION_MIN, parseHmToMinutes } from "../../../shared/logistics-scheduling-constraints";
+import {
+  resolveLogisticsTaskKind,
+  type LogisticsTaskKind,
+  type LogisticsTaskKindSource,
+} from "../../../shared/logistics-task-kind";
 import type {
   DriverNode,
   HardConstraintSpec,
@@ -7,7 +12,7 @@ import type {
   SoftConstraintSpec,
   TaskNode,
 } from "./input-contract";
-import { resolveBagHandlingModeWithTrace } from "./bag-handling";
+import { resolveLogisticsTaskKindModeWithTrace } from "./bag-handling";
 import {
   loadLogisticsRoutingSourceData,
   type LogisticsRoutingSourceData,
@@ -27,6 +32,42 @@ import {
 } from "./auto-convoke-logistics-drivers";
 import { validateRoutingProblemInput } from "./validation";
 import type { ValidationIssue } from "./validation-contract";
+
+function resolveTaskLogisticsKindWithTrace(taskData: SchedulableLogisticsTaskInput): {
+  value: LogisticsTaskKind | null;
+  trace: NonNullable<TaskNode["debug"]>["ruleTrace"];
+} {
+  const persistedKind = resolveLogisticsTaskKind({
+    cleanerId: taskData.cleanerId,
+    cleanerSequence: taskData.cleanerSequence,
+    premium: taskData.premium,
+    paxIn: taskData.paxIn,
+    logisticsTaskKind: taskData.logisticsTaskKind,
+    logisticsTaskKindSource: taskData.logisticsTaskKindSource as LogisticsTaskKindSource | null,
+  });
+
+  if (taskData.logisticsTaskKindSource === "manual" && persistedKind) {
+    return {
+      value: persistedKind,
+      trace: [
+        {
+          code: "MANUAL_LOGISTICS_TASK_KIND",
+          value: {
+            logisticsTaskKind: persistedKind,
+            logisticsTaskKindSource: taskData.logisticsTaskKindSource,
+          },
+        },
+      ],
+    };
+  }
+
+  return resolveLogisticsTaskKindModeWithTrace({
+    cleanerId: taskData.cleanerId,
+    cleanerSequence: taskData.cleanerSequence,
+    isPremium: taskData.premium,
+    paxIn: taskData.paxIn,
+  });
+}
 
 function buildDriverNodes(sourceData: LogisticsRoutingSourceData): DriverNode[] {
   return sourceData.selectedDrivers.map((driver) => {
@@ -54,16 +95,11 @@ function buildTaskNode(args: {
 }): { task: TaskNode; hardConstraints: HardConstraintSpec[]; softWindows: SoftConstraintSpec[] } {
   const { taskData, nodeIndex, workDate, sourceData } = args;
   const priority = normalizePriority(taskData.priority);
-  const bagHandling = resolveBagHandlingModeWithTrace({
-    cleanerId: taskData.cleanerId,
-    cleanerSequence: taskData.cleanerSequence,
-    isPremium: taskData.premium,
-    paxIn: taskData.paxIn,
-  });
+  const logisticsTaskKind = resolveTaskLogisticsKindWithTrace(taskData);
   const builtWindow = buildTaskWindow({
     taskId: taskData.taskId,
     priority,
-    bagHandling: bagHandling.value,
+    logisticsTaskKind: logisticsTaskKind.value,
     workDate,
     cleaningTime: taskData.cleaningTime,
     checkoutDate: taskData.checkoutDate,
@@ -96,7 +132,7 @@ function buildTaskNode(args: {
         addressGroupId: null,
       },
       priority,
-      bagHandling: bagHandling.value,
+      logisticsTaskKind: logisticsTaskKind.value,
       serviceDurationMin: LOGISTICS_SERVICE_DURATION_MIN,
       rawTimes: {
         checkoutDate: taskData.checkoutDate,
@@ -109,7 +145,7 @@ function buildTaskNode(args: {
       hardWindow: builtWindow.hardWindow,
       softWindows: builtWindow.softWindows,
       debug: {
-        ruleTrace: [...bagHandling.trace, ...builtWindow.ruleTrace],
+        ruleTrace: [...logisticsTaskKind.trace, ...builtWindow.ruleTrace],
         sourceTimes: builtWindow.sourceTimes,
       },
       groupingHints: {

@@ -100,6 +100,10 @@ interface LogisticsTask {
   straordinaria?: boolean | null;
   lat?: string | null;
   lng?: string | null;
+  logistics_task_kind?: string | null;
+  logistics_task_kind_source?: string | null;
+  cleaner_id?: number | null;
+  cleaner_sequence?: number | null;
 }
 
 const isEquivalentStraordinariaTask = (task: any): boolean =>
@@ -186,6 +190,21 @@ function convertLogisticsRawToTask(
     locked_reason: raw.locked_reason != null ? String(raw.locked_reason) : undefined,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    ...(raw.logistics_task_kind != null
+      ? { logistics_task_kind: String(raw.logistics_task_kind) }
+      : {}),
+    ...(raw.logistics_task_kind_source != null
+      ? { logistics_task_kind_source: String(raw.logistics_task_kind_source) }
+      : {}),
+    ...(raw.cleaner_id != null && Number.isFinite(Number(raw.cleaner_id))
+      ? { cleaner_id: Number(raw.cleaner_id) }
+      : {}),
+    ...(raw.cleaner_sequence != null && Number.isFinite(Number(raw.cleaner_sequence))
+      ? { cleaner_sequence: Number(raw.cleaner_sequence) }
+      : {}),
+    ...(typeof raw.task_id !== "undefined"
+      ? { task_id: Number(raw.task_id) }
+      : {}),
   };
 
   convertedTask.duplicate_group_id =
@@ -230,8 +249,8 @@ function convertLogisticsTimelineTaskToMapTask(task: any, driverId: number): Tas
     checkout_time: task?.checkout_time != null ? String(task.checkout_time) : undefined,
     checkin_date: task?.checkin_date != null ? String(task.checkin_date) : undefined,
     checkin_time: task?.checkin_time != null ? String(task.checkin_time) : undefined,
-    pax_in: typeof task?.pax_in === "number" ? task.pax_in : undefined,
-    pax_out: typeof task?.pax_out === "number" ? task.pax_out : undefined,
+    pax_in: task?.pax_in != null && task?.pax_in !== "" ? Number(task.pax_in) : undefined,
+    pax_out: task?.pax_out != null && task?.pax_out !== "" ? Number(task.pax_out) : undefined,
     operation_id: typeof task?.operation_id === "number" ? task.operation_id : undefined,
     customer_name: task?.customer_name != null ? String(task.customer_name) : undefined,
     customer_reference: task?.customer_reference != null ? String(task.customer_reference) : undefined,
@@ -240,6 +259,12 @@ function convertLogisticsTimelineTaskToMapTask(task: any, driverId: number): Tas
     locked_reason: task?.locked_reason != null ? String(task.locked_reason) : undefined,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    ...(task?.logistics_task_kind != null
+      ? { logistics_task_kind: String(task.logistics_task_kind) }
+      : {}),
+    ...(task?.logistics_task_kind_source != null
+      ? { logistics_task_kind_source: String(task.logistics_task_kind_source) }
+      : {}),
     ...( { assignedCleaner: driverId, sequence: task?.sequence } as any ),
   } as TaskType;
 }
@@ -1329,6 +1354,7 @@ export default function GenerateLogisticsAssignments() {
               flushDropZone
               operationsScope="logistics"
               highlightedTaskIds={highlightedEarlyOut}
+              onLogisticsTimelineMutated={reloadLogisticsPage}
             />
             <PriorityColumn
               title="HIGH PRIORITY"
@@ -1341,6 +1367,7 @@ export default function GenerateLogisticsAssignments() {
               flushDropZone
               operationsScope="logistics"
               highlightedTaskIds={highlightedHighPriority}
+              onLogisticsTimelineMutated={reloadLogisticsPage}
             />
             <PriorityColumn
               title="LOW PRIORITY"
@@ -1353,6 +1380,7 @@ export default function GenerateLogisticsAssignments() {
               flushDropZone
               operationsScope="logistics"
               highlightedTaskIds={highlightedLowPriority}
+              onLogisticsTimelineMutated={reloadLogisticsPage}
             />
           </div>
 

@@ -52,7 +52,9 @@ async function loadLogisticsTasksWithLockStatus(workDate: string): Promise<Logis
         cleaner_ctx.cleaner_task_start_time AS "cleanerTaskStartTime",
         cleaner_ctx.cleaner_sequence AS "cleanerSequence",
         COALESCE(dtl.locked, lc.locked, false) AS "locked",
-        COALESCE(dtl.locked_reason, lc.locked_reason) AS "lockedReason"
+        COALESCE(dtl.locked_reason, lc.locked_reason) AS "lockedReason",
+        lc.logistics_task_kind AS "logisticsTaskKind",
+        lc.logistics_task_kind_source AS "logisticsTaskKindSource"
       FROM lg_containers lc
       LEFT JOIN daily_task_locks dtl
         ON dtl.work_date = lc.work_date
@@ -97,6 +99,10 @@ async function loadLogisticsTasksWithLockStatus(workDate: string): Promise<Logis
     cleanerSequence: row.cleanerSequence != null ? Number(row.cleanerSequence) : null,
     locked: row.locked === true,
     lockedReason: row.lockedReason ? String(row.lockedReason) : null,
+    logisticsTaskKind: row.logisticsTaskKind ? String(row.logisticsTaskKind) : null,
+    logisticsTaskKindSource: row.logisticsTaskKindSource
+      ? String(row.logisticsTaskKindSource)
+      : null,
   }));
 }
 

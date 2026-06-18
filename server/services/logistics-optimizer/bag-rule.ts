@@ -1,3 +1,13 @@
+/**
+ * @deprecated Legacy optimizer-only terminology.
+ *
+ * Production logistics routing uses `LogisticsTaskKind`
+ * (`pick-up` / `delivery` / `delivery/pick-up` / null) from
+ * `shared/logistics-task-kind.ts`.
+ *
+ * Keep this module isolated to the disabled legacy optimizer (`phase2.ts`)
+ * until that code path is removed in a separate cleanup.
+ */
 export type LogisticsBagPolicy =
   | "NORMAL_TASK"
   | "DRIVER_BRINGS_BAG"

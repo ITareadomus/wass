@@ -3,6 +3,18 @@ import { Draggable } from "react-beautiful-dnd";
 import { useQuery } from "@tanstack/react-query";
 import { TaskType as Task } from "@shared/schema";
 import { shouldBlinkLogisticsTaskCard } from "@shared/logistics-scheduling-constraints";
+import {
+  resolveLogisticsTaskKind,
+  type LogisticsTaskKind,
+} from "@shared/logistics-task-kind";
+import {
+  DIALOG_SECTION_CORNER_BADGE_WRAP_CLASS,
+  LOGISTICS_KIND_BADGE_LABEL,
+  LogisticsKindAddBadge,
+  LogisticsKindBadge,
+  LogisticsKindPickerDialog,
+  logisticsKindStripeClass,
+} from "@/lib/logistics-task-kind-ui";
 import { format, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
 import { fetchWithOperation } from '@/lib/operationManager';
@@ -205,6 +217,8 @@ interface TaskCardProps {
   operationsScope?: "housekeeping" | "office" | "logistics";
   /** Solo timeline logistica: nome driver (colonna sinistra). Non usare per HK — lì sarebbe il cleaner. */
   timelineRowStaffDisplayLabel?: string | null;
+  /** Dopo mutazione timeline logistica (es. tipologia manuale). */
+  onLogisticsTimelineMutated?: () => void;
 }
 
 function getTaskMapMarkerId(task: Task): string {
@@ -248,6 +262,7 @@ export default function TaskCard({
   isPriorityWindowViolation = false,
   operationsScope = "housekeeping",
   timelineRowStaffDisplayLabel = null,
+  onLogisticsTimelineMutated,
 }: TaskCardProps) {
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -474,6 +489,7 @@ const displayClickableInputClass =
   const [logisticsDriverBadge, setLogisticsDriverBadge] = useState<string | null>(null);
   const [resolvedLogisticsDriverTaskKey, setResolvedLogisticsDriverTaskKey] = useState<string>("");
   const [logisticsHousekeepingCleanerLabel, setLogisticsHousekeepingCleanerLabel] = useState<string | null>(null);
+  const [logisticsHousekeepingCleanerId, setLogisticsHousekeepingCleanerId] = useState<number | null>(null);
   const [logisticsHousekeepingSequence, setLogisticsHousekeepingSequence] = useState<number | null>(null);
   const [logisticsHousekeepingStartTime, setLogisticsHousekeepingStartTime] = useState<string | null>(null);
   const [logisticsHousekeepingEndTime, setLogisticsHousekeepingEndTime] = useState<string | null>(null);
@@ -495,6 +511,7 @@ const displayClickableInputClass =
   const lastCollaboratorsTaskIdRef = useRef<number | null>(null);
   const initializedEditFieldsTaskKeyRef = useRef<string>("");
   const isLogisticsTimelineDetails = operationsScope === "logistics" && isInTimeline;
+  const isLogisticsDetails = operationsScope === "logistics";
   // Dialog completo in tutte le pagine non-office (timeline + containers).
   const isTimelineDetailsDialog = !isOfficeScope;
   const { toast } = useToast();
@@ -672,6 +689,17 @@ const displayClickableInputClass =
   const [editingPaxInInDialog, setEditingPaxInInDialog] = useState("");
   const [isSavingPaxIn, setIsSavingPaxIn] = useState(false);
   const [customerNoteDialogOpen, setCustomerNoteDialogOpen] = useState(false);
+  const [logisticsKindPickerOpen, setLogisticsKindPickerOpen] = useState(false);
+  const [isSavingLogisticsKind, setIsSavingLogisticsKind] = useState(false);
+  const [logisticsKindOverridesByTaskId, setLogisticsKindOverridesByTaskId] = useState<
+    Record<
+      string,
+      {
+        kind: LogisticsTaskKind;
+        source: "manual";
+      }
+    >
+  >({});
   const [editingCustomerNoteInDialog, setEditingCustomerNoteInDialog] = useState("");
   const [isSavingCustomerNote, setIsSavingCustomerNote] = useState(false);
 
@@ -1025,16 +1053,39 @@ const displayClickableInputClass =
     return { label: "STANDARD" };
   };
 
-  const categoryStripeClass = cardIsStraordinaria
-    ? "bg-red-500"
-    : cardIsPremium
-      ? "bg-yellow-500"
-      : "bg-green-500";
+  const cardTaskAny = task as any;
+  const cardTaskIdKey = String(cardTaskAny.task_id ?? cardTaskAny.id ?? "");
+  const cardLogisticsKindOverride = logisticsKindOverridesByTaskId[cardTaskIdKey];
+  const cardLogisticsTaskKind =
+    operationsScope === "logistics"
+      ? resolveLogisticsTaskKind({
+          logisticsTaskKind:
+            cardLogisticsKindOverride?.kind ?? cardTaskAny.logistics_task_kind,
+          logisticsTaskKindSource:
+            cardLogisticsKindOverride?.source ?? cardTaskAny.logistics_task_kind_source,
+          cleanerId: cardTaskAny.cleaner_id ?? null,
+          cleanerSequence: cardTaskAny.cleaner_sequence ?? null,
+          premium: task.premium,
+          paxIn: cardTaskAny.pax_in,
+        })
+      : null;
 
-  // Card neutra come le card elenco cleaner; categoria indicata dalla striscia laterale.
-  const cardSurfaceClass = isLocked && !isInTimeline
-    ? "bg-gray-100 dark:bg-gray-500/80 border-border/60 opacity-70"
-    : "bg-custom-blue-light border-border/60";
+  const categoryStripeClass =
+    operationsScope === "logistics"
+      ? logisticsKindStripeClass(cardLogisticsTaskKind)
+      : cardIsStraordinaria
+        ? "bg-red-500"
+        : cardIsPremium
+          ? "bg-yellow-500"
+          : "bg-green-500";
+
+  // Nei container: sfondo pagina per contrasto con la colonna; in timeline resta custom-blue-light.
+  const cardSurfaceClass =
+    isLocked && !isInTimeline
+      ? "bg-muted/80 border-border/60 opacity-70"
+      : !isInTimeline
+        ? "bg-background border-border shadow-sm"
+        : "bg-custom-blue-light border-border/60";
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -1159,6 +1210,7 @@ const displayClickableInputClass =
           lastHousekeepingDetailsFetchTaskKeyRef.current = "";
           setResolvedHousekeepingTaskKey("");
           setLogisticsHousekeepingCleanerLabel(null);
+          setLogisticsHousekeepingCleanerId(null);
           setLogisticsHousekeepingSequence(null);
           setLogisticsHousekeepingStartTime(null);
           setLogisticsHousekeepingEndTime(null);
@@ -1176,6 +1228,7 @@ const displayClickableInputClass =
           lastHousekeepingDetailsFetchTaskKeyRef.current = detailsTaskKey;
           setResolvedHousekeepingTaskKey(detailsTaskKey);
           setLogisticsHousekeepingCleanerLabel(null);
+          setLogisticsHousekeepingCleanerId(null);
           setLogisticsHousekeepingSequence(null);
           setLogisticsHousekeepingStartTime(null);
           setLogisticsHousekeepingEndTime(null);
@@ -1192,6 +1245,7 @@ const displayClickableInputClass =
         lastHousekeepingDetailsFetchTaskKeyRef.current = detailsTaskKey;
         if (taskKeyChanged) {
           setLogisticsHousekeepingCleanerLabel(null);
+          setLogisticsHousekeepingCleanerId(null);
           setLogisticsHousekeepingSequence(null);
           setLogisticsHousekeepingStartTime(null);
           setLogisticsHousekeepingEndTime(null);
@@ -1210,6 +1264,12 @@ const displayClickableInputClass =
         const label = String(json?.cleanerLabel ?? "").trim();
         setResolvedHousekeepingTaskKey(detailsTaskKey);
         setLogisticsHousekeepingCleanerLabel(label || null);
+        const rawCleanerId = json?.cleanerId;
+        const cleanerIdNum =
+          rawCleanerId === null || rawCleanerId === undefined || rawCleanerId === ""
+            ? NaN
+            : Number(rawCleanerId);
+        setLogisticsHousekeepingCleanerId(Number.isFinite(cleanerIdNum) ? cleanerIdNum : null);
         const rawSeq = json?.sequence;
         const sequenceNum =
           rawSeq === null || rawSeq === undefined || rawSeq === "" ? NaN : Number(rawSeq);
@@ -1225,6 +1285,7 @@ const displayClickableInputClass =
         if (!cancelled) {
           setResolvedHousekeepingTaskKey(detailsTaskKey);
           setLogisticsHousekeepingCleanerLabel(null);
+          setLogisticsHousekeepingCleanerId(null);
           setLogisticsHousekeepingSequence(null);
           setLogisticsHousekeepingStartTime(null);
           setLogisticsHousekeepingEndTime(null);
@@ -1862,6 +1923,60 @@ const displayClickableInputClass =
     }
   };
 
+  const handleSelectLogisticsKind = async (kind: LogisticsTaskKind) => {
+    if (!Number.isFinite(dialogTaskId)) {
+      toast({
+        title: "Errore",
+        description: "Task non valida",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingLogisticsKind(true);
+    try {
+      const workDate =
+        localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const response = await fetch("/api/update-logistics-task-kind", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: workDate,
+          taskId: dialogTaskId,
+          kind,
+          modified_by: currentUser.username || "unknown",
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Errore nel salvataggio");
+      }
+
+      setLogisticsKindOverridesByTaskId((prev) => ({
+        ...prev,
+        [displayTaskIdKey]: {
+          kind,
+          source: "manual",
+        },
+      }));
+      setLogisticsKindPickerOpen(false);
+      toast({
+        title: "Tipologia logistica salvata",
+        description: LOGISTICS_KIND_BADGE_LABEL[kind],
+      });
+      onLogisticsTimelineMutated?.();
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile salvare la tipologia logistica",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingLogisticsKind(false);
+    }
+  };
+
   // Calcola la larghezza in base alla durata
   const calculateWidth = (duration: string | undefined, forTimeline: boolean) => {
     const safeDuration = duration || "0.0";
@@ -2025,6 +2140,8 @@ const displayClickableInputClass =
   const currentDetailsTaskKey = getTaskKey(displayTask) || getTaskKey(task);
   const taskAny = task as any;
   const displayTaskAny = displayTask as any;
+  const displayTaskIdKey = String(displayTaskAny.task_id ?? displayTaskAny.id ?? "");
+  const displayLogisticsKindOverride = logisticsKindOverridesByTaskId[displayTaskIdKey];
   const modalTaskAny = isModalOpen ? displayTaskAny : taskAny;
   const bedsInfo =
     resolvedLogisticsDriverTaskKey === currentDetailsTaskKey ? logisticsStructureBeds : null;
@@ -2089,6 +2206,19 @@ const displayClickableInputClass =
     (isLogisticsTimelineDetails ? (displayTaskAny.start_time ?? displayTaskAny.startTime) : null) ??
     null;
   const logisticsScheduledAt = String(logisticsScheduledAtRaw ?? "").trim();
+  // "Schedulato entro le" = fine slot logistica (start + 15 min). Solo end_time task, non turno driver.
+  const logisticsScheduledUntilRaw =
+    modalTaskAny.logistics_end_time ??
+    modalTaskAny.logisticsEndTime ??
+    (isLogisticsTimelineDetails ? (modalTaskAny.end_time ?? modalTaskAny.endTime) : null) ??
+    taskAny.logistics_end_time ??
+    taskAny.logisticsEndTime ??
+    (isLogisticsTimelineDetails ? (taskAny.end_time ?? taskAny.endTime) : null) ??
+    displayTaskAny.logistics_end_time ??
+    displayTaskAny.logisticsEndTime ??
+    (isLogisticsTimelineDetails ? (displayTaskAny.end_time ?? displayTaskAny.endTime) : null) ??
+    null;
+  const logisticsScheduledUntil = String(logisticsScheduledUntilRaw ?? "").trim();
   const fallbackTimelineSequence =
     (isLogisticsTimelineDetails
       ? (taskAny.sequence ??
@@ -2100,13 +2230,93 @@ const displayClickableInputClass =
       : null) ?? null;
   const effectiveLogisticsSequence = Number(logisticsTimelineSequence ?? fallbackTimelineSequence);
   const isSingleKeyStructure = Number(effectiveStructureAlertKeys) === 1;
-  const isFirstSequenceLogistics = Number.isFinite(effectiveLogisticsSequence) && effectiveLogisticsSequence === 1;
+  const effectiveLogisticsTaskKind =
+    operationsScope === "logistics"
+      ? resolveLogisticsTaskKind({
+        cleanerId: logisticsHousekeepingCleanerId ?? displayTaskAny.cleaner_id ?? null,
+        cleanerSequence: logisticsHousekeepingSequence,
+        premium: displayTask.premium,
+        paxIn: displayTaskAny.pax_in,
+        logisticsTaskKind:
+          displayLogisticsKindOverride?.kind ?? displayTaskAny.logistics_task_kind,
+        logisticsTaskKindSource:
+          displayLogisticsKindOverride?.source ?? displayTaskAny.logistics_task_kind_source,
+      })
+    : null;
+
+  const dialogDisplayIsPremium = Boolean(displayTask.premium);
+  const dialogDisplayIsStraordinaria =
+    Boolean(displayTask.straordinaria) ||
+    isContinuazioneStraordinariaTask(displayTask) ||
+    isOfficeStraordinariaOperation(displayTask);
+  const dialogExternalBadgeLabel = getExternalInterventionBadgeLabel(
+    displayTask,
+    dialogDisplayIsStraordinaria,
+    dialogDisplayIsPremium
+  );
+  const dialogHousekeepingTypeLabel = dialogExternalBadgeLabel
+    ? dialogExternalBadgeLabel
+    : isOfficeStraordinariaOperation(displayTask)
+      ? "PULIZIA UFFICI STRAORDINARIA"
+      : isOfficeOtherOperation(displayTask)
+        ? "PULIZIA UFFICI"
+        : isContinuazioneStraordinariaTask(displayTask)
+          ? "CONTINUAZIONE PS"
+          : getTaskTypeStyle(dialogDisplayIsStraordinaria, dialogDisplayIsPremium).label;
+  const dialogHousekeepingTypeBadge = (
+    <Badge
+      variant="outline"
+      className={cn(
+        "text-xs shrink-0 px-2 py-0.5 rounded border font-medium",
+        dialogExternalBadgeLabel
+          ? "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700"
+          : (Boolean(displayTask.straordinaria) || isContinuazioneStraordinariaTask(displayTask))
+              ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
+              : Boolean(displayTask.premium)
+                ? "bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
+                : "bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400"
+      )}
+    >
+      {dialogHousekeepingTypeLabel}
+    </Badge>
+  );
+  const dialogHousekeepingCornerTypeBadge = (
+    <Badge
+      variant="outline"
+      className={cn(
+        "text-xs shrink-0 px-2 py-0.5 rounded border font-medium",
+        dialogExternalBadgeLabel
+          ? "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200 border-sky-300 dark:border-sky-700"
+          : (Boolean(displayTask.straordinaria) || isContinuazioneStraordinariaTask(displayTask))
+              ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border-red-500"
+              : Boolean(displayTask.premium)
+                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
+                : "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200 border-green-600 dark:border-green-400"
+      )}
+    >
+      {dialogHousekeepingTypeLabel}
+    </Badge>
+  );
+  const dialogLogisticsKindBadgeCorner =
+    effectiveLogisticsTaskKind != null ? (
+      <LogisticsKindBadge kind={effectiveLogisticsTaskKind} />
+    ) : !isTaskReadOnly ? (
+      <LogisticsKindAddBadge
+        onClick={() => setLogisticsKindPickerOpen(true)}
+        disabled={isSavingLogisticsKind}
+      />
+    ) : null;
+
   const logisticsAlertParts: string[] = [];
   if (isSingleKeyStructure) {
     logisticsAlertParts.push("Consegnare chiave al cleaner.");
   }
-  if (isFirstSequenceLogistics) {
+  if (effectiveLogisticsTaskKind === "pick-up") {
     logisticsAlertParts.push("Solo ritiro dello sporco, no borsone.");
+  } else if (effectiveLogisticsTaskKind === "delivery") {
+    logisticsAlertParts.push("Consegna dotazione o materiale al cleaner.");
+  } else if (effectiveLogisticsTaskKind === "delivery/pick-up") {
+    logisticsAlertParts.push("Consegna borsone e ritiro sporco al checkout.");
   }
   const alertText = logisticsAlertParts.join(" ");
   const notesText =
@@ -2172,6 +2382,9 @@ const displayClickableInputClass =
   const logisticsScheduledDisplayValue = !isInTimeline
     ? "non assegnato"
     : logisticsScheduledAt || "non assegnato";
+  const logisticsScheduledUntilDisplayValue = !isInTimeline
+    ? "non assegnato"
+    : logisticsScheduledUntil || "non assegnato";
   const logisticsAlertDisplayValue = alertText || "—";
   const logisticsBedsDisplayValue = bedsSummaryText || "—";
   const hasCollaboration = Number((displayTask as any).collaborator_count || 0) > 1;
@@ -2488,23 +2701,33 @@ const displayClickableInputClass =
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-h-[56px]">
-        <div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-h-[56px]">
+        <div className="text-center">
           <p className="text-sm font-semibold text-muted-foreground">Travel Time</p>
           <Input
             value={logisticsTravelDisplayValue}
             readOnly
-            className={displayInputClass}
+            className={cn(displayInputClass, "text-center")}
             tabIndex={-1}
             onFocus={(e) => e.currentTarget.blur()}
           />
         </div>
-        <div>
-          <p className="text-sm font-semibold text-muted-foreground">Schedulato alle</p>
+        <div className="text-center">
+          <p className="text-sm font-semibold text-muted-foreground">Start Time</p>
           <Input
             value={logisticsScheduledDisplayValue}
             readOnly
-            className={displayInputClass}
+            className={cn(displayInputClass, "text-center")}
+            tabIndex={-1}
+            onFocus={(e) => e.currentTarget.blur()}
+          />
+        </div>
+        <div className="text-center">
+          <p className="text-sm font-semibold text-muted-foreground">End Time</p>
+          <Input
+            value={logisticsScheduledUntilDisplayValue}
+            readOnly
+            className={cn(displayInputClass, "text-center")}
             tabIndex={-1}
             onFocus={(e) => e.currentTarget.blur()}
           />
@@ -2633,8 +2856,10 @@ const displayClickableInputClass =
                       aria-hidden="true"
                     />
                     {operationsScope === "logistics" && isInTimeline ? (
-                      <div className="flex h-full min-h-[40px] w-full items-center justify-center text-[#ff0000] font-extrabold text-[13px]">
-                        {seq}
+                      <div className="flex h-full min-h-[40px] w-full flex-col items-start justify-center gap-0 p-[0.5px] pl-2">
+                        <span className="text-foreground font-extrabold text-[13px] shrink-0">
+                          {seq}
+                        </span>
                       </div>
                     ) : (
                       <>
@@ -2852,45 +3077,7 @@ const displayClickableInputClass =
 
               <DialogTitle className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-2 text-center">
                 Dettagli Task #{getTaskKey(displayTask)}
-                {(() => {
-                  const displayIsPremium = Boolean(displayTask.premium);
-                  const displayIsStraordinaria =
-                    Boolean(displayTask.straordinaria) ||
-                    isContinuazioneStraordinariaTask(displayTask) ||
-                    isOfficeStraordinariaOperation(displayTask);
-                  const displayExternalBadgeLabel = getExternalInterventionBadgeLabel(
-                    displayTask,
-                    displayIsStraordinaria,
-                    displayIsPremium
-                  );
-                  const displayTypeLabel = displayExternalBadgeLabel
-                    ? displayExternalBadgeLabel
-                    : isOfficeStraordinariaOperation(displayTask)
-                      ? "PULIZIA UFFICI STRAORDINARIA"
-                      : isOfficeOtherOperation(displayTask)
-                        ? "PULIZIA UFFICI"
-                        : isContinuazioneStraordinariaTask(displayTask)
-                          ? "CONTINUAZIONE PS"
-                          : getTaskTypeStyle(displayIsStraordinaria, displayIsPremium).label;
-
-                  return (
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "text-xs shrink-0 px-2 py-0.5 rounded border font-medium",
-                    displayExternalBadgeLabel
-                      ? "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700"
-                    : (Boolean(displayTask.straordinaria) || isContinuazioneStraordinariaTask(displayTask))
-                        ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
-                        : Boolean(displayTask.premium)
-                          ? "bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
-                          : "bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400"
-                  )}
-                >
-                  {displayTypeLabel}
-                </Badge>
-                  );
-                })()}
+                {!isLogisticsTimelineDetails && dialogHousekeepingTypeBadge}
                 {(displayTask as any).priority && (
                   <Badge
                     variant="outline"
@@ -2942,6 +3129,11 @@ const displayClickableInputClass =
                       <Truck className="h-3.5 w-3.5 shrink-0" />
                       <span>Dettagli Logistica</span>
                     </div>
+                    {isLogisticsDetails && dialogLogisticsKindBadgeCorner && (
+                      <div className={DIALOG_SECTION_CORNER_BADGE_WRAP_CLASS}>
+                        {dialogLogisticsKindBadgeCorner}
+                      </div>
+                    )}
 
                     <div className="grid gap-3 pt-2">{logisticsTimelineDetailFields()}</div>
                   </div>
@@ -2990,6 +3182,9 @@ const displayClickableInputClass =
                 <Building2 className="h-3.5 w-3.5 shrink-0" />
                 <span>{isLogisticsTimelineDetails ? "Dettagli Housekeeping" : "Dettagli Task"}</span>
               </div>
+            )}
+            {isLogisticsTimelineDetails && (
+              <div className={DIALOG_SECTION_CORNER_BADGE_WRAP_CLASS}>{dialogHousekeepingCornerTypeBadge}</div>
             )}
             <div
               className={cn(
@@ -3561,6 +3756,15 @@ const displayClickableInputClass =
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog scelta tipologia logistica (task non determinati) */}
+      <LogisticsKindPickerDialog
+        open={logisticsKindPickerOpen}
+        onOpenChange={setLogisticsKindPickerOpen}
+        taskLabel={`#${getTaskKey(displayTask)}`}
+        onSelect={handleSelectLogisticsKind}
+        isSaving={isSavingLogisticsKind}
+      />
 
       {/* Dialog Modifica Tipologia intervento - stesso stile di Pax-In / Check-out / Check-in */}
       <Dialog open={operationDialogOpen} onOpenChange={(open) => !open && setOperationDialogOpen(false)}>

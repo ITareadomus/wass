@@ -4,10 +4,12 @@ import {
   LOGISTICS_SERVICE_DURATION_MIN,
   parseHmToMinutes,
 } from "../../../shared/logistics-scheduling-constraints";
+import {
+  requiresDriverBeforeCleaner,
+  type LogisticsTaskKind,
+} from "../../../shared/logistics-task-kind";
 import type { PriorityWindows } from "../optimizer/priorityWindows";
-import { requiresDriverBeforeCleaner } from "./bag-handling";
 import type {
-  BagHandling,
   HardConstraintSpec,
   Minutes,
   TaskHardWindow,
@@ -26,7 +28,7 @@ export const DRIVER_BRINGS_BAG_TOLERANCE_REASON =
 export interface BuildTaskWindowInput {
   taskId: number;
   priority: "EO" | "HP" | "LP" | null;
-  bagHandling: BagHandling;
+  logisticsTaskKind: LogisticsTaskKind | null;
   workDate: string;
   cleaningTime: number | null;
   checkoutDate: string | null;
@@ -57,7 +59,7 @@ function parseTime(value: unknown, fallback: Minutes | null = null): Minutes | n
 }
 
 function getCleanerTaskStartTime(input: BuildTaskWindowInput): string | null {
-  if (!requiresDriverBeforeCleaner(input.bagHandling)) return null;
+  if (!requiresDriverBeforeCleaner(input.logisticsTaskKind)) return null;
   return input.cleanerTaskStartTime ?? input.cleanerStartTime;
 }
 

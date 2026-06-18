@@ -1,6 +1,11 @@
 # Vincoli di assegnazione — logistics-optimizer
 
-Documentazione dei vincoli rispettati dal modulo `server/services/logistics-optimizer`.
+Documentazione dei vincoli rispettati dal modulo legacy `server/services/logistics-optimizer`.
+
+> Nota: il solver attivo è `logistics-optimizer-final` e usa il modello
+> `logistics_task_kind` (`pick-up`, `delivery`, `delivery/pick-up`, `null`).
+> I termini `NORMAL_TASK`, `DRIVER_BRINGS_BAG` e `CLEANER_HAS_BAG` qui sotto
+> sono mantenuti solo per descrivere il codice legacy.
 
 **Flusso:** Phase 0 (input) → Phase 1 (driver + candidati) → Phase 2 (assegnazione) → Apply (timeline + validazione finale).
 
@@ -13,13 +18,23 @@ Documentazione dei vincoli rispettati dal modulo `server/services/logistics-opti
 | **Task bloccate** | Escluse in Phase 0 (`locked` su container o `daily_task_locks`). |
 | **Coordinate** | Senza `lat`/`lng` valide → escluse dai candidati Phase 1 (non schedulabili). |
 | **Driver** | Serve almeno un driver logistica selezionato per la data; altrimenti l’optimizer non parte (`NO_SELECTED_DRIVERS`). |
-| **Bag policy** | Non esclude task: tutte le sequence sono eleggibili; la policy guida priorità e vincoli cleaner. |
+| **Tipologia logistica** | Nel modello attivo non esclude task: guida finestre e vincoli cleaner (`delivery/pick-up` richiede driver prima del cleaner; `pick-up`, `delivery`, `null` no). |
 
 ---
 
-## 2. Regole borsone (`bag-rule`)
+## 2. Regole borsone legacy (`bag-rule`)
 
-Definite in `bag-rule.ts` (`computeBagPolicy`).
+Definite in `bag-rule.ts` (`computeBagPolicy`) e mantenute solo per il legacy optimizer.
+Nel percorso attivo usare `shared/logistics-task-kind.ts`.
+
+| Tipologia attiva | Condizione |
+|--------|--------|
+| `null` | Senza cleaner/sequence |
+| `delivery/pick-up` | Cleaner presente e (`sequence !== 1` **oppure** premium **oppure** `pax_in > 4`) |
+| `pick-up` | Sequence 1, non premium, `pax_in ≤ 4` |
+| `delivery` | Solo manuale; dotazione/materiale, non regola borsone |
+
+Mapping legacy indicativo:
 
 | Policy | Quando |
 |--------|--------|
@@ -27,7 +42,7 @@ Definite in `bag-rule.ts` (`computeBagPolicy`).
 | `DRIVER_BRINGS_BAG` | Sequence 1 + (premium **oppure** `pax_in > 4`) |
 | `CLEANER_HAS_BAG` | Sequence 1, non premium, `pax_in ≤ 4` |
 
-`requiresDriverBeforeCleaner`: vale per `NORMAL_TASK` e `DRIVER_BRINGS_BAG`, **non** per `CLEANER_HAS_BAG`.
+Nel modello attivo `requiresDriverBeforeCleaner` vale solo per `delivery/pick-up`.
 
 ---
 
@@ -48,10 +63,10 @@ Calcolati da `buildLogisticsScheduleForDriver` in `logistics-driver-schedule.ts`
 
 Implementato in Phase 2 (`getCleanerViolation`).
 
-| Policy | Comportamento |
+| Tipologia attiva | Comportamento |
 |--------|----------------|
-| `NORMAL_TASK` / `DRIVER_BRINGS_BAG` | Riferimento: `cleanerTaskStartTime` (o `cleanerStartTime`). Il driver può iniziare il task logistico **dopo** l’inizio HK solo entro tolleranza: **`ceil(2/3 × cleaningTime)`** se durata presente (`lg_containers.cleaning_time`), altrimenti **30 min**. Oltre → `CLEANER_TIME_CONSTRAINT`. I 15 minuti di durata logistica non pesano su questo vincolo: conta l’arrivo/inizio, perché il borsone è disponibile da quel momento. |
-| `CLEANER_HAS_BAG` | **Nessun** vincolo “prima del cleaner” (solo ritiro sporco). Urgenza legata al **checkout** (priorità), non all’inizio HK. |
+| `delivery/pick-up` | Riferimento: `cleanerTaskStartTime` (o `cleanerStartTime`). Il driver può iniziare il task logistico **dopo** l’inizio HK solo entro tolleranza: **`ceil(2/3 × cleaningTime)`** se durata presente (`lg_containers.cleaning_time`), altrimenti **30 min**. Oltre → `CLEANER_TIME_CONSTRAINT`. I 15 minuti di durata logistica non pesano su questo vincolo: conta l’arrivo/inizio, perché il borsone è disponibile da quel momento. |
+| `pick-up` / `delivery` / `null` | **Nessun** vincolo “prima del cleaner”. `pick-up` è solo ritiro sporco; `delivery` è dotazione/materiale manuale. |
 
 **Formula violazione (consegna borsone):**
 
@@ -80,8 +95,8 @@ Non sono vincoli di fattibilità per singolo task, ma definiscono i **gruppi** c
 
 **Deadline per priorità** (`getTaskDeadlineMin`):
 
-- Con consegna borsone: min tra inizio cleaner e check-in (se applicabile).
-- `CLEANER_HAS_BAG`: include anche checkout (se applicabile sulla data).
+- `delivery/pick-up`: min tra inizio cleaner e check-in (se applicabile).
+- `pick-up`: include anche checkout (se applicabile sulla data).
 
 ---
 
