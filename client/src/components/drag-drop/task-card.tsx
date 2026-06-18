@@ -499,6 +499,9 @@ const displayClickableInputClass =
   const [logisticsHousekeepingEndTime, setLogisticsHousekeepingEndTime] = useState<string | null>(null);
   const [logisticsHousekeepingTravelTime, setLogisticsHousekeepingTravelTime] = useState<number | null>(null);
   const [logisticsTimelineSequence, setLogisticsTimelineSequence] = useState<number | null>(null);
+  const [logisticsTimelineStartTime, setLogisticsTimelineStartTime] = useState<string | null>(null);
+  const [logisticsTimelineEndTime, setLogisticsTimelineEndTime] = useState<string | null>(null);
+  const [logisticsTimelineTravelTime, setLogisticsTimelineTravelTime] = useState<number | null>(null);
   const [logisticsHousekeepingNotes, setLogisticsHousekeepingNotes] = useState<string | null>(null);
   const [customerNotesByTaskKey, setCustomerNotesByTaskKey] = useState<Record<string, string>>({});
   const [logisticsStructureBeds, setLogisticsStructureBeds] = useState<{
@@ -515,6 +518,8 @@ const displayClickableInputClass =
   const lastCollaboratorsTaskIdRef = useRef<number | null>(null);
   const initializedEditFieldsTaskKeyRef = useRef<string>("");
   const isLogisticsTimelineDetails = operationsScope === "logistics" && isInTimeline;
+  const isHousekeepingDetails = operationsScope === "housekeeping";
+  const isHousekeepingTimelineDetails = operationsScope === "housekeeping" && isInTimeline;
   const isLogisticsDetails = operationsScope === "logistics";
   // Dialog completo in tutte le pagine non-office (timeline + containers).
   const isTimelineDetailsDialog = !isOfficeScope;
@@ -1123,6 +1128,9 @@ const displayClickableInputClass =
           setResolvedLogisticsDriverTaskKey("");
           setLogisticsDriverBadge(null);
           setLogisticsTimelineSequence(null);
+          setLogisticsTimelineStartTime(null);
+          setLogisticsTimelineEndTime(null);
+          setLogisticsTimelineTravelTime(null);
           setLogisticsHousekeepingNotes(null);
           setLogisticsStructureBeds(null);
           setLogisticsStructureAlertKeys(null);
@@ -1137,6 +1145,9 @@ const displayClickableInputClass =
           setResolvedLogisticsDriverTaskKey(detailsTaskKey);
           setLogisticsDriverBadge(null);
           setLogisticsTimelineSequence(null);
+          setLogisticsTimelineStartTime(null);
+          setLogisticsTimelineEndTime(null);
+          setLogisticsTimelineTravelTime(null);
           setLogisticsHousekeepingNotes(null);
           setLogisticsStructureBeds(null);
           setLogisticsStructureAlertKeys(null);
@@ -1154,6 +1165,9 @@ const displayClickableInputClass =
           if (taskKeyChanged) {
             setLogisticsDriverBadge(null);
             setLogisticsTimelineSequence(null);
+            setLogisticsTimelineStartTime(null);
+            setLogisticsTimelineEndTime(null);
+            setLogisticsTimelineTravelTime(null);
             setLogisticsHousekeepingNotes(null);
             setLogisticsStructureBeds(null);
             setLogisticsStructureAlertKeys(null);
@@ -1169,12 +1183,18 @@ const displayClickableInputClass =
         const json = res.ok ? await res.json().catch(() => ({})) : {};
         const badge = String(json?.driverBadge ?? "").trim();
         const logisticsSeqNum = Number(json?.sequence);
+        const logisticsStartText = String(json?.startTime ?? "").trim();
+        const logisticsEndText = String(json?.endTime ?? "").trim();
+        const logisticsTravelNum = Number(json?.travelTime);
         const housekeepingNotesText = String(json?.housekeepingNotes ?? "").trim();
         const bedsRaw = json?.structureBeds;
         const alertKeysRaw = Number(json?.structureAlertKeys);
         setResolvedLogisticsDriverTaskKey(detailsTaskKey);
         setLogisticsDriverBadge(badge || null);
         setLogisticsTimelineSequence(Number.isFinite(logisticsSeqNum) ? logisticsSeqNum : null);
+        setLogisticsTimelineStartTime(logisticsStartText || null);
+        setLogisticsTimelineEndTime(logisticsEndText || null);
+        setLogisticsTimelineTravelTime(Number.isFinite(logisticsTravelNum) ? logisticsTravelNum : null);
         setLogisticsHousekeepingNotes(housekeepingNotesText || null);
         setLogisticsStructureBeds(
           bedsRaw && typeof bedsRaw === "object"
@@ -1192,6 +1212,9 @@ const displayClickableInputClass =
           setResolvedLogisticsDriverTaskKey(detailsTaskKey);
           setLogisticsDriverBadge(null);
           setLogisticsTimelineSequence(null);
+          setLogisticsTimelineStartTime(null);
+          setLogisticsTimelineEndTime(null);
+          setLogisticsTimelineTravelTime(null);
           setLogisticsHousekeepingNotes(null);
           setLogisticsStructureBeds(null);
           setLogisticsStructureAlertKeys(null);
@@ -2175,8 +2198,15 @@ const displayClickableInputClass =
     const num = Number(value);
     return Number.isFinite(num) ? num : null;
   };
+  const resolvedLogisticsStartTime =
+    resolvedLogisticsDriverTaskKey === currentDetailsTaskKey ? logisticsTimelineStartTime : null;
+  const resolvedLogisticsEndTime =
+    resolvedLogisticsDriverTaskKey === currentDetailsTaskKey ? logisticsTimelineEndTime : null;
+  const resolvedLogisticsTravelTime =
+    resolvedLogisticsDriverTaskKey === currentDetailsTaskKey ? logisticsTimelineTravelTime : null;
 
   const logisticsTravelTimeRaw =
+    resolvedLogisticsTravelTime ??
     modalTaskAny.logistics_travel_time ??
     modalTaskAny.logisticsTravelTime ??
     modalTaskAny.driver_travel_time ??
@@ -2198,6 +2228,7 @@ const displayClickableInputClass =
   // "Schedulato alle" nel box logistica deve usare solo dati logistici dedicati.
   // Evita fallback su driver_start_time (orario turno) e su start_time housekeeping.
   const logisticsScheduledAtRaw =
+    resolvedLogisticsStartTime ??
     modalTaskAny.logistics_start_time ??
     modalTaskAny.logisticsStartTime ??
     modalTaskAny.logistics_scheduled_time ??
@@ -2217,6 +2248,7 @@ const displayClickableInputClass =
   const logisticsScheduledAt = String(logisticsScheduledAtRaw ?? "").trim();
   // "Schedulato entro le" = fine slot logistica (start + 15 min). Solo end_time task, non turno driver.
   const logisticsScheduledUntilRaw =
+    resolvedLogisticsEndTime ??
     modalTaskAny.logistics_end_time ??
     modalTaskAny.logisticsEndTime ??
     (isLogisticsTimelineDetails ? (modalTaskAny.end_time ?? modalTaskAny.endTime) : null) ??
@@ -2240,10 +2272,19 @@ const displayClickableInputClass =
   const effectiveLogisticsSequence = Number(logisticsTimelineSequence ?? fallbackTimelineSequence);
   const isSingleKeyStructure = Number(effectiveStructureAlertKeys) === 1;
   const effectiveLogisticsTaskKind =
-    operationsScope === "logistics"
+    isLogisticsDetails || isHousekeepingTimelineDetails
       ? resolveLogisticsTaskKind({
-        cleanerId: logisticsHousekeepingCleanerId ?? displayTaskAny.cleaner_id ?? null,
-        cleanerSequence: logisticsHousekeepingSequence,
+        cleanerId:
+          logisticsHousekeepingCleanerId ??
+          cleanerId ??
+          displayTaskAny.assignedCleaner ??
+          displayTaskAny.cleaner_id ??
+          null,
+        cleanerSequence:
+          logisticsHousekeepingSequence ??
+          displayTaskAny.sequence ??
+          displayTaskAny.cleaner_sequence ??
+          null,
         premium: displayTask.premium,
         paxIn: displayTaskAny.pax_in,
         logisticsTaskKind:
@@ -2309,7 +2350,7 @@ const displayClickableInputClass =
   const dialogLogisticsKindBadgeCorner =
     effectiveLogisticsTaskKind != null ? (
       <LogisticsKindBadge kind={effectiveLogisticsTaskKind} />
-    ) : !isTaskReadOnly ? (
+    ) : isLogisticsDetails && !isTaskReadOnly ? (
       <LogisticsKindAddBadge
         onClick={() => setLogisticsKindPickerOpen(true)}
         disabled={isSavingLogisticsKind}
@@ -2383,17 +2424,12 @@ const displayClickableInputClass =
   const logisticsSequenceDisplayValue = String(
     logisticsTimelineSequence ?? fallbackTimelineSequence ?? "—"
   );
-  const logisticsTravelDisplayValue = !isInTimeline
-    ? "non assegnato"
-    : logisticsTravelMinutes !== null
+  const logisticsTravelDisplayValue =
+    logisticsTravelMinutes !== null
       ? `${logisticsTravelMinutes} minuti`
       : "non assegnato";
-  const logisticsScheduledDisplayValue = !isInTimeline
-    ? "non assegnato"
-    : logisticsScheduledAt || "non assegnato";
-  const logisticsScheduledUntilDisplayValue = !isInTimeline
-    ? "non assegnato"
-    : logisticsScheduledUntil || "non assegnato";
+  const logisticsScheduledDisplayValue = logisticsScheduledAt || "non assegnato";
+  const logisticsScheduledUntilDisplayValue = logisticsScheduledUntil || "non assegnato";
   const logisticsAlertDisplayValue = alertText || "—";
   const logisticsBedsDisplayValue = bedsSummaryText || "—";
   const hasCollaboration = Number((displayTask as any).collaborator_count || 0) > 1;
@@ -3086,7 +3122,7 @@ const displayClickableInputClass =
 
               <DialogTitle className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-2 text-center">
                 Dettagli Task #{getTaskKey(displayTask)}
-                {!isLogisticsTimelineDetails && dialogHousekeepingTypeBadge}
+                {!isLogisticsDetails && !isHousekeepingDetails && dialogHousekeepingTypeBadge}
                 {(displayTask as any).priority && (
                   <Badge
                     variant="outline"
@@ -3138,7 +3174,7 @@ const displayClickableInputClass =
                       <Truck className="h-3.5 w-3.5 shrink-0" />
                       <span>Dettagli Logistica</span>
                     </div>
-                    {isLogisticsDetails && dialogLogisticsKindBadgeCorner && (
+                    {dialogLogisticsKindBadgeCorner && (
                       <div className={DIALOG_SECTION_CORNER_BADGE_WRAP_CLASS}>
                         {dialogLogisticsKindBadgeCorner}
                       </div>
@@ -3189,10 +3225,10 @@ const displayClickableInputClass =
             {isTimelineDetailsDialog && (
               <div className="absolute -top-3 left-3 inline-flex items-center gap-1.5 rounded-t-md rounded-b-sm border border-border bg-background px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-foreground shadow-sm">
                 <Building2 className="h-3.5 w-3.5 shrink-0" />
-                <span>{isLogisticsTimelineDetails ? "Dettagli Housekeeping" : "Dettagli Task"}</span>
+                <span>{isLogisticsDetails || isHousekeepingDetails ? "Dettagli Housekeeping" : "Dettagli Task"}</span>
               </div>
             )}
-            {isLogisticsTimelineDetails && (
+            {(isLogisticsDetails || isHousekeepingDetails) && (
               <div className={DIALOG_SECTION_CORNER_BADGE_WRAP_CLASS}>{dialogHousekeepingCornerTypeBadge}</div>
             )}
             <div
