@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/select";
 
 const OFFICE_SCOPE_ENABLED = false;
+const REFRESH_TIMEOUT_MS = 45000;
 
 interface Task {
   task_id: string | number;
@@ -73,7 +74,7 @@ interface ContainersData {
 }
 
 interface OperationsData {
-  active_operations: { id: number; name: string }[];
+  active_operations: { id: number; name: string; enable_wass?: boolean; enable_wass_readonly?: boolean }[];
 }
 
 export default function UnconfirmedTasks() {
@@ -131,6 +132,13 @@ export default function UnconfirmedTasks() {
     15: "PULIZIA UFFICI/ALTRO",
     38: "PULIZIA UFFICI/ALTRO STRAORDINARIA",
   };
+  const defaultOperationNames: Record<number, string> = {
+    1: "FERMATA",
+    2: "PARTENZA",
+    3: "PULIZIA STRAORDINARIA",
+    4: "RIPASSO",
+    ...officeOperationNames,
+  };
   const fetchedOperations = operationsData?.active_operations || [];
   const fetchedOpsById = new Map<number, string>(
     fetchedOperations.map((op) => [Number(op.id), String(op.name || "").trim()])
@@ -140,13 +148,11 @@ export default function UnconfirmedTasks() {
         id,
         name: fetchedOpsById.get(id) || officeOperationNames[id],
       }))
-    : fetchedOperations;
+    : fetchedOperations.filter((op) => op.enable_wass !== false);
 
-  const operationNames: Record<number, string> = allowedOperations.reduce(
+  const operationNames: Record<number, string> = fetchedOperations.reduce(
     (acc, op) => ({ ...acc, [op.id]: op.name }),
-    isOfficeScope
-      ? { ...officeOperationNames }
-      : ({ 1: "FERMATA", 2: "PARTENZA", 3: "PULIZIA STRAORDINARIA", 4: "RIPASSO" } as Record<number, string>)
+    isOfficeScope ? { ...officeOperationNames } : defaultOperationNames
   );
 
   
@@ -160,20 +166,33 @@ export default function UnconfirmedTasks() {
   } = useQuery({
     queryKey: ["/api/containers/refresh", selectedDate],
     queryFn: async () => {
-      const response = await fetch("/api/containers/refresh", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: selectedDate, scope: scopeValue }),
-      });
-      if (!response.ok) {
-        const msg = await response.text().catch(() => "");
-        throw new Error(msg || "Failed to refresh containers");
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
+      try {
+        const response = await fetch("/api/containers/refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: selectedDate, scope: scopeValue }),
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          const msg = await response.text().catch(() => "");
+          throw new Error(msg || "Failed to refresh containers");
+        }
+        return response.json();
+      } catch (error: any) {
+        if (error?.name === "AbortError") {
+          throw new Error("Timeout refresh containers: la richiesta ha superato 45 secondi.");
+        }
+        throw error;
+      } finally {
+        window.clearTimeout(timeoutId);
       }
-      return response.json();
     },
     // Ad ogni apertura pagina e ad ogni cambio data deve rieseguire il refresh
     staleTime: 0,
     gcTime: 0,
+    retry: false,
     refetchOnMount: "always",
     refetchOnWindowFocus: false,
   });

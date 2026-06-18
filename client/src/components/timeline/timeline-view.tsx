@@ -58,6 +58,7 @@ interface TimelineViewProps {
   lastValidDragIndex?: number | null; // Indice valido durante il drag (da container verso timeline)
   draggingOverCleanerId?: number | null; // ID del cleaner su cui si sta trascinando
   searchTask?: string; // Ricerca task per ID, logistic code, address o customer reference
+  preassignedAnimatedTaskIds?: Set<string>;
 }
 
 interface Cleaner {
@@ -76,6 +77,7 @@ interface Cleaner {
   preferred_customers: number[];
   telegram_id: number | null;
   start_time: string | null;
+  end_time?: string | null;
   show_plus_one?: boolean;
 }
 
@@ -132,6 +134,16 @@ const formatTimelineSlot = (minutes: number) => {
   const hours = Math.floor(minutes / 60);
   return `${String(hours).padStart(2, "0")}:00`;
 };
+type CleanerDirectoryEntry = {
+  id: number;
+  name?: string;
+  lastname?: string;
+  alias?: string;
+  role?: string;
+};
+
+const PREASSIGNED_REASON_NORMAL = "preassigned_enable_wass";
+const PREASSIGNED_REASON_READONLY = "preassigned_enable_wass_readonly";
 
 export default function TimelineView({
   personnel,
@@ -144,6 +156,7 @@ export default function TimelineView({
   lastValidDragIndex = null,
   draggingOverCleanerId = null,
   searchTask = "",
+  preassignedAnimatedTaskIds = new Set<string>(),
 }: TimelineViewProps) {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
@@ -171,6 +184,7 @@ export default function TimelineView({
   const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
   const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
   const [cleanersAliases, setCleanersAliases] = useState<Record<number, { alias: string; name?: string; lastname?: string }>>({});
+  const [cleanersDirectory, setCleanersDirectory] = useState<Record<number, CleanerDirectoryEntry>>({});
   const [isAddCleanerDialogOpen, setIsAddCleanerDialogOpen] = useState(false);
   const [availableCleaners, setAvailableCleaners] = useState<Cleaner[]>([]);
   const [cleanerToReplace, setCleanerToReplace] = useState<number | null>(null);
@@ -185,6 +199,7 @@ export default function TimelineView({
   const [pendingCleaner, setPendingCleaner] = useState<any>(null); // Added to track pending cleaner ID
   const [showAdamTransferDialog, setShowAdamTransferDialog] = useState(false); // Stato per il dialog di trasferimento ADAM
   const [showResetDialog, setShowResetDialog] = useState(false); // Stato per il dialog di reset assegnazioni
+  const [showPreassignedTasksDialog, setShowPreassignedTasksDialog] = useState(false);
   const [lastAdamTransfer, setLastAdamTransfer] = useState<string | null>(null); // Timestamp ultimo trasferimento ADAM
   const [lockedCleaners, setLockedCleaners] = useState<Set<number>>(new Set()); // Set degli ID dei cleaner bloccati
 
@@ -227,6 +242,9 @@ export default function TimelineView({
       })
       .map(t => String((t as any).id || (t as any).task_id || '')));
   })();
+  const effectiveHighlightedTaskIds = React.useMemo(() => {
+    return new Set<string>(highlightedTaskIds);
+  }, [highlightedTaskIds]);
 
   // Stato per tracciare acknowledge per coppie (task, cleaner)
   type IncompatibleKey = string; // chiave del tipo `${taskId}-${cleanerId}`
@@ -236,6 +254,24 @@ export default function TimelineView({
   const getIncompatibleKey = (task: any, cleanerId: number): IncompatibleKey => {
     const taskId = task.task_id ?? task.id ?? task.logisticCode;
     return `${taskId}-${cleanerId}`;
+  };
+
+  const resolvePreassignedMode = (task: any): "readonly" | "normal" | null => {
+    const explicitMode = String(task?.preAssignedMode ?? "").trim().toLowerCase();
+    if (explicitMode === "readonly") return "readonly";
+    if (explicitMode === "normal") return "normal";
+    const reasons = Array.isArray(task?.reasons) ? task.reasons : [];
+    if (reasons.some((reason: unknown) => String(reason ?? "").trim() === PREASSIGNED_REASON_READONLY)) {
+      return "readonly";
+    }
+    if (reasons.some((reason: unknown) => String(reason ?? "").trim() === PREASSIGNED_REASON_NORMAL)) {
+      return "normal";
+    }
+    return null;
+  };
+
+  const isReadonlyPreassignedTask = (task: any): boolean => {
+    return resolvePreassignedMode(task) === "readonly";
   };
 
   const { toast } = useToast();
@@ -294,11 +330,10 @@ export default function TimelineView({
     });
   }, []);
 
-  // EO, HP, LP brackets for priority windows
+  // EO/HP/LP brackets derived from the hp-centric priority settings.
   type PriorityWindows = {
-    EO: { start: string; end: string };
-    HP: { start: string; end: string };
-    LP: { start: string; end?: string | null };
+    hpStart: string;
+    hpEnd: string;
   };
   
   const [priorityWindows, setPriorityWindows] = useState<PriorityWindows | null>(null);
@@ -314,29 +349,11 @@ export default function TimelineView({
   
         const s = await res.json();
   
-        // Struttura presa da app_settings.json nel DB:
-        // s["early-out"].eo_start_time / eo_end_time
-        // s["high-priority"].hp_start_time / hp_end_time
-        // low-priority potrebbe esserci o no (nel tuo repo lato server esiste come chiave)
-        const eoStart = s?.["early-out"]?.eo_start_time;
-        const eoEnd = s?.["early-out"]?.eo_end_time;
-  
         const hpStart = s?.["high-priority"]?.hp_start_time;
         const hpEnd = s?.["high-priority"]?.hp_end_time;
-  
-        const lpStart =
-          s?.["low-priority"]?.lp_start_time
-          // fallback sensato se non c’è low-priority nel JSON:
-          ?? hpEnd
-          ?? hpStart;
-  
-        if (eoStart && eoEnd && hpStart && hpEnd && lpStart) {
-          setPriorityWindows({
-            EO: { start: eoStart, end: eoEnd },
-            HP: { start: hpStart, end: hpEnd },
-            // LP tipicamente “da lpStart in poi”
-            LP: { start: lpStart, end: null },
-          });
+
+        if (hpStart && hpEnd) {
+          setPriorityWindows({ hpStart, hpEnd });
         }
       } catch (e) {
         console.warn("Failed to load /api/settings for priority windows", e);
@@ -468,6 +485,53 @@ export default function TimelineView({
     dragState.scrollContainer.classList.remove("is-panning");
     timelineScrollDragRef.current = null;
   }, []);
+  const normalizeCleanerRole = (rawRole: string | undefined | null) => {
+    const role = String(rawRole ?? "").trim();
+    if (!role) return "";
+    const lowered = role.toLowerCase();
+    if (lowered.includes("ufficio") || lowered.includes("office")) {
+      return "Ufficio";
+    }
+    return role;
+  };
+
+  const isOfficeCleanerRole = (rawRole: string | undefined | null) => {
+    return normalizeCleanerRole(rawRole) === "Ufficio";
+  };
+
+  const getCleanerDisplayDataByRaw = (cleanerLike: any, cleanerId: number) => {
+    const isIdLikeName = (value: string | undefined | null) => {
+      const normalized = String(value ?? "").trim();
+      if (!normalized) return false;
+      return normalized.toUpperCase() === `ID ${cleanerId}` || /^ID\s+\d+$/i.test(normalized);
+    };
+
+    const aliasEntry = cleanersAliases[cleanerId];
+    const directoryEntry = cleanersDirectory[cleanerId];
+
+    const cleanerAlias = typeof cleanerLike?.alias === "string" ? cleanerLike.alias.trim() : "";
+    const alias = String(aliasEntry?.alias || cleanerAlias || directoryEntry?.alias || "").trim();
+
+    const rawName = String(cleanerLike?.name ?? "").trim();
+    const rawLastname = String(cleanerLike?.lastname ?? "").trim();
+
+    const name = isIdLikeName(rawName) ? "" : rawName;
+    const lastname = rawLastname || aliasEntry?.lastname || directoryEntry?.lastname || "";
+    const fallbackName = aliasEntry?.name || directoryEntry?.name || "";
+    const resolvedName = name || fallbackName;
+    const fullName = `${resolvedName} ${lastname}`.trim();
+    const role = normalizeCleanerRole(cleanerLike?.role || directoryEntry?.role);
+    const primaryLabel = alias || fullName || `ID ${cleanerId}`;
+
+    return {
+      alias,
+      name: resolvedName,
+      lastname,
+      fullName,
+      role,
+      primaryLabel,
+    };
+  };
 
   // Mostra cleaners da selected_cleaners API + cleaners che hanno task in timeline
   // DEVE essere definito PRIMA di getGlobalStartTime() che lo usa
@@ -500,13 +564,103 @@ export default function TimelineView({
     () => tasks.filter(task => visibleCleanerIds.has(Number((task as any).assignedCleaner))),
     [tasks, visibleCleanerIds]
   );
+  const cleanerDirectoryIds = React.useMemo(() => {
+    const ids = new Set<number>();
+    for (const cleaner of cleaners) {
+      const id = Number((cleaner as any)?.id);
+      if (Number.isFinite(id)) ids.add(id);
+    }
+    for (const entry of timelineCleaners || []) {
+      const id = Number(entry?.cleaner?.id);
+      if (Number.isFinite(id)) ids.add(id);
+    }
+    for (const task of tasks || []) {
+      const assignedRaw = (task as any)?.assignedCleaner ?? (task as any)?.cleanerId;
+      const id = Number(assignedRaw);
+      if (Number.isFinite(id)) ids.add(id);
+    }
+    return Array.from(ids).sort((a, b) => a - b);
+  }, [cleaners, timelineCleaners, tasks]);
+
+  const cleanerDirectoryIdsKey = cleanerDirectoryIds.join(",");
+
+  const preassignedTasksSummary = React.useMemo(() => {
+    const getPreassignedCleanerLabel = (cleaner: any, cleanerId: number) => {
+      return getCleanerDisplayDataByRaw(cleaner, cleanerId).primaryLabel;
+    };
+
+    const cleanerLabelById = new Map<number, string>();
+    for (const cleaner of allCleanersToShow) {
+      const cleanerId = Number((cleaner as any)?.id);
+      if (!Number.isFinite(cleanerId)) continue;
+      cleanerLabelById.set(cleanerId, getPreassignedCleanerLabel(cleaner, cleanerId));
+    }
+    for (const entry of timelineCleaners || []) {
+      const cleanerId = Number(entry?.cleaner?.id);
+      if (!Number.isFinite(cleanerId)) continue;
+      const label = getPreassignedCleanerLabel(entry?.cleaner, cleanerId);
+      const timelineAlias = String(cleanersAliases[cleanerId]?.alias ?? entry?.cleaner?.alias ?? "").trim();
+      if (!cleanerLabelById.has(cleanerId) || timelineAlias) {
+        cleanerLabelById.set(cleanerId, label);
+      }
+    }
+
+    const seen = new Set<string>();
+    const rows: Array<{
+      key: string;
+      mode: "readonly" | "normal";
+      logisticCode: string;
+      address: string;
+      cleanerLabel: string;
+    }> = [];
+
+    for (const task of tasks) {
+      const mode = resolvePreassignedMode(task);
+      if (!mode) continue;
+
+      const assignedCleanerRaw = (task as any).assignedCleaner ?? (task as any).cleanerId;
+      const assignedCleanerId = Number(assignedCleanerRaw);
+      const logisticCode = String(
+        (task as any).logistic_code ??
+        (task as any).logisticCode ??
+        (task as any).name ??
+        (task as any).task_id ??
+        (task as any).id ??
+        "N/D"
+      );
+      const cleanerLabel = Number.isFinite(assignedCleanerId)
+        ? (cleanerLabelById.get(assignedCleanerId) || `ID ${assignedCleanerId}`)
+        : "Non assegnata";
+      const address = String((task as any).address ?? "").trim().toUpperCase();
+
+      const key = `${String((task as any).task_id ?? (task as any).id ?? logisticCode)}-${Number.isFinite(assignedCleanerId) ? assignedCleanerId : "na"}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      rows.push({ key, mode, logisticCode, address, cleanerLabel });
+    }
+
+    rows.sort((a, b) =>
+      a.logisticCode.localeCompare(b.logisticCode, undefined, { numeric: true, sensitivity: "base" })
+    );
+
+    return {
+      all: rows,
+      readonly: rows.filter((row) => row.mode === "readonly"),
+      normal: rows.filter((row) => row.mode === "normal"),
+    };
+  }, [tasks, allCleanersToShow, timelineCleaners, cleanersAliases, cleanersDirectory]);
 
   // Crea Set di ID cleaner rimossi per facile lookup
   const removedCleanerIds = React.useMemo(() => {
     const selectedIds = new Set(cleaners.map(c => c.id));
     return new Set(
       timelineCleaners
-        .filter(tc => tc.tasks && tc.tasks.length > 0 && !selectedIds.has(tc.cleaner?.id))
+        .filter(tc =>
+          Array.isArray(tc.tasks) &&
+          tc.tasks.some((task: any) => !isReadonlyPreassignedTask(task)) &&
+          !selectedIds.has(tc.cleaner?.id)
+        )
         .map(tc => tc.cleaner?.id)
     );
   }, [cleaners, timelineCleaners]);
@@ -543,8 +697,10 @@ export default function TimelineView({
       await loadCleaners();
 
       const message = data.removedFromTimeline
-        ? `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso completamente (nessuna task).`
-        : `${selectedCleaner?.name} ${selectedCleaner?.lastname} è è stato rimosso dalla selezione. Le sue task rimangono in timeline.`;
+        ? data.readonlyTasksRemoved > 0
+          ? `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso completamente insieme alle task read-only.`
+          : `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso completamente (nessuna task).`
+        : `${selectedCleaner?.name} ${selectedCleaner?.lastname} è stato rimosso dalla selezione. Le sue task modificabili rimangono in timeline.`;
 
       toast({
         title: "Cleaner rimosso",
@@ -692,6 +848,8 @@ export default function TimelineView({
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
       }
+      await loadTimelineCleaners();
+      await loadCleaners();
       // Aggiorna i dati della timeline per mostrare i metadata aggiornati
       await loadTimelineData();
 
@@ -958,34 +1116,63 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     return colors[cleanerId % colors.length];
   };
 
-  const isIdPlaceholder = (value: string | undefined | null, cleanerId: number) => {
-    const normalized = String(value ?? "").trim();
-    if (!normalized) return false;
-    return normalized.toUpperCase() === `ID ${cleanerId}` || /^ID\s+\d+$/i.test(normalized);
+  const getCleanerDisplayData = (cleaner: Cleaner) => {
+    return getCleanerDisplayDataByRaw(cleaner, cleaner.id);
   };
 
-  const getCleanerDisplayData = (cleaner: Cleaner) => {
-    const aliasEntry = cleanersAliases[cleaner.id];
-    const cleanerAlias = typeof cleaner.alias === "string" ? cleaner.alias.trim() : "";
-    const alias = (aliasEntry?.alias || cleanerAlias || "").trim();
+  const loadCleanersDirectory = async (ids: number[]) => {
+    try {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const baseResponses = await Promise.all([
+        fetch(`/api/cleaners?date=${dateStr}&scope=housekeeping`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        }),
+        fetch(`/api/cleaners?date=${dateStr}&scope=office`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        }),
+      ]);
 
-    const rawName = String(cleaner.name ?? "").trim();
-    const rawLastname = String(cleaner.lastname ?? "").trim();
+      const basePayloads = await Promise.all(
+        baseResponses.map(async (response) => (response.ok ? response.json() : { cleaners: [] }))
+      );
 
-    const name = isIdPlaceholder(rawName, cleaner.id) ? "" : rawName;
-    const lastname = rawLastname || aliasEntry?.lastname || "";
-    const fallbackName = aliasEntry?.name || "";
-    const resolvedName = name || fallbackName;
-    const fullName = `${resolvedName} ${lastname}`.trim();
-    const primaryLabel = alias || fullName || `ID ${cleaner.id}`;
+      let resolvedPayload: any = { cleaners: [] };
+      if (ids.length > 0) {
+        const resolvedResponse = await fetch(`/api/cleaners-resolve?ids=${ids.join(",")}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        });
+        if (resolvedResponse.ok) {
+          resolvedPayload = await resolvedResponse.json();
+        }
+      }
 
-    return {
-      alias,
-      name: resolvedName,
-      lastname,
-      fullName,
-      primaryLabel,
-    };
+      const payloads = [...basePayloads, resolvedPayload];
+
+      const mergedDirectory: Record<number, CleanerDirectoryEntry> = {};
+      for (const payload of payloads) {
+        const cleanersList = Array.isArray(payload?.cleaners) ? payload.cleaners : [];
+        for (const cleaner of cleanersList) {
+          const cleanerId = Number(cleaner?.id);
+          if (!Number.isFinite(cleanerId)) continue;
+          const current = mergedDirectory[cleanerId] || { id: cleanerId };
+          mergedDirectory[cleanerId] = {
+            id: cleanerId,
+            name: current.name || String(cleaner?.name ?? "").trim() || undefined,
+            lastname: current.lastname || String(cleaner?.lastname ?? "").trim() || undefined,
+            alias: current.alias || String(cleaner?.alias ?? "").trim() || undefined,
+            role: current.role || String(cleaner?.role ?? "").trim() || undefined,
+          };
+        }
+      }
+
+      setCleanersDirectory(mergedDirectory);
+    } catch (error) {
+      console.error("Errore nel caricamento directory cleaners:", error);
+      setCleanersDirectory({});
+    }
   };
 
   // Funzione per caricare i cleaner da API (PostgreSQL/MySQL)
@@ -1118,6 +1305,10 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     (window as any).loadSelectedCleaners = loadCleaners;
   }, []);
 
+  useEffect(() => {
+    loadCleanersDirectory(cleanerDirectoryIds);
+  }, [selectedDate, cleanerDirectoryIdsKey]);
+
   const handleCleanerClick = (cleaner: Cleaner, e?: React.MouseEvent) => {
     // Solo click singolo apre il dialog
     if (clickTimer) {
@@ -1145,14 +1336,16 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       // Primo click: avvia timer
       const timer = setTimeout(() => {
         // Verifica se ci sono task incompatibili NON ancora ackate
-        if (validationRules && cleaner?.role) {
+        const cleanerRole = getCleanerDisplayDataByRaw(cleaner, cleaner.id).role;
+        if (validationRules && cleanerRole && !isOfficeCleanerRole(cleanerRole)) {
           const cleanerTasks = tasks
             .filter(task => (task as any).assignedCleaner === cleaner.id)
             .map(normalizeTask);
 
           const incompatibleTasks = cleanerTasks.filter(task => {
+            if (isReadonlyPreassignedTask(task)) return false;
             if (canCleanerHandleTaskSync(
-              cleaner.role,
+              cleanerRole,
               task,
               validationRules,
             )) return false;
@@ -1401,7 +1594,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       (window as any).setHasUnsavedChanges(true);
     }
 
-    if (cleanerToReplace) {
+    if (cleanerToReplace !== null) {
       removeCleanerMutation.mutate(cleanerToReplace, {
         onSuccess: () => {
           addCleanerMutation.mutate(cleanerId);
@@ -1419,7 +1612,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
   // Handler per confermare l'aggiunta di un cleaner non disponibile
   const handleConfirmAddUnavailableCleaner = async () => {
-    if (confirmUnavailableDialog.cleanerId) {
+    if (confirmUnavailableDialog.cleanerId !== null) {
       // Prima salva lo start time aggiornato
       try {
         const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -1452,7 +1645,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       if ((window as any).setHasUnsavedChanges) {
         (window as any).setHasUnsavedChanges(true);
       }
-      if (cleanerToReplace) {
+      if (cleanerToReplace !== null) {
         removeCleanerMutation.mutate(cleanerToReplace, {
           onSuccess: () => {
             addCleanerMutation.mutate(confirmUnavailableDialog.cleanerId!);
@@ -1469,7 +1662,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
   // Handler per confermare la rimozione di un cleaner
   const handleConfirmRemoveCleaner = () => {
-    if (confirmRemovalDialog.cleanerId) {
+    if (confirmRemovalDialog.cleanerId !== null) {
       removeCleanerMutation.mutate(confirmRemovalDialog.cleanerId);
       setConfirmRemovalDialog({ open: false, cleanerId: null });
     }
@@ -1677,7 +1870,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
-      const response = await fetchWithOperation('reset-timeline', '/api/reset-timeline-assignments', {
+      const response = await fetchWithOperation('reset-timeline', withScope('/api/reset-timeline-assignments'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1698,8 +1891,12 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       localStorage.removeItem('last_saved_assignment');
       (window as any).setHasUnsavedChanges?.(true);
 
-      // Una SOLA pipeline di reload dei dati
+      // Una SOLA pipeline di reload dei dati.
+      // Deve riallineare task + cleaners (timeline e selected) per replicare
+      // il comportamento di un refresh pagina completo.
       await (window as any).reloadAllTasks?.();
+      await loadTimelineCleaners();
+      await loadCleaners();
       await loadTimelineData();
 
       toast({
@@ -1793,13 +1990,12 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     };
   };
 
-  // Funzione per verificare se un task viola la sua finestra temporale di priorità
-  // EO: 10:00-10:59, HP: 11:00-15:30, LP: >= 11:00
+  // Verifica le finestre operative derivate da HP Start/End.
   const isPriorityWindowViolation = (task: any): boolean => {
     const priority = task.priority;
     const startTimeStr = task.start_time;
     
-    if (!priority || !startTimeStr) return false;
+    if (!priority || !startTimeStr || !priorityWindows) return false;
     
     // Normalizza priority per gestire TUTTI i formati possibili:
     // DB: early_out, high_priority, low_priority, high, low
@@ -1828,19 +2024,16 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     if (isNaN(hours) || isNaN(minutes)) return false;
     const startMinutes = hours * 60 + minutes;
     
-    // Finestre temporali (in minuti dalla mezzanotte)
-    const EO_START = 10 * 60;      // 10:00 = 600
-    const EO_END = 10 * 60 + 59;   // 10:59 = 659
-    const HP_START = 11 * 60;      // 11:00 = 660
-    const HP_END = 15 * 60 + 30;   // 15:30 = 930
-    const LP_START = 11 * 60;      // 11:00 = 660
+    const hpStart = timeToMinutes(priorityWindows.hpStart);
+    const hpEnd = timeToMinutes(priorityWindows.hpEnd);
     
     if (priorityType === 'eo') {
-      return startMinutes < EO_START || startMinutes > EO_END;
+      return startMinutes >= hpStart;
     } else if (priorityType === 'hp') {
-      return startMinutes < HP_START || startMinutes > HP_END;
+      return startMinutes < hpStart || startMinutes > hpEnd;
     } else if (priorityType === 'lp') {
-      return startMinutes < LP_START;
+      // LP can start from hp_start onward; there is no preferred upper bound.
+      return startMinutes < hpStart;
     }
     
     return false;
@@ -1854,7 +2047,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
     allCleanersToShow.forEach(cleaner => {
       if (removedCleanerIds.has(cleaner.id)) return;
-      if (!cleaner.role) return;
+      const cleanerDisplay = getCleanerDisplayDataByRaw(cleaner, cleaner.id);
+      const cleanerRole = cleanerDisplay.role;
+      if (!cleanerRole || isOfficeCleanerRole(cleanerRole)) return;
 
       const cleanerTasks = tasks
         .filter(task => (task as any).assignedCleaner === cleaner.id)
@@ -1863,8 +2058,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       // CRITICAL: Verifica TUTTE le task incompatibili, ignorando lo stato di acknowledge
       // L'acknowledge serve solo per non mostrare il dialog al click, NON per nascondere i toast
       const incompatibleTasks = cleanerTasks.filter(task => {
+        if (isReadonlyPreassignedTask(task)) return false;
         return !canCleanerHandleTaskSync(
-          cleaner.role,
+          cleanerRole,
           task,
           validationRules,
         );
@@ -1873,8 +2069,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       if (incompatibleTasks.length > 0) {
         incompatibleAssignments.push({
           cleanerId: cleaner.id,
-          cleanerName: `${cleaner.name} ${cleaner.lastname}`,
-          role: cleaner.role,
+          cleanerName: cleanerDisplay.fullName || cleanerDisplay.primaryLabel,
+          role: cleanerRole,
           taskNames: incompatibleTasks.map(t => t.name).join(', ')
         });
       }
@@ -2103,6 +2299,18 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               <h2 className="text-xl font-bold text-foreground flex items-center">
                 <CalendarIcon className="w-5 h-5 mr-2 text-custom-blue" />
                 {isOfficeScope ? "Timeline Ufficio" : "Timeline Housekeeping"} - {cleaners.length} Cleaners
+                {preassignedTasksSummary.all.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="ml-2 h-7 w-7 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10"
+                    title={`Task pre-assegnate ADAM: ${preassignedTasksSummary.all.length}`}
+                    onClick={() => setShowPreassignedTasksDialog(true)}
+                  >
+                    <Lock className="w-4 h-4" />
+                  </Button>
+                )}
               </h2>
             </div>
             <div className="flex gap-3 print:hidden">
@@ -2153,13 +2361,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     {priorityWindows && (
     <div className="relative h-full" style={{ width: timelineScaledWidth, minWidth: "100%" }}>
       {(() => {
-        const eo1 = clamp(minutesToPct(timeToMinutes(priorityWindows.EO.start)), 0, 100);
-        const eo2 = clamp(minutesToPct(timeToMinutes(priorityWindows.EO.end)), 0, 100);
+        const hpStartMin = timeToMinutes(priorityWindows.hpStart);
+        const hpEndMin = timeToMinutes(priorityWindows.hpEnd);
 
-        const hp1 = clamp(minutesToPct(timeToMinutes(priorityWindows.HP.start)), 0, 100);
-        const hp2 = clamp(minutesToPct(timeToMinutes(priorityWindows.HP.end)), 0, 100);
+        const hp1 = clamp(minutesToPct(hpStartMin), 0, 100);
+        const hp2 = clamp(minutesToPct(hpEndMin), 0, 100);
 
-        const lp1 = clamp(minutesToPct(timeToMinutes(priorityWindows.LP.start)), 0, 100);
+        const lp1 = clamp(minutesToPct(hpEndMin), 0, 100);
         const lp2 = 100;
 
         // Due piani:
@@ -2174,7 +2382,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
         const windows = [
           { key: "LP", left: lp1, right: lp2, top: TOP_LP, opacity: 0.65 },
-          { key: "EO", left: eoLeft, right: eo2, top: TOP_MAIN, opacity: 0.85 },
+          { key: "EO", left: eoLeft, right: hp1, top: TOP_MAIN, opacity: 0.85 },
           { key: "HP", left: hp1, right: hp2, top: TOP_MAIN, opacity: 0.75 },
         ];
 
@@ -2235,7 +2443,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           {/* Header con orari - unico per tutti i cleaner */}
           <div className="flex items-stretch my-0.5 px-1 h-[40px]">
             <div
-              className="relative flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden"
+              className="relative flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden translate-y-2"
               style={{ width: `${cleanerColumnWidth}px` }}
             >
               <div
@@ -2362,6 +2570,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               allCleanersToShow.map((cleaner, index) => {
                 const color = getCleanerColor(cleaner.id);
                 const droppableId = `cleaner-${cleaner.id}`;
+                const cleanerDisplay = getCleanerDisplayData(cleaner as Cleaner);
+                const cleanerRole = cleanerDisplay.role;
 
                 // Trova tutte le task assegnate a questo cleaner
                 const cleanerTasks = tasks.filter(task =>
@@ -2372,10 +2582,11 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
                 // Verifica se ci sono task incompatibili per questo cleaner
                 // Controlla ogni coppia (task, cleaner) invece del solo cleanerId
-                const hasIncompatibleTasks = validationRules && cleaner?.role
+                const hasIncompatibleTasks = validationRules && cleanerRole && !isOfficeCleanerRole(cleanerRole)
                   ? cleanerTasks.some(task => {
+                      if (isReadonlyPreassignedTask(task)) return false;
                       if (canCleanerHandleTaskSync(
-                        cleaner.role,
+                        cleanerRole,
                         task,
                         validationRules,
                       )) return false;
@@ -2388,7 +2599,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 const cleanerStartTime = cleaner.start_time || "10:00";
 
                 return (
-                  <div key={cleaner.id} className="flex mb-0.5">
+                  <div key={cleaner.id} className="flex mb-0.5 h-[50px]">
                     {/* Info cleaner */}
                     <div
                       className="flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-custom-blue-light cursor-pointer hover:bg-muted/35 transition-colors"
@@ -2430,7 +2641,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                       )}
                       <div className="min-w-0 w-full flex items-center gap-2 px-2">
                         <div className="truncate font-semibold text-[13px] leading-none flex-1">
-                          {getCleanerDisplayData(cleaner).primaryLabel.toUpperCase()}
+                          {cleanerDisplay.primaryLabel.toUpperCase()}
                         </div>
                         {isRemoved && (
                           <div className="bg-red-600 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
@@ -2444,24 +2655,24 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           </div>
                         )}
                         {/* Se straordinario, mostra SOLO badge S */}
-                        {!isRemoved && cleaner.role === "Straordinario" ? (
+                        {!isRemoved && cleanerRole === "Straordinario" ? (
                           <div className="bg-red-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                             S
                           </div>
                         ) : (
                           /* Altrimenti mostra badge role normale */
                           <>
-                            {!isRemoved && cleaner.role === "Premium" && (
+                            {!isRemoved && cleanerRole === "Premium" && (
                               <div className="bg-yellow-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                                 P
                               </div>
                             )}
-                            {!isRemoved && cleaner.role === "Formatore" && (
+                            {!isRemoved && cleanerRole === "Formatore" && (
                               <div className="bg-orange-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                                 F
                               </div>
                             )}
-                            {!isRemoved && cleaner.role === "Ufficio" && (
+                            {!isRemoved && cleanerRole === "Ufficio" && (
                               <div className="bg-sky-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                                 U
                               </div>
@@ -2649,9 +2860,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     const uniqueKey = `${taskId}-cleaner-${cleaner.id}`;
 
                                     // Verifica compatibilità task-cleaner
-                                    const isIncompatible = validationRules && cleaner?.role
-                                      ? !canCleanerHandleTaskSync(
-                                          cleaner.role,
+                                    const isIncompatible = validationRules && cleanerRole && !isOfficeCleanerRole(cleanerRole)
+                                      ? !isReadonlyPreassignedTask(task) && !canCleanerHandleTaskSync(
+                                          cleanerRole,
                                           task,
                                           validationRules,
                                         )
@@ -2663,7 +2874,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                         {seq === 1 && initialOffsetWidthPx > 0 && shouldShowInitialOffset && (
                                           <div
                                             className="flex-shrink-0"
-                                            style={{ width: `${initialOffsetWidthPx}px`, minHeight: '45px' }}
+                                            style={{ width: `${initialOffsetWidthPx}px`, minHeight: '50px' }}
                                             aria-hidden="true"
                                           />
                                         )}
@@ -2671,20 +2882,14 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                         {/* Travel time marker - FUORI dal Draggable (solo per sequence >= 2) */}
                                         {seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
                                           <div
-                                            className="flex items-center justify-center flex-shrink-0 py-3"
+                                            className="flex flex-shrink-0 items-center"
                                             style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
                                             title={`${travelTime} min`}
                                           >
-                                            <svg
-                                              width="20"
-                                              height="20"
-                                              viewBox="0 0 24 24"
-                                              fill="currentColor"
-                                              className="flex-shrink-0"
-                                              style={{ color: getCleanerHexColor(cleaner.id) }}
-                                            >
-                                              <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
-                                            </svg>
+                                            <div
+                                              aria-hidden
+                                              className="h-0.5 w-full bg-slate-500/55 dark:bg-slate-400/40"
+                                            />
                                           </div>
                                         )}
 
@@ -2739,7 +2944,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                       )}
                     </Droppable>
                     {/* Colonna ore totali lavorate */}
-                    <div className="flex-shrink-0 w-20 flex items-center justify-center border-l border-border bg-sky-100/30 dark:bg-sky-900/10 text-center">
+                    <div className="flex-shrink-0 w-20 h-[50px] flex items-center justify-center border-l border-border bg-sky-100/30 dark:bg-sky-900/10 text-center">
                       {(() => {
                         const cleanerTasks = tasks.filter(task =>
                           (task as any).assignedCleaner === cleaner.id
@@ -2845,6 +3050,61 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       </div>
 
       {/* Incompatible Tasks Warning Dialog */}
+      <Dialog open={showPreassignedTasksDialog} onOpenChange={setShowPreassignedTasksDialog}>
+        <DialogContent className="w-[min(96vw,600px)] max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-amber-600" />
+              Task pre-assegnati da ADAM
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <div className="rounded-md border border-amber-300/70 bg-amber-50/40 dark:bg-amber-950/20 p-3">
+              <div className="font-semibold text-amber-700 dark:text-amber-300 mb-2 flex items-center gap-2">
+                <Lock className="w-4 h-4" />
+                Read-only ({preassignedTasksSummary.readonly.length})
+              </div>
+              {preassignedTasksSummary.readonly.length === 0 ? (
+                <p className="text-muted-foreground">Nessuna task read-only pre-assegnata.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {preassignedTasksSummary.readonly.map((row) => (
+                    <div key={`ro-${row.key}`} className="flex items-center justify-between gap-3 flex-nowrap min-w-0">
+                      <span className="font-medium min-w-0 truncate whitespace-nowrap">
+                        {row.logisticCode}
+                        {row.address ? ` - ${row.address}` : ""}
+                      </span>
+                      <span className="text-muted-foreground shrink-0 whitespace-nowrap text-right">{`assegnato a ${row.cleanerLabel}`}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="rounded-md border border-sky-300/70 bg-sky-50/40 dark:bg-sky-950/20 p-3">
+              <div className="font-semibold text-sky-700 dark:text-sky-300 mb-2 flex items-center gap-2">
+                <Unlock className="w-4 h-4" />
+                Non read-only ({preassignedTasksSummary.normal.length})
+              </div>
+              {preassignedTasksSummary.normal.length === 0 ? (
+                <p className="text-muted-foreground">Nessuna task pre-assegnata non read-only.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {preassignedTasksSummary.normal.map((row) => (
+                    <div key={`rw-${row.key}`} className="flex items-center justify-between gap-3 flex-nowrap min-w-0">
+                      <span className="font-medium min-w-0 truncate whitespace-nowrap">
+                        {row.logisticCode}
+                        {row.address ? ` - ${row.address}` : ""}
+                      </span>
+                      <span className="text-muted-foreground shrink-0 whitespace-nowrap text-right">{`assegnato a ${row.cleanerLabel}`}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={incompatibleDialog.open} onOpenChange={(open) => !open && setIncompatibleDialog({ open: false, cleanerId: null, tasks: [] })}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -2855,10 +3115,11 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               <div className="text-base space-y-3">
                 {incompatibleDialog.cleanerId && (() => {
                   const cleaner = allCleanersToShow.find(c => c.id === incompatibleDialog.cleanerId);
+                  const cleanerDisplay = cleaner ? getCleanerDisplayDataByRaw(cleaner, cleaner.id) : null;
                   return cleaner ? (
                     <>
                       <p className="font-semibold text-foreground">
-                        Il cleaner <span className="text-black dark:text-white">{cleaner.name} {cleaner.lastname}</span> ({cleaner.role}) ha delle task non compatibili con il suo ruolo:
+                        Il cleaner <span className="text-black dark:text-white">{cleanerDisplay?.fullName || cleanerDisplay?.primaryLabel}</span> ({cleanerDisplay?.role || cleaner.role}) ha delle task non compatibili con il suo ruolo:
                       </p>
                       <ul className="list-disc list-inside space-y-2 pl-2">
                         {incompatibleDialog.tasks.map((task, idx) => (
@@ -2879,8 +3140,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 if (incompatibleDialog.cleanerId) {
                   const cleanerId = incompatibleDialog.cleanerId;
                   const cleaner = allCleanersToShow.find(c => c.id === incompatibleDialog.cleanerId);
+                  const cleanerRole = cleaner ? getCleanerDisplayDataByRaw(cleaner, cleaner.id).role : "";
 
-                  if (cleaner && validationRules) {
+                  if (cleaner && validationRules && cleanerRole && !isOfficeCleanerRole(cleanerRole)) {
                     // Recupera tutte le task di questo cleaner
                     const cleanerTasks = tasks
                       .filter(task => (task as any).assignedCleaner === cleanerId)
@@ -2892,7 +3154,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
                       cleanerTasks.forEach(task => {
                         if (!canCleanerHandleTaskSync(
-                          cleaner.role,
+                          cleanerRole,
                           task,
                           validationRules,
                         )) {
@@ -3057,10 +3319,10 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           <DialogHeader>
             <DialogTitle>Conferma Rimozione Cleaner</DialogTitle>
             <DialogDescription>
-              Sei sicuro di voler rimuovere "{confirmRemovalDialog.cleanerId ? (() => {
+              Sei sicuro di voler rimuovere "{confirmRemovalDialog.cleanerId !== null ? (() => {
                 const cleaner = allCleanersToShow.find(c => c.id === confirmRemovalDialog.cleanerId);
                 return cleaner ? `${cleaner.name} ${cleaner.lastname}` : 'Unknown';
-              })() : ''}" dalla selezione? Le sue task rimarranno in timeline finché non verrà sostituito.
+              })() : ''}" dalla selezione? Le task modificabili rimarranno in timeline finché non verrà sostituito; se ha solo task read-only, verranno rimosse insieme al cleaner.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 mt-4">
@@ -3074,7 +3336,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             <Button
               onClick={handleConfirmRemoveCleaner}
               variant="outline"
-              disabled={!confirmRemovalDialog.cleanerId || removeCleanerMutation.isPending}
+              disabled={confirmRemovalDialog.cleanerId === null || removeCleanerMutation.isPending}
               className="border-2 border-custom-blue hover:bg-accent hover:text-accent-foreground"
             >
               Conferma Rimozione
@@ -3324,22 +3586,22 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 {selectedCleaner && (
                   <>
                     {/* Se straordinario, mostra SOLO badge straordinario (priorità assoluta) */}
-                    {selectedCleaner.role === "Straordinario" ? (
+                    {getCleanerDisplayData(selectedCleaner).role === "Straordinario" ? (
                       <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-600/30 text-gray-900 dark:bg-red-500/40 dark:text-red-200 border-red-700 dark:border-red-400">
                         Straordinario
                       </span>
                     ) : (
                       /* Altrimenti mostra badge role normale */
                       <>
-                        {selectedCleaner.role === "Formatore" ? (
+                        {getCleanerDisplayData(selectedCleaner).role === "Formatore" ? (
                           <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-600/30 text-gray-900 dark:bg-orange-500/40 dark:text-orange-200 border-orange-700 dark:border-orange-400">
                             Formatore
                           </span>
-                        ) : selectedCleaner.role === "Premium" ? (
+                        ) : getCleanerDisplayData(selectedCleaner).role === "Premium" ? (
                           <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-600/30 text-gray-900 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-700 dark:border-yellow-400">
                             Premium
                           </span>
-                        ) : selectedCleaner.role === "Ufficio" ? (
+                        ) : getCleanerDisplayData(selectedCleaner).role === "Ufficio" ? (
                           <span className="px-2 py-0.5 rounded border font-medium text-sm bg-sky-600/30 text-gray-900 dark:bg-sky-500/40 dark:text-sky-200 border-sky-700 dark:border-sky-400">
                             Ufficio
                           </span>
@@ -3514,6 +3776,15 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     }}
                   >
                     {selectedCleaner.start_time || "10:00"}
+                  </p>
+                </div>
+
+                <div className="col-span-2">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">
+                    End Time
+                  </p>
+                  <p className="text-sm p-2 rounded border border-border">
+                    {selectedCleaner.end_time || "20:00"}
                   </p>
                 </div>
 

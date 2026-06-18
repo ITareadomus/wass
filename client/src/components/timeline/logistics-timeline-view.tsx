@@ -12,7 +12,15 @@ import {
   Save,
   Bike,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type PointerEvent, type UIEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  Fragment,
+  type PointerEvent,
+  type UIEvent,
+} from "react";
 import { useLocation } from "wouter";
 import { Droppable } from "react-beautiful-dnd";
 import { useMutation } from "@tanstack/react-query";
@@ -24,6 +32,11 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getCleanerHexColor } from "@/lib/cleaner-colors";
 import type { TaskType as Task } from "@shared/schema";
+import {
+  computeLogisticsCheckoutWaitGap,
+  parseHmToMinutes,
+} from "@shared/logistics-scheduling-constraints";
+import { estimateLogisticsReturnToDepotMinutes } from "@shared/logistics-travel-estimate";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,9 +65,8 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type PriorityWindows = {
-  EO: { start: string; end: string };
-  HP: { start: string; end: string };
-  LP: { start: string; end?: string | null };
+  hpStart: string;
+  hpEnd: string;
 };
 
 export interface LogisticsDriverRow {
@@ -64,10 +76,13 @@ export interface LogisticsDriverRow {
   role?: string;
   premium?: boolean;
   start_time?: string | null;
+  end_time?: string | null;
   alias?: string;
   counter_hours?: number | string;
   counter_days?: number;
   contract_type?: string | null;
+  assigned_vehicle_name?: string | null;
+  vehicle_name?: string | null;
   show_plus_one?: boolean;
   assigned_vehicle_name?: string | null;
   vehicle_name?: string | null;
@@ -78,11 +93,49 @@ export interface LogisticsDriverRow {
 interface LogisticsTimelineViewProps {
   workDate: string;
   drivers: LogisticsDriverRow[];
-  driversAssignments: Array<{ driver: LogisticsDriverRow; tasks: any[] }>;
+  driversAssignments: Array<{ driver: LogisticsDriverRow; tasks: any[]; return_travel_time?: number }>;
   searchTask: string;
   isReadOnly?: boolean;
   isLoadingOverlay?: boolean;
   onRefresh: () => Promise<void>;
+}
+
+function minutesToTimelineWidthPx(
+  minutes: number,
+  virtualMinutes: number,
+  timelineWidth: number
+): number {
+  if (minutes <= 0 || virtualMinutes <= 0 || timelineWidth <= 0) return 0;
+  return (minutes / virtualMinutes) * timelineWidth;
+}
+
+function LogisticsRouteLineSegment({
+  widthPx,
+  title,
+  showEndCap = false,
+}: {
+  widthPx: number;
+  title?: string;
+  showEndCap?: boolean;
+}) {
+  if (widthPx <= 0) return null;
+  return (
+    <div
+      className="flex flex-shrink-0 items-center"
+      style={{ width: `${widthPx}px`, minHeight: "50px" }}
+      title={title}
+    >
+      <div className="relative flex w-full items-center">
+        <div aria-hidden className="h-0.5 flex-1 bg-slate-500/55 dark:bg-slate-400/40" />
+        {showEndCap && (
+          <div
+            aria-hidden
+            className="h-3 w-0.5 shrink-0 rounded-full bg-orange-500 dark:bg-orange-400"
+          />
+        )}
+      </div>
+    </div>
+  );
 }
 
 function priorityUiFromTask(t: any): "early-out" | "high" | "low" {
@@ -120,8 +173,8 @@ function timelineTaskToTask(t: any, driverId: number): Task {
     checkout_time: t.checkout_time != null ? String(t.checkout_time) : undefined,
     checkin_date: t.checkin_date != null ? String(t.checkin_date) : undefined,
     checkin_time: t.checkin_time != null ? String(t.checkin_time) : undefined,
-    pax_in: typeof t.pax_in === "number" ? t.pax_in : undefined,
-    pax_out: typeof t.pax_out === "number" ? t.pax_out : undefined,
+    pax_in: t.pax_in != null && t.pax_in !== "" ? Number(t.pax_in) : undefined,
+    pax_out: t.pax_out != null && t.pax_out !== "" ? Number(t.pax_out) : undefined,
     operation_id: typeof t.operation_id === "number" ? t.operation_id : undefined,
     customer_name: t.customer_name != null ? String(t.customer_name) : undefined,
     customer_reference: t.customer_reference != null ? String(t.customer_reference) : undefined,
@@ -129,10 +182,16 @@ function timelineTaskToTask(t: any, driverId: number): Task {
     start_time: t.start_time != null ? String(t.start_time) : undefined,
     end_time: t.end_time != null ? String(t.end_time) : undefined,
     travel_time: t.travel_time != null ? Number(t.travel_time) : undefined,
+    checkout_wait_minutes:
+      t.checkout_wait_minutes != null ? Number(t.checkout_wait_minutes) : undefined,
     locked: Boolean(t.locked),
     locked_reason: t.locked_reason != null ? String(t.locked_reason) : undefined,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    ...(t.logistics_task_kind != null ? { logistics_task_kind: String(t.logistics_task_kind) } : {}),
+    ...(t.logistics_task_kind_source != null
+      ? { logistics_task_kind_source: String(t.logistics_task_kind_source) }
+      : {}),
     ...( { assignedCleaner: driverId, sequence: t.sequence } as any ),
   };
 }
@@ -297,6 +356,8 @@ export default function LogisticsTimelineView({
   const [isSavingDriverStartTime, setIsSavingDriverStartTime] = useState(false);
   const [confirmRemoveDriverId, setConfirmRemoveDriverId] = useState<number | null>(null);
   const [selectedSwapDriver, setSelectedSwapDriver] = useState<string>("");
+  const [filteredDriverIdForMap, setFilteredDriverIdForMap] = useState<number | null>(null);
+  const [driverClickTimer, setDriverClickTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   const loadDriverAliases = useCallback(async () => {
     try {
@@ -341,18 +402,10 @@ export default function LogisticsTimelineView({
         });
         if (!res.ok) return;
         const s = await res.json();
-        const eoStart = s?.["early-out"]?.eo_start_time;
-        const eoEnd = s?.["early-out"]?.eo_end_time;
         const hpStart = s?.["high-priority"]?.hp_start_time;
         const hpEnd = s?.["high-priority"]?.hp_end_time;
-        const lpStart =
-          s?.["low-priority"]?.lp_start_time ?? hpEnd ?? hpStart;
-        if (eoStart && eoEnd && hpStart && hpEnd && lpStart) {
-          setPriorityWindows({
-            EO: { start: eoStart, end: eoEnd },
-            HP: { start: hpStart, end: hpEnd },
-            LP: { start: lpStart, end: null },
-          });
+        if (hpStart && hpEnd) {
+          setPriorityWindows({ hpStart, hpEnd });
         }
       } catch (e) {
         console.warn("Failed to load /api/settings for logistics priority windows", e);
@@ -492,8 +545,12 @@ export default function LogisticsTimelineView({
   };
 
   const assignmentByDriver = new Map<number, any[]>();
+  const returnTravelByDriver = new Map<number, number>();
   for (const row of driversAssignments) {
     assignmentByDriver.set(row.driver.id, row.tasks || []);
+    if (row.return_travel_time != null && Number.isFinite(Number(row.return_travel_time))) {
+      returnTravelByDriver.set(row.driver.id, Number(row.return_travel_time));
+    }
   }
 
   const hasTasksInTimeline = driversAssignments.some((r) => (r.tasks?.length || 0) > 0);
@@ -529,11 +586,25 @@ export default function LogisticsTimelineView({
     });
   };
 
+  const getGlobalEndTime = () => {
+    if (drivers.length === 0) return "20:00";
+    const endTimes = drivers.map((d) => d.end_time || "20:00");
+    return endTimes.reduce((max, current) => {
+      const [maxH, maxM] = max.split(":").map(Number);
+      const [curH, curM] = current.split(":").map(Number);
+      const maxMinutes = maxH * 60 + maxM;
+      const curMinutes = curH * 60 + curM;
+      return curMinutes > maxMinutes ? current : max;
+    });
+  };
+
   const generateGlobalTimeSlots = () => {
     const globalStartTime = getGlobalStartTime();
+    const globalEndTime = getGlobalEndTime();
     const [startHour, startMin] = globalStartTime.split(":").map(Number);
+    const [endHourRaw] = globalEndTime.split(":").map(Number);
     const startHourRounded = startMin > 0 ? startHour : startHour;
-    const endHour = 19;
+    const endHour = endHourRaw;
     const slots: string[] = [];
     for (let hour = startHourRounded; hour <= endHour; hour++) {
       slots.push(`${String(hour).padStart(2, "0")}:00`);
@@ -543,10 +614,12 @@ export default function LogisticsTimelineView({
 
   const getGlobalTimelineMinutes = () => {
     const globalStartTime = getGlobalStartTime();
+    const globalEndTime = getGlobalEndTime();
     const [startHour, startMin] = globalStartTime.split(":").map(Number);
+    const [endHour, endMin] = globalEndTime.split(":").map(Number);
     const startHourRounded = startMin > 0 ? startHour : startHour;
     const startMinutes = startHourRounded * 60;
-    const endMinutes = 19 * 60;
+    const endMinutes = endHour * 60 + endMin;
     return endMinutes - startMinutes;
   };
 
@@ -842,6 +915,68 @@ export default function LogisticsTimelineView({
     void loadDriverAliases();
   };
 
+  const handleDriverHeaderClick = (driver: LogisticsDriverRow, e: any) => {
+    e.preventDefault();
+
+    if (driverClickTimer) {
+      clearTimeout(driverClickTimer);
+      setDriverClickTimer(null);
+
+      const currentFilteredDriverId = (window as any).mapFilteredCleanerId as number | null;
+      if (currentFilteredDriverId === driver.id) {
+        setFilteredDriverIdForMap(null);
+        (window as any).mapFilteredCleanerId = null;
+        toast({
+          title: "Filtro mappa rimosso",
+          description: "Ora visualizzi tutte le task in mappa",
+          variant: "default",
+        });
+      } else {
+        setFilteredDriverIdForMap(driver.id);
+        (window as any).mapFilteredCleanerId = driver.id;
+        (window as any).mapFilteredTaskId = null;
+        const driverLabel =
+          driversAliases[driver.id]?.alias ||
+          driver.alias ||
+          `${(driver.name || "").trim()} ${(driver.lastname || "").trim()}`.trim() ||
+          `Driver ${driver.id}`;
+        toast({
+          title: "Filtro mappa attivato",
+          description: `Visualizzi solo le task di ${driverLabel}`,
+          variant: "default",
+        });
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      openDriverDetails(driver);
+      setDriverClickTimer(null);
+    }, 250);
+    setDriverClickTimer(timer);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (driverClickTimer) {
+        clearTimeout(driverClickTimer);
+      }
+    };
+  }, [driverClickTimer]);
+
+  useEffect(() => {
+    const sync = setInterval(() => {
+      const globalFilteredDriverId = (window as any).mapFilteredCleanerId;
+      const normalized =
+        globalFilteredDriverId == null || Number.isNaN(Number(globalFilteredDriverId))
+          ? null
+          : Number(globalFilteredDriverId);
+      setFilteredDriverIdForMap((prev) => (prev === normalized ? prev : normalized));
+    }, 250);
+
+    return () => clearInterval(sync);
+  }, []);
+
   const handleOpenAliasDialogForDriver = (d: LogisticsDriverRow) => {
     const currentAlias = driversAliases[d.id]?.alias ?? d.alias ?? "";
     setEditingAlias(currentAlias);
@@ -1016,11 +1151,11 @@ export default function LogisticsTimelineView({
               {priorityWindows && (
                 <div className="relative h-full min-w-full">
                   {(() => {
-                    const eo1 = clamp(minutesToPct(timeToMinutes(priorityWindows.EO.start)), 0, 100);
-                    const eo2 = clamp(minutesToPct(timeToMinutes(priorityWindows.EO.end)), 0, 100);
-                    const hp1 = clamp(minutesToPct(timeToMinutes(priorityWindows.HP.start)), 0, 100);
-                    const hp2 = clamp(minutesToPct(timeToMinutes(priorityWindows.HP.end)), 0, 100);
-                    const lp1 = clamp(minutesToPct(timeToMinutes(priorityWindows.LP.start)), 0, 100);
+                    const hpStartMin = timeToMinutes(priorityWindows.hpStart);
+                    const hpEndMin = timeToMinutes(priorityWindows.hpEnd);
+                    const hp1 = clamp(minutesToPct(hpStartMin), 0, 100);
+                    const hp2 = clamp(minutesToPct(hpEndMin), 0, 100);
+                    const lp1 = clamp(minutesToPct(hpEndMin), 0, 100);
                     const lp2 = 100;
                     const TOP_LP = 2;
                     const TOP_MAIN = 18;
@@ -1030,7 +1165,7 @@ export default function LogisticsTimelineView({
 
                     const windows = [
                       { key: "LP" as const, left: lp1, right: lp2, top: TOP_LP, opacity: 0.65 },
-                      { key: "EO" as const, left: eoLeft, right: eo2, top: TOP_MAIN, opacity: 0.85 },
+                      { key: "EO" as const, left: eoLeft, right: hp1, top: TOP_MAIN, opacity: 0.85 },
                       { key: "HP" as const, left: hp1, right: hp2, top: TOP_MAIN, opacity: 0.75 },
                     ];
                     return windows.map((w) => {
@@ -1204,6 +1339,11 @@ export default function LogisticsTimelineView({
             ) : (
               drivers.map((driver) => {
                 const rawTasks = assignmentByDriver.get(driver.id) || [];
+                const rawByTaskId = new Map<number, any>();
+                for (const rt of rawTasks) {
+                  const tid = Number((rt as any)?.task_id);
+                  if (Number.isFinite(tid)) rawByTaskId.set(tid, rt);
+                }
                 const tasks = rawTasks
                   .map((t) => timelineTaskToTask(t, driver.id))
                   .sort((a, b) => {
@@ -1223,17 +1363,16 @@ export default function LogisticsTimelineView({
                       className={cn(
                         "flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-custom-blue-light",
                         "cursor-pointer hover:bg-muted/35 transition-colors",
+                        filteredDriverIdForMap === driver.id &&
+                          "ring-2 ring-amber-400 border-amber-500 dark:ring-amber-500/80 dark:border-amber-500",
                         driver.isRemoved && "opacity-70"
                       )}
                       style={{ width: `${driverColumnWidth}px` }}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        openDriverDetails(driver);
-                      }}
+                      onClick={(e) => handleDriverHeaderClick(driver, e)}
                       title={
                         driver.isRemoved
                           ? "Dettagli — driver rimosso dai convocati (sostituisci dal pannello)"
-                          : "Dettagli driver"
+                          : "Dettagli driver (doppio click: filtro mappa)"
                       }
                     >
                       {!driver.isRemoved && (
@@ -1314,24 +1453,134 @@ export default function LogisticsTimelineView({
                               />
                             ))}
                           </div>
-                          <div className="relative z-10 flex min-w-full items-center h-full min-h-[45px] px-0 gap-0 flex-wrap">
-                            {tasks.map((task, index) => (
-                              <TaskCard
-                                key={`${task.id}-${driver.id}`}
-                                task={task}
-                                index={index}
-                                isInTimeline
-                                allTasks={tasks}
-                                currentContainer=""
-                                cleanerId={driver.id}
-                                isReadOnly={isReadOnly}
-                                isDragDisabled={isReadOnly || Boolean((task as any).locked)}
-                                timelineWidthPx={timelineWidthPx}
-                                operationsScope="logistics"
-                                isHighlighted={hi.has(String(task.id))}
-                                timelineRowStaffDisplayLabel={driverRowDisplayLabel}
-                              />
-                            ))}
+                          <div className="relative z-10 flex items-center h-full min-h-[45px] px-0 gap-0 flex-wrap">
+                            {(() => {
+                              const virtualMinutes = globalTimeSlots.length * 60;
+                              const timelineWidth = timelineWidthPx || 0;
+                              const lastRawTask =
+                                rawTasks.length > 0 ? rawTasks[rawTasks.length - 1] : null;
+                              const returnTravelMinutes =
+                                returnTravelByDriver.get(driver.id) ??
+                                (lastRawTask
+                                  ? estimateLogisticsReturnToDepotMinutes(lastRawTask)
+                                  : 0);
+                              const returnTravelWidthPx = minutesToTimelineWidthPx(
+                                returnTravelMinutes,
+                                virtualMinutes,
+                                timelineWidth
+                              );
+
+                              return (
+                                <>
+                            {tasks.map((task, index) => {
+                              const tid = Number(task.id);
+                              const raw = rawByTaskId.get(tid) as any;
+                              const prevRaw = index > 0 ? rawTasks[index - 1] : null;
+                              const seq = Number(raw?.sequence ?? index + 1);
+                              const travelTime =
+                                raw?.travel_time != null ? Number(raw.travel_time) : 0;
+                              const checkoutWait = computeLogisticsCheckoutWaitGap({
+                                workDate,
+                                sequence: seq,
+                                startTime: raw?.start_time,
+                                checkoutTime: raw?.checkout_time,
+                                checkoutDate: raw?.checkout_date,
+                                checkoutWaitMinutes: raw?.checkout_wait_minutes,
+                                travelMinutes: travelTime,
+                                prevEndTime: prevRaw?.end_time,
+                                prevCheckinDate: prevRaw?.checkin_date,
+                              });
+                              const travelWidthPx = minutesToTimelineWidthPx(
+                                travelTime,
+                                virtualMinutes,
+                                timelineWidth
+                              );
+                              const waitingGapWidthPx = minutesToTimelineWidthPx(
+                                checkoutWait,
+                                virtualMinutes,
+                                timelineWidth
+                              );
+                              let initialIdleOffsetPx = 0;
+                              if (seq === 1 && virtualMinutes > 0 && timelineWidth > 0) {
+                                const gridStartMinutes = timeToMinutes(globalTimeSlots[0] || "10:00");
+                                const taskStartMinutes = parseHmToMinutes(raw?.start_time, null);
+                                const driverStartMinutes =
+                                  parseHmToMinutes(driver.start_time, null) ?? gridStartMinutes;
+                                let routeStartMinutes = driverStartMinutes;
+                                if (taskStartMinutes != null) {
+                                  routeStartMinutes = taskStartMinutes - checkoutWait - travelTime;
+                                }
+                                const idleMinutes = Math.max(0, routeStartMinutes - gridStartMinutes);
+                                initialIdleOffsetPx = minutesToTimelineWidthPx(
+                                  idleMinutes,
+                                  virtualMinutes,
+                                  timelineWidth
+                                );
+                              }
+                              return (
+                                <Fragment key={`${task.id}-${driver.id}-frag`}>
+                                  {seq === 1 && initialIdleOffsetPx > 0 && (
+                                    <div
+                                      className="flex-shrink-0"
+                                      style={{ width: `${initialIdleOffsetPx}px`, minHeight: "50px" }}
+                                      aria-hidden
+                                    />
+                                  )}
+                                  <LogisticsRouteLineSegment
+                                    widthPx={travelWidthPx}
+                                    title={travelTime > 0 ? `${travelTime} min` : undefined}
+                                  />
+                                  {checkoutWait > 0 && waitingGapWidthPx > 0 && raw?.checkout_time && (
+                                    <div
+                                      className="flex items-center justify-center flex-shrink-0 py-3 bg-amber-100/50 dark:bg-amber-900/20 border-y border-dashed border-amber-400"
+                                      style={{ width: `${waitingGapWidthPx}px`, minHeight: "50px" }}
+                                      title={`Attesa checkout: ${checkoutWait} min`}
+                                    >
+                                      <svg
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        className="text-amber-600 dark:text-amber-400 flex-shrink-0"
+                                      >
+                                        <circle cx="12" cy="12" r="10" />
+                                        <polyline points="12,6 12,12 16,14" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                  <TaskCard
+                                    key={`${task.id}-${driver.id}`}
+                                    task={task}
+                                    index={index}
+                                    isInTimeline
+                                    allTasks={tasks}
+                                    currentContainer=""
+                                    cleanerId={driver.id}
+                                    isReadOnly={isReadOnly}
+                                    isDragDisabled={isReadOnly || Boolean((task as any).locked)}
+                                    timelineWidthPx={timelineWidthPx}
+                                    operationsScope="logistics"
+                                    isHighlighted={hi.has(String(task.id))}
+                                    timelineRowStaffDisplayLabel={driverRowDisplayLabel}
+                                    onLogisticsTimelineMutated={onRefresh}
+                                  />
+                                </Fragment>
+                              );
+                            })}
+                            <LogisticsRouteLineSegment
+                              widthPx={returnTravelWidthPx}
+                              title={
+                                returnTravelMinutes > 0
+                                  ? `Rientro in magazzino: ${returnTravelMinutes} min`
+                                  : undefined
+                              }
+                              showEndCap
+                            />
+                                </>
+                              );
+                            })()}
                             {provided.placeholder}
                           </div>
                         </div>
@@ -1852,6 +2101,15 @@ export default function LogisticsTimelineView({
                       selectedDriverForDetails.alias ||
                       `${selectedDriverForDetails.name ?? ""} ${selectedDriverForDetails.lastname ?? ""}`.trim() ||
                       `ID ${selectedDriverForDetails.id}`}
+                  </p>
+                </div>
+
+                <div className="col-span-2">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">
+                    End Time
+                  </p>
+                  <p className="text-sm p-2 rounded border border-border">
+                    {selectedDriverForDetails.end_time || "20:00"}
                   </p>
                 </div>
 

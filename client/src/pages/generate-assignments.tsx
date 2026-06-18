@@ -1,5 +1,9 @@
 import { DragDropContext, DropResult } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
+import {
+  isWorkDateHistoricallyLocked,
+  isWorkDateInPast,
+} from "@shared/work-date-access";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
 import MapSection from "@/components/map/map-section";
@@ -19,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { useToast } from "@/hooks/use-toast";
-import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
+import { isContinuazioneStraordinariaTask, isTaskLocked } from "@/lib/taskValidation";
 
 const OFFICE_SCOPE_ENABLED = false;
 const getDefaultTimelineMapPanel = () => {
@@ -36,6 +40,9 @@ const getDefaultTimelineMapPanel = () => {
     height: size,
   };
 };
+type PreAssignedMode = "normal" | "readonly";
+const PREASSIGNED_REASON_NORMAL = "preassigned_enable_wass";
+const PREASSIGNED_REASON_READONLY = "preassigned_enable_wass_readonly";
 
 interface RawTask {
   task_id: number;
@@ -66,7 +73,29 @@ interface RawTask {
   duplicate_group_id?: string;
   duplicate_group_size_active?: number;
   is_duplicate_active?: boolean;
+  preAssignedMode?: PreAssignedMode;
 }
+
+const normalizeTaskReasons = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  const unique = new Set<string>();
+  for (const reason of value) {
+    const normalized = String(reason ?? "").trim();
+    if (!normalized) continue;
+    unique.add(normalized);
+  }
+  return Array.from(unique);
+};
+
+const resolvePreAssignedModeFromTask = (task: any): PreAssignedMode | null => {
+  const explicit = String(task?.preAssignedMode ?? "").trim().toLowerCase();
+  if (explicit === "readonly") return "readonly";
+  if (explicit === "normal") return "normal";
+  const reasons = normalizeTaskReasons(task?.reasons);
+  if (reasons.includes(PREASSIGNED_REASON_READONLY)) return "readonly";
+  if (reasons.includes(PREASSIGNED_REASON_NORMAL)) return "normal";
+  return null;
+};
 
 const isEquivalentStraordinariaTask = (task: any): boolean =>
   Boolean(task?.straordinaria) || isContinuazioneStraordinariaTask(task);
@@ -128,19 +157,18 @@ function indexById(list: Task[]): Map<string, Task> {
   return m;
 }
 
-// Helper per verificare se una data è nel passato
-const isDateInPast = (date: Date): boolean => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Normalizza a inizio giornata per confronto
-  const targetDate = new Date(date);
-  targetDate.setHours(0, 0, 0, 0);
-  return targetDate < today;
-};
-
 // Tipo per risposta API timeline (evita inferenza never[] su assignments/cleaners_assignments)
 interface TimelineCleanerEntry {
   cleaner: { id: number; name?: string };
-  tasks?: Array<{ task_id: number; id?: number; logistic_code?: number; sequence?: number; priority?: string }>;
+  tasks?: Array<{
+    task_id: number;
+    id?: number;
+    logistic_code?: number;
+    sequence?: number;
+    priority?: string;
+    preAssignedMode?: PreAssignedMode;
+    reasons?: string[];
+  }>;
 }
 interface TimelineAssignmentEntry {
   task_id: number;
@@ -149,6 +177,8 @@ interface TimelineAssignmentEntry {
   id?: number;
   logistic_code?: number;
   priority?: string;
+  preAssignedMode?: PreAssignedMode;
+  reasons?: string[];
 }
 interface TimelineAssignmentsData {
   assignments: TimelineAssignmentEntry[];
@@ -485,6 +515,56 @@ export default function GenerateAssignments() {
     const separator = url.includes("?") ? "&" : "?";
     return `${url}${separator}scope=${scopeValue}`;
   }, [scopeValue]);
+  const [preassignedAnimatedTaskIds, setPreassignedAnimatedTaskIds] = useState<Set<string>>(new Set());
+  const preassignedReplayByDateRef = useRef<Set<string>>(new Set());
+
+  const replayPreassignedTasks = useCallback((dateStr: string, tasks: Task[]) => {
+    if (preassignedReplayByDateRef.current.has(dateStr)) return;
+    const preassignedOnTimeline = tasks.filter((task) => {
+      const assignedCleaner = Number((task as any).assignedCleaner ?? (task as any).cleanerId);
+      if (!Number.isFinite(assignedCleaner)) return false;
+      return resolvePreAssignedModeFromTask(task) !== null;
+    });
+    if (preassignedOnTimeline.length === 0) return;
+
+    preassignedReplayByDateRef.current.add(dateStr);
+    const animatedIds = new Set<string>(
+      preassignedOnTimeline.map((task) =>
+        String((task as any).id ?? (task as any).task_id ?? (task as any).name ?? "")
+      )
+    );
+    setPreassignedAnimatedTaskIds(animatedIds);
+    window.setTimeout(() => setPreassignedAnimatedTaskIds(new Set()), 4000);
+
+    const readonlyCount = preassignedOnTimeline.filter(
+      (task) => resolvePreAssignedModeFromTask(task) === "readonly"
+    ).length;
+    const normalCount = preassignedOnTimeline.length - readonlyCount;
+    const maxSingleToasts = 5;
+    for (let i = 0; i < Math.min(preassignedOnTimeline.length, maxSingleToasts); i++) {
+      const task = preassignedOnTimeline[i];
+      const mode = resolvePreAssignedModeFromTask(task) === "readonly" ? "readonly" : "normal";
+      const cleanerId = Number((task as any).assignedCleaner ?? (task as any).cleanerId);
+      window.setTimeout(() => {
+        toast({
+          title: "Task pre-assegnata in timeline",
+          description: `Task ${(task as any).name} auto-collocata sul cleaner ${cleanerId}${mode === "readonly" ? " (readonly)" : ""}`,
+          variant: "success",
+          duration: 2500,
+        });
+      }, i * 180);
+    }
+    if (preassignedOnTimeline.length > maxSingleToasts) {
+      window.setTimeout(() => {
+        toast({
+          title: "Task pre-assegnate caricate",
+          description: `${preassignedOnTimeline.length} task ripristinate (${normalCount} normali, ${readonlyCount} readonly)`,
+          variant: "success",
+          duration: 3500,
+        });
+      }, maxSingleToasts * 180);
+    }
+  }, [toast]);
 
   useEffect(() => {
     localStorage.setItem("assignments_scope", scopeValue);
@@ -715,7 +795,7 @@ export default function GenerateAssignments() {
       today.setHours(0, 0, 0, 0);
       const targetDate = new Date(date);
       targetDate.setHours(0, 0, 0, 0);
-      const isPastDate = targetDate < today;
+      const isPastDate = isWorkDateInPast(date);
       const isCurrentDate = targetDate.getTime() === today.getTime();
 
       // CRITICAL: Verifica SE esistono assegnazioni salvate per questa data
@@ -795,8 +875,8 @@ export default function GenerateAssignments() {
           });
 
           // Imposta timeline in modalità read-only SOLO per date passate
-          setIsTimelineReadOnly(isPastDate);
-          if (isPastDate) {
+          setIsTimelineReadOnly(isWorkDateHistoricallyLocked(date));
+          if (isWorkDateHistoricallyLocked(date)) {
             console.log("🔒 Timeline impostata in modalità READ-ONLY (data passata)");
           } else {
             console.log("✏️ Timeline impostata in modalità EDITABILE (data corrente/futura con salvataggio)");
@@ -822,7 +902,7 @@ export default function GenerateAssignments() {
           setIsExtracting(false);
         } else {
           // Caricamento fallito = nessun salvataggio disponibile
-          if (isPastDate) {
+          if (isWorkDateHistoricallyLocked(date)) {
             console.log("📭 Data passata senza salvataggi disponibili - mostro container in sola lettura");
             setIsTimelineReadOnly(true);
           } else {
@@ -862,7 +942,7 @@ export default function GenerateAssignments() {
         }
 
         // SOLO date STRETTAMENTE passate sono read-only
-        if (isPastDate) {
+        if (isWorkDateHistoricallyLocked(date)) {
           console.log("🔒 Data passata senza assegnazioni salvate - NESSUNA ESTRAZIONE");
           setIsTimelineReadOnly(true);
 
@@ -891,13 +971,8 @@ export default function GenerateAssignments() {
       console.error("Errore nella verifica assegnazioni salvate:", error);
 
       // Fallback SOLO per date NON passate
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const targetDate = new Date(date);
-      targetDate.setHours(0, 0, 0, 0);
-
-      if (targetDate >= today) {
-        console.log("Fallback: estrazione per data presente/futura");
+      if (!isWorkDateHistoricallyLocked(date)) {
+        console.log("Fallback: estrazione per data presente/futura (o passata in development)");
         await extractData(date);
       } else {
         console.log("Fallback: data passata, nessuna estrazione");
@@ -960,6 +1035,21 @@ export default function GenerateAssignments() {
 
   useEffect(() => {
     const currentDateStr = format(selectedDate, 'yyyy-MM-dd');
+    const consumeConvocationsRefreshRequest = () => {
+      try {
+        const raw = sessionStorage.getItem("refreshAssignmentsAfterConvocations");
+        if (!raw) return false;
+
+        const request = JSON.parse(raw);
+        if (request?.date !== currentDateStr || request?.scope !== scopeValue) return false;
+
+        sessionStorage.removeItem("refreshAssignmentsAfterConvocations");
+        return true;
+      } catch {
+        sessionStorage.removeItem("refreshAssignmentsAfterConvocations");
+        return false;
+      }
+    };
 
     // CRITICAL: Se la data è cambiata (non al primo mount), redirect a unconfirmed-tasks
     const isDateChange = prevDateRef.current !== null && prevDateRef.current !== currentDateStr;
@@ -973,8 +1063,16 @@ export default function GenerateAssignments() {
 
     // Al primo mount, carica i dati
     if (isInitialMount) {
-      console.log(`📅 Initial mount - trigger: "initial"`);
-      refreshAssignments("initial", selectedDate);
+      const shouldForceRefreshAfterConvocations = consumeConvocationsRefreshRequest();
+      console.log(
+        shouldForceRefreshAfterConvocations
+          ? `📅 Initial mount dopo convocazioni - refresh forzato`
+          : `📅 Initial mount - trigger: "initial"`
+      );
+      refreshAssignments(
+        shouldForceRefreshAfterConvocations ? "manual-refresh" : "initial",
+        selectedDate
+      );
       setIsInitialMount(false);
       prevDateRef.current = currentDateStr;
     }
@@ -993,6 +1091,7 @@ export default function GenerateAssignments() {
       duplicate_group_id?: string;
       duplicate_group_size_active?: number;
       is_duplicate_active?: boolean;
+      preAssignedMode?: PreAssignedMode;
     } = {
       id: rawTask.task_id.toString(),
       name: rawTask.logistic_code?.toString() || 'N/A',
@@ -1024,6 +1123,7 @@ export default function GenerateAssignments() {
       type_apt: (rawTask as any).type_apt,
       locked: (rawTask as any).locked,
       locked_reason: (rawTask as any).locked_reason,
+      preAssignedMode: rawTask.preAssignedMode ?? resolvePreAssignedModeFromTask(rawTask) ?? undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -1145,7 +1245,8 @@ export default function GenerateAssignments() {
               assignedCleaner: cleanerId,
               cleanerId: cleanerId,
               sequence: task.sequence,
-              priority: task.priority || 'low_priority'
+              priority: task.priority || 'low_priority',
+              preAssignedMode: (task as any).preAssignedMode ?? resolvePreAssignedModeFromTask(task) ?? undefined,
             };
 
             // Chiave composita per supportare collaborazione (stesso task su più cleaners)
@@ -1166,7 +1267,8 @@ export default function GenerateAssignments() {
             id: a.task_id || a.id,
             name: String(a.logistic_code),
             assignedCleaner: cleanerId,
-            priority: a.priority || 'low_priority'
+            priority: a.priority || 'low_priority',
+            preAssignedMode: (a as any).preAssignedMode ?? resolvePreAssignedModeFromTask(a) ?? undefined,
           };
           const compositeKey = `${taskId}-${cleanerId}`;
           assignedTaskIds.add(taskId);
@@ -1322,6 +1424,11 @@ export default function GenerateAssignments() {
             pax_out: timelineAssignment.pax_out,
             operation_id: timelineAssignment.operation_id,
             alias: timelineAssignment.alias,
+            preAssignedMode:
+              (timelineAssignment as any).preAssignedMode ??
+              resolvePreAssignedModeFromTask(timelineAssignment) ??
+              resolvePreAssignedModeFromTask(baseTask) ??
+              undefined,
           } as any;
 
           // Usa chiave composita per evitare dedup tra collaboratori
@@ -1343,6 +1450,9 @@ export default function GenerateAssignments() {
       dlog(`   - Task nei containers: ${dedupedTasks.filter(t => !(t as any).assignedCleaner).length}`);
 
       setAllTasksWithAssignments(dedupedTasks);
+      if (!silent) {
+        replayPreassignedTasks(dateStr, dedupedTasks);
+      }
 
       if (!silent) {
         setIsLoadingTasks(false);
@@ -1507,6 +1617,9 @@ export default function GenerateAssignments() {
         const errData = await response.json().catch(() => ({}));
         // Gestione errore 423 (Task bloccata o Cleaner bloccato)
         if (response.status === 423) {
+          if (errData.error === 'PREASSIGNED_READONLY') {
+            throw new Error('Task pre-assegnata readonly: operazione non consentita');
+          }
           if (errData.error === 'CLEANER_LOCKED') {
             throw new Error('Cleaner bloccato: impossibile assegnare');
           }
@@ -1576,7 +1689,16 @@ export default function GenerateAssignments() {
         body: JSON.stringify({ taskId, logisticCode, date: dateStr, scope: scopeValue }),
       });
       if (!response.ok) {
-        console.error('Errore nella rimozione dell\'assegnazione dalla timeline');
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 423 && errorData.error === "PREASSIGNED_READONLY") {
+          toast({
+            title: "Task pre-assegnata readonly",
+            description: "Puoi solo riordinarla nella stessa riga cleaner.",
+            variant: "warning",
+          });
+          return;
+        }
+        console.error('Errore nella rimozione dell\'assegnazione dalla timeline', errorData);
         toast({
           title: "Errore",
           description: "Impossibile spostare la task dalla timeline",
@@ -1695,6 +1817,23 @@ export default function GenerateAssignments() {
         : draggableId;
       const task = allTasksWithAssignments.find(t => String(t.id) === String(taskId));
       const logisticCode = task?.name; // name contiene il logistic_code
+      const taskPreAssignedMode = resolvePreAssignedModeFromTask(task);
+      const isReadonlyPreassigned = taskPreAssignedMode === "readonly";
+
+      if (isReadonlyPreassigned) {
+        const isSameCleanerReorder =
+          fromCleanerId !== null &&
+          toCleanerId !== null &&
+          fromCleanerId === toCleanerId;
+        if (!isSameCleanerReorder) {
+          toast({
+            title: "Task pre-assegnata readonly",
+            description: "Puoi solo riordinarla nella stessa riga cleaner.",
+            variant: "warning",
+          });
+          return;
+        }
+      }
 
       // ENFORCEMENT: Se la task è bloccata, non permettere spostamento in timeline
       if (task && (task as any).locked && !fromCleanerId) {
@@ -1797,6 +1936,9 @@ export default function GenerateAssignments() {
             // Gestione errore 423 (Task bloccata o Cleaner bloccato)
             if (response.status === 423) {
               const errorData = await response.json().catch(() => ({}));
+              if (errorData.error === 'PREASSIGNED_READONLY') {
+                throw new Error('Task pre-assegnata readonly: non puoi cambiare cleaner');
+              }
               if (errorData.error === 'CLEANER_LOCKED') {
                 throw new Error('Cleaner bloccato: impossibile assegnare');
               }
@@ -2060,19 +2202,24 @@ export default function GenerateAssignments() {
   // const allTasks = [...timelineTasksWithoutDuplicates, ...containerTasks];
 
   // Determina se la modalità storica è attiva (data passata)
-  const isHistoricalMode = isDateInPast(selectedDate);
+  const isHistoricalMode = isWorkDateHistoricallyLocked(selectedDate);
+
+  const unlockedTasksForStats = useMemo(
+    () => allTasksWithAssignments.filter((task) => !isTaskLocked(task)),
+    [allTasksWithAssignments]
+  );
 
   // Filtra le task non assegnate
   const unassignedTasks = allTasksWithAssignments.filter(task => !(task as any).assignedCleaner);
-  const straordinarieCount = allTasksWithAssignments.filter((t) => isEquivalentStraordinariaTask(t)).length;
-  const standardCount = allTasksWithAssignments.filter(
+  const straordinarieCount = unlockedTasksForStats.filter((t) => isEquivalentStraordinariaTask(t)).length;
+  const standardCount = unlockedTasksForStats.filter(
     (t) => !isEquivalentStraordinariaTask(t) && !t.premium
   ).length;
-  const premiumCount = allTasksWithAssignments.filter(
+  const premiumCount = unlockedTasksForStats.filter(
     (t) => !isEquivalentStraordinariaTask(t) && t.premium
   ).length;
-  const puliziaUfficioCount = Math.max(0, allTasksWithAssignments.length - straordinarieCount);
-  const puliziaUfficioInternaCount = allTasksWithAssignments.filter((task) => {
+  const puliziaUfficioCount = Math.max(0, unlockedTasksForStats.length - straordinarieCount);
+  const puliziaUfficioInternaCount = unlockedTasksForStats.filter((task) => {
     const taskAny = task as any;
     const operationId = Number(taskAny.operation_id ?? taskAny.operationId);
     const operationName = String(
@@ -2420,6 +2567,7 @@ export default function GenerateAssignments() {
                   lastValidDragIndex={lastValidDragIndex}
                   draggingOverCleanerId={draggingOverCleanerId}
                   searchTask={searchTask}
+                  preassignedAnimatedTaskIds={preassignedAnimatedTaskIds}
                 />
                 {!isTimelineMapOpen && (
                   <button
@@ -2533,7 +2681,7 @@ export default function GenerateAssignments() {
                       <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-3 border-2 border-blue-300 dark:border-blue-700">
                         <div className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">Totale</div>
                         <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-                          {allTasksWithAssignments.length}
+                          {unlockedTasksForStats.length}
                         </div>
                       </div>
 
@@ -2567,7 +2715,7 @@ export default function GenerateAssignments() {
                       <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-3 border-2 border-blue-300 dark:border-blue-700">
                         <div className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">Totale</div>
                         <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-                          {allTasksWithAssignments.length}
+                          {unlockedTasksForStats.length}
                         </div>
                       </div>
 

@@ -4,10 +4,12 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
 import { fileURLToPath } from "url";
 import path from "path";
+
+const log = (...args: unknown[]) => {
+  console.log(...args);
+};
 
 const app = express();
 app.use(express.json());
@@ -52,6 +54,8 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  const { registerRoutes } = await import("./routes");
+  const { setupVite, serveStatic } = await import("./vite");
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

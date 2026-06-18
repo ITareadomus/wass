@@ -46,6 +46,8 @@ async function createLogisticsContainersTables() {
         customer_reference TEXT,
         locked BOOLEAN DEFAULT FALSE,
         locked_reason TEXT,
+        logistics_task_kind VARCHAR(50),
+        logistics_task_kind_source VARCHAR(20),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         UNIQUE(work_date, task_id)
@@ -111,6 +113,8 @@ async function createLogisticsContainersTables() {
         customer_reference TEXT,
         locked BOOLEAN DEFAULT FALSE,
         locked_reason TEXT,
+        logistics_task_kind VARCHAR(50),
+        logistics_task_kind_source VARCHAR(20),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         created_by VARCHAR(100) DEFAULT 'system'
       );
@@ -123,6 +127,19 @@ async function createLogisticsContainersTables() {
       CREATE INDEX IF NOT EXISTS idx_lg_containers_history_task_id
       ON lg_containers_history(task_id);
     `);
+
+    await client.query(
+      `ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS logistics_task_kind VARCHAR(50)`
+    );
+    await client.query(
+      `ALTER TABLE IF EXISTS lg_containers_history ADD COLUMN IF NOT EXISTS logistics_task_kind VARCHAR(50)`
+    );
+    await client.query(
+      `ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS logistics_task_kind_source VARCHAR(20)`
+    );
+    await client.query(
+      `ALTER TABLE IF EXISTS lg_containers_history ADD COLUMN IF NOT EXISTS logistics_task_kind_source VARCHAR(20)`
+    );
 
     console.log('✅ Logistics containers tables created successfully');
   } catch (error) {

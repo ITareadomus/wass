@@ -33,6 +33,8 @@ async function createHistoryTable() {
         reasons TEXT[] DEFAULT '{}',
         manually_moved BOOLEAN NOT NULL DEFAULT false,
         priority VARCHAR(50),
+        cleaner_start_time VARCHAR(10) DEFAULT '10:00',
+        cleaner_end_time VARCHAR(10) DEFAULT '20:00',
         start_time VARCHAR(10),
         end_time VARCHAR(10),
         followup BOOLEAN,

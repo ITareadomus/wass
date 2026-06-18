@@ -48,6 +48,8 @@ async function createTable() {
 
           -- riferimento al cleaner
           cleaner_id           INTEGER     NOT NULL,
+          cleaner_start_time   VARCHAR(10) DEFAULT '10:00',
+          cleaner_end_time     VARCHAR(10) DEFAULT '20:00',
 
           -- tutti i campi della TASK (copiati 1:1 dal JSON)
           task_id              BIGINT      NOT NULL,
