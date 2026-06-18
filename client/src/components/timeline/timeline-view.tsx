@@ -81,6 +81,59 @@ interface Cleaner {
   show_plus_one?: boolean;
 }
 
+const DEFAULT_TIMELINE_START_MINUTES = 10 * 60;
+const DEFAULT_TIMELINE_END_MINUTES = 19 * 60;
+const MIN_TIMELINE_TASK_WIDTH_PX = 150;
+const FALLBACK_SHORTEST_TASK_MINUTES = 30;
+const TIMELINE_END_BUFFER_MINUTES = 60;
+
+const parseTimelineClockToMinutes = (value?: string | null) => {
+  if (!value) return null;
+  const parts = String(value).split(":");
+  if (parts.length < 2) return null;
+
+  const hours = Number(parts[0]);
+  const minutes = Number(parts[1]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+
+  return hours * 60 + minutes;
+};
+
+const parseTimelineDurationToMinutes = (duration?: string | number | null) => {
+  if (duration === undefined || duration === null) return 0;
+
+  if (typeof duration === "number") {
+    return Number.isFinite(duration) ? duration : 0;
+  }
+
+  const [hoursPart = "0", minutesPart = "0"] = String(duration).split(".");
+  const hours = Number.parseInt(hoursPart, 10);
+  const minutes = Number.parseInt(minutesPart, 10);
+
+  return (Number.isFinite(hours) ? hours : 0) * 60 + (Number.isFinite(minutes) ? minutes : 0);
+};
+
+const getTimelineTaskDurationMinutes = (task: any) => {
+  const directDuration = Number(task?.cleaning_time ?? task?.cleaningTime);
+  if (Number.isFinite(directDuration) && directDuration > 0) {
+    return directDuration;
+  }
+
+  return parseTimelineDurationToMinutes(task?.duration);
+};
+
+const getTimelineTravelMinutes = (task: any) => {
+  const travel = Number(task?.travel_time ?? task?.travelTime);
+  return Number.isFinite(travel) && travel > 0 ? travel : 0;
+};
+
+const roundDownToHour = (minutes: number) => Math.floor(minutes / 60) * 60;
+const roundUpToHour = (minutes: number) => Math.ceil(minutes / 60) * 60;
+
+const formatTimelineSlot = (minutes: number) => {
+  const hours = Math.floor(minutes / 60);
+  return `${String(hours).padStart(2, "0")}:00`;
+};
 type CleanerDirectoryEntry = {
   id: number;
   name?: string;
@@ -363,9 +416,6 @@ export default function TimelineView({
     startX: number;
     startScrollLeft: number;
   } | null>(null);
-  const timelineWidthScale = 1.06;
-  const timelineScaledWidth = `${timelineWidthScale * 100}%`;
-  const timelineTaskWidthPx = timelineWidthPx * timelineWidthScale;
 
   // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
   // DEVE essere definito PRIMA di allCleanersToShow che lo usa
@@ -505,6 +555,15 @@ export default function TimelineView({
     return combined;
   }, [cleaners, timelineCleaners]);
 
+  const visibleCleanerIds = React.useMemo(
+    () => new Set(allCleanersToShow.map(cleaner => Number(cleaner.id))),
+    [allCleanersToShow]
+  );
+
+  const timelineAssignedTasks = React.useMemo(
+    () => tasks.filter(task => visibleCleanerIds.has(Number((task as any).assignedCleaner))),
+    [tasks, visibleCleanerIds]
+  );
   const cleanerDirectoryIds = React.useMemo(() => {
     const ids = new Set<number>();
     for (const cleaner of cleaners) {
@@ -829,76 +888,137 @@ export default function TimelineView({
     });
   };
 
-  // Trova lo start time minimo tra tutti i cleaner
+  // Trova lo start time minimo tra tutti i cleaner e arrotonda la griglia all'ora intera.
   const getGlobalStartTime = () => {
-    if (allCleanersToShow.length === 0) return "10:00";
+    if (allCleanersToShow.length === 0) return formatTimelineSlot(DEFAULT_TIMELINE_START_MINUTES);
 
-    const startTimes = allCleanersToShow.map(c => c.start_time || "10:00");
-    const minTime = startTimes.reduce((min, current) => {
-      const [minH, minM] = min.split(':').map(Number);
-      const [curH, curM] = current.split(':').map(Number);
-      const minMinutes = minH * 60 + minM;
-      const curMinutes = curH * 60 + curM;
-      return curMinutes < minMinutes ? current : min;
-    });
+    const cleanerStartMinutes = allCleanersToShow
+      .map(c => parseTimelineClockToMinutes(c.start_time) ?? DEFAULT_TIMELINE_START_MINUTES);
+    const startMinutes = cleanerStartMinutes.length > 0
+      ? Math.min(...cleanerStartMinutes)
+      : DEFAULT_TIMELINE_START_MINUTES;
 
-    return minTime;
+    return formatTimelineSlot(roundDownToHour(startMinutes));
   };
 
-  const getGlobalEndTime = () => {
-    if (allCleanersToShow.length === 0) return "20:00";
+  const globalStartTime = getGlobalStartTime();
+  const timelineStartMinutes = parseTimelineClockToMinutes(globalStartTime) ?? DEFAULT_TIMELINE_START_MINUTES;
 
-    const endTimes = allCleanersToShow.map((c: any) => c.end_time || "20:00");
-    const maxTime = endTimes.reduce((max: string, current: string) => {
-      const [maxH, maxM] = max.split(":").map(Number);
-      const [curH, curM] = current.split(":").map(Number);
-      const maxMinutes = maxH * 60 + maxM;
-      const curMinutes = curH * 60 + curM;
-      return curMinutes > maxMinutes ? current : max;
-    });
+  const shortestTaskMinutes = React.useMemo(() => {
+    const validDurations = timelineAssignedTasks
+      .map(task => getTimelineTaskDurationMinutes(task as any))
+      .filter(duration => Number.isFinite(duration) && duration > 0);
 
-    return maxTime;
-  };
+    return validDurations.length > 0
+      ? Math.min(...validDurations)
+      : FALLBACK_SHORTEST_TASK_MINUTES;
+  }, [timelineAssignedTasks]);
 
-  // Genera time slots globali basati sullo start time minimo (solo orari interi)
+  const minimumTimelinePxPerMinute = MIN_TIMELINE_TASK_WIDTH_PX / shortestTaskMinutes;
+
+  const timelineEndMinutes = React.useMemo(() => {
+    const cleanerStartById = new Map<number, number>();
+    for (const cleaner of allCleanersToShow) {
+      cleanerStartById.set(
+        Number(cleaner.id),
+        parseTimelineClockToMinutes(cleaner.start_time) ?? timelineStartMinutes
+      );
+    }
+
+    const endCandidates: number[] = [];
+
+    for (const task of timelineAssignedTasks) {
+      const taskObj = task as any;
+      const duration = getTimelineTaskDurationMinutes(taskObj);
+      if (!Number.isFinite(duration) || duration <= 0) continue;
+
+      const startMinutes = parseTimelineClockToMinutes(
+        taskObj.start_time || taskObj.fw_start_time || taskObj.startTime
+      );
+      const endMinutes = parseTimelineClockToMinutes(taskObj.end_time || taskObj.endTime);
+
+      if (endMinutes !== null) {
+        endCandidates.push(endMinutes);
+      } else if (startMinutes !== null) {
+        endCandidates.push(startMinutes + duration);
+      }
+    }
+
+    const tasksByCleaner = new Map<number, any[]>();
+    for (const task of timelineAssignedTasks) {
+      const cleanerId = Number((task as any).assignedCleaner);
+      if (!Number.isFinite(cleanerId)) continue;
+      const cleanerTasks = tasksByCleaner.get(cleanerId) ?? [];
+      cleanerTasks.push(task as any);
+      tasksByCleaner.set(cleanerId, cleanerTasks);
+    }
+
+    for (const [cleanerId, cleanerTasks] of tasksByCleaner) {
+      let cursor = cleanerStartById.get(cleanerId) ?? timelineStartMinutes;
+
+      const sortedTasks = [...cleanerTasks].sort((a, b) => {
+        const seqA = Number(a.sequence);
+        const seqB = Number(b.sequence);
+        if (Number.isFinite(seqA) && Number.isFinite(seqB)) return seqA - seqB;
+
+        const timeA = parseTimelineClockToMinutes(a.start_time || a.fw_start_time || a.startTime) ?? cursor;
+        const timeB = parseTimelineClockToMinutes(b.start_time || b.fw_start_time || b.startTime) ?? cursor;
+        return timeA - timeB;
+      });
+
+      sortedTasks.forEach((taskObj, index) => {
+        const duration = getTimelineTaskDurationMinutes(taskObj);
+        if (!Number.isFinite(duration) || duration <= 0) return;
+
+        const explicitStart = parseTimelineClockToMinutes(
+          taskObj.start_time || taskObj.fw_start_time || taskObj.startTime
+        );
+
+        if (explicitStart !== null) {
+          cursor = Math.max(cursor, explicitStart);
+        } else if (index > 0) {
+          cursor += getTimelineTravelMinutes(taskObj);
+        }
+
+        cursor += duration;
+        endCandidates.push(cursor);
+      });
+    }
+
+    if (endCandidates.length === 0) return DEFAULT_TIMELINE_END_MINUTES;
+
+    const latestEnd = Math.max(...endCandidates);
+    return Math.max(
+      timelineStartMinutes + 60,
+      roundUpToHour(latestEnd + TIMELINE_END_BUFFER_MINUTES)
+    );
+  }, [allCleanersToShow, timelineAssignedTasks, timelineStartMinutes]);
+
+  // Genera time slots globali basati sul range visibile dinamico.
   const generateGlobalTimeSlots = () => {
-    const globalStartTime = getGlobalStartTime();
-    const globalEndTime = getGlobalEndTime();
-    const [startHour, startMin] = globalStartTime.split(':').map(Number);
-    const [endHourRaw] = globalEndTime.split(':').map(Number);
-
-    // Arrotonda all'ora intera precedente per iniziare sempre da un'ora intera
-    const startHourRounded = startMin > 0 ? startHour : startHour;
-    const endHour = endHourRaw;
-
     const slots: string[] = [];
+    const slotsCount = Math.max(1, Math.ceil((timelineEndMinutes - timelineStartMinutes) / 60));
 
-    // Genera slot ogni ora fino all'end_time massimo dei cleaner (solo orari interi)
-    for (let hour = startHourRounded; hour <= endHour; hour++) {
-      slots.push(`${String(hour).padStart(2, '0')}:00`);
+    for (let idx = 0; idx < slotsCount; idx++) {
+      slots.push(formatTimelineSlot(timelineStartMinutes + idx * 60));
     }
 
     return slots;
   };
 
-  // Calcola i minuti totali della timeline globale (in base all'ora ARROTONDATA per match con la griglia)
-  const getGlobalTimelineMinutes = () => {
-    const globalStartTime = getGlobalStartTime();
-    const globalEndTime = getGlobalEndTime();
-    const [startHour, startMin] = globalStartTime.split(':').map(Number);
-    const [endHour, endMin] = globalEndTime.split(':').map(Number);
-
-    // CRITICAL: Usa l'ora arrotondata (come la griglia visiva) per calcolare i minuti
-    const startHourRounded = startMin > 0 ? startHour : startHour;
-    const startMinutes = startHourRounded * 60; // Parte dall'ora intera
-    const endMinutes = endHour * 60 + endMin;
-    return endMinutes - startMinutes;
-  };
+  const getGlobalTimelineMinutes = () => Math.max(60, timelineEndMinutes - timelineStartMinutes);
 
   // Genera gli slot una volta sola
   const globalTimeSlots = generateGlobalTimeSlots();
   const globalTimelineMinutes = getGlobalTimelineMinutes();
-  const globalStartTime = getGlobalStartTime();
+  const minimumTimelineContentWidthPx = globalTimelineMinutes * minimumTimelinePxPerMinute;
+  const timelineContentWidthPx = Math.max(
+    timelineWidthPx,
+    minimumTimelineContentWidthPx
+  );
+  const timelinePxPerMinute = timelineContentWidthPx / globalTimelineMinutes;
+  const timelineScaledWidth = timelineContentWidthPx > 0 ? `${timelineContentWidthPx}px` : "100%";
+  const timelineTaskWidthPx = timelineContentWidthPx;
 
 
 // Helpers to render EO/HP/LP brackets above the time header
@@ -915,14 +1035,11 @@ const getTimelineStartMinutes = () => {
   return timeToMinutes(first);
 };
 
-const getTimelineEndMinutes = () => timeToMinutes(getGlobalEndTime());
+const getTimelineEndMinutes = () => timelineEndMinutes;
 
 const minutesToPct = (absoluteMinutes: number) => {
-  if (!globalTimeSlots?.length) return 0;
-
-  const timelineStart = timeToMinutes(globalTimeSlots[0]);
-  const timelineEnd = timelineStart + globalTimeSlots.length * 60;
-
+  const timelineStart = getTimelineStartMinutes();
+  const timelineEnd = getTimelineEndMinutes();
   const total = timelineEnd - timelineStart;
   if (total <= 0) return 0;
 
@@ -949,7 +1066,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
   React.useEffect(() => {
     (window as any).globalTimelineMinutes = globalTimelineMinutes;
     (window as any).globalTimeSlotsCount = globalTimeSlots.length;
-  }, [globalTimelineMinutes, globalTimeSlots.length]);
+    (window as any).timelinePxPerMinute = timelinePxPerMinute;
+    (window as any).minTimelineTaskWidthPx = MIN_TIMELINE_TASK_WIDTH_PX;
+  }, [globalTimelineMinutes, globalTimeSlots.length, timelinePxPerMinute]);
 
   // Misura la larghezza della timeline row per TaskCard (state React → rerender)
   React.useEffect(() => {
@@ -2691,16 +2810,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                       }
                                     }
 
-                                    // Calcola larghezza EFFETTIVA in base ai minuti reali di travel_time
-                                    // Usa la stessa base di calcolo dei task (slot * 60 minuti virtuali)
+                                    // Calcola le larghezze con la stessa scala temporale usata da task e griglia.
                                     const effectiveTravelMinutes = seq >= 2 && travelTime > 0 && !snapshot.isDraggingOver ? travelTime : 0;
-                                    const virtualMinutes = globalTimeSlots.length * 60;
-                                    const timelineWidth = timelineTaskWidthPx || 0;
-                                    const travelWidthPx = effectiveTravelMinutes > 0 && virtualMinutes > 0 && timelineWidth > 0
-                                      ? (effectiveTravelMinutes / virtualMinutes) * timelineWidth
+                                    const travelWidthPx = effectiveTravelMinutes > 0 && timelinePxPerMinute > 0
+                                      ? effectiveTravelMinutes * timelinePxPerMinute
                                       : 0;
-                                    const initialOffsetWidthPx = seq === 1 && timeOffset > 0 && virtualMinutes > 0 && timelineWidth > 0
-                                      ? (timeOffset / virtualMinutes) * timelineWidth
+                                    const initialOffsetWidthPx = seq === 1 && timeOffset > 0 && timelinePxPerMinute > 0
+                                      ? timeOffset * timelinePxPerMinute
                                       : 0;
                                     const shouldShowInitialOffset =
                                       !snapshot.isDraggingOver && !Boolean(snapshot.draggingFromThisWith);
@@ -2735,8 +2851,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                         }
                                       }
                                     }
-                                    const waitingGapWidthPx = waitingGap > 0 && virtualMinutes > 0 && timelineWidth > 0
-                                      ? (waitingGap / virtualMinutes) * timelineWidth
+                                    const waitingGapWidthPx = waitingGap > 0 && timelinePxPerMinute > 0
+                                      ? waitingGap * timelinePxPerMinute
                                       : 0;
 
                                     // Chiave univoca per task collaborative: include cleaner.id
@@ -2809,6 +2925,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           isDragDisabled={isTimelineInteractionDisabled}
                                           isReadOnly={isReadOnly}
                                           timelineWidthPx={timelineTaskWidthPx}
+                                          timelinePxPerMinute={timelinePxPerMinute}
+                                          minTimelineTaskWidthPx={MIN_TIMELINE_TASK_WIDTH_PX}
                                           isHighlighted={highlightedTaskIds.has(String(task.id))}
                                           cleanerId={cleaner.id}
                                           isPriorityWindowViolation={isPriorityWindowViolation(task)}
