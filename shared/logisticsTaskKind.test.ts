@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildLogisticsContainerAutoKindPatches,
   buildLogisticsTaskKindPayload,
   buildManualLogisticsTaskKindPayload,
   isCleanerHasBag,
@@ -197,5 +198,55 @@ describe("logisticsTaskKindBadge", () => {
     expect(logisticsTaskKindBadge("pick-up").text).toBe("PICK-UP");
     expect(logisticsTaskKindBadge("delivery/pick-up").className).toContain("purple");
     expect(logisticsTaskKindBadge("pick-up").className).toContain("sky");
+  });
+});
+
+describe("buildLogisticsContainerAutoKindPatches", () => {
+  it("creates patches only for non-manual rows that changed", () => {
+    const enrichedTasksById = new Map<number, any>([
+      [
+        100,
+        {
+          logistics_task_kind: "pick-up",
+          logistics_task_kind_source: "auto",
+        },
+      ],
+      [
+        200,
+        {
+          logistics_task_kind: "delivery/pick-up",
+          logistics_task_kind_source: "auto",
+        },
+      ],
+    ]);
+
+    const patches = buildLogisticsContainerAutoKindPatches(
+      [
+        {
+          task_id: 100,
+          logistics_task_kind: null,
+          logistics_task_kind_source: null,
+        },
+        {
+          task_id: 200,
+          logistics_task_kind: "delivery/pick-up",
+          logistics_task_kind_source: "auto",
+        },
+        {
+          task_id: 300,
+          logistics_task_kind: "delivery",
+          logistics_task_kind_source: "manual",
+        },
+      ],
+      enrichedTasksById
+    );
+
+    expect(patches).toEqual([
+      {
+        taskId: 100,
+        logistics_task_kind: "pick-up",
+        logistics_task_kind_source: "auto",
+      },
+    ]);
   });
 });

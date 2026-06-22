@@ -141,3 +141,53 @@ export function logisticsTaskKindBadge(kind: LogisticsTaskKind): {
       "bg-sky-500/30 text-sky-800 dark:bg-sky-500/40 dark:text-sky-200 border-sky-600 dark:border-sky-400",
   };
 }
+
+export interface LogisticsContainerKindPatch {
+  taskId: number;
+  logistics_task_kind: LogisticsTaskKind;
+  logistics_task_kind_source: "auto";
+}
+
+export function buildLogisticsContainerAutoKindPatches(
+  rows: Array<{
+    task_id: number;
+    logistics_task_kind: string | null;
+    logistics_task_kind_source: string | null;
+  }>,
+  enrichedTasksById: Map<
+    number,
+    { logistics_task_kind?: string | null; logistics_task_kind_source?: string | null }
+  >
+): LogisticsContainerKindPatch[] {
+  const patches: LogisticsContainerKindPatch[] = [];
+
+  for (const row of rows) {
+    if (row.logistics_task_kind_source === "manual") continue;
+
+    const taskId = Number(row.task_id);
+    const enriched = enrichedTasksById.get(taskId);
+    if (!enriched?.logistics_task_kind || enriched.logistics_task_kind_source !== "auto") {
+      continue;
+    }
+
+    const nextKind = normalizeLogisticsTaskKind(enriched.logistics_task_kind, "auto");
+    if (!nextKind) continue;
+
+    const currentKind =
+      row.logistics_task_kind != null ? String(row.logistics_task_kind) : null;
+    const currentSource =
+      row.logistics_task_kind_source != null
+        ? String(row.logistics_task_kind_source)
+        : null;
+
+    if (currentKind === nextKind && currentSource === "auto") continue;
+
+    patches.push({
+      taskId,
+      logistics_task_kind: nextKind,
+      logistics_task_kind_source: "auto",
+    });
+  }
+
+  return patches;
+}

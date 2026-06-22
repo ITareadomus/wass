@@ -15,6 +15,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   Fragment,
@@ -34,6 +35,7 @@ import { getCleanerHexColor } from "@/lib/cleaner-colors";
 import type { TaskType as Task } from "@shared/schema";
 import {
   computeLogisticsCheckoutWaitGap,
+  LOGISTICS_SERVICE_DURATION_MIN,
   parseHmToMinutes,
 } from "@shared/logistics-scheduling-constraints";
 import { estimateLogisticsReturnToDepotMinutes } from "@shared/logistics-travel-estimate";
@@ -99,6 +101,30 @@ interface LogisticsTimelineViewProps {
   isLoadingOverlay?: boolean;
   onRefresh: () => Promise<void>;
 }
+
+const DEFAULT_TIMELINE_START_MINUTES = 10 * 60;
+const DEFAULT_TIMELINE_END_MINUTES = 20 * 60;
+const TIMELINE_END_BUFFER_MINUTES = 60;
+
+const parseTimelineClockToMinutes = (value?: string | null) => {
+  if (!value) return null;
+  const parts = String(value).split(":");
+  if (parts.length < 2) return null;
+
+  const hours = Number(parts[0]);
+  const minutes = Number(parts[1]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+
+  return hours * 60 + minutes;
+};
+
+const roundDownToHour = (minutes: number) => Math.floor(minutes / 60) * 60;
+const roundUpToHour = (minutes: number) => Math.ceil(minutes / 60) * 60;
+
+const formatTimelineSlot = (minutes: number) => {
+  const hours = Math.floor(minutes / 60);
+  return `${String(hours).padStart(2, "0")}:00`;
+};
 
 function minutesToTimelineWidthPx(
   minutes: number,
@@ -582,53 +608,68 @@ export default function LogisticsTimelineView({
   const driverColumnWidth = calculateDriverColumnWidth();
 
   const getGlobalStartTime = () => {
-    if (drivers.length === 0) return "10:00";
-    const startTimes = drivers.map((d) => d.start_time || "10:00");
-    return startTimes.reduce((min, current) => {
-      const [minH, minM] = min.split(":").map(Number);
-      const [curH, curM] = current.split(":").map(Number);
-      const minMinutes = minH * 60 + minM;
-      const curMinutes = curH * 60 + curM;
-      return curMinutes < minMinutes ? current : min;
-    });
+    if (drivers.length === 0) return formatTimelineSlot(DEFAULT_TIMELINE_START_MINUTES);
+
+    const driverStartMinutes = drivers.map(
+      (d) => parseTimelineClockToMinutes(d.start_time) ?? DEFAULT_TIMELINE_START_MINUTES
+    );
+    const startMinutes =
+      driverStartMinutes.length > 0
+        ? Math.min(...driverStartMinutes)
+        : DEFAULT_TIMELINE_START_MINUTES;
+
+    return formatTimelineSlot(roundDownToHour(startMinutes));
   };
 
-  const getGlobalEndTime = () => {
-    if (drivers.length === 0) return "20:00";
-    const endTimes = drivers.map((d) => d.end_time || "20:00");
-    return endTimes.reduce((max, current) => {
-      const [maxH, maxM] = max.split(":").map(Number);
-      const [curH, curM] = current.split(":").map(Number);
-      const maxMinutes = maxH * 60 + maxM;
-      const curMinutes = curH * 60 + curM;
-      return curMinutes > maxMinutes ? current : max;
-    });
-  };
+  const globalStartTime = getGlobalStartTime();
+  const timelineStartMinutes =
+    parseTimelineClockToMinutes(globalStartTime) ?? DEFAULT_TIMELINE_START_MINUTES;
+
+  const timelineEndMinutes = useMemo(() => {
+    const endCandidates: number[] = [];
+
+    for (const row of driversAssignments) {
+      for (const raw of row.tasks || []) {
+        const endMin = parseTimelineClockToMinutes(raw?.end_time);
+        if (endMin !== null) endCandidates.push(endMin);
+
+        const startMin = parseHmToMinutes(raw?.start_time, null);
+        if (startMin != null) {
+          endCandidates.push(startMin + LOGISTICS_SERVICE_DURATION_MIN);
+        }
+      }
+    }
+
+    if (endCandidates.length === 0) {
+      const shiftEnds = drivers
+        .map((d) => parseTimelineClockToMinutes(d.end_time))
+        .filter((value): value is number => value !== null);
+      if (shiftEnds.length > 0) {
+        return Math.max(timelineStartMinutes + 60, roundUpToHour(Math.max(...shiftEnds)));
+      }
+      return DEFAULT_TIMELINE_END_MINUTES;
+    }
+
+    const latestEnd = Math.max(...endCandidates);
+    return Math.max(
+      timelineStartMinutes + 60,
+      roundUpToHour(latestEnd + TIMELINE_END_BUFFER_MINUTES)
+    );
+  }, [drivers, driversAssignments, timelineStartMinutes]);
 
   const generateGlobalTimeSlots = () => {
-    const globalStartTime = getGlobalStartTime();
-    const globalEndTime = getGlobalEndTime();
-    const [startHour, startMin] = globalStartTime.split(":").map(Number);
-    const [endHourRaw] = globalEndTime.split(":").map(Number);
-    const startHourRounded = startMin > 0 ? startHour : startHour;
-    const endHour = endHourRaw;
     const slots: string[] = [];
-    for (let hour = startHourRounded; hour <= endHour; hour++) {
-      slots.push(`${String(hour).padStart(2, "0")}:00`);
+    const slotsCount = Math.max(1, Math.ceil((timelineEndMinutes - timelineStartMinutes) / 60));
+
+    for (let idx = 0; idx < slotsCount; idx++) {
+      slots.push(formatTimelineSlot(timelineStartMinutes + idx * 60));
     }
+
     return slots;
   };
 
-  const getGlobalTimelineMinutes = () => {
-    const globalStartTime = getGlobalStartTime();
-    const globalEndTime = getGlobalEndTime();
-    const [startHour, startMin] = globalStartTime.split(":").map(Number);
-    const [endHour, endMin] = globalEndTime.split(":").map(Number);
-    const startHourRounded = startMin > 0 ? startHour : startHour;
-    const startMinutes = startHourRounded * 60;
-    const endMinutes = endHour * 60 + endMin;
-    return endMinutes - startMinutes;
-  };
+  const getGlobalTimelineMinutes = () =>
+    Math.max(60, timelineEndMinutes - timelineStartMinutes);
 
   const globalTimeSlots = generateGlobalTimeSlots();
   const globalTimelineMinutes = getGlobalTimelineMinutes();
@@ -641,12 +682,9 @@ export default function LogisticsTimelineView({
   const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
   const minutesToPct = (absoluteMinutes: number) => {
-    if (!globalTimeSlots.length) return 0;
-    const timelineStart = timeToMinutes(globalTimeSlots[0]);
-    const timelineEnd = timelineStart + globalTimeSlots.length * 60;
-    const total = timelineEnd - timelineStart;
+    const total = timelineEndMinutes - timelineStartMinutes;
     if (total <= 0) return 0;
-    return ((absoluteMinutes - timelineStart) / total) * 100;
+    return ((absoluteMinutes - timelineStartMinutes) / total) * 100;
   };
 
   useEffect(() => {
@@ -1517,7 +1555,7 @@ export default function LogisticsTimelineView({
                           </div>
                           <div className="relative z-10 flex items-center h-full min-h-[45px] px-0 gap-0 flex-wrap">
                             {(() => {
-                              const virtualMinutes = globalTimeSlots.length * 60;
+                              const virtualMinutes = globalTimelineMinutes;
                               const timelineWidth = timelineWidthPx || 0;
                               const lastRawTask =
                                 rawTasks.length > 0 ? rawTasks[rawTasks.length - 1] : null;
@@ -1564,7 +1602,7 @@ export default function LogisticsTimelineView({
                               );
                               let initialIdleOffsetPx = 0;
                               if (seq === 1 && virtualMinutes > 0 && timelineWidth > 0) {
-                                const gridStartMinutes = timeToMinutes(globalTimeSlots[0] || "10:00");
+                                const gridStartMinutes = timelineStartMinutes;
                                 const taskStartMinutes = parseHmToMinutes(raw?.start_time, null);
                                 const driverStartMinutes =
                                   parseHmToMinutes(driver.start_time, null) ?? gridStartMinutes;

@@ -1642,6 +1642,12 @@ export class PgDailyAssignmentsService {
   async saveLogisticsTimeline(workDate: string, timeline: any): Promise<number> {
     const client = await pool.connect();
     try {
+      const { enrichLogisticsTimelineData, loadManualLogisticsTimelineTaskKinds } = await import(
+        "./logistics-task-kind-enrichment"
+      );
+      const manualKindsByTaskId = await loadManualLogisticsTimelineTaskKinds(workDate);
+      await enrichLogisticsTimelineData(workDate, timeline, { manualKindsByTaskId });
+
       const rows = this.logisticsTimelineToRows(workDate, timeline);
       await client.query('BEGIN');
       await client.query('DELETE FROM lg_timeline WHERE work_date = $1', [workDate]);
@@ -1747,6 +1753,19 @@ export class PgDailyAssignmentsService {
       if (rows.length === 0) {
         return null;
       }
+
+      const taskIds = rows.map((row) => Number(row.task_id)).filter((id) => Number.isFinite(id));
+      const {
+        loadCleanerContextByTaskIds,
+        enrichLogisticsTimelineTask,
+        syncLogisticsTimelineAutoKinds,
+      } = await import("./logistics-task-kind-enrichment");
+      const { buildLogisticsContainerAutoKindPatches } = await import(
+        "../../shared/logistics-task-kind"
+      );
+      const cleanerContextByTaskId = await loadCleanerContextByTaskIds(workDate, taskIds);
+      const enrichedTasksById = new Map<number, any>();
+
       const driverMap = new Map<number, { driver: any; tasks: any[] }>();
       for (const row of rows) {
         if (!driverMap.has(row.driver_id)) {
@@ -1800,14 +1819,40 @@ export class PgDailyAssignmentsService {
         if (row.travel_time !== null) task.travel_time = row.travel_time;
         const cw = Number((row as any).checkout_wait_minutes ?? 0);
         if (cw > 0) task.checkout_wait_minutes = cw;
-        if ((row as any).logistics_task_kind) {
-          task.logistics_task_kind = (row as any).logistics_task_kind;
+        if ((row as any).logistics_task_kind != null) {
+          task.logistics_task_kind = String((row as any).logistics_task_kind);
         }
-        if ((row as any).logistics_task_kind_source) {
-          task.logistics_task_kind_source = (row as any).logistics_task_kind_source;
+        if ((row as any).logistics_task_kind_source != null) {
+          task.logistics_task_kind_source = String((row as any).logistics_task_kind_source);
         }
-        driverMap.get(row.driver_id)!.tasks.push(task);
+
+        const cleanerCtx = cleanerContextByTaskId.get(Number(row.task_id));
+        if (cleanerCtx?.cleanerId != null) {
+          task.cleaner_id = cleanerCtx.cleanerId;
+        }
+        if (cleanerCtx?.cleanerSequence != null) {
+          task.cleaner_sequence = cleanerCtx.cleanerSequence;
+        }
+
+        const enrichedTask = enrichLogisticsTimelineTask(
+          task,
+          cleanerCtx?.cleanerId ?? null,
+          cleanerCtx?.cleanerSequence ?? null
+        );
+        enrichedTasksById.set(Number(row.task_id), enrichedTask);
+        driverMap.get(row.driver_id)!.tasks.push(enrichedTask);
       }
+
+      try {
+        const kindPatches = buildLogisticsContainerAutoKindPatches(rows, enrichedTasksById);
+        const synced = await syncLogisticsTimelineAutoKinds(workDate, kindPatches);
+        if (synced > 0) {
+          console.log(`✅ PG: Sincronizzati ${synced} logistics_task_kind auto su lg_timeline per ${workDate}`);
+        }
+      } catch (syncError) {
+        console.error('⚠️ PG: Errore sync logistics_task_kind su lg_timeline:', syncError);
+      }
+
       const drivers_assignments = Array.from(driverMap.values()).map((da) => ({
         ...da,
         tasks: da.tasks.sort((a, b) => (a.sequence || 0) - (b.sequence || 0)),
@@ -1843,6 +1888,9 @@ export class PgDailyAssignmentsService {
   ): Promise<number> {
     const client = await pool.connect();
     try {
+      const { enrichLogisticsTimelineData } = await import("./logistics-task-kind-enrichment");
+      await enrichLogisticsTimelineData(workDate, timeline);
+
       const rows = this.logisticsTimelineToRows(workDate, timeline);
       await client.query('BEGIN');
       await client.query(
@@ -2144,8 +2192,16 @@ export class PgDailyAssignmentsService {
 
       const locksMap = await this.getLocksMap(workDate);
       const taskIds = result.rows.map((row: any) => Number(row.task_id)).filter((id) => Number.isFinite(id));
-      const { loadCleanerContextByTaskIds } = await import("./logistics-task-kind-enrichment");
+      const {
+        loadCleanerContextByTaskIds,
+        enrichLogisticsContainerTask,
+        syncLogisticsContainerAutoKinds,
+      } = await import("./logistics-task-kind-enrichment");
+      const { buildLogisticsContainerAutoKindPatches } = await import(
+        "../../shared/logistics-task-kind"
+      );
       const cleanerContextByTaskId = await loadCleanerContextByTaskIds(workDate, taskIds);
+      const enrichedTasksById = new Map<number, any>();
 
       const tasksByPriority: { [key: string]: any[] } = {
         early_out: [],
@@ -2219,19 +2275,36 @@ export class PgDailyAssignmentsService {
           task.cleaner_sequence = cleanerCtx.cleanerSequence;
         }
 
+        const enrichedTask = enrichLogisticsContainerTask(
+          task,
+          cleanerCtx?.cleanerId ?? null,
+          cleanerCtx?.cleanerSequence ?? null
+        );
+        enrichedTasksById.set(Number(row.task_id), enrichedTask);
+
         const lockInfo = locksMap.get(row.task_id);
         if (lockInfo) {
-          task.locked = lockInfo.locked;
-          task.locked_reason = lockInfo.lockedReason;
-          task.locked_by = lockInfo.lockedBy;
+          enrichedTask.locked = lockInfo.locked;
+          enrichedTask.locked_reason = lockInfo.lockedReason;
+          enrichedTask.locked_by = lockInfo.lockedBy;
         } else {
-          task.locked = row.locked || false;
-          task.locked_reason = row.locked_reason || undefined;
+          enrichedTask.locked = row.locked || false;
+          enrichedTask.locked_reason = row.locked_reason || undefined;
         }
 
         const dbPriority = String(row.priority || 'low').toLowerCase();
         const frontendPriority = priorityMap[dbPriority] || 'low_priority';
-        tasksByPriority[frontendPriority].push(task);
+        tasksByPriority[frontendPriority].push(enrichedTask);
+      }
+
+      try {
+        const kindPatches = buildLogisticsContainerAutoKindPatches(result.rows, enrichedTasksById);
+        const synced = await syncLogisticsContainerAutoKinds(workDate, kindPatches);
+        if (synced > 0) {
+          console.log(`✅ PG: Sincronizzati ${synced} logistics_task_kind auto su lg_containers per ${workDate}`);
+        }
+      } catch (syncError) {
+        console.error('⚠️ PG: Errore sync logistics_task_kind su lg_containers:', syncError);
       }
 
       const allTasks = [...tasksByPriority.early_out, ...tasksByPriority.high_priority, ...tasksByPriority.low_priority];
@@ -2406,18 +2479,14 @@ export class PgDailyAssignmentsService {
   async saveLogisticsContainers(workDate: string, containersData: any): Promise<boolean> {
     const client = await pool.connect();
     try {
-      await client.query('BEGIN');
-      await client.query('DELETE FROM lg_containers WHERE work_date = $1', [workDate]);
-
       const containers = containersData?.containers || {};
-      let totalInserted = 0;
-
       const priorityConfigs = [
         { dbName: 'early_out', keys: ['early_out'] },
         { dbName: 'high_priority', keys: ['high_priority', 'high'] },
         { dbName: 'low_priority', keys: ['low_priority', 'low'] }
       ];
 
+      const tasksWithPriority: Array<{ dbName: string; task: any }> = [];
       for (const config of priorityConfigs) {
         let tasks: any[] = [];
         for (const key of config.keys) {
@@ -2427,11 +2496,44 @@ export class PgDailyAssignmentsService {
             break;
           }
         }
-
         for (const task of tasks) {
-          if (!task.task_id) continue;
+          if (!task?.task_id) continue;
+          tasksWithPriority.push({ dbName: config.dbName, task });
+        }
+      }
 
-          await client.query(`
+      const taskIds = tasksWithPriority
+        .map(({ task }) => Number(task.task_id))
+        .filter((id) => Number.isFinite(id));
+      const {
+        loadCleanerContextByTaskIds,
+        loadManualLogisticsContainerTaskKinds,
+        enrichLogisticsContainerTask,
+      } = await import("./logistics-task-kind-enrichment");
+      const [cleanerContextByTaskId, manualKindsByTaskId] = await Promise.all([
+        loadCleanerContextByTaskIds(workDate, taskIds),
+        loadManualLogisticsContainerTaskKinds(workDate),
+      ]);
+
+      await client.query('BEGIN');
+      await client.query('DELETE FROM lg_containers WHERE work_date = $1', [workDate]);
+
+      let totalInserted = 0;
+      for (const { dbName, task } of tasksWithPriority) {
+        const taskId = Number(task.task_id);
+        const manualKind = manualKindsByTaskId.get(taskId);
+        const taskForPersist =
+          manualKind && task.logistics_task_kind_source !== "manual"
+            ? { ...task, ...manualKind }
+            : task;
+        const cleanerCtx = cleanerContextByTaskId.get(taskId);
+        const enrichedTask = enrichLogisticsContainerTask(
+          taskForPersist,
+          cleanerCtx?.cleanerId ?? null,
+          cleanerCtx?.cleanerSequence ?? null
+        );
+
+        await client.query(`
             INSERT INTO lg_containers (
               work_date, priority,
               task_id, logistic_code, client_id, premium, address, lat, lng,
@@ -2446,41 +2548,42 @@ export class PgDailyAssignmentsService {
             )
           `, [
             workDate,
-            config.dbName,
-            task.task_id,
-            task.logistic_code || 0,
-            task.client_id || null,
-            task.premium || false,
-            task.address || null,
-            task.lat || null,
-            task.lng || null,
-            task.cleaning_time || 0,
-            normalizeDateToYmd(task.checkin_date),
-            normalizeDateToYmd(task.checkout_date),
-            task.checkin_time || null,
-            task.checkout_time || null,
-            task.pax_in ?? null,
-            task.pax_out ?? null,
-            task.small_equipment || false,
-            task.operation_id ?? null,
-            task.confirmed_operation || false,
-            task.straordinaria || false,
-            task.type_apt || null,
-            task.alias || null,
-            task.customer_name || null,
-            task.customer_note != null ? String(task.customer_note) : null,
-            toCustomerNoteHistoryJson(task.customer_note_history),
-            task.reasons || [],
-            task.customer_reference || null,
-            task.locked || false,
-            task.locked_reason || null,
-            task.logistics_task_kind != null ? String(task.logistics_task_kind) : null,
-            task.logistics_task_kind_source != null
-              ? String(task.logistics_task_kind_source)
+            dbName,
+            enrichedTask.task_id,
+            enrichedTask.logistic_code || 0,
+            enrichedTask.client_id || null,
+            enrichedTask.premium || false,
+            enrichedTask.address || null,
+            enrichedTask.lat || null,
+            enrichedTask.lng || null,
+            enrichedTask.cleaning_time || 0,
+            normalizeDateToYmd(enrichedTask.checkin_date),
+            normalizeDateToYmd(enrichedTask.checkout_date),
+            enrichedTask.checkin_time || null,
+            enrichedTask.checkout_time || null,
+            enrichedTask.pax_in ?? null,
+            enrichedTask.pax_out ?? null,
+            enrichedTask.small_equipment || false,
+            enrichedTask.operation_id ?? null,
+            enrichedTask.confirmed_operation || false,
+            enrichedTask.straordinaria || false,
+            enrichedTask.type_apt || null,
+            enrichedTask.alias || null,
+            enrichedTask.customer_name || null,
+            enrichedTask.customer_note != null ? String(enrichedTask.customer_note) : null,
+            toCustomerNoteHistoryJson(enrichedTask.customer_note_history),
+            enrichedTask.reasons || [],
+            enrichedTask.customer_reference || null,
+            enrichedTask.locked || false,
+            enrichedTask.locked_reason || null,
+            enrichedTask.logistics_task_kind != null
+              ? String(enrichedTask.logistics_task_kind)
+              : null,
+            enrichedTask.logistics_task_kind_source != null
+              ? String(enrichedTask.logistics_task_kind_source)
               : null,
           ]);
-          totalInserted++;
-        }
+        totalInserted++;
       }
 
       await client.query('COMMIT');
@@ -2888,6 +2991,20 @@ export class PgDailyAssignmentsService {
   ): Promise<number> {
     const client = await pool.connect();
     try {
+      const { persistLogisticsContainerAutoKindsForDate } = await import(
+        "./logistics-task-kind-enrichment"
+      );
+      try {
+        const synced = await persistLogisticsContainerAutoKindsForDate(workDate);
+        if (synced > 0) {
+          console.log(
+            `✅ PG Logistics History: allineati ${synced} logistics_task_kind auto su lg_containers per ${workDate}`
+          );
+        }
+      } catch (syncError) {
+        console.error('⚠️ PG Logistics History: errore sync logistics_task_kind containers:', syncError);
+      }
+
       await client.query('BEGIN');
       await client.query(
         'SELECT 1 FROM lg_containers_revision WHERE work_date = $1 FOR UPDATE',

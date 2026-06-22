@@ -2024,15 +2024,24 @@ const displayClickableInputClass =
       // Usa la larghezza della timeline in pixel (passata da timeline-view via props)
       const timelineWidth = timelineWidthPx || 0;
       const slotsCount = (window as any).globalTimeSlotsCount || 10;
-      const virtualMinutes = slotsCount * 60; // Minuti virtuali basati su slot
-      
+      const globalMinutes = Number((window as any).globalTimelineMinutes);
+      const virtualMinutes =
+        Number.isFinite(globalMinutes) && globalMinutes > 0
+          ? globalMinutes
+          : slotsCount * 60;
+
       if (timelineWidth > 0) {
-        // Calcola in pixel assoluti
-        const widthPx = (effectiveMinutes / virtualMinutes) * timelineWidth;
+        let widthPx = (effectiveMinutes / virtualMinutes) * timelineWidth;
+        if (operationsScope === "logistics") {
+          widthPx *= 1.08;
+        }
         return `${widthPx}px`;
       } else {
         // Fallback a percentuale se larghezza non disponibile
-        const widthPercentage = (effectiveMinutes / virtualMinutes) * 100;
+        let widthPercentage = (effectiveMinutes / virtualMinutes) * 100;
+        if (operationsScope === "logistics") {
+          widthPercentage *= 1.08;
+        }
         return `${widthPercentage}%`;
       }
     } else {
@@ -2166,11 +2175,11 @@ const displayClickableInputClass =
   // Determina se il drag è disabilitato in base alla data, se la task è già salvata, o se è bloccata
   const shouldDisableDrag = isDragDisabled || (displayTask as any).checkin_date || isLocked || isPreAssignedReadonly;
 
-  // Usa sequence per determinare se è la prima task o successive (più robusto di index)
-  // CRITICAL: In timeline usare sempre task (la card rappresenta questa task), non displayTask (dialog)
-  const seq = (task as any).sequence ?? (index + 1);
   const currentDetailsTaskKey = getTaskKey(displayTask) || getTaskKey(task);
   const taskAny = task as any;
+  const logisticsAdamCode = String(
+    taskAny.logistic_code ?? task.name ?? taskAny.logisticCode ?? taskAny.task_id ?? task.id ?? ""
+  ).trim();
   const displayTaskAny = displayTask as any;
   const displayTaskIdKey = String(displayTaskAny.task_id ?? displayTaskAny.id ?? "");
   const displayLogisticsKindOverride = logisticsKindOverridesByTaskId[displayTaskIdKey];
@@ -2863,22 +2872,18 @@ const displayClickableInputClass =
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div
-                    className={`
-                      ${cardSurfaceClass}
-                      rounded-md border px-2 py-1 transition-colors duration-200
-                      ${snapshot.isDragging ? "shadow-lg" : ""}
-                      ${
-                        isSelected && isMultiSelectMode && !isInTimeline
-                          ? "z-[1] ring-2 ring-sky-500 ring-inset"
-                          : ""
-                      }
-                      ${isOverdue && isInTimeline ? "animate-blink" : ""}
-                      ${isPriorityWindowViolation && isInTimeline ? "animate-blink-orange" : ""}
-                      ${!snapshot.isDragging && isMapFiltered ? "task-border-map-filtered" : ""}
-                      ${!snapshot.isDragging && !isMapFiltered && isHighlighted ? "task-border-search-highlighted" : ""}
-                      cursor-pointer
-                      flex-shrink-0 relative group
-                    `}
+                    className={cn(
+                      cardSurfaceClass,
+                      "rounded-md border transition-colors duration-200",
+                      isLogisticsTimelineDetails ? "px-1 py-0" : "px-2 py-1",
+                      snapshot.isDragging && "shadow-lg",
+                      isSelected && isMultiSelectMode && !isInTimeline && "z-[1] ring-2 ring-sky-500 ring-inset",
+                      isOverdue && isInTimeline && "animate-blink",
+                      isPriorityWindowViolation && isInTimeline && "animate-blink-orange",
+                      !snapshot.isDragging && isMapFiltered && "task-border-map-filtered",
+                      !snapshot.isDragging && !isMapFiltered && isHighlighted && "task-border-search-highlighted",
+                      "cursor-pointer flex-shrink-0 relative group"
+                    )}
                     style={{
                       width: cardWidth,
                       minWidth: cardWidth,
@@ -2901,9 +2906,12 @@ const displayClickableInputClass =
                       aria-hidden="true"
                     />
                     {operationsScope === "logistics" && isInTimeline ? (
-                      <div className="flex h-full min-h-[40px] w-full flex-col items-start justify-center gap-0 p-[0.5px] pl-2">
-                        <span className="text-foreground font-extrabold text-[13px] shrink-0">
-                          {seq}
+                      <div className="absolute inset-0 flex items-center justify-center overflow-hidden px-1">
+                        <span
+                          className="text-foreground font-extrabold text-[13px] truncate max-w-full leading-none text-center -translate-x-0.5"
+                          title={logisticsAdamCode}
+                        >
+                          {logisticsAdamCode}
                         </span>
                       </div>
                     ) : (
