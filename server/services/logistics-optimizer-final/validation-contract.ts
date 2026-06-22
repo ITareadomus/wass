@@ -41,7 +41,8 @@ export type ValidationIssueCode =
   | "INVALID_BUSINESS_GROUP"
   | "UNKNOWN_TASK_IN_BUSINESS_GROUP"
   | "DUPLICATE_BUSINESS_GROUP_ID"
-  | "UNKNOWN_BUSINESS_GROUP_IN_CONSTRAINT";
+  | "UNKNOWN_BUSINESS_GROUP_IN_CONSTRAINT"
+  | "SAME_BUILDING_GROUP_NOT_LOCKED";
 
 export interface ValidationIssue {
   code: ValidationIssueCode;

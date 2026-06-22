@@ -169,7 +169,7 @@ export type HardConstraintSpec =
       type: "REQUIRED_DRIVER_TASK";
       taskId: TaskId;
       driverId: DriverId;
-      source: "timeline_pre_assigned";
+      source: "timeline_pre_assigned" | "same_coordinates_building";
       manuallyMoved?: boolean;
     };
 
@@ -255,6 +255,8 @@ export interface RoutingProblemMetadata {
   autoConvokedDriversCount: number;
   autoConvokeMissingInDbDriverIds: number[];
   autoConvokeMissingInDbDriversCount: number;
+  sameBuildingDriverLockCount: number;
+  skippedSameBuildingGroupsCount: number;
   lockedAssignmentsSolverIntegration: "integrated_v4b" | "pending";
   validation: RoutingProblemValidationResult;
 }

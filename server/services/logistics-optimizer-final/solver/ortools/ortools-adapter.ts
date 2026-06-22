@@ -1,4 +1,5 @@
 import type { DriverNode, RoutingProblemInput, TaskNode } from "../../input-contract";
+import { BUSINESS_GROUP_THRESHOLDS } from "../../groups/group-weights";
 import {
   ORTOOLS_SOLVER_ID,
   ROUTING_SOLUTION_SCHEMA_VERSION,
@@ -218,18 +219,29 @@ function applyIntraGroupCostBonus(
   nodeIndices: number[],
   weight: number,
   maxBonus: number,
-  maxTravelMin?: number
+  maxTravelMin?: number,
+  options?: { preserveMinimumTravelMin?: number; bonusMaxTravelMin?: number }
 ): void {
   const bonus = Math.max(1, Math.min(maxBonus, Math.floor(weight / 5)));
+  const preserveMinimumTravelMin = options?.preserveMinimumTravelMin ?? 0;
+  const bonusMaxTravelMin = options?.bonusMaxTravelMin;
 
   for (const from of nodeIndices) {
     for (const to of nodeIndices) {
       if (from === to) continue;
+      const travel = travelMatrixMin[from]?.[to];
       if (maxTravelMin !== undefined) {
-        const travel = travelMatrixMin[from]?.[to];
         if (!Number.isFinite(travel) || travel > maxTravelMin) continue;
       }
-      cost[from][to] = Math.max(0, cost[from][to] - bonus);
+      if (bonusMaxTravelMin !== undefined) {
+        if (!Number.isFinite(travel) || travel > bonusMaxTravelMin) continue;
+      }
+      const current = cost[from][to];
+      const maxReduction =
+        preserveMinimumTravelMin > 0
+          ? Math.max(0, current - preserveMinimumTravelMin)
+          : current;
+      cost[from][to] = Math.max(0, current - Math.min(bonus, maxReduction));
     }
   }
 }
@@ -258,16 +270,13 @@ export function buildCostMatrixMin(
       travelMatrixMin,
       nodeIndices,
       group.weight,
-      10,
-      group.maxTravelMin
+      15,
+      group.maxTravelMin,
+      {
+        preserveMinimumTravelMin: 0,
+        bonusMaxTravelMin: BUSINESS_GROUP_THRESHOLDS.NEARBY_CLUSTER_BONUS_MAX_TRAVEL_MIN,
+      }
     );
-  }
-
-  for (const group of softGroups.sameCleanerGroups) {
-    const nodeIndices = group.taskIds
-      .map((taskId) => taskIdToNodeIndex.get(taskId))
-      .filter((nodeIndex): nodeIndex is number => nodeIndex !== undefined);
-    applyIntraGroupCostBonus(cost, travelMatrixMin, nodeIndices, group.weight, 15);
   }
 
   for (const group of softGroups.priorityCompatibleGroups) {
@@ -277,21 +286,8 @@ export function buildCostMatrixMin(
     applyIntraGroupCostBonus(cost, travelMatrixMin, nodeIndices, group.weight, 12);
   }
 
-  for (const group of softGroups.cleanerSequenceGroups) {
-    const bonus = Math.max(1, Math.min(15, Math.floor(group.weight / 3)));
-    const reversePenalty = Math.max(1, Math.floor(bonus / 2));
-
-    for (let index = 0; index < group.orderedTaskIds.length - 1; index += 1) {
-      const fromNode = taskIdToNodeIndex.get(group.orderedTaskIds[index]);
-      const toNode = taskIdToNodeIndex.get(group.orderedTaskIds[index + 1]);
-      if (fromNode === undefined || toNode === undefined) continue;
-
-      cost[fromNode][toNode] = Math.max(0, cost[fromNode][toNode] - bonus);
-      if (fromNode !== toNode) {
-        cost[toNode][fromNode] = cost[toNode][fromNode] + reversePenalty;
-      }
-    }
-  }
+  // Cleaner sequence / same-cleaner are not routing-order hard rules — geo wins via
+  // nearby/same-building shaping on travelMatrixMin. Soft group metadata remains in payload.
 
   return cost;
 }

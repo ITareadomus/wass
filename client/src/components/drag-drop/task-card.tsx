@@ -3077,7 +3077,10 @@ const displayClickableInputClass =
                     )}
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-xs text-base px-3 py-2">
+                <TooltipContent
+                  side="top"
+                  className="z-[10000] max-w-xs text-base px-3 py-2 pointer-events-none"
+                >
                   <div className="flex flex-col items-center gap-2">
                     <p className="font-semibold">{displayTask.address?.toUpperCase() || "INDIRIZZO NON DISPONIBILE"}</p>
                     {shouldShowTooltipTimes && ((displayTask as any).checkout_time || (displayTask as any).checkin_time) && (

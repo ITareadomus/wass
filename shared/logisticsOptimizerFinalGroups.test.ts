@@ -408,7 +408,7 @@ describe("buildBusinessGroups", () => {
         expect.objectContaining({
           type: "KEEP_NEARBY_CLUSTER_TOGETHER",
           maxTravelMin: 10,
-          weight: 15,
+          weight: 45,
         }),
       ])
     );

@@ -1557,6 +1557,10 @@ export default function LogisticsTimelineView({
                             {(() => {
                               const virtualMinutes = globalTimelineMinutes;
                               const timelineWidth = timelineWidthPx || 0;
+                              const timelinePxPerMinute =
+                                virtualMinutes > 0 && timelineWidth > 0
+                                  ? timelineWidth / virtualMinutes
+                                  : 0;
                               const lastRawTask =
                                 rawTasks.length > 0 ? rawTasks[rawTasks.length - 1] : null;
                               const returnTravelMinutes =
@@ -1661,6 +1665,7 @@ export default function LogisticsTimelineView({
                                     isReadOnly={isReadOnly}
                                     isDragDisabled={isReadOnly || Boolean((task as any).locked)}
                                     timelineWidthPx={timelineWidthPx}
+                                    timelinePxPerMinute={timelinePxPerMinute}
                                     operationsScope="logistics"
                                     isHighlighted={hi.has(String(task.id))}
                                     timelineRowStaffDisplayLabel={driverRowDisplayLabel}

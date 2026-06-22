@@ -239,6 +239,88 @@ describe("buildOrToolsPayload", () => {
     expect(payload.costMatrixMin[node1][node2]).toBeLessThan(payload.travelMatrixMin[node1][node2]);
   });
 
+  it("prefers short nearby legs over longer cleaner-cluster legs after Lanzone", () => {
+    const lanzone = {
+      taskId: 231292,
+      logisticCode: 1530,
+      priority: "high_priority",
+      cleaningTime: 60,
+      lat: 45.461049,
+      lng: 9.175446,
+      checkinDate: "2026-06-18",
+      checkoutDate: "2026-06-18",
+      checkinTime: "14:00",
+      checkoutTime: "11:15",
+      cleanerId: 1064,
+      cleanerStartTime: "11:15",
+      cleanerTaskStartTime: "11:15",
+      cleanerSequence: 1,
+      premium: false,
+      paxIn: 2,
+      locked: false,
+      lockedReason: null,
+    };
+    const morigi = {
+      taskId: 231747,
+      logisticCode: 1681,
+      priority: "high_priority",
+      cleaningTime: 360,
+      lat: 45.462448,
+      lng: 9.181131,
+      checkinDate: "2026-06-18",
+      checkoutDate: null,
+      checkinTime: "16:00",
+      checkoutTime: null,
+      cleanerId: 1045,
+      cleanerStartTime: "11:00",
+      cleanerTaskStartTime: "11:00",
+      cleanerSequence: 1,
+      premium: false,
+      paxIn: 2,
+      locked: false,
+      lockedReason: null,
+    };
+    const tantardini = {
+      taskId: 231759,
+      logisticCode: 1679,
+      priority: "low_priority",
+      cleaningTime: 60,
+      lat: 45.446423,
+      lng: 9.181616,
+      checkinDate: null,
+      checkoutDate: null,
+      checkinTime: null,
+      checkoutTime: null,
+      cleanerId: 1064,
+      cleanerStartTime: "12:33",
+      cleanerTaskStartTime: "12:33",
+      cleanerSequence: 2,
+      premium: false,
+      paxIn: 2,
+      locked: false,
+      lockedReason: null,
+    };
+
+    const input = buildRoutingProblemInputFromSource(
+      buildBaseSourceData({
+        schedulableTasks: [lanzone, morigi, tantardini],
+        allTaskData: [lanzone, morigi, tantardini],
+      })
+    );
+
+    const { payload } = buildOrToolsPayload(input);
+    const lanzoneNode = input.tasks.find((t) => t.taskId === 231292)!.nodeIndex;
+    const morigiNode = input.tasks.find((t) => t.taskId === 231747)!.nodeIndex;
+    const tantardiniNode = input.tasks.find((t) => t.taskId === 231759)!.nodeIndex;
+
+    expect(payload.costMatrixMin[lanzoneNode][morigiNode]).toBeLessThan(
+      payload.costMatrixMin[lanzoneNode][tantardiniNode]
+    );
+    expect(payload.travelMatrixMin[lanzoneNode][morigiNode]).toBeLessThan(
+      payload.travelMatrixMin[lanzoneNode][tantardiniNode]
+    );
+  });
+
   it("includes EO preferred soft time windows and balance weight", () => {
     const input = buildMinimalInput();
     const { payload } = buildOrToolsPayload(input);

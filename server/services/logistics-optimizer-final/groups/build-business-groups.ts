@@ -25,44 +25,57 @@ export function buildBusinessGroups(
 export function buildBusinessGroupSoftConstraints(
   groups: RoutingBusinessGroup[]
 ): SoftConstraintSpec[] {
-  return groups.map((group) => {
+  const constraints: SoftConstraintSpec[] = [];
+
+  for (const group of groups) {
     switch (group.type) {
       case "SAME_COORDINATES_BUILDING":
-        return {
+        constraints.push({
           type: "KEEP_SAME_COORDINATES_BUILDING_TOGETHER",
           groupId: group.groupId,
           weight: BUSINESS_GROUP_WEIGHTS.KEEP_SAME_COORDINATES_BUILDING_TOGETHER,
           toleranceMeters: group.toleranceMeters,
-        };
+        });
+        break;
       case "SAME_CLEANER":
-        return {
-          type: "KEEP_SAME_CLEANER_TASKS_TOGETHER",
-          groupId: group.groupId,
-          weight: BUSINESS_GROUP_WEIGHTS.KEEP_SAME_CLEANER_TASKS_TOGETHER,
-          cleanerId: group.cleanerId,
-        };
+        if (BUSINESS_GROUP_WEIGHTS.KEEP_SAME_CLEANER_TASKS_TOGETHER > 0) {
+          constraints.push({
+            type: "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+            groupId: group.groupId,
+            weight: BUSINESS_GROUP_WEIGHTS.KEEP_SAME_CLEANER_TASKS_TOGETHER,
+            cleanerId: group.cleanerId,
+          });
+        }
+        break;
       case "CLEANER_SEQUENCE":
-        return {
-          type: "KEEP_CLEANER_SEQUENCE",
-          groupId: group.groupId,
-          weight: BUSINESS_GROUP_WEIGHTS.KEEP_CLEANER_SEQUENCE,
-          cleanerId: group.cleanerId,
-          orderedTaskIds: group.orderedTaskIds,
-        };
+        if (BUSINESS_GROUP_WEIGHTS.KEEP_CLEANER_SEQUENCE > 0) {
+          constraints.push({
+            type: "KEEP_CLEANER_SEQUENCE",
+            groupId: group.groupId,
+            weight: BUSINESS_GROUP_WEIGHTS.KEEP_CLEANER_SEQUENCE,
+            cleanerId: group.cleanerId,
+            orderedTaskIds: group.orderedTaskIds,
+          });
+        }
+        break;
       case "PRIORITY_COMPATIBLE":
-        return {
+        constraints.push({
           type: "KEEP_PRIORITY_COMPATIBLE_TASKS_TOGETHER",
           groupId: group.groupId,
           weight: BUSINESS_GROUP_WEIGHTS.KEEP_PRIORITY_COMPATIBLE_TASKS_TOGETHER,
           windowOverlap: group.windowOverlap,
-        };
+        });
+        break;
       case "NEARBY_CLUSTER":
-        return {
+        constraints.push({
           type: "KEEP_NEARBY_CLUSTER_TOGETHER",
           groupId: group.groupId,
           weight: BUSINESS_GROUP_WEIGHTS.KEEP_NEARBY_CLUSTER_TOGETHER,
           maxTravelMin: group.maxTravelMin,
-        };
+        });
+        break;
     }
-  });
+  }
+
+  return constraints;
 }

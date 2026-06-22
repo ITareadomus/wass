@@ -27,6 +27,10 @@ import {
 import { buildDepotNode, buildLocationNodes, buildTravelMatrixMin } from "./travel-matrix";
 import { buildRequiredDriverConstraints } from "./timeline-assignment-hints";
 import {
+  buildRequiredDriverByTaskIdFromConstraints,
+  buildSameBuildingDriverConstraints,
+} from "./same-building-driver-constraints";
+import {
   autoConvokeLogisticsDriversWithPreAssignedTasks,
   type AutoConvokeLogisticsDriversResult,
 } from "./auto-convoke-logistics-drivers";
@@ -204,12 +208,16 @@ function buildMetadata(args: {
   sourceData: LogisticsRoutingSourceData;
   preAssignedRequiredCount: number;
   skippedTimelineAssignmentHintsCount: number;
+  sameBuildingDriverLockCount: number;
+  skippedSameBuildingGroupsCount: number;
   autoConvokeResult?: AutoConvokeLogisticsDriversResult;
 }): RoutingProblemMetadata {
   const {
     sourceData,
     preAssignedRequiredCount,
     skippedTimelineAssignmentHintsCount,
+    sameBuildingDriverLockCount,
+    skippedSameBuildingGroupsCount,
     autoConvokeResult,
   } = args;
   const autoConvokedDriverIds = autoConvokeResult?.autoConvokedDriverIds ?? [];
@@ -232,6 +240,8 @@ function buildMetadata(args: {
     autoConvokedDriversCount: autoConvokedDriverIds.length,
     autoConvokeMissingInDbDriverIds,
     autoConvokeMissingInDbDriversCount: autoConvokeMissingInDbDriverIds.length,
+    sameBuildingDriverLockCount,
+    skippedSameBuildingGroupsCount,
     lockedAssignmentsSolverIntegration: "integrated_v4b",
     excludedTasks: [
       ...lockedTasks.map((task) => ({
@@ -296,10 +306,22 @@ export function buildRoutingProblemInputFromSource(
   const travelMatrixMin = buildTravelMatrixMin(nodes);
   const businessGroups = buildBusinessGroups(tasks, travelMatrixMin);
   const businessSoftConstraints = buildBusinessGroupSoftConstraints(businessGroups);
+  const existingRequiredDriverByTaskId = buildRequiredDriverByTaskIdFromConstraints(
+    requiredDriverBuild.constraints
+  );
+  const sameBuildingDriverBuild = buildSameBuildingDriverConstraints({
+    businessGroups,
+    tasks,
+    drivers,
+    travelMatrixMin,
+    existingRequiredDriverByTaskId,
+  });
   const metadata = buildMetadata({
     sourceData,
     preAssignedRequiredCount: requiredDriverBuild.constraints.length,
     skippedTimelineAssignmentHintsCount: requiredDriverBuild.skippedHints.length,
+    sameBuildingDriverLockCount: sameBuildingDriverBuild.lockedGroupCount,
+    skippedSameBuildingGroupsCount: sameBuildingDriverBuild.skippedGroups.length,
     autoConvokeResult: options?.autoConvokeResult,
   });
 
@@ -316,6 +338,7 @@ export function buildRoutingProblemInputFromSource(
       ...buildDriverConstraints(drivers),
       ...hardConstraints,
       ...requiredDriverBuild.constraints,
+      ...sameBuildingDriverBuild.constraints,
     ],
     softConstraints: [...taskSoftConstraints, ...businessSoftConstraints],
     businessGroups,
@@ -323,10 +346,41 @@ export function buildRoutingProblemInputFromSource(
   };
 
   input.metadata.validation = mergeRequiredDriverBuildErrors(
-    validateRoutingProblemInput(input),
+    mergeSameBuildingSkippedGroupWarnings(
+      validateRoutingProblemInput(input),
+      sameBuildingDriverBuild.skippedGroups
+    ),
     requiredDriverBuild.errors
   );
   return input;
+}
+
+function mergeSameBuildingSkippedGroupWarnings(
+  validation: RoutingProblemMetadata["validation"],
+  skippedGroups: ReturnType<typeof buildSameBuildingDriverConstraints>["skippedGroups"]
+): RoutingProblemMetadata["validation"] {
+  if (skippedGroups.length === 0) return validation;
+
+  const warnings: ValidationIssue[] = [...validation.warnings];
+  for (const skipped of skippedGroups) {
+    warnings.push({
+      severity: "warning",
+      code: "SAME_BUILDING_GROUP_NOT_LOCKED",
+      message: `Same-building group ${skipped.groupId} could not be locked to a single driver (${skipped.reason}).`,
+      path: "businessGroups",
+      actual: {
+        groupId: skipped.groupId,
+        taskIds: skipped.taskIds,
+        reason: skipped.reason,
+        driverIds: skipped.driverIds,
+      },
+    });
+  }
+
+  return {
+    ...validation,
+    warnings,
+  };
 }
 
 export interface BuildLogisticsRoutingInputOptions {
