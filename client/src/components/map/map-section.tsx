@@ -65,6 +65,14 @@ export default function MapSection({
       : baseTaskId;
   };
 
+  const getMapMarkerTitle = (task: Task): string => {
+    const adamCode = String(task.name ?? "").trim();
+    const clientAlias = String((task as any).alias ?? "").trim();
+    const address = String(task.address ?? "").trim();
+    const line1 = clientAlias ? `${adamCode} - ${clientAlias}` : adamCode;
+    return address ? `${line1}\n${address}` : line1;
+  };
+
   // Carica i cleaners
   useEffect(() => {
     const loadCleaners = async () => {
@@ -360,7 +368,7 @@ export default function MapSection({
             div.style.fontWeight = 'bold';
             div.style.zIndex = isHighlighted ? '1000' : String(index);
             div.textContent = sequence !== undefined && sequence !== null ? String(sequence) : '';
-            div.title = `${task.name} - ${task.type}${sequence !== undefined ? ` (Seq: ${sequence})` : ''}`;
+            div.title = getMapMarkerTitle(task);
             
             // Aggiungi animazione bounce se evidenziato
             if (isHighlighted) {
@@ -514,7 +522,7 @@ export default function MapSection({
         const marker = new window.google.maps.Marker({
           position,
           map: googleMapRef.current,
-          title: `${task.name} - ${task.type}`,
+          title: getMapMarkerTitle(task),
           icon: {
             path: window.google.maps.SymbolPath.CIRCLE,
             fillColor: markerColor,

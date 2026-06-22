@@ -1088,6 +1088,24 @@ const displayClickableInputClass =
           ? "bg-yellow-500"
           : "bg-green-500";
 
+  const cardLogisticsSequenceRaw =
+    operationsScope === "logistics"
+      ? cardTaskAny.sequence ??
+        cardTaskAny.logistics_sequence ??
+        cardTaskAny.logisticsSequence
+      : null;
+  const cardLogisticsSequenceNum = Number(cardLogisticsSequenceRaw);
+  const cardLogisticsSequence =
+    operationsScope === "logistics" &&
+    Number.isFinite(cardLogisticsSequenceNum) &&
+    cardLogisticsSequenceNum > 0
+      ? cardLogisticsSequenceNum
+      : operationsScope === "logistics" && isInTimeline
+        ? index + 1
+        : null;
+  const cardLogisticsSequenceLabel =
+    cardLogisticsSequence != null ? String(cardLogisticsSequence) : null;
+
   // Nei container: sfondo pagina per contrasto con la colonna; in timeline resta custom-blue-light.
   const cardSurfaceClass =
     isLocked && !isInTimeline
@@ -2068,6 +2086,12 @@ const displayClickableInputClass =
 
   // Mostra orari nel tooltip solo per task < 1 ora E quando le frecce sono nascoste
   const shouldShowTooltipTimes = totalMinutes < 60 && !shouldShowCheckInOutArrows;
+  const cardTooltipAddressLabel =
+    String(displayTask.address ?? "").trim().toUpperCase() || "INDIRIZZO NON DISPONIBILE";
+  const cardTooltipClientAlias = String(displayTask.alias ?? "").trim();
+  const cardTooltipAddressLine = cardTooltipClientAlias
+    ? `${cardTooltipAddressLabel} - ${cardTooltipClientAlias}`
+    : cardTooltipAddressLabel;
 
   // Verifica violazioni temporali (considerando le date!)
   // In timeline la barra deve riflettere la task che rappresenta (task), non la task nel dialog (displayTask)
@@ -2905,11 +2929,23 @@ const displayClickableInputClass =
                       className={`absolute left-[2px] top-[2px] bottom-[2px] w-1.5 rounded-sm ${categoryStripeClass}`}
                       aria-hidden="true"
                     />
+                    {operationsScope === "logistics" && cardLogisticsSequenceLabel && (
+                      <div
+                        className={cn(
+                          "absolute -top-1.5 -right-1.5 z-[65] flex shrink-0 items-center justify-center rounded-full border border-border/80 bg-background/95 font-extrabold leading-none text-foreground shadow-sm",
+                          cardLogisticsSequenceLabel.length > 1
+                            ? "h-4 min-w-4 px-0.5 text-[9px]"
+                            : "h-4 w-4 text-[10px]"
+                        )}
+                        title={`Sequenza ${cardLogisticsSequenceLabel}`}
+                      >
+                        {cardLogisticsSequenceLabel}
+                      </div>
+                    )}
                     {operationsScope === "logistics" && isInTimeline ? (
                       <div className="absolute inset-0 flex items-center justify-center overflow-hidden px-1">
                         <span
                           className="text-foreground font-extrabold text-[13px] truncate max-w-full leading-none text-center -translate-x-0.5"
-                          title={logisticsAdamCode}
                         >
                           {logisticsAdamCode}
                         </span>
@@ -3082,7 +3118,7 @@ const displayClickableInputClass =
                   className="z-[10000] max-w-xs text-base px-3 py-2 pointer-events-none"
                 >
                   <div className="flex flex-col items-center gap-2">
-                    <p className="font-semibold">{displayTask.address?.toUpperCase() || "INDIRIZZO NON DISPONIBILE"}</p>
+                    <p className="font-semibold">{cardTooltipAddressLine}</p>
                     {shouldShowTooltipTimes && ((displayTask as any).checkout_time || (displayTask as any).checkin_time) && (
                       <div className="flex items-center gap-3 text-sm">
                         {(displayTask as any).checkout_time && (
