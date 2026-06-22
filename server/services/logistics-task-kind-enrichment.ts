@@ -4,10 +4,16 @@ import {
   type LogisticsContainerKindPatch,
 } from "../../shared/logistics-task-kind";
 import pool from "../../shared/pg-db";
+import { formatHmTime } from "../../shared/logistics-task-windows";
+import { attachLogisticsTaskWindowFields } from "./logistics-task-window-fields";
 
 export interface CleanerContextForTask {
   cleanerId: number | null;
   cleanerSequence: number | null;
+  cleanerStartTime: string | null;
+  cleanerEndTime: string | null;
+  cleanerTaskStartTime: string | null;
+  cleanerTaskEndTime: string | null;
 }
 
 function withoutBagPolicy(task: any): any {
@@ -58,13 +64,26 @@ export async function loadCleanerContextByTaskIds(
       SELECT DISTINCT ON (dac.task_id)
         dac.task_id AS "taskId",
         dac.cleaner_id AS "cleanerId",
-        dac.sequence AS "cleanerSequence"
+        dac.sequence AS "cleanerSequence",
+        dac.cleaner_start_time::text AS "cleanerStartTime",
+        dac.cleaner_end_time::text AS "cleanerEndTime",
+        dac.start_time::text AS "cleanerTaskStartTime",
+        dac.end_time::text AS "cleanerTaskEndTime"
       FROM daily_assignments_current dac
       WHERE dac.work_date = $1
         AND dac.task_id = ANY($2::int[])
         AND (dac.scope = 'housekeeping' OR dac.scope IS NULL)
         AND dac.cleaner_id IS NOT NULL
-      ORDER BY dac.task_id, dac.id DESC
+      ORDER BY dac.task_id,
+        EXISTS (
+          SELECT 1 FROM task_collaborators tc
+          WHERE tc.work_date = dac.work_date
+            AND tc.task_id = dac.task_id
+            AND tc.cleaner_id = dac.cleaner_id
+            AND tc.is_primary IS TRUE
+        ) DESC,
+        dac.sequence ASC NULLS LAST,
+        dac.id ASC
     `,
     [workDate, taskIds]
   );
@@ -75,6 +94,10 @@ export async function loadCleanerContextByTaskIds(
       {
         cleanerId: row.cleanerId != null ? Number(row.cleanerId) : null,
         cleanerSequence: row.cleanerSequence != null ? Number(row.cleanerSequence) : null,
+        cleanerStartTime: formatHmTime(row.cleanerStartTime),
+        cleanerEndTime: formatHmTime(row.cleanerEndTime),
+        cleanerTaskStartTime: formatHmTime(row.cleanerTaskStartTime),
+        cleanerTaskEndTime: formatHmTime(row.cleanerTaskEndTime),
       },
     ])
   );
@@ -93,11 +116,13 @@ export async function enrichDriverTasksWithLogisticsKind(
   driverEntry.tasks = driverEntry.tasks.map((task) => {
     const taskId = Number(task?.task_id);
     const context = contextByTaskId.get(taskId);
-    return enrichLogisticsTimelineTask(
+    const enrichedTask = enrichLogisticsTimelineTask(
       task,
       context?.cleanerId ?? null,
       context?.cleanerSequence ?? null
     );
+    attachLogisticsTaskWindowFields(enrichedTask, context);
+    return enrichedTask;
   });
 }
 

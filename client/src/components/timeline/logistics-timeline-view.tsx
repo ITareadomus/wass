@@ -83,11 +83,11 @@ export interface LogisticsDriverRow {
   counter_hours?: number | string;
   counter_days?: number;
   contract_type?: string | null;
+  assigned_vehicle_pms_code?: string | null;
   assigned_vehicle_name?: string | null;
+  vehicle_pms_code?: string | null;
   vehicle_name?: string | null;
   show_plus_one?: boolean;
-  assigned_vehicle_name?: string | null;
-  vehicle_name?: string | null;
   /** Presente se il driver ha task in timeline ma non è più nei convocati */
   isRemoved?: boolean;
 }
@@ -1484,13 +1484,28 @@ export default function LogisticsTimelineView({
                           style={{ backgroundColor: getCleanerHexColor(driver.id) }}
                         />
                       )}
-                      <div className="min-w-0 w-full flex items-center gap-2 px-2">
-                        <div className="truncate font-semibold text-[13px] leading-none flex-1">
-                          {driversAliases[driver.id]?.alias ||
-                            driver.alias ||
-                            `${(driver.name || "").toUpperCase()} ${(driver.lastname || "").toUpperCase()}`.trim() ||
-                            `ID ${driver.id}`}
+                      <div className="relative min-w-0 w-full flex items-center gap-2 px-2 py-1">
+                        <div className="min-w-0 flex flex-1">
+                          <div className="truncate pr-14 font-semibold text-[13px] leading-none">
+                            {driversAliases[driver.id]?.alias ||
+                              driver.alias ||
+                              `${(driver.name || "").toUpperCase()} ${(driver.lastname || "").toUpperCase()}`.trim() ||
+                              `ID ${driver.id}`}
+                          </div>
                         </div>
+                        {(() => {
+                          const plate = String(
+                            (driver as any).assigned_vehicle_pms_code ??
+                              (driver as any).vehicle_pms_code ??
+                              ""
+                          ).trim();
+                          if (!plate) return null;
+                          return (
+                            <span className="absolute right-1 top-1 shrink-0 rounded border border-custom-blue/40 bg-background/80 px-1 text-[10px] font-semibold leading-4 text-custom-blue">
+                              {plate}
+                            </span>
+                          );
+                        })()}
                         {driver.isRemoved && (
                           <div className="bg-red-600 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                             RIMOSSO

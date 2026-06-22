@@ -3,6 +3,7 @@ import { DragDropContext, type DropResult } from "react-beautiful-dnd";
 import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
 import { useToast } from "@/hooks/use-toast";
 import PriorityColumn from "@/components/drag-drop/priority-column";
+import AssignedTasksSequenceSummary from "@/components/assigned-tasks-sequence-summary";
 import LogisticsTimelineView from "@/components/timeline/logistics-timeline-view";
 import MapSection from "@/components/map/map-section";
 import type { TaskType } from "@shared/schema";
@@ -23,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { isContinuazioneStraordinariaTask, isTaskLocked } from "@/lib/taskValidation";
+import { buildSequenceSummaryGroupsFromDriverAssignments } from "@/lib/sequence-summary";
 import {
   Dialog,
   DialogContent,
@@ -1012,6 +1014,19 @@ export default function GenerateLogisticsAssignments() {
     [lowPriorityTasks, searchTask, containerHighlightTaskId]
   );
 
+  const showContainers = useMemo(
+    () =>
+      earlyOutTasks.some((task) => !isTaskLocked(task)) ||
+      highPriorityTasks.some((task) => !isTaskLocked(task)) ||
+      lowPriorityTasks.some((task) => !isTaskLocked(task)),
+    [earlyOutTasks, highPriorityTasks, lowPriorityTasks]
+  );
+
+  const sequenceSummaryGroups = useMemo(
+    () => buildSequenceSummaryGroupsFromDriverAssignments(logisticsDriversAssignments),
+    [logisticsDriversAssignments]
+  );
+
   const allTasksWithAssignments = useMemo(() => {
     const timelineTasks: TaskType[] = [];
     for (const row of logisticsDriversAssignments) {
@@ -1342,6 +1357,7 @@ export default function GenerateLogisticsAssignments() {
         </div>
 
         <DragDropContext onDragEnd={onDragEnd} onDragUpdate={onDragUpdate}>
+          {showContainers && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 w-full">
             <PriorityColumn
               title="EARLY OUT"
@@ -1383,6 +1399,7 @@ export default function GenerateLogisticsAssignments() {
               onLogisticsTimelineMutated={reloadLogisticsPage}
             />
           </div>
+          )}
 
           <div className="mt-0 grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-3">
@@ -1553,6 +1570,14 @@ export default function GenerateLogisticsAssignments() {
             </div>
             </div>
           </div>
+
+          {!showContainers && (
+            <AssignedTasksSequenceSummary
+              groups={sequenceSummaryGroups}
+              searchTask={searchTask}
+              staffLabel="Driver"
+            />
+          )}
         </DragDropContext>
 
         <Dialog

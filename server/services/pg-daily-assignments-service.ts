@@ -1765,6 +1765,7 @@ export class PgDailyAssignmentsService {
       );
       const cleanerContextByTaskId = await loadCleanerContextByTaskIds(workDate, taskIds);
       const enrichedTasksById = new Map<number, any>();
+      const { attachLogisticsTaskWindowFields } = await import("./logistics-task-window-fields");
 
       const driverMap = new Map<number, { driver: any; tasks: any[] }>();
       for (const row of rows) {
@@ -1839,6 +1840,7 @@ export class PgDailyAssignmentsService {
           cleanerCtx?.cleanerId ?? null,
           cleanerCtx?.cleanerSequence ?? null
         );
+        attachLogisticsTaskWindowFields(enrichedTask, cleanerCtx);
         enrichedTasksById.set(Number(row.task_id), enrichedTask);
         driverMap.get(row.driver_id)!.tasks.push(enrichedTask);
       }

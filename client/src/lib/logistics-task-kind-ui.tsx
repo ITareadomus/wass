@@ -86,6 +86,13 @@ export function logisticsKindStripeClass(kind: LogisticsTaskKind | null): string
   return LOGISTICS_KIND_STRIPE_UNKNOWN_CLASS;
 }
 
+export function logisticsKindSequenceDotClass(kind: LogisticsTaskKind | null): string {
+  return cn(
+    "inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-sm",
+    logisticsKindStripeClass(kind)
+  );
+}
+
 export function logisticsKindBadgeClass(kind: LogisticsTaskKind): string {
   if (kind === "delivery/pick-up") {
     return "border-purple-600 dark:border-purple-400 text-purple-900 dark:text-purple-200";
