@@ -2,7 +2,10 @@ import React, { useState, useEffect, useRef } from "react";
 import { Draggable } from "react-beautiful-dnd";
 import { useQuery } from "@tanstack/react-query";
 import { TaskType as Task } from "@shared/schema";
-import { shouldBlinkLogisticsTaskCard } from "@shared/logistics-scheduling-constraints";
+import {
+  pickLogisticsViolationFields,
+  shouldBlinkLogisticsTimelineTask,
+} from "@shared/logistics-scheduling-constraints";
 import {
   resolveLogisticsTaskKind,
   type LogisticsTaskKind,
@@ -215,7 +218,6 @@ interface TaskCardProps {
   waitingGapWidthPx?: number;
   isHighlighted?: boolean;
   cleanerId?: number | null;
-  isPriorityWindowViolation?: boolean;
   /** housekeeping → /api/operations (enable_wass); logistics → enable_wass_route */
   operationsScope?: "housekeeping" | "office" | "logistics";
   /** Solo timeline logistica: nome driver (colonna sinistra). Non usare per HK — lì sarebbe il cleaner. */
@@ -264,7 +266,6 @@ export default function TaskCard({
   waitingGapWidthPx = 0,
   isHighlighted = false,
   cleanerId = null,
-  isPriorityWindowViolation = false,
   operationsScope = "housekeeping",
   timelineRowStaffDisplayLabel = null,
   onLogisticsTimelineMutated,
@@ -2091,12 +2092,17 @@ const displayClickableInputClass =
     String(displayTask.address ?? "").trim().toUpperCase() || "INDIRIZZO NON DISPONIBILE";
   const cardTooltipClientAlias = String(displayTask.alias ?? "").trim();
   const cardTooltipAddressLine =
-    operationsScope === "logistics" && cardTooltipClientAlias
+    operationsScope === "logistics" && isInTimeline && cardTooltipClientAlias
       ? `${cardTooltipAddressLabel} - ${cardTooltipClientAlias}`
       : cardTooltipAddressLabel;
 
   // Verifica violazioni temporali (considerando le date!)
   // In timeline la barra deve riflettere la task che rappresenta (task), non la task nel dialog (displayTask)
+  const logisticsViolationInput =
+    operationsScope === "logistics" && isInTimeline
+      ? pickLogisticsViolationFields((task as Record<string, unknown>) ?? null)
+      : null;
+
   const isOverdue = (() => {
     const taskForBar = isInTimeline ? task : displayTask;
     const taskObj = taskForBar as any;
@@ -2105,19 +2111,8 @@ const displayClickableInputClass =
 
     if (operationsScope === "logistics") {
       const selectedWorkDate = localStorage.getItem("selected_work_date");
-      if (!selectedWorkDate) return false;
-      return shouldBlinkLogisticsTaskCard(
-        {
-          start_time: normalizeTime(taskObj.start_time || taskObj.startTime),
-          end_time: normalizeTime(taskObj.end_time || taskObj.endTime),
-          checkout_time: normalizeTime(taskObj.checkout_time),
-          checkout_date: normalizeDate(taskObj.checkout_date),
-          checkin_time: normalizeTime(taskObj.checkin_time),
-          checkin_date: normalizeDate(taskObj.checkin_date),
-          checkout_wait_minutes: taskObj.checkout_wait_minutes,
-        },
-        selectedWorkDate
-      );
+      if (!selectedWorkDate || !logisticsViolationInput) return false;
+      return shouldBlinkLogisticsTimelineTask(logisticsViolationInput, selectedWorkDate);
     }
 
     // Housekeeping / office: regole esistenti
@@ -2901,11 +2896,10 @@ const displayClickableInputClass =
                     className={cn(
                       cardSurfaceClass,
                       "rounded-md border transition-colors duration-200",
-                      isLogisticsTimelineDetails ? "px-1 py-0" : "px-2 py-1",
+                      isLogisticsTimelineDetails ? "px-1 py-0" : "flex items-center px-2 py-1",
                       snapshot.isDragging && "shadow-lg",
                       isSelected && isMultiSelectMode && !isInTimeline && "z-[1] ring-2 ring-sky-500 ring-inset",
                       isOverdue && isInTimeline && "animate-blink",
-                      isPriorityWindowViolation && isInTimeline && "animate-blink-orange",
                       !snapshot.isDragging && isMapFiltered && "task-border-map-filtered",
                       !snapshot.isDragging && !isMapFiltered && isHighlighted && "task-border-search-highlighted",
                       "cursor-pointer flex-shrink-0 relative group"
@@ -3037,10 +3031,10 @@ const displayClickableInputClass =
                               "flex flex-col items-end gap-0.5 min-h-[28px]",
                               // posizione verticale
                               linesCount === 2
-                                ? "top-[5px] justify-start"
+                                ? "inset-y-0 justify-center"
                                 : shouldBottomRightSingleLine
                                   ? "bottom-[5px] justify-end"
-                                  : "top-[5px] justify-center",
+                                  : "inset-y-0 justify-center",
                             ].join(" ")}
                           >
                             {hasCheckout && (
@@ -3079,10 +3073,10 @@ const displayClickableInputClass =
                         );
                       })()}
 
-                    <div className="flex flex-col items-start justify-center h-full gap-0 p-[0.5px] pl-2 overflow-visible">
+                    <div className="flex flex-col items-start justify-center flex-1 min-w-0 gap-0.5 pl-2 pr-1 overflow-visible">
                       <div className="flex items-center gap-1 w-full min-w-0 overflow-visible">
                         <span
-                          className="text-foreground font-extrabold text-[13px] shrink-0"
+                          className="text-foreground font-extrabold text-[13px] leading-none shrink-0"
                           data-testid={`task-name-${getTaskKey(task)}`}
                         >
                           {task.name}
@@ -3099,7 +3093,7 @@ const displayClickableInputClass =
                         )}
                       </div>
                       {task.alias && (
-                        <span className="opacity-80 leading-none mt-0.5 text-foreground font-semibold text-[9px] whitespace-nowrap">
+                        <span className="opacity-80 leading-none text-foreground font-semibold text-[9px] whitespace-nowrap">
                           {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                         </span>
                       )}

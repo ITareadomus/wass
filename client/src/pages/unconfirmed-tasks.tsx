@@ -359,10 +359,10 @@ export default function UnconfirmedTasks() {
   return (
     <div
       className={cn(
-        "bg-background",
+        "bg-background overflow-x-hidden",
         lockPageToViewport
           ? "flex h-[calc(100dvh-3.5rem-1px)] max-h-[calc(100dvh-3.5rem-1px)] flex-col overflow-hidden md:h-[calc(100dvh-3.75rem-1px)] md:max-h-[calc(100dvh-3.75rem-1px)]"
-          : "min-h-screen"
+          : "min-h-screen overflow-x-hidden"
       )}
     >
       <main

@@ -2258,7 +2258,7 @@ export default function GenerateAssignments() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-background text-foreground">
       <div className="mx-auto flex w-full min-h-0 max-w-[1920px] flex-1 flex-col overflow-x-hidden px-4 pb-6 pt-3">
         {!(isExtracting || isLoadingTasks || isLoading) && (
           <div className="mx-auto mb-3 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-4">

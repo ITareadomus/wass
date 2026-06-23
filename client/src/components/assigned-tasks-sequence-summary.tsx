@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { ListOrdered, MessageCircle } from "lucide-react";
+import { Draggable, Droppable } from "react-beautiful-dnd";
+import { ListOrdered, Loader2, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SequenceSummaryGroup } from "@/lib/sequence-summary";
 import { logisticsKindSequenceDotClass, LogisticsSequenceBadge } from "@/lib/logistics-task-kind-ui";
@@ -22,6 +23,8 @@ interface AssignedTasksSequenceSummaryProps {
   groups: SequenceSummaryGroup[];
   searchTask?: string;
   staffLabel?: string;
+  isDragDisabled?: boolean;
+  loadingDriverIds?: number[];
 }
 
 function matchesSearch(entry: SequenceSummaryGroup["tasks"][number], query: string): boolean {
@@ -108,7 +111,7 @@ function SequenceSummaryCustomerNoteIndicator({
       <TooltipTrigger asChild>
         <button
           type="button"
-          className="relative inline-flex shrink-0 cursor-pointer items-center rounded-sm border-0 bg-transparent p-0"
+          className="relative inline-flex shrink-0 cursor-pointer items-center rounded-sm border-0 bg-transparent p-0 focus:outline-none"
           onClick={(event) => {
             event.stopPropagation();
             onOpen(text, logisticCode);
@@ -126,21 +129,56 @@ function SequenceSummaryCustomerNoteIndicator({
   );
 }
 
+function SequenceSummaryViolationIndicator({
+  messages,
+  logisticCode,
+  onOpen,
+}: {
+  messages: string[];
+  logisticCode: string;
+  onOpen: (messages: string[], logisticCode: string) => void;
+}) {
+  if (messages.length === 0) return null;
+
+  return (
+    <button
+      type="button"
+      className="absolute right-1 top-1 z-10 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold leading-none text-white shadow-sm ring-1 ring-background hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-1"
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpen(messages, logisticCode);
+      }}
+      aria-label="Mostra spiegazione violazione"
+      title="Violazione timeline"
+    >
+      !
+    </button>
+  );
+}
+
 export default function AssignedTasksSequenceSummary({
   groups,
   searchTask = "",
   staffLabel = "Cleaner",
+  isDragDisabled = false,
+  loadingDriverIds = [],
 }: AssignedTasksSequenceSummaryProps) {
   const [customerNoteDialog, setCustomerNoteDialog] = useState<{
     open: boolean;
     note: string;
     logisticCode: string;
   }>({ open: false, note: "", logisticCode: "" });
+  const [violationDialog, setViolationDialog] = useState<{
+    open: boolean;
+    logisticCode: string;
+    messages: string[];
+  }>({ open: false, logisticCode: "", messages: [] });
 
   const totalTasks = useMemo(
     () => groups.reduce((sum, group) => sum + group.tasks.length, 0),
     [groups]
   );
+  const loadingDriverIdSet = useMemo(() => new Set(loadingDriverIds), [loadingDriverIds]);
 
   if (groups.length === 0) {
     return null;
@@ -148,7 +186,7 @@ export default function AssignedTasksSequenceSummary({
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="mb-4 mt-4 w-full">
+      <div className="mb-4 mt-4 w-full min-w-0 overflow-hidden">
         <div className="rounded-lg border-2 border-custom-blue bg-custom-blue-light p-4">
         <div className="mb-4 flex items-center justify-between">
           <div>
@@ -163,115 +201,170 @@ export default function AssignedTasksSequenceSummary({
           </div>
         </div>
 
-        <div className="grid min-h-[120px] grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid min-h-[120px] min-w-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
           {groups.map((group) => (
             <div
               key={group.id}
-              className="flex min-h-[120px] min-w-0 flex-col overflow-x-auto rounded-lg border border-custom-blue/40 bg-background/70 p-3"
+              className="relative flex h-full min-h-[120px] min-w-0 flex-col overflow-hidden rounded-lg border border-custom-blue/40 bg-background/70 p-3"
             >
-              <div className="flex min-w-max flex-col">
+              {loadingDriverIdSet.has(group.id) && (
+                <div className="absolute inset-0 z-40 flex items-center justify-center rounded-lg bg-black/20 backdrop-blur-sm pointer-events-none dark:bg-black/40">
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
+                    <p className="text-sm font-medium text-foreground">Aggiornamento…</p>
+                  </div>
+                </div>
+              )}
+              <div className="sequence-summary-driver-scroll flex min-h-0 min-w-0 flex-1 flex-col pb-0.5">
+                <div className="flex min-w-max flex-col">
                 <div className="mb-2 border-b border-custom-blue/20 pb-2">
-                  <h4 className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-custom-blue">
+                  <h4 className="flex flex-nowrap items-center gap-x-2 whitespace-nowrap text-sm font-semibold text-custom-blue">
                     <span>{group.label}</span>
-                    <span className="inline-flex items-center font-normal">
+                    <span className="inline-flex items-center gap-x-1 font-normal">
                       {group.vehiclePlate && (
                         <span className="shrink-0 rounded border border-custom-blue/40 bg-background/80 px-1.5 text-[10px] font-semibold leading-4 text-custom-blue">
                           {group.vehiclePlate}
                         </span>
                       )}
+                      <span className="shrink-0 text-muted-foreground">-</span>
                       <span className="text-muted-foreground">
-                        · {group.tasks.length} task
+                        {group.tasks.length} task
                       </span>
                     </span>
                   </h4>
                 </div>
 
-                <ol className="flex flex-col gap-1.5">
-                  {group.tasks.map((entry) => {
-                    const isHighlighted = searchTask.trim()
-                      ? matchesSearch(entry, searchTask.trim())
-                      : false;
+                <Droppable
+                  droppableId={`summary-${group.id}`}
+                  direction="vertical"
+                  isDropDisabled={isDragDisabled}
+                >
+                  {(provided, snapshot) => (
+                    <ol
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={cn(
+                        "flex flex-col gap-1.5",
+                        snapshot.isDraggingOver && "rounded-md bg-custom-blue/5 ring-1 ring-custom-blue/30"
+                      )}
+                    >
+                      {group.tasks.map((entry, index) => {
+                        const isHighlighted = searchTask.trim()
+                          ? matchesSearch(entry, searchTask.trim())
+                          : false;
+                        const isTimelineViolated = entry.timelineViolated === true;
+                        const violationMessages = entry.violationMessages ?? [];
 
-                    return (
-                      <li
-                        key={`${group.id}-${entry.taskId}-${entry.sequence}`}
-                        className={cn(
-                          "rounded-md border px-2 py-1.5 text-xs",
-                          isHighlighted
-                            ? "border-amber-400 bg-amber-50 dark:bg-amber-950/30"
-                            : "border-border/70 bg-background"
-                        )}
-                      >
-                        <div className="min-w-max">
-                          <div className="flex items-center gap-1 whitespace-nowrap text-[11px]">
-                            <span className={logisticsKindSequenceDotClass(entry.logisticsTaskKind)}>
-                              {entry.sequence}
-                            </span>
-                            <span className="shrink-0 text-muted-foreground/60">|</span>
-                            <span className="shrink-0 font-semibold text-foreground">
-                              {entry.logisticCode || "N/D"}
-                            </span>
-                            {entry.address && (
-                              <>
-                                <span className="shrink-0 text-muted-foreground/60">|</span>
-                                <span className="shrink-0 text-muted-foreground">{entry.address}</span>
-                              </>
+                        return (
+                          <Draggable
+                            key={`${group.id}-${entry.taskId}`}
+                            draggableId={String(entry.taskId)}
+                            index={index}
+                            isDragDisabled={isDragDisabled}
+                          >
+                            {(dragProvided, dragSnapshot) => (
+                              <li
+                                ref={dragProvided.innerRef}
+                                {...dragProvided.draggableProps}
+                                {...dragProvided.dragHandleProps}
+                                style={dragProvided.draggableProps.style}
+                                className={cn(
+                                  "sequence-summary-task relative rounded-md border px-2 py-1.5 text-xs",
+                                  "pr-6",
+                                  isTimelineViolated
+                                    ? "animate-blink-inset border-red-500 bg-red-50 dark:bg-red-950/30"
+                                    : isHighlighted
+                                    ? "border-amber-400 bg-amber-50 dark:bg-amber-950/30"
+                                    : "border-border/70 bg-background",
+                                  dragSnapshot.isDragging && "shadow-lg ring-2 ring-custom-blue/40",
+                                  !isDragDisabled && "cursor-grab active:cursor-grabbing"
+                                )}
+                              >
+                                {isTimelineViolated && (
+                                  <SequenceSummaryViolationIndicator
+                                    messages={violationMessages}
+                                    logisticCode={entry.logisticCode || "N/D"}
+                                    onOpen={(messages, logisticCode) =>
+                                      setViolationDialog({ open: true, messages, logisticCode })
+                                    }
+                                  />
+                                )}
+                                <div className="min-w-max">
+                                  <div className="flex flex-nowrap items-center gap-x-1 whitespace-nowrap text-[11px]">
+                                      <span className={logisticsKindSequenceDotClass(entry.logisticsTaskKind)}>
+                                        {entry.sequence}
+                                      </span>
+                                      <span className="shrink-0 text-muted-foreground/60">|</span>
+                                      <span className="shrink-0 font-semibold text-foreground">
+                                        {entry.logisticCode || "N/D"}
+                                      </span>
+                                      {entry.address && (
+                                        <>
+                                          <span className="shrink-0 text-muted-foreground/60">|</span>
+                                          <span className="shrink-0 text-muted-foreground">{entry.address}</span>
+                                        </>
+                                      )}
+                                      <span className="shrink-0 text-muted-foreground/60">|</span>
+                                      <span className="shrink-0 whitespace-nowrap text-muted-foreground">
+                                        <span className="font-medium text-foreground/80">LG window:</span>{" "}
+                                        {entry.lgWindow}
+                                      </span>
+                                      {entry.sofabedLabel && (
+                                        <>
+                                          <span className="shrink-0 text-muted-foreground/60">|</span>
+                                          <span className="shrink-0 whitespace-nowrap text-muted-foreground">
+                                            {entry.sofabedLabel}
+                                          </span>
+                                        </>
+                                      )}
+                                    </div>
+                                    <div className="mt-1 flex flex-nowrap items-center gap-x-1 whitespace-nowrap text-[11px] text-muted-foreground">
+                                      {(entry.cleanerLabel || entry.cleanerSequence) && (
+                                        <>
+                                          <SequenceSummaryCleanerAssignment
+                                            cleanerLabel={entry.cleanerLabel}
+                                            cleanerSequence={entry.cleanerSequence}
+                                          />
+                                          <span className="shrink-0 text-muted-foreground/60">|</span>
+                                        </>
+                                      )}
+                                      <span className="shrink-0 whitespace-nowrap">
+                                        <span className="font-medium text-foreground/80">HK window:</span>{" "}
+                                        {entry.hkWindow}
+                                      </span>
+                                      {(entry.checkoutTime || entry.checkinTime) && (
+                                        <>
+                                          <span className="shrink-0 text-muted-foreground/60">|</span>
+                                          <SequenceSummaryCheckInOut
+                                            checkoutTime={entry.checkoutTime}
+                                            checkinTime={entry.checkinTime}
+                                          />
+                                        </>
+                                      )}
+                                      {entry.customerNote && (
+                                        <>
+                                          <span className="shrink-0 text-muted-foreground/60">|</span>
+                                          <SequenceSummaryCustomerNoteIndicator
+                                            note={entry.customerNote}
+                                            logisticCode={entry.logisticCode || "N/D"}
+                                            onOpen={(note, logisticCode) =>
+                                              setCustomerNoteDialog({ open: true, note, logisticCode })
+                                            }
+                                          />
+                                        </>
+                                      )}
+                                    </div>
+                                </div>
+                              </li>
                             )}
-                            <span className="shrink-0 text-muted-foreground/60">|</span>
-                            <span className="shrink-0 whitespace-nowrap text-muted-foreground">
-                              <span className="font-medium text-foreground/80">LG window:</span>{" "}
-                              {entry.lgWindow}
-                            </span>
-                            {entry.sofabedLabel && (
-                              <>
-                                <span className="shrink-0 text-muted-foreground/60">|</span>
-                                <span className="shrink-0 whitespace-nowrap text-muted-foreground">
-                                  {entry.sofabedLabel}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                          <div className="mt-1 flex items-center gap-1 whitespace-nowrap text-[11px] text-muted-foreground">
-                            {(entry.cleanerLabel || entry.cleanerSequence) && (
-                              <>
-                                <SequenceSummaryCleanerAssignment
-                                  cleanerLabel={entry.cleanerLabel}
-                                  cleanerSequence={entry.cleanerSequence}
-                                />
-                                <span className="shrink-0 text-muted-foreground/60">|</span>
-                              </>
-                            )}
-                            <span className="shrink-0 whitespace-nowrap">
-                              <span className="font-medium text-foreground/80">HK window:</span>{" "}
-                              {entry.hkWindow}
-                            </span>
-                            {(entry.checkoutTime || entry.checkinTime) && (
-                              <>
-                                <span className="shrink-0 text-muted-foreground/60">|</span>
-                                <SequenceSummaryCheckInOut
-                                  checkoutTime={entry.checkoutTime}
-                                  checkinTime={entry.checkinTime}
-                                />
-                              </>
-                            )}
-                            {entry.customerNote && (
-                              <>
-                                <span className="shrink-0 text-muted-foreground/60">|</span>
-                                <SequenceSummaryCustomerNoteIndicator
-                                  note={entry.customerNote}
-                                  logisticCode={entry.logisticCode || "N/D"}
-                                  onOpen={(note, logisticCode) =>
-                                    setCustomerNoteDialog({ open: true, note, logisticCode })
-                                  }
-                                />
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ol>
+                          </Draggable>
+                        );
+                      })}
+                      {provided.placeholder}
+                    </ol>
+                  )}
+                </Droppable>
+                </div>
               </div>
             </div>
           ))}
@@ -308,6 +401,42 @@ export default function AssignedTasksSequenceSummary({
               onClick={() =>
                 setCustomerNoteDialog((prev) => ({ ...prev, open: false }))
               }
+            >
+              Chiudi
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={violationDialog.open}
+        onOpenChange={(open) => setViolationDialog((prev) => ({ ...prev, open }))}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex flex-wrap items-baseline gap-x-1">
+              <span>Violazione timeline</span>
+              <span className="text-sm font-normal text-muted-foreground">
+                task <strong>{violationDialog.logisticCode}</strong>
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+          <ul className="mt-2 space-y-2 text-sm text-foreground">
+            {violationDialog.messages.map((message, index) => (
+              <li
+                key={`${violationDialog.logisticCode}-violation-${index}`}
+                className="rounded-md border border-red-200 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40"
+              >
+                {message}
+              </li>
+            ))}
+          </ul>
+          <div className="mt-4 flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-2 border-custom-blue"
+              onClick={() => setViolationDialog((prev) => ({ ...prev, open: false }))}
             >
               Chiudi
             </Button>

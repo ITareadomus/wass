@@ -439,6 +439,7 @@ export default function GenerateLogisticsAssignments() {
     Array<{ driver: { id: number; name?: string; lastname?: string; role?: string; premium?: boolean; start_time?: string | null }; tasks: any[] }>
   >([]);
   const [isLoadingDragDrop, setIsLoadingDragDrop] = useState(false);
+  const [summaryLoadingDriverIds, setSummaryLoadingDriverIds] = useState<number[]>([]);
   /** Estrazione / refresh da ADAM al cambio data (come checkAndAutoLoadSavedAssignments + extractData su HK) */
   const [isExtractingLogistics, setIsExtractingLogistics] = useState(false);
   const [extractionStep, setExtractionStep] = useState("Inizializzazione...");
@@ -1023,7 +1024,10 @@ export default function GenerateLogisticsAssignments() {
   );
 
   const sequenceSummaryGroups = useMemo(() => {
-    const groups = buildSequenceSummaryGroupsFromDriverAssignments(logisticsDriversAssignments);
+    const groups = buildSequenceSummaryGroupsFromDriverAssignments(
+      logisticsDriversAssignments,
+      format(selectedDate, "yyyy-MM-dd")
+    );
     const order = logisticsDrivers.map((driver) => driver.id);
     if (order.length === 0) return groups;
 
@@ -1052,9 +1056,14 @@ export default function GenerateLogisticsAssignments() {
   }, [earlyOutTasks, highPriorityTasks, lowPriorityTasks, logisticsDriversAssignments]);
 
   const parseDriverId = (droppableId: string | undefined | null) => {
-    if (!droppableId?.startsWith("timeline-")) return null;
-    const n = Number(droppableId.slice("timeline-".length));
-    return Number.isFinite(n) ? n : null;
+    if (!droppableId) return null;
+    for (const prefix of ["timeline-", "summary-"]) {
+      if (droppableId.startsWith(prefix)) {
+        const n = Number(droppableId.slice(prefix.length));
+        return Number.isFinite(n) ? n : null;
+      }
+    }
+    return null;
   };
 
   const parseContainerKey = (
@@ -1169,12 +1178,24 @@ export default function GenerateLogisticsAssignments() {
       return;
     }
 
+    const isSummaryDrag = source.droppableId.startsWith("summary-");
+    const affectedSummaryDriverIds = [
+      ...new Set([fromDriverId, toDriverId].filter((id): id is number => id != null)),
+    ];
+
+    if (isSummaryDrag) {
+      setSummaryLoadingDriverIds(affectedSummaryDriverIds);
+    } else {
+      setSummaryLoadingDriverIds([]);
+    }
     setIsLoadingDragDrop(true);
+
     isDraggingRef.current = true;
     if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
     dragTimeoutRef.current = setTimeout(() => {
       isDraggingRef.current = false;
       setIsLoadingDragDrop(false);
+      setSummaryLoadingDriverIds([]);
     }, 10000);
 
     try {
@@ -1228,12 +1249,13 @@ export default function GenerateLogisticsAssignments() {
       isDraggingRef.current = false;
       if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
       setIsLoadingDragDrop(false);
+      setSummaryLoadingDriverIds([]);
     }
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <div className="mx-auto flex w-full min-h-0 max-w-[1920px] flex-1 flex-col px-4 pb-6 pt-3">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-background text-foreground">
+      <div className="mx-auto flex w-full min-h-0 max-w-[1920px] flex-1 flex-col overflow-x-hidden px-4 pb-6 pt-3">
         {!isExtractingLogistics && (
           <div className="mb-6 flex w-full flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-4">
@@ -1425,6 +1447,7 @@ export default function GenerateLogisticsAssignments() {
                   searchTask={searchTask}
                   isReadOnly={isTimelineReadOnly}
                   isLoadingOverlay={isLoadingDragDrop}
+                  suppressTaskDrag={!showContainers}
                   onRefresh={reloadLogisticsPage}
                 />
                 {!isTimelineMapOpen && (
@@ -1590,6 +1613,8 @@ export default function GenerateLogisticsAssignments() {
               groups={sequenceSummaryGroups}
               searchTask={searchTask}
               staffLabel="Driver"
+              isDragDisabled={isTimelineReadOnly}
+              loadingDriverIds={summaryLoadingDriverIds}
             />
           )}
         </DragDropContext>

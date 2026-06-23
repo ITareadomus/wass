@@ -27,7 +27,7 @@ export function PageViewportCentered({
   return (
     <div
       className={cn(
-        "flex w-full flex-col items-center justify-center px-4 py-6",
+        "flex w-full min-w-0 flex-col items-center justify-center overflow-x-hidden px-4 py-6",
         layout === "viewport" && PAGE_BELOW_HEADER_MIN_H,
         layout === "fill" && "min-h-0 flex-1",
         className

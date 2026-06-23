@@ -2067,55 +2067,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     };
   };
 
-  // Verifica le finestre operative derivate da HP Start/End.
-  const isPriorityWindowViolation = (task: any): boolean => {
-    const priority = task.priority;
-    const startTimeStr = task.start_time;
-    
-    if (!priority || !startTimeStr || !priorityWindows) return false;
-    
-    // Normalizza priority per gestire TUTTI i formati possibili:
-    // DB: early_out, high_priority, low_priority, high, low
-    // Container: early-out, high, low
-    // Possibili varianti: EO, HP, LP (abbreviazioni)
-    const p = String(priority).toLowerCase().trim();
-    
-    // Determina il tipo di priorità
-    let priorityType: 'eo' | 'hp' | 'lp' | null = null;
-    
-    if (p === 'early_out' || p === 'early-out' || p === 'eo' || p.includes('early')) {
-      priorityType = 'eo';
-    } else if (p === 'high_priority' || p === 'high-priority' || p === 'high' || p === 'hp') {
-      priorityType = 'hp';
-    } else if (p === 'low_priority' || p === 'low-priority' || p === 'low' || p === 'lp') {
-      priorityType = 'lp';
-    }
-    
-    if (!priorityType) return false;
-    
-    // Parse start_time (formato HH:MM:SS o HH:MM)
-    const timeParts = startTimeStr.split(':');
-    if (timeParts.length < 2) return false;
-    const hours = parseInt(timeParts[0], 10);
-    const minutes = parseInt(timeParts[1], 10);
-    if (isNaN(hours) || isNaN(minutes)) return false;
-    const startMinutes = hours * 60 + minutes;
-    
-    const hpStart = timeToMinutes(priorityWindows.hpStart);
-    const hpEnd = timeToMinutes(priorityWindows.hpEnd);
-    
-    if (priorityType === 'eo') {
-      return startMinutes >= hpStart;
-    } else if (priorityType === 'hp') {
-      return startMinutes < hpStart || startMinutes > hpEnd;
-    } else if (priorityType === 'lp') {
-      // LP can start from hp_start onward; there is no preferred upper bound.
-      return startMinutes < hpStart;
-    }
-    
-    return false;
-  };
-
   // Gestione toast per incompatibilità task-cleaner (con sistema per coppie)
   useEffect(() => {
     if (!validationRules) return;
@@ -2358,7 +2309,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     <>
       <div
         ref={timelineRef}
-        className={`bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm relative ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
+        className={`bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm relative overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
       >
         {/* Loading overlay durante drag&drop e rimozione cleaner */}
         {(isLoadingDragDrop || removeCleanerMutation.isPending || clearAllSelectedCleanersMutation.isPending) && (
@@ -2618,7 +2569,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           </div>
 
           {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
-          <div className="flex-1 overflow-auto px-1 pb-1 pt-0">
+          <div className="flex-1 overflow-x-hidden overflow-y-auto px-1 pb-1 pt-0">
             {allCleanersToShow.length === 0 && !isReadOnly ? (
               <div className="flex items-center justify-center h-64 bg-yellow-100 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
                 <div className="text-center p-6">
@@ -2676,7 +2627,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 const cleanerStartTime = cleaner.start_time || "10:00";
 
                 return (
-                  <div key={cleaner.id} className="flex mb-0.5 h-[50px]">
+                  <div key={cleaner.id} className="flex mb-0.5 h-[50px] min-w-0">
                     {/* Info cleaner */}
                     <div
                       className="flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-custom-blue-light cursor-pointer hover:bg-muted/35 transition-colors"
@@ -3006,7 +2957,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           minTimelineTaskWidthPx={MIN_TIMELINE_TASK_WIDTH_PX}
                                           isHighlighted={highlightedTaskIds.has(String(task.id))}
                                           cleanerId={cleaner.id}
-                                          isPriorityWindowViolation={isPriorityWindowViolation(task)}
                                         />
                                       </React.Fragment>
                                     );

@@ -1,5 +1,9 @@
 import { formatHmTime, formatWorkWindowLabel } from "@shared/logistics-task-windows";
 import {
+  getLogisticsTimelineViolationMessages,
+  pickLogisticsViolationFields,
+} from "@shared/logistics-scheduling-constraints";
+import {
   resolveLogisticsTaskKind,
   type LogisticsTaskKind,
 } from "@shared/logistics-task-kind";
@@ -19,6 +23,8 @@ export type SequenceSummaryEntry = {
   sofabedLabel?: string | null;
   customerNote?: string | null;
   logisticsTaskKind: LogisticsTaskKind | null;
+  timelineViolated?: boolean;
+  violationMessages?: string[];
 };
 
 export type SequenceSummaryGroup = {
@@ -193,9 +199,20 @@ function extractLatestCustomerNoteFromHistory(history: unknown): string | null {
   return null;
 }
 
-function mapTaskToSummaryEntry(task: any, fallbackSequence: number): SequenceSummaryEntry {
+function mapTaskToSummaryEntry(
+  task: any,
+  fallbackSequence: number,
+  workDate?: string
+): SequenceSummaryEntry {
   const sequence = Number(task?.sequence);
   const cleanerIdRaw = Number(task?.cleaner_id ?? task?.cleanerId);
+  const violationFields = pickLogisticsViolationFields(task);
+  const violationMessages =
+    workDate != null && workDate !== ""
+      ? getLogisticsTimelineViolationMessages(violationFields, workDate)
+      : [];
+  const timelineViolated = violationMessages.length > 0;
+
   return {
     sequence: Number.isFinite(sequence) && sequence > 0 ? sequence : fallbackSequence,
     taskId: getTaskId(task),
@@ -214,6 +231,8 @@ function mapTaskToSummaryEntry(task: any, fallbackSequence: number): SequenceSum
     ),
     customerNote: resolveCustomerNote(task),
     logisticsTaskKind: resolveLogisticsTaskKindForSummary(task),
+    timelineViolated,
+    violationMessages,
   };
 }
 
@@ -284,7 +303,8 @@ export function buildSequenceSummaryGroupsFromDriverAssignments(
       vehicle_pms_code?: string | null;
     };
     tasks?: any[];
-  }>
+  }>,
+  workDate?: string
 ): SequenceSummaryGroup[] {
   const groups: SequenceSummaryGroup[] = [];
 
@@ -297,7 +317,7 @@ export function buildSequenceSummaryGroupsFromDriverAssignments(
       id: row.driver.id,
       label: resolveDriverLabel(row.driver),
       vehiclePlate: resolveDriverVehiclePlate(row.driver),
-      tasks: sortedTasks.map((task, index) => mapTaskToSummaryEntry(task, index + 1)),
+      tasks: sortedTasks.map((task, index) => mapTaskToSummaryEntry(task, index + 1, workDate)),
     });
   }
 

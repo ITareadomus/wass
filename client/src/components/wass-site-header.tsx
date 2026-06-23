@@ -14,11 +14,11 @@ export function WassSiteHeader({ right, className }: WassSiteHeaderProps) {
   return (
     <header
       className={cn(
-        "border-b border-border/50 bg-muted/50 dark:bg-muted/30",
+        "overflow-x-hidden border-b border-border/50 bg-muted/50 dark:bg-muted/30",
         className
       )}
     >
-      <div className="mx-auto flex w-full max-w-[1920px] items-stretch">
+      <div className="mx-auto flex w-full min-w-0 max-w-[1920px] items-stretch">
         <div
           className={cn(
             "flex w-14 shrink-0 items-center justify-center border-r border-border/50 bg-muted/90 px-2.5 dark:bg-muted/45 md:w-[4.5rem]",

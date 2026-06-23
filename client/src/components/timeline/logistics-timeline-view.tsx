@@ -37,6 +37,7 @@ import {
   computeLogisticsCheckoutWaitGap,
   LOGISTICS_SERVICE_DURATION_MIN,
   parseHmToMinutes,
+  pickLogisticsViolationFields,
 } from "@shared/logistics-scheduling-constraints";
 import { estimateLogisticsReturnToDepotMinutes } from "@shared/logistics-travel-estimate";
 import {
@@ -99,6 +100,7 @@ interface LogisticsTimelineViewProps {
   searchTask: string;
   isReadOnly?: boolean;
   isLoadingOverlay?: boolean;
+  suppressTaskDrag?: boolean;
   onRefresh: () => Promise<void>;
 }
 
@@ -219,6 +221,7 @@ function timelineTaskToTask(t: any, driverId: number): Task {
       ? { logistics_task_kind_source: String(t.logistics_task_kind_source) }
       : {}),
     ...( { assignedCleaner: driverId, sequence: t.sequence } as any ),
+    ...pickLogisticsViolationFields(t),
   };
 }
 
@@ -250,6 +253,7 @@ export default function LogisticsTimelineView({
   searchTask,
   isReadOnly = false,
   isLoadingOverlay = false,
+  suppressTaskDrag = false,
   onRefresh,
 }: LogisticsTimelineViewProps) {
   const [, setLocation] = useLocation();
@@ -1190,7 +1194,7 @@ export default function LogisticsTimelineView({
 
   return (
     <>
-      <div className="bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm relative">
+      <div className="bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm relative overflow-hidden">
         {(isLoadingOverlay || clearDriversMutation.isPending) && (
           <div className="absolute inset-0 bg-black/20 dark:bg-black/40 rounded-lg flex items-center justify-center z-40 backdrop-blur-sm pointer-events-none">
             <div className="flex flex-col items-center gap-3">
@@ -1411,7 +1415,7 @@ export default function LogisticsTimelineView({
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto px-4 pb-1 pt-0">
+          <div className="flex-1 overflow-x-hidden overflow-y-auto px-4 pb-1 pt-0">
             {drivers.length === 0 && !isReadOnly ? (
               <div className="flex items-center justify-center h-64 bg-yellow-100 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
                 <div className="text-center p-6">
@@ -1458,7 +1462,7 @@ export default function LogisticsTimelineView({
                   `${(driver.name || "").toUpperCase()} ${(driver.lastname || "").toUpperCase()}`.trim() ||
                   `ID ${driver.id}`;
                 return (
-                  <div key={driver.id} className="flex mb-0.5">
+                  <div key={driver.id} className="flex mb-0.5 min-w-0">
                     <div
                       className={cn(
                         "flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-custom-blue-light",
@@ -1532,7 +1536,11 @@ export default function LogisticsTimelineView({
                           )}
                       </div>
                     </div>
-                    <Droppable droppableId={`timeline-${driver.id}`} direction="horizontal" isDropDisabled={isReadOnly}>
+                    <Droppable
+                      droppableId={`timeline-${driver.id}`}
+                      direction="horizontal"
+                      isDropDisabled={isReadOnly || suppressTaskDrag}
+                    >
                       {(provided, snapshot) => (
                         <div
                           {...provided.droppableProps}
@@ -1678,7 +1686,9 @@ export default function LogisticsTimelineView({
                                     currentContainer=""
                                     cleanerId={driver.id}
                                     isReadOnly={isReadOnly}
-                                    isDragDisabled={isReadOnly || Boolean((task as any).locked)}
+                                    isDragDisabled={
+                                      isReadOnly || suppressTaskDrag || Boolean((task as any).locked)
+                                    }
                                     timelineWidthPx={timelineWidthPx}
                                     timelinePxPerMinute={timelinePxPerMinute}
                                     operationsScope="logistics"

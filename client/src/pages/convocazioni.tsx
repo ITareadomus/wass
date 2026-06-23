@@ -867,7 +867,7 @@ export default function Convocazioni() {
 
   return (
     <div className="h-[calc(100dvh-3.5rem-1px)] overflow-hidden bg-background text-foreground md:h-[calc(100dvh-3.75rem-1px)]">
-      <div className="flex h-full w-full flex-col px-4 pb-6 pt-3">
+      <div className="flex h-full w-full min-w-0 flex-col overflow-x-hidden px-4 pb-6 pt-3">
         {isLoading ? (
           <PageViewportCentered layout="fill" className="py-4">
             <div className="max-w-lg space-y-4 text-center">
