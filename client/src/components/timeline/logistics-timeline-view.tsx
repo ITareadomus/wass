@@ -147,7 +147,7 @@ function LogisticsRouteLineSegment({
   if (widthPx <= 0) return null;
   return (
     <div
-      className="flex flex-shrink-0 items-center"
+      className="flex flex-shrink-0 cursor-pointer items-center"
       style={{ width: `${widthPx}px`, minHeight: "50px" }}
       title={title}
     >

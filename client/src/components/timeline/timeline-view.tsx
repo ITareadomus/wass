@@ -2959,7 +2959,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                         {/* Travel time marker - FUORI dal Draggable (solo per sequence >= 2) */}
                                         {seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
                                           <div
-                                            className="flex flex-shrink-0 items-center"
+                                            className="flex flex-shrink-0 cursor-pointer items-center"
                                             style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
                                             title={`${travelTime} min`}
                                           >

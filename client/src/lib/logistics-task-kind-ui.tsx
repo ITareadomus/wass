@@ -93,6 +93,47 @@ export function logisticsKindSequenceDotClass(kind: LogisticsTaskKind | null): s
   );
 }
 
+/** Badge sequenza su card timeline logistica (angolo in alto a destra). */
+export function logisticsSequenceBadgeClass(
+  label: string | number,
+  size: "card" | "inline" = "card"
+): string {
+  const text = String(label);
+  const multi = text.length > 1;
+
+  if (size === "inline") {
+    return cn(
+      "inline-flex shrink-0 items-center justify-center box-border rounded-full border border-border/80 bg-background/95 p-0 font-extrabold leading-none text-foreground shadow-sm",
+      multi ? "h-[15px] min-w-[15px] max-h-[15px] px-0.5 text-[8px]" : "size-[15px] text-[9px]"
+    );
+  }
+
+  return cn(
+    "flex shrink-0 items-center justify-center box-border rounded-full border border-border/80 bg-background/95 p-0 font-extrabold leading-none text-foreground shadow-sm",
+    multi ? "h-4 min-w-4 max-h-4 px-0.5 text-[9px]" : "size-4 max-h-4 text-[10px]"
+  );
+}
+
+export function LogisticsSequenceBadge({
+  sequence,
+  size = "card",
+  className,
+}: {
+  sequence: string | number;
+  size?: "card" | "inline";
+  className?: string;
+}) {
+  const label = String(sequence);
+  return (
+    <span
+      className={cn(logisticsSequenceBadgeClass(label, size), className)}
+      title={`Sequenza ${label}`}
+    >
+      {label}
+    </span>
+  );
+}
+
 export function logisticsKindBadgeClass(kind: LogisticsTaskKind): string {
   if (kind === "delivery/pick-up") {
     return "border-purple-600 dark:border-purple-400 text-purple-900 dark:text-purple-200";

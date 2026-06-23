@@ -1,4 +1,4 @@
-import { formatWorkWindowLabel } from "@shared/logistics-task-windows";
+import { formatHmTime, formatWorkWindowLabel } from "@shared/logistics-task-windows";
 import {
   resolveLogisticsTaskKind,
   type LogisticsTaskKind,
@@ -11,6 +11,13 @@ export type SequenceSummaryEntry = {
   address: string;
   hkWindow: string;
   lgWindow: string;
+  checkoutTime?: string | null;
+  checkinTime?: string | null;
+  cleanerLabel?: string | null;
+  cleanerId?: number | null;
+  cleanerSequence?: number | null;
+  sofabedLabel?: string | null;
+  customerNote?: string | null;
   logisticsTaskKind: LogisticsTaskKind | null;
 };
 
@@ -97,8 +104,98 @@ function resolveLogisticsTaskKindForSummary(task: any): LogisticsTaskKind | null
   });
 }
 
+function resolveCheckTime(task: any, ...keys: string[]): string | null {
+  for (const key of keys) {
+    const formatted = formatHmTime(task?.[key]);
+    if (formatted) return formatted;
+  }
+  return null;
+}
+
+function resolveTaskCleanerLabel(task: any): string | null {
+  const alias = String(
+    task?.cleaner_alias ??
+      task?.assigned_cleaner_alias ??
+      task?.cleanerAlias ??
+      ""
+  ).trim();
+  if (alias) return alias;
+
+  const name = String(task?.cleaner_name ?? task?.cleanerName ?? "").trim();
+  const lastname = String(task?.cleaner_lastname ?? task?.cleanerLastname ?? "").trim();
+  const fullName = `${name} ${lastname}`.trim();
+  if (fullName) return fullName;
+
+  const cleanerId = Number(task?.cleaner_id ?? task?.cleanerId);
+  if (Number.isFinite(cleanerId)) return `ID ${cleanerId}`;
+
+  return null;
+}
+
+function resolveTaskCleanerSequence(task: any): number | null {
+  const sequence = Number(task?.cleaner_sequence ?? task?.cleanerSequence);
+  return Number.isFinite(sequence) && sequence > 0 ? sequence : null;
+}
+
+function resolveSofabedCount(task: any, ...keys: string[]): number | null {
+  for (const key of keys) {
+    const num = Number(task?.[key]);
+    if (Number.isFinite(num) && num > 0) return num;
+  }
+  return null;
+}
+
+export function formatSofabedSummaryLabel(
+  singleSofabeds: number | null | undefined,
+  doubleSofabeds: number | null | undefined
+): string | null {
+  const parts: string[] = [];
+  const single = Number(singleSofabeds);
+  const double = Number(doubleSofabeds);
+
+  if (Number.isFinite(single) && single > 0) {
+    parts.push(`${single} ${single === 1 ? "singolo" : "singoli"}`);
+  }
+  if (Number.isFinite(double) && double > 0) {
+    parts.push(`${double} ${double === 1 ? "matrimoniale" : "matrimoniali"}`);
+  }
+
+  if (parts.length === 0) return null;
+  return `DV: ${parts.join(", ")}`;
+}
+
+function resolveCustomerNote(task: any): string | null {
+  const fromHistory = extractLatestCustomerNoteFromHistory(
+    task?.customer_note_history ?? task?.customerNoteHistory
+  );
+  if (fromHistory) return fromHistory;
+
+  const direct = String(task?.customer_note ?? task?.customerNote ?? "")
+    .replace(/<\s*\/?\s*br\s*\/?\s*>/gi, "\n")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .trim();
+  return direct || null;
+}
+
+function extractLatestCustomerNoteFromHistory(history: unknown): string | null {
+  if (!Array.isArray(history) || history.length === 0) return null;
+  for (let idx = history.length - 1; idx >= 0; idx--) {
+    const entry = history[idx];
+    if (!entry || typeof entry !== "object") continue;
+    const text = String((entry as { text?: unknown }).text ?? "")
+      .replace(/<\s*\/?\s*br\s*\/?\s*>/gi, "\n")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .trim();
+    if (text) return text;
+  }
+  return null;
+}
+
 function mapTaskToSummaryEntry(task: any, fallbackSequence: number): SequenceSummaryEntry {
   const sequence = Number(task?.sequence);
+  const cleanerIdRaw = Number(task?.cleaner_id ?? task?.cleanerId);
   return {
     sequence: Number.isFinite(sequence) && sequence > 0 ? sequence : fallbackSequence,
     taskId: getTaskId(task),
@@ -106,6 +203,16 @@ function mapTaskToSummaryEntry(task: any, fallbackSequence: number): SequenceSum
     address: String(task?.address ?? "").trim().toUpperCase(),
     hkWindow: resolveHkWindow(task),
     lgWindow: resolveLgWindow(task),
+    checkoutTime: resolveCheckTime(task, "checkout_time", "checkoutTime"),
+    checkinTime: resolveCheckTime(task, "checkin_time", "checkinTime"),
+    cleanerLabel: resolveTaskCleanerLabel(task),
+    cleanerId: Number.isFinite(cleanerIdRaw) ? cleanerIdRaw : null,
+    cleanerSequence: resolveTaskCleanerSequence(task),
+    sofabedLabel: formatSofabedSummaryLabel(
+      resolveSofabedCount(task, "single_sofabeds", "singleSofabeds"),
+      resolveSofabedCount(task, "double_sofabeds", "doubleSofabeds")
+    ),
+    customerNote: resolveCustomerNote(task),
     logisticsTaskKind: resolveLogisticsTaskKindForSummary(task),
   };
 }
@@ -163,7 +270,6 @@ export function buildSequenceSummaryGroupsFromTasks(tasks: any[]): SequenceSumma
     });
   }
 
-  groups.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
   return groups;
 }
 
@@ -195,6 +301,5 @@ export function buildSequenceSummaryGroupsFromDriverAssignments(
     });
   }
 
-  groups.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
   return groups;
 }

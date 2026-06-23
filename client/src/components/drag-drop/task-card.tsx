@@ -13,6 +13,7 @@ import {
   LogisticsKindAddBadge,
   LogisticsKindBadge,
   LogisticsKindPickerDialog,
+  LogisticsSequenceBadge,
   logisticsKindStripeClass,
 } from "@/lib/logistics-task-kind-ui";
 import { format, parseISO } from "date-fns";
@@ -2089,9 +2090,10 @@ const displayClickableInputClass =
   const cardTooltipAddressLabel =
     String(displayTask.address ?? "").trim().toUpperCase() || "INDIRIZZO NON DISPONIBILE";
   const cardTooltipClientAlias = String(displayTask.alias ?? "").trim();
-  const cardTooltipAddressLine = cardTooltipClientAlias
-    ? `${cardTooltipAddressLabel} - ${cardTooltipClientAlias}`
-    : cardTooltipAddressLabel;
+  const cardTooltipAddressLine =
+    operationsScope === "logistics" && cardTooltipClientAlias
+      ? `${cardTooltipAddressLabel} - ${cardTooltipClientAlias}`
+      : cardTooltipAddressLabel;
 
   // Verifica violazioni temporali (considerando le date!)
   // In timeline la barra deve riflettere la task che rappresenta (task), non la task nel dialog (displayTask)
@@ -2930,17 +2932,10 @@ const displayClickableInputClass =
                       aria-hidden="true"
                     />
                     {operationsScope === "logistics" && cardLogisticsSequenceLabel && (
-                      <div
-                        className={cn(
-                          "absolute -top-1.5 -right-1.5 z-[65] flex shrink-0 items-center justify-center rounded-full border border-border/80 bg-background/95 font-extrabold leading-none text-foreground shadow-sm",
-                          cardLogisticsSequenceLabel.length > 1
-                            ? "h-4 min-w-4 px-0.5 text-[9px]"
-                            : "h-4 w-4 text-[10px]"
-                        )}
-                        title={`Sequenza ${cardLogisticsSequenceLabel}`}
-                      >
-                        {cardLogisticsSequenceLabel}
-                      </div>
+                      <LogisticsSequenceBadge
+                        sequence={cardLogisticsSequenceLabel}
+                        className="absolute -top-1.5 -right-1.5 z-[65]"
+                      />
                     )}
                     {operationsScope === "logistics" && isInTimeline ? (
                       <div className="absolute inset-0 flex items-center justify-center overflow-hidden px-1">

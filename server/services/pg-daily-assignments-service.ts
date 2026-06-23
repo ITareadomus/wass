@@ -1759,6 +1759,7 @@ export class PgDailyAssignmentsService {
         loadCleanerContextByTaskIds,
         enrichLogisticsTimelineTask,
         syncLogisticsTimelineAutoKinds,
+        attachCleanerContextFields,
       } = await import("./logistics-task-kind-enrichment");
       const { buildLogisticsContainerAutoKindPatches } = await import(
         "../../shared/logistics-task-kind"
@@ -1828,12 +1829,7 @@ export class PgDailyAssignmentsService {
         }
 
         const cleanerCtx = cleanerContextByTaskId.get(Number(row.task_id));
-        if (cleanerCtx?.cleanerId != null) {
-          task.cleaner_id = cleanerCtx.cleanerId;
-        }
-        if (cleanerCtx?.cleanerSequence != null) {
-          task.cleaner_sequence = cleanerCtx.cleanerSequence;
-        }
+        attachCleanerContextFields(task, cleanerCtx);
 
         const enrichedTask = enrichLogisticsTimelineTask(
           task,
@@ -2198,6 +2194,7 @@ export class PgDailyAssignmentsService {
         loadCleanerContextByTaskIds,
         enrichLogisticsContainerTask,
         syncLogisticsContainerAutoKinds,
+        attachCleanerContextFields,
       } = await import("./logistics-task-kind-enrichment");
       const { buildLogisticsContainerAutoKindPatches } = await import(
         "../../shared/logistics-task-kind"
@@ -2270,12 +2267,7 @@ export class PgDailyAssignmentsService {
         }
 
         const cleanerCtx = cleanerContextByTaskId.get(Number(row.task_id));
-        if (cleanerCtx?.cleanerId != null) {
-          task.cleaner_id = cleanerCtx.cleanerId;
-        }
-        if (cleanerCtx?.cleanerSequence != null) {
-          task.cleaner_sequence = cleanerCtx.cleanerSequence;
-        }
+        attachCleanerContextFields(task, cleanerCtx);
 
         const enrichedTask = enrichLogisticsContainerTask(
           task,

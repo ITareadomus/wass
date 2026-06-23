@@ -2569,6 +2569,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await enrichDriverTasksWithLogisticsKind(entry, workDate);
           }
         }
+        const { enrichLogisticsTimelineStructureSofabeds } = await import(
+          "./services/adam-structure-sofabeds"
+        );
+        const { enrichLogisticsTimelineCustomerNotes } = await import(
+          "./services/logistics-customer-notes-enrichment"
+        );
+        await enrichLogisticsTimelineStructureSofabeds(timeline);
+        await enrichLogisticsTimelineCustomerNotes(workDate, timeline);
       }
       res.json(timeline);
     } catch (error: any) {

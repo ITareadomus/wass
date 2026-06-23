@@ -6,14 +6,31 @@ import {
 import pool from "../../shared/pg-db";
 import { formatHmTime } from "../../shared/logistics-task-windows";
 import { attachLogisticsTaskWindowFields } from "./logistics-task-window-fields";
+import { enrichLogisticsTimelineStructureSofabeds } from "./adam-structure-sofabeds";
+import { enrichLogisticsTimelineCustomerNotes } from "./logistics-customer-notes-enrichment";
 
 export interface CleanerContextForTask {
   cleanerId: number | null;
   cleanerSequence: number | null;
+  cleanerName: string | null;
+  cleanerLastname: string | null;
+  cleanerAlias: string | null;
   cleanerStartTime: string | null;
   cleanerEndTime: string | null;
   cleanerTaskStartTime: string | null;
   cleanerTaskEndTime: string | null;
+}
+
+export function attachCleanerContextFields(
+  task: any,
+  context: CleanerContextForTask | null | undefined
+): void {
+  if (!task || !context) return;
+  if (context.cleanerId != null) task.cleaner_id = context.cleanerId;
+  if (context.cleanerSequence != null) task.cleaner_sequence = context.cleanerSequence;
+  if (context.cleanerName) task.cleaner_name = context.cleanerName;
+  if (context.cleanerLastname) task.cleaner_lastname = context.cleanerLastname;
+  if (context.cleanerAlias) task.cleaner_alias = context.cleanerAlias;
 }
 
 function withoutBagPolicy(task: any): any {
@@ -65,11 +82,15 @@ export async function loadCleanerContextByTaskIds(
         dac.task_id AS "taskId",
         dac.cleaner_id AS "cleanerId",
         dac.sequence AS "cleanerSequence",
+        dac.cleaner_name AS "cleanerName",
+        dac.cleaner_lastname AS "cleanerLastname",
+        a.alias AS "cleanerAlias",
         dac.cleaner_start_time::text AS "cleanerStartTime",
         dac.cleaner_end_time::text AS "cleanerEndTime",
         dac.start_time::text AS "cleanerTaskStartTime",
         dac.end_time::text AS "cleanerTaskEndTime"
       FROM daily_assignments_current dac
+      LEFT JOIN aliases a ON a.cleaner_id = dac.cleaner_id
       WHERE dac.work_date = $1
         AND dac.task_id = ANY($2::int[])
         AND (dac.scope = 'housekeeping' OR dac.scope IS NULL)
@@ -94,6 +115,10 @@ export async function loadCleanerContextByTaskIds(
       {
         cleanerId: row.cleanerId != null ? Number(row.cleanerId) : null,
         cleanerSequence: row.cleanerSequence != null ? Number(row.cleanerSequence) : null,
+        cleanerName: row.cleanerName != null ? String(row.cleanerName).trim() || null : null,
+        cleanerLastname:
+          row.cleanerLastname != null ? String(row.cleanerLastname).trim() || null : null,
+        cleanerAlias: row.cleanerAlias != null ? String(row.cleanerAlias).trim() || null : null,
         cleanerStartTime: formatHmTime(row.cleanerStartTime),
         cleanerEndTime: formatHmTime(row.cleanerEndTime),
         cleanerTaskStartTime: formatHmTime(row.cleanerTaskStartTime),
@@ -122,6 +147,7 @@ export async function enrichDriverTasksWithLogisticsKind(
       context?.cleanerSequence ?? null
     );
     attachLogisticsTaskWindowFields(enrichedTask, context);
+    attachCleanerContextFields(enrichedTask, context ?? undefined);
     return enrichedTask;
   });
 }
@@ -295,15 +321,13 @@ export async function enrichLogisticsTimelineData(
         cleanerCtx?.cleanerId ?? null,
         cleanerCtx?.cleanerSequence ?? null
       );
-      if (cleanerCtx?.cleanerId != null) {
-        enriched.cleaner_id = cleanerCtx.cleanerId;
-      }
-      if (cleanerCtx?.cleanerSequence != null) {
-        enriched.cleaner_sequence = cleanerCtx.cleanerSequence;
-      }
+      attachCleanerContextFields(enriched, cleanerCtx);
       return enriched;
     });
   }
+
+  await enrichLogisticsTimelineStructureSofabeds(timeline);
+  await enrichLogisticsTimelineCustomerNotes(workDate, timeline);
 }
 
 async function buildAutoKindPatchesFromTaskRows(

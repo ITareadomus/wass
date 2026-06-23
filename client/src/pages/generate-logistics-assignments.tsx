@@ -1022,10 +1022,24 @@ export default function GenerateLogisticsAssignments() {
     [earlyOutTasks, highPriorityTasks, lowPriorityTasks]
   );
 
-  const sequenceSummaryGroups = useMemo(
-    () => buildSequenceSummaryGroupsFromDriverAssignments(logisticsDriversAssignments),
-    [logisticsDriversAssignments]
-  );
+  const sequenceSummaryGroups = useMemo(() => {
+    const groups = buildSequenceSummaryGroupsFromDriverAssignments(logisticsDriversAssignments);
+    const order = logisticsDrivers.map((driver) => driver.id);
+    if (order.length === 0) return groups;
+
+    const byId = new Map(groups.map((group) => [group.id, group]));
+    const ordered = order
+      .map((id) => byId.get(id))
+      .filter((group): group is (typeof groups)[number] => group != null);
+
+    for (const group of groups) {
+      if (!order.includes(group.id)) {
+        ordered.push(group);
+      }
+    }
+
+    return ordered;
+  }, [logisticsDriversAssignments, logisticsDrivers]);
 
   const allTasksWithAssignments = useMemo(() => {
     const timelineTasks: TaskType[] = [];
