@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { Fragment, useState, useEffect, useMemo, type Dispatch, type SetStateAction } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -6,7 +6,17 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Users, CalendarIcon, ArrowLeft, Save, UserPlus, Search, RefreshCw, AlertTriangle, Truck, Bike } from "lucide-react";
+import { Users, CalendarIcon, ArrowLeft, Save, UserPlus, Search, RefreshCw, AlertTriangle, Truck, Bike, BarChart3 } from "lucide-react";
+import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
+import AssignmentTaskStatisticsPanel, {
+  computeAssignmentTaskStatisticsFromTasks,
+  type AssignmentTaskStatistics,
+} from "@/components/stats/assignment-task-statistics";
+import {
+  getDefaultTimelineFloatingPanel,
+  useTimelineFloatingPanel,
+} from "@/hooks/use-timeline-floating-panel";
+import type { TaskType } from "@shared/schema";
 import { format, differenceInCalendarDays } from "date-fns";
 import { it } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -57,6 +67,382 @@ interface TaskStats {
   logistics: number;
 }
 
+const getDefaultConvocazioniStatsPanel = () =>
+  getDefaultTimelineFloatingPanel("right", { width: 320, height: 320 });
+const getDefaultConvocazioniDriversPanel = () =>
+  getDefaultTimelineFloatingPanel("right", { width: 320, height: 420 });
+const getDefaultConvocazioniVehiclesPanel = () =>
+  getDefaultTimelineFloatingPanel("right", { width: 300, height: 360 });
+
+function ConvocazioniRosterStatsPanelContent({
+  roster,
+  title,
+  variant,
+}: {
+  roster: Cleaner[];
+  title: string;
+  variant: "drivers" | "housekeeping";
+}) {
+  const total = roster.length;
+  const pct = (count: number) => (total > 0 ? Math.round((count / total) * 100) : 0);
+  const dash = (count: number) => `${total > 0 ? (count / total) * 251.2 : 0} 251.2`;
+
+  const availableCount = roster.filter((c) => c.available !== false).length;
+  const unavailableCount = roster.filter((c) => c.available === false).length;
+  const premiumCount = roster.filter((c) => c.role === "Premium").length;
+  const standardCount = roster.filter((c) => c.role === "Standard").length;
+  const formatoreCount = roster.filter((c) => c.role === "Formatore").length;
+  const straordinarioCount = roster.filter((c) => c.role === "Straordinario").length;
+
+  const ring = (
+    label: string,
+    count: number,
+    boxClass: string,
+    trackClass: string,
+    arcClass: string,
+    textClass: string,
+    countClass: string
+  ) => (
+    <div className={`flex h-[112px] flex-col items-center justify-center rounded-lg border-2 p-2.5 ${boxClass}`}>
+      <svg className="mb-1 h-14 w-14" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" className={trackClass} />
+        <circle
+          cx="50"
+          cy="50"
+          r="40"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="8"
+          strokeDasharray={dash(count)}
+          strokeDashoffset="0"
+          transform="rotate(-90 50 50)"
+          className={`${arcClass} transition-all duration-500`}
+          strokeLinecap="round"
+        />
+        <text x="50" y="50" textAnchor="middle" dominantBaseline="middle" className={`text-lg font-bold ${textClass}`}>
+          {pct(count)}%
+        </text>
+      </svg>
+      <span className={`text-center text-[11px] font-semibold ${countClass}`}>{label}</span>
+      <span className={`text-[10px] ${countClass}`}>
+        {count}/{total}
+      </span>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col">
+      <div className="border-b border-border px-4 py-3">
+        <h3 className="flex items-center font-semibold text-foreground">
+          <Users className="mr-2 h-5 w-5 text-custom-blue" />
+          {title}
+        </h3>
+      </div>
+      <div className="p-4">
+        <div className="grid grid-cols-2 gap-3">
+          {ring(
+            "Disponibili",
+            availableCount,
+            "border-blue-300 bg-blue-100 dark:border-blue-700 dark:bg-blue-950/50",
+            "text-blue-200 dark:text-blue-900",
+            "text-blue-500 dark:text-blue-600",
+            "fill-blue-600 dark:fill-blue-400",
+            "text-blue-800 dark:text-blue-200"
+          )}
+          {ring(
+            "Non Disponibili",
+            unavailableCount,
+            "border-gray-300 bg-gray-100 dark:border-gray-700 dark:bg-gray-950/50",
+            "text-gray-200 dark:text-gray-800",
+            "text-gray-500 dark:text-gray-600",
+            "fill-gray-600 dark:fill-gray-400",
+            "text-gray-800 dark:text-gray-200"
+          )}
+          {variant === "housekeeping" && (
+            <>
+              {ring(
+                "Premium",
+                premiumCount,
+                "border-yellow-300 bg-yellow-100 dark:border-yellow-700 dark:bg-yellow-950/50",
+                "text-yellow-200 dark:text-yellow-900",
+                "text-yellow-500 dark:text-yellow-600",
+                "fill-yellow-600 dark:fill-yellow-400",
+                "text-yellow-800 dark:text-yellow-200"
+              )}
+              {ring(
+                "Standard",
+                standardCount,
+                "border-green-300 bg-green-100 dark:border-green-700 dark:bg-green-950/50",
+                "text-green-200 dark:text-green-900",
+                "text-green-500 dark:text-green-600",
+                "fill-green-600 dark:fill-green-400",
+                "text-green-800 dark:text-green-200"
+              )}
+              {ring(
+                "Formatori",
+                formatoreCount,
+                "border-orange-300 bg-orange-100 dark:border-orange-700 dark:bg-orange-950/50",
+                "text-orange-200 dark:text-orange-900",
+                "text-orange-500 dark:text-orange-600",
+                "fill-orange-600 dark:fill-orange-400",
+                "text-orange-800 dark:text-orange-200"
+              )}
+              {ring(
+                "Straordinari",
+                straordinarioCount,
+                "border-red-300 bg-red-100 dark:border-red-700 dark:bg-red-950/50",
+                "text-red-200 dark:text-red-900",
+                "text-red-500 dark:text-red-600",
+                "fill-red-600 dark:fill-red-400",
+                "text-red-800 dark:text-red-200"
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function driverVehiclePanelLabel(driver: Cleaner): string {
+  const alias = String(driver.alias ?? "").trim();
+  if (alias) return alias;
+  return `${driver.name} ${driver.lastname}`.trim();
+}
+
+function ConvocazioniVehiclesPanelContent({
+  selectedDrivers,
+  selectedVehicleByDriver,
+  setSelectedVehicleByDriver,
+  availableVehicles,
+  assignedVehicleIds,
+}: {
+  selectedDrivers: Cleaner[];
+  selectedVehicleByDriver: Record<number, string>;
+  setSelectedVehicleByDriver: Dispatch<SetStateAction<Record<number, string>>>;
+  availableVehicles: LogisticsVehicleOption[];
+  assignedVehicleIds: Set<number>;
+}) {
+  return (
+    <div className="flex flex-col">
+      <div className="shrink-0 border-b border-border px-4 py-3">
+        <h3 className="flex items-center font-semibold text-foreground">
+          <Truck className="mr-2 h-5 w-5 text-custom-blue" />
+          Veicoli
+        </h3>
+      </div>
+      <div className="p-4">
+        {selectedDrivers.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Nessun driver selezionato.</p>
+        ) : (
+          <div className="grid w-fit max-w-full grid-cols-[auto_9.5rem] items-start gap-x-2 gap-y-2.5">
+            {selectedDrivers.map((driver) => {
+              const currentVehicleId = Number(selectedVehicleByDriver[driver.id] ?? "");
+              const selectableVehicles = availableVehicles.filter((vehicle) => {
+                if (vehicle.id === currentVehicleId) return true;
+                return !assignedVehicleIds.has(vehicle.id);
+              });
+              const driverLabel = driverVehiclePanelLabel(driver);
+              return (
+                <Fragment key={driver.id}>
+                  <div className="max-w-[9rem] break-words text-xs font-medium leading-snug text-slate-800 dark:text-slate-200">
+                    {driverLabel}
+                  </div>
+                  <select
+                    value={selectedVehicleByDriver[driver.id] ?? ""}
+                    onChange={(e) =>
+                      setSelectedVehicleByDriver((prev) => ({
+                        ...prev,
+                        [driver.id]: e.target.value,
+                      }))
+                    }
+                    className="h-7 w-full rounded border border-slate-300 bg-background px-2 text-xs dark:border-slate-700"
+                  >
+                    <option value="">Seleziona veicolo</option>
+                    {selectableVehicles.map((vehicle) => (
+                      <option key={vehicle.id} value={vehicle.id}>
+                        {vehicle.name}
+                      </option>
+                    ))}
+                  </select>
+                </Fragment>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function priorityUiFromLogisticsTask(raw: any): "early-out" | "high" | "low" {
+  const p = String(raw?.priority || "").toLowerCase();
+  if (["early_out", "early-out", "earlyout", "early_out_assignment", "eo"].includes(p)) {
+    return "early-out";
+  }
+  if (
+    ["high_priority", "high-priority", "highpriority", "high", "high_priority_assignment", "hp"].includes(p)
+  ) {
+    return "high";
+  }
+  return "low";
+}
+
+function convLogisticsRawToStatsTask(
+  raw: any,
+  priority: "early-out" | "high" | "low"
+): TaskType {
+  const id = String(raw?.task_id ?? raw?.id ?? "");
+  return {
+    id,
+    name: String(raw?.logistic_code ?? id),
+    type: String(raw?.customer_name || ""),
+    duration: "0.00",
+    priority,
+    assignedTo: null,
+    status: "pending",
+    scheduledTime: null,
+    locked: Boolean(raw?.locked),
+    locked_reason: raw?.locked_reason != null ? String(raw.locked_reason) : undefined,
+    premium: Boolean(raw?.premium),
+    pax_in: typeof raw?.pax_in === "number" ? raw.pax_in : undefined,
+    ...(raw?.logistics_task_kind != null
+      ? { logistics_task_kind: String(raw.logistics_task_kind) }
+      : {}),
+    ...(raw?.logistics_task_kind_source != null
+      ? { logistics_task_kind_source: String(raw.logistics_task_kind_source) }
+      : {}),
+    ...(raw?.cleaner_id != null && Number.isFinite(Number(raw.cleaner_id))
+      ? { cleaner_id: Number(raw.cleaner_id) }
+      : {}),
+    ...(raw?.cleaner_sequence != null && Number.isFinite(Number(raw.cleaner_sequence))
+      ? { cleaner_sequence: Number(raw.cleaner_sequence) }
+      : {}),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  } as TaskType;
+}
+
+function convLogisticsTimelineToStatsTask(raw: any, driverId: number): TaskType {
+  const task = convLogisticsRawToStatsTask(raw, priorityUiFromLogisticsTask(raw));
+  return {
+    ...task,
+    assignedCleaner: driverId,
+    cleaner_id:
+      raw?.cleaner_id != null && Number.isFinite(Number(raw.cleaner_id))
+        ? Number(raw.cleaner_id)
+        : driverId,
+    cleaner_sequence:
+      raw?.cleaner_sequence != null && Number.isFinite(Number(raw.cleaner_sequence))
+        ? Number(raw.cleaner_sequence)
+        : raw?.sequence != null && Number.isFinite(Number(raw.sequence))
+          ? Number(raw.sequence)
+          : undefined,
+  } as TaskType;
+}
+
+function buildLogisticsStatsTasks(containers: any, timelineRows: any[]): TaskType[] {
+  const c = containers || {};
+  const containerPriority = (
+    raw: any,
+    bucket: "early_out" | "high_priority" | "low_priority"
+  ): TaskType => {
+    const priority: "early-out" | "high" | "low" =
+      bucket === "early_out" ? "early-out" : bucket === "high_priority" ? "high" : "low";
+    return convLogisticsRawToStatsTask(raw, priority);
+  };
+
+  const containerTasks = [
+    ...(c.early_out?.tasks || []).map((raw: any) => containerPriority(raw, "early_out")),
+    ...(c.high_priority?.tasks || []).map((raw: any) => containerPriority(raw, "high_priority")),
+    ...(c.low_priority?.tasks || []).map((raw: any) => containerPriority(raw, "low_priority")),
+  ];
+
+  const assigned: TaskType[] = [];
+  const assignedTaskIds = new Set<string>();
+  for (const row of timelineRows) {
+    const driverId = Number(row?.driver?.id);
+    if (!Number.isFinite(driverId)) continue;
+    for (const task of row?.tasks || []) {
+      const mapTask = convLogisticsTimelineToStatsTask(task, driverId);
+      assigned.push(mapTask);
+      assignedTaskIds.add(String(mapTask.id));
+    }
+  }
+
+  const unassigned = containerTasks.filter((task) => !assignedTaskIds.has(String(task.id)));
+  return [...unassigned, ...assigned];
+}
+
+function convHousekeepingRawToStatsTask(
+  raw: any,
+  priority: "early-out" | "high" | "low"
+): TaskType {
+  const id = String(raw?.task_id ?? raw?.id ?? "");
+  return {
+    id,
+    name: String(raw?.name ?? raw?.logistic_code ?? id),
+    type: String(raw?.customer_name || raw?.type || ""),
+    duration: "0.00",
+    priority,
+    assignedTo: null,
+    status: "pending",
+    scheduledTime: null,
+    locked: Boolean(raw?.locked),
+    locked_reason: raw?.locked_reason != null ? String(raw.locked_reason) : undefined,
+    premium: raw?.premium === true || raw?.premium === 1 || raw?.premium === "1",
+    straordinaria:
+      raw?.straordinaria === true ||
+      raw?.is_straordinaria === true ||
+      Number(raw?.operation_id) === 3 ||
+      Number(raw?.operation_id) === 37,
+    operation_id: typeof raw?.operation_id === "number" ? raw.operation_id : undefined,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  } as TaskType;
+}
+
+function convHousekeepingTimelineToStatsTask(raw: any, cleanerId: number): TaskType {
+  const task = convHousekeepingRawToStatsTask(raw, priorityUiFromLogisticsTask(raw));
+  return {
+    ...task,
+    assignedCleaner: cleanerId,
+  } as TaskType;
+}
+
+function buildHousekeepingStatsTasks(containers: any, timelineRows: any[]): TaskType[] {
+  const c = containers || {};
+  const containerPriority = (
+    raw: any,
+    bucket: "early_out" | "high_priority" | "low_priority"
+  ): TaskType => {
+    const priority: "early-out" | "high" | "low" =
+      bucket === "early_out" ? "early-out" : bucket === "high_priority" ? "high" : "low";
+    return convHousekeepingRawToStatsTask(raw, priority);
+  };
+
+  const containerTasks = [
+    ...(c.early_out?.tasks || []).map((raw: any) => containerPriority(raw, "early_out")),
+    ...(c.high_priority?.tasks || []).map((raw: any) => containerPriority(raw, "high_priority")),
+    ...(c.low_priority?.tasks || []).map((raw: any) => containerPriority(raw, "low_priority")),
+  ];
+
+  const assigned: TaskType[] = [];
+  const assignedTaskIds = new Set<string>();
+  for (const row of timelineRows) {
+    const cleanerId = Number(row?.cleaner?.id);
+    if (!Number.isFinite(cleanerId)) continue;
+    for (const task of row?.tasks || []) {
+      const mapTask = convHousekeepingTimelineToStatsTask(task, cleanerId);
+      assigned.push(mapTask);
+      assignedTaskIds.add(String(mapTask.id));
+    }
+  }
+
+  const unassigned = containerTasks.filter((task) => !assignedTaskIds.has(String(task.id)));
+  return [...unassigned, ...assigned];
+}
+
 function convocationKindFromSearch(): "cleaners" | "drivers" | "office" {
   if (typeof window === "undefined") return "cleaners";
   const kind = new URLSearchParams(window.location.search).get("kind");
@@ -80,12 +466,34 @@ export default function Convocazioni() {
   const convKind = useConvocationKind();
   const isDrivers = convKind === "drivers";
   const isOffice = convKind === "office";
+  const isHousekeeping = !isDrivers && !isOffice;
   const scopeValue: "housekeeping" | "office" = isOffice ? "office" : "housekeeping";
   const withScope = (url: string) =>
     `${url}${url.includes("?") ? "&" : "?"}scope=${scopeValue}`;
 
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [taskStats, setTaskStats] = useState<TaskStats>({ total: 0, premium: 0, standard: 0, straordinarie: 0, officeInternal: 0, logistics: 0 });
+  const [logisticsAssignmentStats, setLogisticsAssignmentStats] = useState<AssignmentTaskStatistics>({
+    total: 0,
+    locked: 0,
+    unassigned: 0,
+    pickUp: 0,
+    deliveryPickUp: 0,
+    delivery: 0,
+    altro: 0,
+  });
+  const [housekeepingAssignmentStats, setHousekeepingAssignmentStats] = useState<AssignmentTaskStatistics>({
+    total: 0,
+    locked: 0,
+    unassigned: 0,
+    standard: 0,
+    premium: 0,
+    straordinarie: 0,
+    altro: 0,
+  });
+  const convocazioniStatsPanel = useTimelineFloatingPanel("right", getDefaultConvocazioniStatsPanel);
+  const convocazioniDriversPanel = useTimelineFloatingPanel("right", getDefaultConvocazioniDriversPanel);
+  const convocazioniVehiclesPanel = useTimelineFloatingPanel("right", getDefaultConvocazioniVehiclesPanel);
   const [selectedCleaners, setSelectedCleaners] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -322,7 +730,7 @@ export default function Convocazioni() {
         setSelectedVehicleByDriver(preselectedVehicleByDriver);
 
         setLoadingMessage("Caricamento statistiche task...");
-        await loadTaskStats(dateStr, isDrivers);
+        await loadTaskStats(dateStr, isDrivers, isOffice);
 
         if (cancelled) return;
         setIsLoading(false);
@@ -349,7 +757,7 @@ export default function Convocazioni() {
     };
   }, [selectedDate, convKind]);
 
-  const loadTaskStats = async (dateStr: string, driversMode: boolean) => {
+  const loadTaskStats = async (dateStr: string, driversMode: boolean, officeMode: boolean) => {
     try {
       const containersUrl = driversMode
         ? `/api/logistics-containers?date=${encodeURIComponent(dateStr)}`
@@ -366,16 +774,31 @@ export default function Convocazioni() {
       if (!containersRes.ok) throw new Error('Errore durante il caricamento dei containers');
       const data = await containersRes.json();
       const c = data.containers || {};
-      const containerTasks = [
-        ...(c.early_out?.tasks || []),
-        ...(c.high_priority?.tasks || []),
-        ...(c.low_priority?.tasks || []),
-      ];
 
       const timelinePayload = timelineRes.ok ? await timelineRes.json() : {};
       const timelineRows = driversMode
         ? (Array.isArray((timelinePayload as any)?.drivers_assignments) ? (timelinePayload as any).drivers_assignments : [])
         : (Array.isArray((timelinePayload as any)?.cleaners_assignments) ? (timelinePayload as any).cleaners_assignments : []);
+
+      if (driversMode) {
+        const mapTasks = buildLogisticsStatsTasks(c, timelineRows);
+        setLogisticsAssignmentStats(computeAssignmentTaskStatisticsFromTasks(mapTasks, "logistics"));
+        return;
+      }
+
+      if (!officeMode) {
+        const mapTasks = buildHousekeepingStatsTasks(c, timelineRows);
+        setHousekeepingAssignmentStats(
+          computeAssignmentTaskStatisticsFromTasks(mapTasks, "housekeeping")
+        );
+        return;
+      }
+
+      const containerTasks = [
+        ...(c.early_out?.tasks || []),
+        ...(c.high_priority?.tasks || []),
+        ...(c.low_priority?.tasks || []),
+      ];
       const timelineTasks = timelineRows.flatMap((row: any) => (Array.isArray(row?.tasks) ? row.tasks : []));
 
       const assignedTaskIds = new Set<string>(
@@ -390,28 +813,7 @@ export default function Convocazioni() {
       });
 
       const allTasks = [...unassignedContainerTasks, ...timelineTasks];
-      let total = 0, premium = 0, standard = 0, straordinarie = 0, officeInternal = 0, logistics = 0;
-      let logisticsOperationIds = new Set<number>();
-      if (driversMode) {
-        try {
-          const opsRes = await fetch('/api/operations?for=logistics', {
-            cache: "no-store",
-            headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
-          });
-          if (opsRes.ok) {
-            const opsData = await opsRes.json();
-            const ops = Array.isArray(opsData?.active_operations) ? opsData.active_operations : [];
-            logisticsOperationIds = new Set(
-              ops
-                .filter((op: any) => String(op?.name || "").toLowerCase().includes("logistica"))
-                .map((op: any) => Number(op?.id))
-                .filter((id: number) => Number.isFinite(id))
-            );
-          }
-        } catch (error) {
-          console.warn("Impossibile caricare operation LOGISTICA:", error);
-        }
-      }
+      let total = 0, premium = 0, standard = 0, straordinarie = 0, officeInternal = 0;
       for (const t of allTasks) {
         const opId = Number((t as any).operation_id);
         const isLocked = isTaskLocked(t);
@@ -428,10 +830,9 @@ export default function Convocazioni() {
           else if (isPremium) premium += 1;
           else standard += 1;
           if (isOfficeInternal) officeInternal += 1;
-          if (driversMode && Number.isFinite(opId) && logisticsOperationIds.has(opId)) logistics += 1;
         }
       }
-      setTaskStats({ total, premium, standard, straordinarie, officeInternal, logistics });
+      setTaskStats({ total, premium, standard, straordinarie, officeInternal, logistics: 0 });
     } catch (error) {
       console.error('Errore nel caricamento delle statistiche task:', error);
     }
@@ -497,10 +898,15 @@ export default function Convocazioni() {
     return used;
   }, [selectedVehicleByDriver]);
 
-  const selectedDriverNames = useMemo(() => {
-    if (!isDrivers) return [];
-    return selectedDrivers.map((c) => `${c.name} ${c.lastname}`.trim());
-  }, [selectedDrivers, isDrivers]);
+  const allSelectedDriversHaveVehicles = useMemo(() => {
+    if (!isDrivers || selectedDrivers.length === 0) return true;
+    return selectedDrivers.every((driver) => {
+      const raw = selectedVehicleByDriver[driver.id];
+      if (raw == null || raw === "") return false;
+      const id = Number(raw);
+      return Number.isFinite(id) && id > 0;
+    });
+  }, [isDrivers, selectedDrivers, selectedVehicleByDriver]);
 
   const toggleCleanerSelection = (cleanerId: number, isAvailable: boolean) => {
     // Se il cleaner è già selezionato, lo deseleziona
@@ -577,6 +983,15 @@ export default function Convocazioni() {
         variant: "destructive",
         title: `⚠️ Nessun ${label} selezionato`,
         description: `Seleziona almeno un ${label} prima di salvare`,
+      });
+      return false;
+    }
+
+    if (isDrivers && !allSelectedDriversHaveVehicles) {
+      toast({
+        variant: "destructive",
+        title: "Veicoli mancanti",
+        description: "Associa un veicolo a ogni driver selezionato prima di salvare",
       });
       return false;
     }
@@ -866,7 +1281,7 @@ export default function Convocazioni() {
   };
 
   return (
-    <div className="h-[calc(100dvh-3.5rem-1px)] overflow-hidden bg-background text-foreground md:h-[calc(100dvh-3.75rem-1px)]">
+    <div className="convocazioni-page h-[calc(100dvh-3.5rem-1px)] overflow-hidden bg-background text-foreground md:h-[calc(100dvh-3.75rem-1px)]">
       <div className="flex h-full w-full min-w-0 flex-col overflow-x-hidden px-4 pb-6 pt-3">
         {isLoading ? (
           <PageViewportCentered layout="fill" className="py-4">
@@ -882,7 +1297,7 @@ export default function Convocazioni() {
             </div>
           </PageViewportCentered>
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col">
+          <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="mb-3 shrink-0 space-y-3">
           {/* Header con titolo e selettore data */}
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -950,9 +1365,9 @@ export default function Convocazioni() {
         </div>
 
         {/* Grid con lista cleaners e statistiche affiancate */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
-          {/* Lista Cleaners - 2/3 dello spazio */}
-          <Card className="p-4 lg:col-span-2 flex flex-col h-full min-h-0 overflow-hidden border-2 border-custom-blue bg-custom-blue-light dark:bg-custom-blue">
+        <div className={cn("grid grid-cols-1 gap-4 flex-1 min-h-0", isOffice && "lg:grid-cols-3")}>
+          {/* Lista Cleaners - full width per logistica e housekeeping */}
+          <Card className={cn("p-4 flex flex-col h-full min-h-0 overflow-hidden border-2 border-custom-blue bg-custom-blue-light dark:bg-custom-blue", isOffice && "lg:col-span-2")}>
             <div className="mb-3 relative shrink-0">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-custom-blue" />
               <Input
@@ -1297,7 +1712,11 @@ export default function Convocazioni() {
                 }
               }}
               size="lg"
-              disabled={selectedCleaners.size === 0 || isSaving}
+              disabled={
+                selectedCleaners.size === 0 ||
+                isSaving ||
+                (isDrivers && !allSelectedDriversHaveVehicles)
+              }
               className="flex items-center gap-2 bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
               data-testid="button-save-and-home"
             >
@@ -1312,9 +1731,9 @@ export default function Convocazioni() {
           </div>
         </Card>
 
-        {/* Pannello Statistiche - 1/3 dello spazio - FISSO */}
-        <Card className="p-4 border-2 bg-background flex flex-col h-full overflow-hidden">
-          <h3 className="text-lg font-semibold text-foreground mb-3 flex items-center">
+        {isOffice && (
+        <Card className="p-4 border-2 bg-background flex flex-col h-full min-h-0 overflow-hidden">
+          <h3 className="text-lg font-semibold text-foreground mb-3 flex shrink-0 items-center">
             <svg
               className="w-5 h-5 mr-2 text-custom-blue"
               fill="none"
@@ -1331,68 +1750,29 @@ export default function Convocazioni() {
             Statistiche
           </h3>
 
-          {/* Statistiche Task */}
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
           <div className="mb-3 pb-2 border-b border-border shrink-0">
-            <h4 className="text-xs font-semibold text-muted-foreground mb-2">
-              {isOffice ? "Task Ufficio" : "Task Giornata"}
-            </h4>
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2">Task Ufficio</h4>
             <div className="grid grid-cols-2 gap-2">
-              {isOffice ? (
-                <>
-                  <div className="col-span-2 bg-blue-100 dark:bg-blue-950/50 rounded-lg p-2 border-2 border-blue-300 dark:border-blue-700">
-                    <div className="text-lg font-bold text-blue-800 dark:text-blue-200">{taskStats.total}</div>
-                    <div className="text-[10px] text-blue-800 dark:text-blue-200">Totale</div>
-                  </div>
-                  <div className="bg-sky-100 dark:bg-sky-950/50 rounded-lg p-2 border-2 border-sky-300 dark:border-sky-700">
-                    <div className="text-lg font-bold text-sky-800 dark:text-sky-200">
-                      {Math.max(0, taskStats.total - taskStats.straordinarie)}
-                    </div>
-                    <div className="text-[10px] text-sky-800 dark:text-sky-200">Pulizia Ufficio</div>
-                  </div>
-                  <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-2 border-2 border-red-300 dark:border-red-700">
-                    <div className="text-lg font-bold text-red-800 dark:text-red-200">{taskStats.straordinarie}</div>
-                    <div className="text-[10px] text-red-800 dark:text-red-200">Pulizia Ufficio Straordinaria</div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="col-span-2 bg-blue-100 dark:bg-blue-950/50 rounded-lg p-2 border-2 border-blue-300 dark:border-blue-700">
-                    <div className="text-lg font-bold text-blue-800 dark:text-blue-200">{taskStats.total}</div>
-                    <div className="text-[10px] text-blue-800 dark:text-blue-200">Totale</div>
-                  </div>
-                  <div className="bg-green-100 dark:bg-green-950/50 rounded-lg p-2 border-2 border-green-300 dark:border-green-700">
-                    <div className="text-lg font-bold text-green-800 dark:text-green-200">{taskStats.standard}</div>
-                    <div className="text-[10px] text-green-800 dark:text-green-200">Standard</div>
-                  </div>
-                  <div className="bg-yellow-100 dark:bg-yellow-950/50 rounded-lg p-2 border-2 border-yellow-300 dark:border-yellow-700">
-                    <div className="text-lg font-bold text-yellow-800 dark:text-yellow-200">{taskStats.premium}</div>
-                    <div className="text-[10px] text-yellow-800 dark:text-yellow-200">Premium</div>
-                  </div>
-                  <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-2 border-2 border-red-300 dark:border-red-700">
-                    <div className="text-lg font-bold text-red-800 dark:text-red-200">{taskStats.straordinarie}</div>
-                    <div className="text-[10px] text-red-800 dark:text-red-200">Straordinarie</div>
-                  </div>
-                  {isDrivers && (
-                    <div className="bg-sky-100 dark:bg-sky-950/50 rounded-lg p-2 border-2 border-sky-300 dark:border-sky-700">
-                      <div className="text-lg font-bold text-sky-800 dark:text-sky-200">{taskStats.logistics}</div>
-                      <div className="text-[10px] text-sky-800 dark:text-sky-200">Logistica</div>
-                    </div>
-                  )}
-                  {!isDrivers && !isOffice && (
-                    <div className="bg-sky-100 dark:bg-sky-950/50 rounded-lg p-2 border-2 border-sky-300 dark:border-sky-700">
-                      <div className="text-lg font-bold text-sky-800 dark:text-sky-200">-</div>
-                      <div className="text-[10px] text-sky-800 dark:text-sky-200">Pulizia Ufficio Interna</div>
-                    </div>
-                  )}
-                </>
-              )}
+              <div className="col-span-2 bg-blue-100 dark:bg-blue-950/50 rounded-lg p-2 border-2 border-blue-300 dark:border-blue-700">
+                <div className="text-lg font-bold text-blue-800 dark:text-blue-200">{taskStats.total}</div>
+                <div className="text-[10px] text-blue-800 dark:text-blue-200">Totale</div>
+              </div>
+              <div className="bg-sky-100 dark:bg-sky-950/50 rounded-lg p-2 border-2 border-sky-300 dark:border-sky-700">
+                <div className="text-lg font-bold text-sky-800 dark:text-sky-200">
+                  {Math.max(0, taskStats.total - taskStats.straordinarie)}
+                </div>
+                <div className="text-[10px] text-sky-800 dark:text-sky-200">Pulizia Ufficio</div>
+              </div>
+              <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-2 border-2 border-red-300 dark:border-red-700">
+                <div className="text-lg font-bold text-red-800 dark:text-red-200">{taskStats.straordinarie}</div>
+                <div className="text-[10px] text-red-800 dark:text-red-200">Pulizia Ufficio Straordinaria</div>
+              </div>
             </div>
           </div>
 
-          {/* Statistiche roster */}
-          <h4 className="text-xs font-semibold text-muted-foreground mb-2 shrink-0">
-            {isDrivers ? "Driver" : isOffice ? "Cleaners Ufficio" : "Cleaners"}
-          </h4>
+          {/* Statistiche roster ufficio */}
+          <h4 className="text-xs font-semibold text-muted-foreground mb-2 shrink-0">Cleaners Ufficio</h4>
           <div className="grid grid-cols-2 gap-2 auto-rows-[112px] shrink-0">
             {/* Disponibili */}
             <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-2.5 h-[112px] flex flex-col items-center justify-center border-2 border-blue-300 dark:border-blue-700">
@@ -1476,232 +1856,145 @@ export default function Convocazioni() {
               </span>
             </div>
 
-            {!isDrivers && !isOffice && (
+          </div>
+          </div>
+
+          <div className="mt-3 pt-3 border-t border-border flex flex-col flex-1 min-h-0">
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2">Legenda Ufficio</h4>
+          </div>
+        </Card>
+        )}
+      </div>
+
+            {isHousekeeping && (
               <>
-            {/* Premium */}
-            <div className="bg-yellow-100 dark:bg-yellow-950/50 rounded-lg p-2 h-[112px] flex flex-col items-center justify-center border-2 border-yellow-300 dark:border-yellow-700">
-              <svg className="w-14 h-14 mb-1" viewBox="0 0 100 100">
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  className="text-yellow-200 dark:text-yellow-900"
+              <TimelineFloatingPanel
+                side="right"
+                fitContent
+                toggleVerticalOffset={-26}
+                isOpen={convocazioniStatsPanel.isOpen}
+                onOpenChange={convocazioniStatsPanel.setIsOpen}
+                panel={convocazioniStatsPanel.panel}
+                onResetPanel={convocazioniStatsPanel.resetPanel}
+                toggleAriaLabel="Mostra statistiche task"
+                toggleTitle="Mostra statistiche task"
+                toggleIcon={<BarChart3 className="h-4 w-4" />}
+                dragTitle="Trascina statistiche"
+                closeAriaLabel="Nascondi statistiche"
+                closeTitle="Nascondi statistiche"
+                onPointerDown={convocazioniStatsPanel.handlePointerDown}
+                onPointerMove={convocazioniStatsPanel.handlePointerMove}
+                onPointerEnd={convocazioniStatsPanel.handlePointerEnd}
+              >
+                <AssignmentTaskStatisticsPanel
+                  variant="housekeeping"
+                  stats={housekeepingAssignmentStats}
                 />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  strokeDasharray={`${filteredCleaners.length > 0 ? (filteredCleaners.filter(c => c.role === "Premium").length / filteredCleaners.length) * 251.2 : 0} 251.2`}
-                  strokeDashoffset="0"
-                  transform="rotate(-90 50 50)"
-                  className="text-yellow-500 dark:text-yellow-600 transition-all duration-500"
-                  strokeLinecap="round"
+              </TimelineFloatingPanel>
+              <TimelineFloatingPanel
+                side="right"
+                fitContent
+                toggleVerticalOffset={26}
+                isOpen={convocazioniDriversPanel.isOpen}
+                onOpenChange={convocazioniDriversPanel.setIsOpen}
+                panel={convocazioniDriversPanel.panel}
+                onResetPanel={convocazioniDriversPanel.resetPanel}
+                toggleAriaLabel="Mostra statistiche cleaners"
+                toggleTitle="Mostra statistiche cleaners"
+                toggleIcon={<Users className="h-4 w-4" />}
+                dragTitle="Trascina statistiche cleaners"
+                closeAriaLabel="Nascondi statistiche cleaners"
+                closeTitle="Nascondi statistiche cleaners"
+                onPointerDown={convocazioniDriversPanel.handlePointerDown}
+                onPointerMove={convocazioniDriversPanel.handlePointerMove}
+                onPointerEnd={convocazioniDriversPanel.handlePointerEnd}
+              >
+                <ConvocazioniRosterStatsPanelContent
+                  roster={driversRoster}
+                  title="Cleaners"
+                  variant="housekeeping"
                 />
-                <text
-                  x="50"
-                  y="50"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="text-lg font-bold fill-yellow-600 dark:fill-yellow-400"
-                >
-                  {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.role === "Premium").length / filteredCleaners.length) * 100) : 0}%
-                </text>
-              </svg>
-              <span className="text-[11px] font-semibold text-yellow-800 dark:text-yellow-200 text-center">Premium</span>
-              <span className="text-[10px] text-yellow-800 dark:text-yellow-200">
-                {filteredCleaners.filter(c => c.role === "Premium").length}/{filteredCleaners.length}
-              </span>
-            </div>
-
-            {/* Standard */}
-            <div className="bg-green-100 dark:bg-green-950/50 rounded-lg p-2 h-[112px] flex flex-col items-center justify-center border-2 border-green-300 dark:border-green-700">
-              <svg className="w-14 h-14 mb-1" viewBox="0 0 100 100">
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  className="text-green-200 dark:text-green-900"
-                />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  strokeDasharray={`${filteredCleaners.length > 0 ? (filteredCleaners.filter(c => c.role === "Standard").length / filteredCleaners.length) * 251.2 : 0} 251.2`}
-                  strokeDashoffset="0"
-                  transform="rotate(-90 50 50)"
-                  className="text-green-500 dark:text-green-600 transition-all duration-500"
-                  strokeLinecap="round"
-                />
-                <text
-                  x="50"
-                  y="50"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="text-lg font-bold fill-green-600 dark:fill-green-400"
-                >
-                  {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.role === "Standard").length / filteredCleaners.length) * 100) : 0}%
-                </text>
-              </svg>
-              <span className="text-[11px] font-semibold text-green-800 dark:text-green-200 text-center">Standard</span>
-              <span className="text-[10px] text-green-800 dark:text-green-200">
-                {filteredCleaners.filter(c => c.role === "Standard").length}/{filteredCleaners.length}
-              </span>
-            </div>
-
-            {/* Formatori */}
-            <div className="bg-orange-100 dark:bg-orange-950/50 rounded-lg p-2 h-[112px] flex flex-col items-center justify-center border-2 border-orange-300 dark:border-orange-700">
-              <svg className="w-14 h-14 mb-1" viewBox="0 0 100 100">
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  className="text-orange-200 dark:text-orange-900"
-                />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  strokeDasharray={`${filteredCleaners.length > 0 ? (filteredCleaners.filter(c => c.role === "Formatore").length / filteredCleaners.length) * 251.2 : 0} 251.2`}
-                  strokeDashoffset="0"
-                  transform="rotate(-90 50 50)"
-                  className="text-orange-500 dark:text-orange-600 transition-all duration-500"
-                  strokeLinecap="round"
-                />
-                <text
-                  x="50"
-                  y="50"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="text-lg font-bold fill-orange-600 dark:fill-orange-400"
-                >
-                  {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.role === "Formatore").length / filteredCleaners.length) * 100) : 0}%
-                </text>
-              </svg>
-              <span className="text-[11px] font-semibold text-orange-800 dark:text-orange-200 text-center">Formatori</span>
-              <span className="text-[10px] text-orange-800 dark:text-orange-200">
-                {filteredCleaners.filter(c => c.role === "Formatore").length}/{filteredCleaners.length}
-              </span>
-            </div>
-
-            {/* Straordinari */}
-            <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-2 h-[112px] flex flex-col items-center justify-center border-2 border-red-300 dark:border-red-700">
-              <svg className="w-14 h-14 mb-1" viewBox="0 0 100 100">
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  className="text-red-200 dark:text-red-900"
-                />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  strokeDasharray={`${filteredCleaners.length > 0 ? (filteredCleaners.filter(c => c.role === "Straordinario").length / filteredCleaners.length) * 251.2 : 0} 251.2`}
-                  strokeDashoffset="0"
-                  transform="rotate(-90 50 50)"
-                  className="text-red-500 dark:text-red-600 transition-all duration-500"
-                  strokeLinecap="round"
-                />
-                <text
-                  x="50"
-                  y="50"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="text-lg font-bold fill-red-600 dark:fill-red-400"
-                >
-                  {filteredCleaners.length > 0 ? Math.round((filteredCleaners.filter(c => c.role === "Straordinario").length / filteredCleaners.length) * 100) : 0}%
-                </text>
-              </svg>
-              <span className="text-[11px] font-semibold text-red-800 dark:text-red-200 text-center">Straordinari</span>
-              <span className="text-[10px] text-red-800 dark:text-red-200">
-                {filteredCleaners.filter(c => c.role === "Straordinario").length}/{filteredCleaners.length}
-              </span>
-            </div>
+              </TimelineFloatingPanel>
               </>
             )}
 
-          </div>
-
-          {isOffice && (
-            <div className="mt-3 pt-3 border-t border-border flex flex-col flex-1 min-h-0">
-              <h4 className="text-xs font-semibold text-muted-foreground mb-2">Legenda Ufficio</h4>
-            </div>
-          )}
-
-          {isDrivers && (
-            <div className="mt-3 pt-3 border-t border-border flex flex-col flex-1 min-h-0">
-              <h4 className="text-xs font-semibold text-muted-foreground mb-2">Veicoli</h4>
-              <div className="bg-slate-100 dark:bg-slate-950/50 rounded-lg p-3 border-2 border-slate-300 dark:border-slate-700 flex-1 min-h-0 overflow-y-auto">
-                {selectedDriverNames.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    Nessun driver selezionato.
-                  </p>
-                ) : (
-                  <div className="space-y-1">
-                    {selectedDrivers.map((driver) => (
-                      <div key={driver.id} className="flex items-center gap-2">
-                        <div className="text-xs font-medium text-slate-800 dark:text-slate-200 flex-1">
-                          {`${driver.name} ${driver.lastname}`.trim()}
-                        </div>
-                        {(() => {
-                          const currentVehicleId = Number(selectedVehicleByDriver[driver.id] ?? "");
-                          const selectableVehicles = availableVehicles.filter((vehicle) => {
-                            if (vehicle.id === currentVehicleId) return true;
-                            return !assignedVehicleIds.has(vehicle.id);
-                          });
-                          return (
-                        <select
-                          value={selectedVehicleByDriver[driver.id] ?? ""}
-                          onChange={(e) =>
-                            setSelectedVehicleByDriver((prev) => ({
-                              ...prev,
-                              [driver.id]: e.target.value,
-                            }))
-                          }
-                          className="h-7 text-xs rounded border border-slate-300 dark:border-slate-700 bg-background px-2 min-w-[120px]"
-                        >
-                          <option value="">Seleziona veicolo</option>
-                          {selectableVehicles.map((vehicle) => (
-                            <option key={vehicle.id} value={vehicle.id}>
-                              {vehicle.name}
-                            </option>
-                          ))}
-                        </select>
-                          );
-                        })()}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </Card>
-      </div>
+            {isDrivers && (
+              <>
+              <TimelineFloatingPanel
+                side="right"
+                fitContent
+                toggleVerticalOffset={-52}
+                isOpen={convocazioniStatsPanel.isOpen}
+                onOpenChange={convocazioniStatsPanel.setIsOpen}
+                panel={convocazioniStatsPanel.panel}
+                onResetPanel={convocazioniStatsPanel.resetPanel}
+                toggleAriaLabel="Mostra statistiche task"
+                toggleTitle="Mostra statistiche task"
+                toggleIcon={<BarChart3 className="h-4 w-4" />}
+                dragTitle="Trascina statistiche"
+                closeAriaLabel="Nascondi statistiche"
+                closeTitle="Nascondi statistiche"
+                onPointerDown={convocazioniStatsPanel.handlePointerDown}
+                onPointerMove={convocazioniStatsPanel.handlePointerMove}
+                onPointerEnd={convocazioniStatsPanel.handlePointerEnd}
+              >
+                <AssignmentTaskStatisticsPanel
+                  variant="logistics"
+                  stats={logisticsAssignmentStats}
+                />
+              </TimelineFloatingPanel>
+              <TimelineFloatingPanel
+                side="right"
+                fitContent
+                isOpen={convocazioniDriversPanel.isOpen}
+                onOpenChange={convocazioniDriversPanel.setIsOpen}
+                panel={convocazioniDriversPanel.panel}
+                onResetPanel={convocazioniDriversPanel.resetPanel}
+                toggleAriaLabel="Mostra statistiche driver"
+                toggleTitle="Mostra statistiche driver"
+                toggleIcon={<Users className="h-4 w-4" />}
+                dragTitle="Trascina statistiche driver"
+                closeAriaLabel="Nascondi statistiche driver"
+                closeTitle="Nascondi statistiche driver"
+                onPointerDown={convocazioniDriversPanel.handlePointerDown}
+                onPointerMove={convocazioniDriversPanel.handlePointerMove}
+                onPointerEnd={convocazioniDriversPanel.handlePointerEnd}
+              >
+                <ConvocazioniRosterStatsPanelContent
+                  roster={driversRoster}
+                  title="Driver"
+                  variant="drivers"
+                />
+              </TimelineFloatingPanel>
+              <TimelineFloatingPanel
+                side="right"
+                fitContent
+                fitContentWidth
+                isOpen={convocazioniVehiclesPanel.isOpen}
+                onOpenChange={convocazioniVehiclesPanel.setIsOpen}
+                panel={convocazioniVehiclesPanel.panel}
+                onResetPanel={convocazioniVehiclesPanel.resetPanel}
+                toggleVerticalOffset={52}
+                toggleAriaLabel="Mostra veicoli"
+                toggleTitle="Mostra veicoli"
+                toggleIcon={<Truck className="h-4 w-4" />}
+                dragTitle="Trascina veicoli"
+                closeAriaLabel="Nascondi veicoli"
+                closeTitle="Nascondi veicoli"
+                onPointerDown={convocazioniVehiclesPanel.handlePointerDown}
+                onPointerMove={convocazioniVehiclesPanel.handlePointerMove}
+                onPointerEnd={convocazioniVehiclesPanel.handlePointerEnd}
+              >
+                <ConvocazioniVehiclesPanelContent
+                  selectedDrivers={selectedDrivers}
+                  selectedVehicleByDriver={selectedVehicleByDriver}
+                  setSelectedVehicleByDriver={setSelectedVehicleByDriver}
+                  availableVehicles={availableVehicles}
+                  assignedVehicleIds={assignedVehicleIds}
+                />
+              </TimelineFloatingPanel>
+              </>
+            )}
 
           </div>
         )}

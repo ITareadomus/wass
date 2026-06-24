@@ -3276,6 +3276,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } = await import("./services/adam-logistics-vehicle-service");
       const fullRows = await pgDailyAssignmentsService.loadLgDriversByIds(driverIds, workDate);
       const rowById = new Map<number, any>(fullRows.map((r: any) => [Number(r.id), r]));
+      const existingVehicleAssignments =
+        await pgDailyAssignmentsService.loadSelectedLogisticsDriverVehicleAssignments(workDate);
       const baseEnriched = selectedDrivers.map((d: any) => {
         const id = typeof d === "number" ? d : d.id;
         const row = rowById.get(id);
@@ -3287,10 +3289,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           typeof d === "object" && d && d.end_time != null
             ? d.end_time
             : row?.end_time || "20:00";
-        const rawVid =
-          typeof d === "object" && d && d.assigned_vehicle_id != null && d.assigned_vehicle_id !== ""
-            ? Number(d.assigned_vehicle_id)
-            : null;
+
+        const hasVehicleField =
+          typeof d === "object" && d && Object.prototype.hasOwnProperty.call(d, "assigned_vehicle_id");
+        const existingAssignment = existingVehicleAssignments?.[String(id)];
+        let rawVid: number | null = null;
+        let vehicleName: string | null = null;
+        let vehiclePmsCode: string | null = null;
+        if (hasVehicleField) {
+          if (d.assigned_vehicle_id != null && d.assigned_vehicle_id !== "") {
+            rawVid = Number(d.assigned_vehicle_id);
+            vehicleName = d.assigned_vehicle_name ?? null;
+            vehiclePmsCode = d.assigned_vehicle_pms_code ?? null;
+          }
+        } else if (existingAssignment?.vehicle_id != null && existingAssignment?.vehicle_id !== "") {
+          rawVid = Number(existingAssignment.vehicle_id);
+          vehicleName = existingAssignment.vehicle_name ?? null;
+          vehiclePmsCode = existingAssignment.vehicle_pms_code ?? null;
+        }
+
         const structureId = normalizeVehicleStructureId(rawVid);
         if (row) {
           return {
@@ -3302,10 +3319,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             start_time: st,
             end_time: et,
             assigned_vehicle_id: structureId,
-            assigned_vehicle_name:
-              typeof d === "object" && d ? d.assigned_vehicle_name ?? null : null,
-            assigned_vehicle_pms_code:
-              typeof d === "object" && d ? d.assigned_vehicle_pms_code ?? null : null,
+            assigned_vehicle_name: vehicleName,
+            assigned_vehicle_pms_code: vehiclePmsCode,
           };
         }
         return typeof d === "number"
@@ -3318,8 +3333,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               start_time: st,
               end_time: et,
               assigned_vehicle_id: structureId,
-              assigned_vehicle_name: null,
-              assigned_vehicle_pms_code: null,
+              assigned_vehicle_name: vehicleName,
+              assigned_vehicle_pms_code: vehiclePmsCode,
             }
           : {
               id: d.id,
@@ -3330,8 +3345,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               start_time: st,
               end_time: et,
               assigned_vehicle_id: structureId,
-              assigned_vehicle_name: d.assigned_vehicle_name ?? null,
-              assigned_vehicle_pms_code: d.assigned_vehicle_pms_code ?? null,
+              assigned_vehicle_name: vehicleName,
+              assigned_vehicle_pms_code: vehiclePmsCode,
             };
       });
 
@@ -3822,7 +3837,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/add-driver-to-timeline", async (req, res) => {
     try {
-      const { driverId, date, modified_by, created_by } = req.body;
+      const {
+        driverId,
+        date,
+        modified_by,
+        created_by,
+        assigned_vehicle_id,
+        assigned_vehicle_name,
+        assigned_vehicle_pms_code,
+      } = req.body;
       if (driverId == null) {
         return res.status(400).json({ success: false, error: "driverId richiesto" });
       }
@@ -3936,11 +3959,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ids.push(did);
       }
 
+      const existingById = new Map(
+        (selectedDriversData?.drivers || []).map((d: any) => [Number(d.id), d])
+      );
+      const vehicleAssignmentsFromPg =
+        await pgDailyAssignmentsService.loadSelectedLogisticsDriverVehicleAssignments(workDate);
+      const newVehicleId =
+        assigned_vehicle_id != null && assigned_vehicle_id !== ""
+          ? Number(assigned_vehicle_id)
+          : null;
+
+      const vehicleFieldsForDriver = (numId: number, existing: any) => {
+        if (numId === did && newVehicleId != null && Number.isFinite(newVehicleId)) {
+          return {
+            assigned_vehicle_id: newVehicleId,
+            assigned_vehicle_name: assigned_vehicle_name ?? null,
+            assigned_vehicle_pms_code: assigned_vehicle_pms_code ?? null,
+          };
+        }
+        if (existing?.assigned_vehicle_id != null && existing.assigned_vehicle_id !== "") {
+          return {
+            assigned_vehicle_id: existing.assigned_vehicle_id,
+            assigned_vehicle_name: existing.assigned_vehicle_name ?? null,
+            assigned_vehicle_pms_code: existing.assigned_vehicle_pms_code ?? null,
+            assigned_vehicle_task_id: existing.assigned_vehicle_task_id ?? null,
+          };
+        }
+        const fromPg = vehicleAssignmentsFromPg?.[String(numId)];
+        if (fromPg?.vehicle_id != null && fromPg?.vehicle_id !== "") {
+          return {
+            assigned_vehicle_id: fromPg.vehicle_id,
+            assigned_vehicle_name: fromPg.vehicle_name ?? null,
+            assigned_vehicle_pms_code: fromPg.vehicle_pms_code ?? null,
+            assigned_vehicle_task_id: fromPg.vehicle_task_id ?? null,
+          };
+        }
+        return {
+          assigned_vehicle_id: null,
+          assigned_vehicle_name: null,
+          assigned_vehicle_pms_code: null,
+          assigned_vehicle_task_id: null,
+        };
+      };
+
+      const driversToSave = ids.map((id) => {
+        const numId = Number(id);
+        const existing = existingById.get(numId);
+        const base = existing ? { ...existing, id: numId } : { id: numId };
+        if (numId === did) {
+          return {
+            ...base,
+            start_time: driverData.start_time || base.start_time || "10:00",
+            end_time: driverData.end_time || base.end_time || "20:00",
+            ...vehicleFieldsForDriver(numId, existing),
+          };
+        }
+        return {
+          ...base,
+          ...vehicleFieldsForDriver(numId, existing),
+        };
+      });
+
       await workspaceFiles.saveSelectedLogisticsDrivers(
         workDate,
         {
-          drivers: ids.map((id) => ({ id })),
-          total_selected: ids.length,
+          drivers: driversToSave,
+          total_selected: driversToSave.length,
           metadata: { date: workDate },
         },
         false,

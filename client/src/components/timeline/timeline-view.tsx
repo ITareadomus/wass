@@ -33,7 +33,7 @@ import {
 } from "@/lib/taskValidation";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { getCleanerHexColor } from "@/lib/cleaner-colors";
+import { getPersonnelHexColor } from "@/lib/cleaner-colors";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -2664,7 +2664,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                             "flex-shrink-0 self-center my-[2px] ml-[2px] h-[calc(100%-4px)] rounded-sm",
                             CLEANER_BOX_VARIANT === "left-bar" ? "w-1.5" : "w-7"
                           )}
-                          style={{ backgroundColor: getCleanerHexColor(cleaner.id) }}
+                          style={{ backgroundColor: getPersonnelHexColor(cleaner.id, "housekeeping") }}
                         />
                       )}
                       <div className="min-w-0 w-full flex items-center gap-2 px-2">

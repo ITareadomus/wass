@@ -700,11 +700,23 @@ export async function saveSelectedLogisticsDrivers(
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
     const arr = data.drivers || [];
     const driverIds = arr.map((d: any) => (typeof d === 'number' ? d : d.id)).filter((id: any) => id != null);
+    const existingVehicleAssignments =
+      await pgDailyAssignmentsService.loadSelectedLogisticsDriverVehicleAssignments(workDate);
     const vehicleAssignments: Record<string, any> = {};
     for (const d of arr) {
       if (!d || typeof d !== 'object' || d.id == null) continue;
       const driverId = String(d.id);
+      const hasVehicleField = Object.prototype.hasOwnProperty.call(d, 'assigned_vehicle_id');
       const vehicleIdRaw = d.assigned_vehicle_id;
+
+      if (!hasVehicleField) {
+        const existing = existingVehicleAssignments?.[driverId];
+        if (existing?.vehicle_id != null && existing?.vehicle_id !== '') {
+          vehicleAssignments[driverId] = { ...existing };
+        }
+        continue;
+      }
+
       if (vehicleIdRaw == null || vehicleIdRaw === '') continue;
       const vehicleId = Number(vehicleIdRaw);
       if (!Number.isFinite(vehicleId)) continue;

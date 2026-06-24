@@ -62,6 +62,10 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
 import {
+  getHousekeepingTypeTier,
+  type HousekeepingTypeTier,
+} from "@/lib/housekeeping-intervention-type";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -1046,25 +1050,6 @@ const displayClickableInputClass =
   const isConfirmedOperation = hasPendingOperationEdit || originalConfirmed;
 
   // Determina il tipo della CARD dai flag dell'oggetto *task* (non quelli della navigazione nel modale)
-  const cardIsPremium = Boolean(task.premium);
-  const cardIsStraordinaria =
-    Boolean(task.straordinaria) ||
-    isContinuazioneStraordinariaTask(task) ||
-    isOfficeStraordinariaOperation(task);
-
-  type HousekeepingTypeTier = "straordinaria" | "premium" | "standard" | "altro";
-
-  const getHousekeepingTypeTier = (
-    taskObj: any,
-    isStraord: boolean,
-    isPrem: boolean
-  ): HousekeepingTypeTier => {
-    if (isStraord) return "straordinaria";
-    if (isPrem) return "premium";
-    if (getExternalInterventionBadgeLabel(taskObj, isStraord, isPrem)) return "altro";
-    if (isOfficeOtherOperation(taskObj)) return "altro";
-    return "standard";
-  };
 
   const HOUSEKEEPING_STRIPE_CLASS: Record<HousekeepingTypeTier, string> = {
     straordinaria: "bg-red-500",
@@ -1091,7 +1076,7 @@ const displayClickableInputClass =
     altro: "bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300 border-gray-400 dark:border-gray-500",
   };
 
-  const cardHousekeepingTier = getHousekeepingTypeTier(task, cardIsStraordinaria, cardIsPremium);
+  const cardHousekeepingTier = getHousekeepingTypeTier(task, operationNames);
 
   // Il modale invece usa displayTask (vedi più sotto)
 
@@ -2380,11 +2365,7 @@ const displayClickableInputClass =
         : isContinuazioneStraordinariaTask(displayTask)
           ? "CONTINUAZIONE PS"
           : getTaskTypeStyle(dialogDisplayIsStraordinaria, dialogDisplayIsPremium).label;
-  const dialogHousekeepingTier = getHousekeepingTypeTier(
-    displayTask,
-    dialogDisplayIsStraordinaria,
-    dialogDisplayIsPremium
-  );
+  const dialogHousekeepingTier = getHousekeepingTypeTier(displayTask, operationNames);
   const dialogHousekeepingTypeBadge = (
     <Badge
       variant="outline"

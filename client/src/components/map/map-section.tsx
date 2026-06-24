@@ -4,7 +4,10 @@ import { TaskType as Task } from "@shared/schema";
 import TaskCard from "@/components/drag-drop/task-card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { getCleanerHexColor } from "@/lib/cleaner-colors";
+import {
+  getPersonnelHexColor,
+  type PersonnelColorScope,
+} from "@/lib/cleaner-colors";
 
 interface MapSectionProps {
   tasks: Task[];
@@ -13,6 +16,7 @@ interface MapSectionProps {
   mapClassName?: string;
   mapMinHeight?: string | number;
   compact?: boolean;
+  personnelColorScope?: PersonnelColorScope;
 }
 
 declare global {
@@ -29,6 +33,7 @@ export default function MapSection({
   mapClassName,
   mapMinHeight,
   compact = false,
+  personnelColorScope = "housekeeping",
 }: MapSectionProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const googleMapRef = useRef<any>(null);
@@ -136,7 +141,7 @@ export default function MapSection({
 
   // Funzione per ottenere il colore del cleaner (sincronizzato con timeline)
   const getCleanerColor = (cleanerId: number) => {
-    return getCleanerHexColor(cleanerId);
+    return getPersonnelHexColor(cleanerId, personnelColorScope);
   };
 
   // Carica Google Maps API
@@ -591,7 +596,7 @@ export default function MapSection({
         }, 100);
       }
     }
-  }, [tasks, isMapLoaded, cleaners, filteredCleanerId, filteredTaskId]);
+  }, [tasks, isMapLoaded, cleaners, filteredCleanerId, filteredTaskId, personnelColorScope]);
 
   return (
     <div className={cn("bg-card rounded-lg border-2 border-border shadow-sm box-border overflow-hidden", compact && "flex flex-col", className)}>

@@ -258,6 +258,24 @@
     display: none;
   }
 
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .convocazioni-page :is(.overflow-y-auto, .overflow-y-scroll, .overflow-auto) {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .convocazioni-page :is(.overflow-y-auto, .overflow-y-scroll, .overflow-auto)::-webkit-scrollbar {
+    display: none;
+  }
+
   .timeline-center-scroll.is-panning {
     cursor: grabbing;
   }

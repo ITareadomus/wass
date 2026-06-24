@@ -31,7 +31,7 @@ import TaskCard from "@/components/drag-drop/task-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { getCleanerHexColor } from "@/lib/cleaner-colors";
+import { getPersonnelHexColor } from "@/lib/cleaner-colors";
 import type { TaskType as Task } from "@shared/schema";
 import {
   computeLogisticsCheckoutWaitGap,
@@ -72,6 +72,20 @@ type PriorityWindows = {
   hpEnd: string;
 };
 
+interface LogisticsVehicleOption {
+  id: number;
+  name: string;
+  pms_code: string | null;
+}
+
+interface AddDriverToTimelinePayload {
+  driverId: number;
+  startTime: string;
+  vehicleId: number;
+  vehicleName: string;
+  vehiclePmsCode: string | null;
+}
+
 export interface LogisticsDriverRow {
   id: number;
   name?: string;
@@ -86,6 +100,7 @@ export interface LogisticsDriverRow {
   contract_type?: string | null;
   assigned_vehicle_pms_code?: string | null;
   assigned_vehicle_name?: string | null;
+  assigned_vehicle_id?: number | null;
   vehicle_pms_code?: string | null;
   vehicle_name?: string | null;
   show_plus_one?: boolean;
@@ -264,6 +279,7 @@ export default function LogisticsTimelineView({
   const [isResetting, setIsResetting] = useState(false);
 
   const [availableDrivers, setAvailableDrivers] = useState<any[]>([]);
+  const [isLoadingAvailableDrivers, setIsLoadingAvailableDrivers] = useState(false);
   const [driverToReplace, setDriverToReplace] = useState<number | null>(null);
   const [startTimeDialog, setStartTimeDialog] = useState<{
     open: boolean;
@@ -272,6 +288,9 @@ export default function LogisticsTimelineView({
     isAvailable: boolean;
   }>({ open: false, driverId: null, driverName: "", isAvailable: true });
   const [pendingStartTime, setPendingStartTime] = useState("10:00");
+  const [pendingVehicleId, setPendingVehicleId] = useState("");
+  const [logisticsVehicles, setLogisticsVehicles] = useState<LogisticsVehicleOption[]>([]);
+  const [isLoadingLogisticsVehicles, setIsLoadingLogisticsVehicles] = useState(false);
   const [confirmUnavailableDialog, setConfirmUnavailableDialog] = useState<{
     open: boolean;
     driverId: number | null;
@@ -612,24 +631,30 @@ export default function LogisticsTimelineView({
     const colorBarWidth = DRIVER_BOX_VARIANT === "left-bar" ? 10 : 32;
     const paddingX = 16;
     const gap = 8;
-    const charWidth = 7.5;
+    const charWidth = 8;
+    const widthBuffer = 12;
 
     return drivers.reduce((maxWidth, driver) => {
       const label = getDriverRowDisplayLabel(driver);
       const plate = getDriverPlate(driver);
+      const colorBar = driver.isRemoved ? 0 : colorBarWidth;
 
-      let width = colorBarWidth + paddingX + label.length * charWidth;
-
-      if (plate) {
-        width += gap + plate.length * 6.5 + 10;
-      }
+      let leftWidth = label.length * charWidth;
       if (driver.isRemoved) {
-        width += gap + 58;
+        leftWidth += gap + 58;
       } else if (driver.role === "Straordinario") {
-        width += gap + 22;
+        leftWidth += gap + 22;
       } else if (driver.role === "Premium" || driver.role === "Formatore") {
-        width += gap + 22;
+        leftWidth += gap + 22;
       }
+
+      let rightWidth = 0;
+      if (plate) {
+        rightWidth = plate.length * 6.5 + 10;
+      }
+
+      const width =
+        colorBar + paddingX + leftWidth + (plate ? gap : 0) + rightWidth + widthBuffer;
 
       return Math.max(maxWidth, width);
     }, 128);
@@ -736,7 +761,109 @@ export default function LogisticsTimelineView({
     };
   }, [drivers, globalTimeSlots.length]);
 
+  const loadLogisticsVehicles = useCallback(async () => {
+    try {
+      setIsLoadingLogisticsVehicles(true);
+      const vRes = await fetch(`/api/logistics-vehicles?date=${encodeURIComponent(workDate)}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+      });
+      if (vRes.ok) {
+        const vj = await vRes.json();
+        setLogisticsVehicles(Array.isArray(vj.vehicles) ? vj.vehicles : []);
+      } else {
+        setLogisticsVehicles([]);
+      }
+    } catch (e) {
+      console.error("loadLogisticsVehicles:", e);
+      setLogisticsVehicles([]);
+    } finally {
+      setIsLoadingLogisticsVehicles(false);
+    }
+  }, [workDate]);
+
+  const assignedVehicleIds = useMemo(() => {
+    const used = new Set<number>();
+    for (const driver of drivers) {
+      const vehicleId = Number(driver.assigned_vehicle_id);
+      if (Number.isFinite(vehicleId)) used.add(vehicleId);
+    }
+    return used;
+  }, [drivers]);
+
+  const vehicleByDriverId = useMemo(() => {
+    const map = new Map<
+      number,
+      { assigned_vehicle_id: number; assigned_vehicle_name: string | null; assigned_vehicle_pms_code: string | null }
+    >();
+    for (const driver of drivers) {
+      const vehicleId = Number(driver.assigned_vehicle_id);
+      if (!Number.isFinite(vehicleId)) continue;
+      map.set(driver.id, {
+        assigned_vehicle_id: vehicleId,
+        assigned_vehicle_name: driver.assigned_vehicle_name ?? driver.vehicle_name ?? null,
+        assigned_vehicle_pms_code: driver.assigned_vehicle_pms_code ?? driver.vehicle_pms_code ?? null,
+      });
+    }
+    return map;
+  }, [drivers]);
+
+  const mergeDriverVehicleFromTimeline = useCallback(
+    (driver: any, driverIdToUpdate?: number) => {
+      const id = Number(driver.id);
+      if (driverIdToUpdate != null && id === driverIdToUpdate) {
+        return driver;
+      }
+      const preserved = vehicleByDriverId.get(id);
+      if (!preserved) return driver;
+      const hasVehicle =
+        driver.assigned_vehicle_id != null && driver.assigned_vehicle_id !== "";
+      if (hasVehicle) return driver;
+      return {
+        ...driver,
+        assigned_vehicle_id: preserved.assigned_vehicle_id,
+        assigned_vehicle_name: preserved.assigned_vehicle_name,
+        assigned_vehicle_pms_code: preserved.assigned_vehicle_pms_code,
+      };
+    },
+    [vehicleByDriverId]
+  );
+
+  const selectableVehicles = useMemo(
+    () => logisticsVehicles.filter((vehicle) => !assignedVehicleIds.has(vehicle.id)),
+    [logisticsVehicles, assignedVehicleIds]
+  );
+
+  const buildAddDriverPayload = (driverId: number): AddDriverToTimelinePayload | null => {
+    const vehicleId = Number(pendingVehicleId);
+    if (!Number.isFinite(vehicleId)) {
+      toast({
+        title: "Veicolo obbligatorio",
+        description: "Seleziona un veicolo da associare al driver",
+        variant: "destructive",
+      });
+      return null;
+    }
+    const vehicle = logisticsVehicles.find((v) => v.id === vehicleId);
+    if (!vehicle) {
+      toast({
+        title: "Errore",
+        description: "Veicolo selezionato non valido",
+        variant: "destructive",
+      });
+      return null;
+    }
+    return {
+      driverId,
+      startTime: pendingStartTime,
+      vehicleId,
+      vehicleName: vehicle.name,
+      vehiclePmsCode: vehicle.pms_code,
+    };
+  };
+
   const loadAvailableDrivers = useCallback(async () => {
+    setIsLoadingAvailableDrivers(true);
     try {
       try {
         await fetch("/api/extract-logistics-drivers", {
@@ -779,28 +906,96 @@ export default function LogisticsTimelineView({
     } catch (e) {
       console.error("loadAvailableDrivers logistics:", e);
       setAvailableDrivers([]);
+    } finally {
+      setIsLoadingAvailableDrivers(false);
     }
   }, [workDate, drivers, driversAssignments]);
 
-  const addDriverMutation = useMutation({
-    mutationFn: async (driverId: number) => {
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      const response = await apiRequest("POST", "/api/add-driver-to-timeline", {
-        driverId,
-        date: workDate,
-        modified_by: user.username || "unknown",
-      });
-      return response.json();
+  const handleOpenAddDriverDialog = useCallback(
+    async (replaceDriverId: number | null = null) => {
+      setDriverToReplace(replaceDriverId);
+      setAddDriverOpen(true);
+      await loadAvailableDrivers();
     },
-    onSuccess: async (data: { replaced?: number | null; message?: string }, driverId) => {
+    [loadAvailableDrivers]
+  );
+
+  const addDriverMutation = useMutation({
+    mutationFn: async (payload: AddDriverToTimelinePayload) => {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const username = user.username || "unknown";
+
+      await apiRequest("POST", "/api/add-driver-to-timeline", {
+        driverId: payload.driverId,
+        date: workDate,
+        modified_by: username,
+        assigned_vehicle_id: payload.vehicleId,
+        assigned_vehicle_name: payload.vehicleName,
+        assigned_vehicle_pms_code: payload.vehiclePmsCode,
+      });
+
+      const selRes = await fetch(`/api/selected-logistics-drivers?date=${encodeURIComponent(workDate)}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+      });
+      if (!selRes.ok) {
+        throw new Error("Impossibile caricare i driver convocati dopo l'aggiunta");
+      }
+      const selData = await selRes.json();
+      const currentDrivers = Array.isArray(selData.drivers) ? selData.drivers : [];
+      const mergedDrivers = currentDrivers.map((driver: any) => {
+        if (Number(driver.id) === payload.driverId) {
+          return {
+            ...driver,
+            start_time: payload.startTime,
+            assigned_vehicle_id: payload.vehicleId,
+            assigned_vehicle_name: payload.vehicleName,
+            assigned_vehicle_pms_code: payload.vehiclePmsCode,
+          };
+        }
+        return mergeDriverVehicleFromTimeline(driver);
+      });
+      if (!mergedDrivers.some((driver: any) => Number(driver.id) === payload.driverId)) {
+        mergedDrivers.push({
+          id: payload.driverId,
+          start_time: payload.startTime,
+          assigned_vehicle_id: payload.vehicleId,
+          assigned_vehicle_name: payload.vehicleName,
+          assigned_vehicle_pms_code: payload.vehiclePmsCode,
+        });
+      }
+
+      await apiRequest("POST", "/api/save-selected-logistics-drivers", {
+        drivers: mergedDrivers,
+        total_selected: mergedDrivers.length,
+        date: workDate,
+        action_type: "replace",
+        modified_by: username,
+      });
+
+      const transferResponse = await apiRequest("POST", "/api/sync-logistics-driver-vehicles-to-adam", {
+        date: workDate,
+        username,
+      });
+      const transferResult = await transferResponse.json();
+      if (!transferResult?.success) {
+        throw new Error(
+          transferResult?.message || "Sincronizzazione driver-veicolo su ADAM non riuscita"
+        );
+      }
+
+      return payload.driverId;
+    },
+    onSuccess: async (driverId: number) => {
       await onRefresh();
       toast({
-        title: data?.replaced != null ? "Driver sostituito" : "Driver aggiunto",
-        description: data?.message || `Operazione completata (ID ${driverId})`,
+        title: driverToReplace != null ? "Driver sostituito" : "Driver aggiunto",
+        description: `Driver aggiunto con veicolo associato (ID ${driverId})`,
         variant: "success",
       });
       setAddDriverOpen(false);
       setStartTimeDialog({ open: false, driverId: null, driverName: "", isAvailable: true });
+      setPendingVehicleId("");
       setDriverToReplace(null);
       setConfirmUnavailableDialog({ open: false, driverId: null });
     },
@@ -823,12 +1018,16 @@ export default function LogisticsTimelineView({
       isAvailable,
     });
     setPendingStartTime(d?.start_time || "10:00");
+    setPendingVehicleId("");
+    void loadLogisticsVehicles();
     setAddDriverOpen(false);
   };
 
   const handleConfirmStartTimeAndAdd = async () => {
     if (startTimeDialog.driverId == null) return;
     const driverId = startTimeDialog.driverId;
+    const payload = buildAddDriverPayload(driverId);
+    if (!payload) return;
 
     try {
       const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -863,12 +1062,14 @@ export default function LogisticsTimelineView({
       return;
     }
 
-    addDriverMutation.mutate(driverId);
+    addDriverMutation.mutate(payload);
   };
 
   const handleConfirmAddUnavailableDriver = async () => {
     const driverId = confirmUnavailableDialog.driverId;
     if (driverId == null) return;
+    const payload = buildAddDriverPayload(driverId);
+    if (!payload) return;
 
     try {
       const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -892,7 +1093,7 @@ export default function LogisticsTimelineView({
       prev.map((c) => (c.id === driverId ? { ...c, start_time: pendingStartTime, available: true } : c))
     );
     setConfirmUnavailableDialog({ open: false, driverId: null });
-    addDriverMutation.mutate(driverId);
+    addDriverMutation.mutate(payload);
   };
 
   const clearDriversMutation = useMutation({
@@ -1507,42 +1708,44 @@ export default function LogisticsTimelineView({
                             "flex-shrink-0 self-center my-[2px] ml-[2px] h-[calc(100%-4px)] rounded-sm",
                             DRIVER_BOX_VARIANT === "left-bar" ? "w-1.5" : "w-7"
                           )}
-                          style={{ backgroundColor: getCleanerHexColor(driver.id) }}
+                          style={{ backgroundColor: getPersonnelHexColor(driver.id, "logistics") }}
                         />
                       )}
-                      <div className="flex items-center gap-2 px-2">
-                        <div className="font-semibold text-[13px] leading-none whitespace-nowrap">
-                          {driverRowDisplayLabel}
+                      <div className="flex w-full min-w-0 flex-1 items-center justify-between gap-2 px-2">
+                        <div className="flex shrink-0 items-center gap-2">
+                          <div className="font-semibold text-[13px] leading-none whitespace-nowrap">
+                            {driverRowDisplayLabel}
+                          </div>
+                          {driver.isRemoved && (
+                            <div className="bg-red-600 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                              RIMOSSO
+                            </div>
+                          )}
+                          {!driver.isRemoved && driver.role === "Straordinario" && (
+                            <div className="bg-red-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                              S
+                            </div>
+                          )}
+                          {!driver.isRemoved &&
+                            driver.role !== "Straordinario" &&
+                            driver.role === "Premium" && (
+                              <div className="bg-yellow-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                                P
+                              </div>
+                            )}
+                          {!driver.isRemoved &&
+                            driver.role !== "Straordinario" &&
+                            driver.role === "Formatore" && (
+                              <div className="bg-orange-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                                F
+                              </div>
+                            )}
                         </div>
                         {driverPlate && (
                           <div className="rounded border border-custom-blue/40 bg-background/80 px-1 text-[10px] font-semibold leading-4 text-custom-blue flex-shrink-0">
                             {driverPlate}
                           </div>
                         )}
-                        {driver.isRemoved && (
-                          <div className="bg-red-600 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
-                            RIMOSSO
-                          </div>
-                        )}
-                        {!driver.isRemoved && driver.role === "Straordinario" && (
-                          <div className="bg-red-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
-                            S
-                          </div>
-                        )}
-                        {!driver.isRemoved &&
-                          driver.role !== "Straordinario" &&
-                          driver.role === "Premium" && (
-                            <div className="bg-yellow-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
-                              P
-                            </div>
-                          )}
-                        {!driver.isRemoved &&
-                          driver.role !== "Straordinario" &&
-                          driver.role === "Formatore" && (
-                            <div className="bg-orange-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
-                              F
-                            </div>
-                          )}
                       </div>
                     </div>
                     <Droppable
@@ -1771,11 +1974,7 @@ export default function LogisticsTimelineView({
                   className="absolute inset-x-0 top-0 z-10 h-[38px] w-full rounded-none border-0 bg-transparent p-0 text-custom-blue hover:bg-transparent hover:text-custom-blue dark:hover:text-custom-blue"
                   aria-label="Aggiungi driver"
                   title="Aggiungi driver"
-                  onClick={() => {
-                    setDriverToReplace(null);
-                    setAddDriverOpen(true);
-                    void loadAvailableDrivers();
-                  }}
+                  onClick={() => void handleOpenAddDriverDialog(null)}
                 >
                   <UserPlus className="w-4 h-4" />
                 </Button>
@@ -1962,10 +2161,18 @@ export default function LogisticsTimelineView({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 mt-4">
-            {availableDrivers.length === 0 ? (
+            {isLoadingAvailableDrivers ? (
               <div className="flex min-h-[min(50vh,280px)] flex-col items-center justify-center gap-3 py-8">
                 <RefreshCw className="h-6 w-6 animate-spin text-custom-blue" />
                 <p className="text-muted-foreground text-center">Caricamento driver disponibili…</p>
+              </div>
+            ) : availableDrivers.length === 0 ? (
+              <div className="flex min-h-[min(50vh,280px)] flex-col items-center justify-center py-8 px-2">
+                <p className="text-muted-foreground text-center">
+                  {driverToReplace != null
+                    ? "Nessun driver disponibile per la sostituzione."
+                    : "Tutti gli autisti disponibili sono già convocati per questa data."}
+                </p>
               </div>
             ) : (
               availableDrivers.map((d: any) => {
@@ -2041,15 +2248,16 @@ export default function LogisticsTimelineView({
         onOpenChange={(open) => {
           if (!open) {
             setStartTimeDialog({ open: false, driverId: null, driverName: "", isAvailable: true });
+            setPendingVehicleId("");
             setAddDriverOpen(true);
           }
         }}
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Inserisci start time</DialogTitle>
+            <DialogTitle>Start time e veicolo</DialogTitle>
             <DialogDescription>
-              Orario di inizio per <strong>{startTimeDialog.driverName}</strong>
+              Imposta orario di inizio e veicolo per <strong>{startTimeDialog.driverName}</strong>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4">
@@ -2098,6 +2306,32 @@ export default function LogisticsTimelineView({
                 Intervalli di 30 minuti (+ / −)
               </p>
             </div>
+            <div>
+              <span className="text-sm font-semibold text-muted-foreground mb-2 block">
+                Veicolo <span className="text-red-500">*</span>
+              </span>
+              {isLoadingLogisticsVehicles ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Caricamento veicoli...
+                </div>
+              ) : selectableVehicles.length === 0 ? (
+                <p className="text-sm text-destructive">Nessun veicolo disponibile per questa data.</p>
+              ) : (
+                <select
+                  value={pendingVehicleId}
+                  onChange={(e) => setPendingVehicleId(e.target.value)}
+                  className="h-9 w-full rounded-md border border-slate-300 bg-background px-3 text-sm dark:border-slate-700"
+                >
+                  <option value="">Seleziona veicolo</option>
+                  {selectableVehicles.map((vehicle) => (
+                    <option key={vehicle.id} value={vehicle.id}>
+                      {vehicle.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
           </div>
           <div className="flex justify-end gap-2 mt-6">
             <Button
@@ -2105,6 +2339,7 @@ export default function LogisticsTimelineView({
               size="sm"
               onClick={() => {
                 setStartTimeDialog({ open: false, driverId: null, driverName: "", isAvailable: true });
+                setPendingVehicleId("");
                 setAddDriverOpen(true);
               }}
               className="border-2 border-custom-blue"
@@ -2115,7 +2350,12 @@ export default function LogisticsTimelineView({
               variant="outline"
               size="sm"
               onClick={() => void handleConfirmStartTimeAndAdd()}
-              disabled={addDriverMutation.isPending}
+              disabled={
+                addDriverMutation.isPending ||
+                isLoadingLogisticsVehicles ||
+                !pendingVehicleId ||
+                selectableVehicles.length === 0
+              }
               className="border-2 border-custom-blue"
             >
               Conferma e aggiungi
@@ -2430,9 +2670,7 @@ export default function LogisticsTimelineView({
                       const id = selectedDriverForDetails.id;
                       setDriverDetailsOpen(false);
                       setSelectedDriverForDetails(null);
-                      setDriverToReplace(id);
-                      setAddDriverOpen(true);
-                      void loadAvailableDrivers();
+                      void handleOpenAddDriverDialog(id);
                     }}
                   >
                     Sostituisci…
