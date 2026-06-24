@@ -592,22 +592,47 @@ export default function LogisticsTimelineView({
 
   const hasTasksInTimeline = driversAssignments.some((r) => (r.tasks?.length || 0) > 0);
 
+  const getDriverRowDisplayLabel = (driver: LogisticsDriverRow) => {
+    const label =
+      driversAliases[driver.id]?.alias ||
+      driver.alias ||
+      `${(driver.name || "").toUpperCase()} ${(driver.lastname || "").toUpperCase()}`.trim() ||
+      `ID ${driver.id}`;
+    return label.toUpperCase();
+  };
+
+  const getDriverPlate = (driver: LogisticsDriverRow) =>
+    String(
+      (driver as any).assigned_vehicle_pms_code ?? (driver as any).vehicle_pms_code ?? ""
+    ).trim();
+
   const calculateDriverColumnWidth = () => {
-    // Mantieni una colonna stabile anche senza driver selezionati,
-    // evitando lo shift della griglia oraria.
     if (drivers.length === 0) return 128;
-    const maxLength = drivers.reduce((max, d) => {
-      const label =
-        driversAliases[d.id]?.alias ||
-        d.alias ||
-        `${d.name ?? ""} ${d.lastname ?? ""}`.trim() ||
-        `ID ${d.id}`;
-      return Math.max(max, label.length);
-    }, 0);
-    const baseWidth = 60;
+
+    const colorBarWidth = DRIVER_BOX_VARIANT === "left-bar" ? 10 : 32;
+    const paddingX = 16;
+    const gap = 8;
     const charWidth = 7.5;
-    const badgeSpace = 30;
-    return Math.max(128, baseWidth + maxLength * charWidth + badgeSpace);
+
+    return drivers.reduce((maxWidth, driver) => {
+      const label = getDriverRowDisplayLabel(driver);
+      const plate = getDriverPlate(driver);
+
+      let width = colorBarWidth + paddingX + label.length * charWidth;
+
+      if (plate) {
+        width += gap + plate.length * 6.5 + 10;
+      }
+      if (driver.isRemoved) {
+        width += gap + 58;
+      } else if (driver.role === "Straordinario") {
+        width += gap + 22;
+      } else if (driver.role === "Premium" || driver.role === "Formatore") {
+        width += gap + 22;
+      }
+
+      return Math.max(maxWidth, width);
+    }, 128);
   };
   const driverColumnWidth = calculateDriverColumnWidth();
 
@@ -1240,8 +1265,8 @@ export default function LogisticsTimelineView({
           </div>
         </div>
 
-        <div className="px-4 pt-4 pb-4 overflow-hidden">
-          <div className="flex items-stretch mb-0 px-4 h-[40px]">
+        <div className="px-1 pt-4 pb-4 overflow-hidden">
+          <div className="flex items-stretch mb-0 px-1 h-[40px]">
             <div className="flex-shrink-0 h-full print:hidden" style={{ width: `${driverColumnWidth}px` }} />
             <div
               ref={registerTimelineScrollRef}
@@ -1317,7 +1342,7 @@ export default function LogisticsTimelineView({
             <div className="flex-shrink-0 w-20 h-full" />
           </div>
 
-          <div className="flex items-stretch my-0.5 px-4 h-[40px]">
+          <div className="flex items-stretch my-0.5 px-1 h-[40px]">
             <div
               className="relative flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden"
               style={{ width: `${driverColumnWidth}px` }}
@@ -1415,7 +1440,7 @@ export default function LogisticsTimelineView({
             </div>
           </div>
 
-          <div className="flex-1 overflow-x-hidden overflow-y-auto px-4 pb-1 pt-0">
+          <div className="flex-1 overflow-x-hidden overflow-y-auto px-1 pb-1 pt-0">
             {drivers.length === 0 && !isReadOnly ? (
               <div className="flex items-center justify-center h-64 bg-yellow-100 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
                 <div className="text-center p-6">
@@ -1456,13 +1481,10 @@ export default function LogisticsTimelineView({
                     return sa - sb;
                   });
                 const hi = highlightedIdsForDriverTasks(tasks, searchTask);
-                const driverRowDisplayLabel =
-                  driversAliases[driver.id]?.alias ||
-                  driver.alias ||
-                  `${(driver.name || "").toUpperCase()} ${(driver.lastname || "").toUpperCase()}`.trim() ||
-                  `ID ${driver.id}`;
+                const driverRowDisplayLabel = getDriverRowDisplayLabel(driver);
+                const driverPlate = getDriverPlate(driver);
                 return (
-                  <div key={driver.id} className="flex mb-0.5 min-w-0">
+                  <div key={driver.id} className="flex mb-0.5 h-[50px] min-w-0">
                     <div
                       className={cn(
                         "flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-custom-blue-light",
@@ -1488,28 +1510,15 @@ export default function LogisticsTimelineView({
                           style={{ backgroundColor: getCleanerHexColor(driver.id) }}
                         />
                       )}
-                      <div className="relative min-w-0 w-full flex items-center gap-2 px-2 py-1">
-                        <div className="min-w-0 flex flex-1">
-                          <div className="truncate pr-14 font-semibold text-[13px] leading-none">
-                            {driversAliases[driver.id]?.alias ||
-                              driver.alias ||
-                              `${(driver.name || "").toUpperCase()} ${(driver.lastname || "").toUpperCase()}`.trim() ||
-                              `ID ${driver.id}`}
-                          </div>
+                      <div className="flex items-center gap-2 px-2">
+                        <div className="font-semibold text-[13px] leading-none whitespace-nowrap">
+                          {driverRowDisplayLabel}
                         </div>
-                        {(() => {
-                          const plate = String(
-                            (driver as any).assigned_vehicle_pms_code ??
-                              (driver as any).vehicle_pms_code ??
-                              ""
-                          ).trim();
-                          if (!plate) return null;
-                          return (
-                            <span className="absolute right-1 top-1 shrink-0 rounded border border-custom-blue/40 bg-background/80 px-1 text-[10px] font-semibold leading-4 text-custom-blue">
-                              {plate}
-                            </span>
-                          );
-                        })()}
+                        {driverPlate && (
+                          <div className="rounded border border-custom-blue/40 bg-background/80 px-1 text-[10px] font-semibold leading-4 text-custom-blue flex-shrink-0">
+                            {driverPlate}
+                          </div>
+                        )}
                         {driver.isRemoved && (
                           <div className="bg-red-600 text-white font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
                             RIMOSSO
@@ -1716,8 +1725,20 @@ export default function LogisticsTimelineView({
                         </div>
                       )}
                     </Droppable>
-                    <div className="flex-shrink-0 w-20 min-h-[45px] border-l border-border flex items-center justify-center text-[13px] font-medium text-foreground">
-                      —
+                    <div className="flex-shrink-0 w-20 h-[50px] flex items-center justify-center border-l border-border bg-sky-100/30 dark:bg-sky-900/10 text-center">
+                      {(() => {
+                        const totalMinutes = rawTasks.reduce((sum, raw) => {
+                          const ct = (raw as any).cleaning_time || 0;
+                          return sum + (typeof ct === "number" ? ct : parseInt(ct, 10) || 0);
+                        }, 0);
+                        const hours = Math.floor(totalMinutes / 60);
+                        const minutes = totalMinutes % 60;
+                        return (
+                          <span className="text-[13px] font-medium tabular-nums text-foreground">
+                            {hours}:{String(minutes).padStart(2, "0")}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
                 );
@@ -1759,7 +1780,7 @@ export default function LogisticsTimelineView({
                   <UserPlus className="w-4 h-4" />
                 </Button>
               </div>
-              <div className="flex-1 pl-2 pr-0 h-full min-h-[44px] grid grid-cols-[1fr_auto] items-center">
+              <div className="flex-1 pl-2 pr-0 h-full grid grid-cols-[1fr_auto] items-center">
                 <Button
                   onClick={() => setShowAdamTransferDialog(true)}
                   size="sm"
