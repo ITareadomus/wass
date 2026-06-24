@@ -1615,6 +1615,7 @@ export default function GenerateLogisticsAssignments() {
               staffLabel="Driver"
               isDragDisabled={isTimelineReadOnly}
               loadingDriverIds={summaryLoadingDriverIds}
+              workDate={format(selectedDate, "yyyy-MM-dd")}
             />
           )}
         </DragDropContext>

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Draggable, Droppable } from "react-beautiful-dnd";
-import { ListOrdered, Loader2, MessageCircle } from "lucide-react";
+import { ListOrdered, Loader2, Maximize2, MessageCircle } from "lucide-react";
+import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import type { SequenceSummaryGroup } from "@/lib/sequence-summary";
 import { logisticsKindSequenceDotClass, LogisticsSequenceBadge } from "@/lib/logistics-task-kind-ui";
@@ -25,6 +26,7 @@ interface AssignedTasksSequenceSummaryProps {
   staffLabel?: string;
   isDragDisabled?: boolean;
   loadingDriverIds?: number[];
+  workDate?: string;
 }
 
 function matchesSearch(entry: SequenceSummaryGroup["tasks"][number], query: string): boolean {
@@ -162,6 +164,7 @@ export default function AssignedTasksSequenceSummary({
   staffLabel = "Cleaner",
   isDragDisabled = false,
   loadingDriverIds = [],
+  workDate = "",
 }: AssignedTasksSequenceSummaryProps) {
   const [customerNoteDialog, setCustomerNoteDialog] = useState<{
     open: boolean;
@@ -173,11 +176,20 @@ export default function AssignedTasksSequenceSummary({
     logisticCode: string;
     messages: string[];
   }>({ open: false, logisticCode: "", messages: [] });
+  const [loadOrderDriverIds, setLoadOrderDriverIds] = useState<Set<number>>(() => new Set());
 
-  const totalTasks = useMemo(
-    () => groups.reduce((sum, group) => sum + group.tasks.length, 0),
-    [groups]
-  );
+  const toggleDriverLoadOrder = (driverId: number) => {
+    setLoadOrderDriverIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(driverId)) {
+        next.delete(driverId);
+      } else {
+        next.add(driverId);
+      }
+      return next;
+    });
+  };
+
   const loadingDriverIdSet = useMemo(() => new Set(loadingDriverIds), [loadingDriverIds]);
 
   if (groups.length === 0) {
@@ -189,23 +201,22 @@ export default function AssignedTasksSequenceSummary({
       <div className="mb-4 mt-4 w-full min-w-0 overflow-hidden">
         <div className="rounded-lg border-2 border-custom-blue bg-custom-blue-light p-4">
         <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h3 className="flex items-center font-semibold text-custom-blue">
-              <ListOrdered className="mr-2 h-5 w-5" />
-              Resoconto assegnazioni
-            </h3>
-            <div className="mt-1 text-xs text-muted-foreground">
-              {totalTasks} task in sequenza · {groups.length} {staffLabel.toLowerCase()}
-              {groups.length === 1 ? "" : "s"}
-            </div>
-          </div>
+          <h3 className="flex items-center text-xl font-bold text-foreground">
+            <ListOrdered className="mr-2 h-5 w-5 text-custom-blue" />
+            Resoconto assegnazioni
+          </h3>
         </div>
 
         <div className="grid min-h-[120px] min-w-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
-          {groups.map((group) => (
+          {groups.map((group) => {
+            const isLoadOrder = loadOrderDriverIds.has(group.id);
+            const displayedTasks = isLoadOrder ? [...group.tasks].reverse() : group.tasks;
+            const isGroupDragDisabled = isDragDisabled || isLoadOrder;
+
+            return (
             <div
               key={group.id}
-              className="relative flex h-full min-h-[120px] min-w-0 flex-col overflow-hidden rounded-lg border border-custom-blue/40 bg-background/70 p-3"
+              className="relative flex h-full min-h-[120px] min-w-0 flex-col overflow-hidden rounded-lg border border-custom-blue/40 p-3"
             >
               {loadingDriverIdSet.has(group.id) && (
                 <div className="absolute inset-0 z-40 flex items-center justify-center rounded-lg bg-black/20 backdrop-blur-sm pointer-events-none dark:bg-black/40">
@@ -215,29 +226,56 @@ export default function AssignedTasksSequenceSummary({
                   </div>
                 </div>
               )}
-              <div className="sequence-summary-driver-scroll flex min-h-0 min-w-0 flex-1 flex-col pb-0.5">
-                <div className="flex min-w-max flex-col">
-                <div className="mb-2 border-b border-custom-blue/20 pb-2">
-                  <h4 className="flex flex-nowrap items-center gap-x-2 whitespace-nowrap text-sm font-semibold text-custom-blue">
-                    <span>{group.label}</span>
-                    <span className="inline-flex items-center gap-x-1 font-normal">
-                      {group.vehiclePlate && (
-                        <span className="shrink-0 rounded border border-custom-blue/40 bg-background/80 px-1.5 text-[10px] font-semibold leading-4 text-custom-blue">
-                          {group.vehiclePlate}
-                        </span>
-                      )}
-                      <span className="shrink-0 text-muted-foreground">-</span>
-                      <span className="text-muted-foreground">
-                        {group.tasks.length} task
+              <div className="mb-2 flex shrink-0 items-start justify-between gap-2 border-b border-border pb-2">
+                <h4 className="flex min-w-0 flex-nowrap items-center gap-x-2 whitespace-nowrap text-sm font-semibold text-foreground">
+                  <span>{group.label}</span>
+                  <span className="inline-flex items-center gap-x-1 font-normal text-foreground">
+                    {group.vehiclePlate && (
+                      <span className="shrink-0 rounded border border-custom-blue/40 bg-background/80 px-1.5 text-[10px] font-semibold leading-4 text-custom-blue">
+                        {group.vehiclePlate}
                       </span>
-                    </span>
-                  </h4>
+                    )}
+                    <span className="shrink-0 text-foreground">-</span>
+                    <span className="text-foreground">{group.tasks.length} task</span>
+                  </span>
+                </h4>
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    {workDate && (
+                      <Link
+                        href={`/generate-logistics-assignments/driver/${group.id}?date=${encodeURIComponent(workDate)}`}
+                      >
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="flex h-7 shrink-0 items-center gap-1 border-2 border-custom-blue px-2 text-[10px] font-semibold"
+                          title="Apri scheda a tutto schermo"
+                          aria-label="Apri scheda a tutto schermo"
+                        >
+                          <Maximize2 className="h-3 w-3 shrink-0" aria-hidden />
+                        </Button>
+                      </Link>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="flex h-7 shrink-0 items-center gap-1 border-2 border-custom-blue px-2 text-[10px] font-semibold"
+                      onClick={() => toggleDriverLoadOrder(group.id)}
+                    >
+                      {isLoadOrder ? "Ordine di sequenza" : "Ordine di carico"}
+                    </Button>
+                  </div>
                 </div>
+              </div>
 
+              <div className="sequence-summary-driver-scroll flex min-h-0 min-w-0 flex-1 flex-col rounded-md bg-background/70 pb-0.5">
+                <div className="flex min-w-max flex-col">
                 <Droppable
                   droppableId={`summary-${group.id}`}
                   direction="vertical"
-                  isDropDisabled={isDragDisabled}
+                  isDropDisabled={isGroupDragDisabled}
                 >
                   {(provided, snapshot) => (
                     <ol
@@ -248,7 +286,7 @@ export default function AssignedTasksSequenceSummary({
                         snapshot.isDraggingOver && "rounded-md bg-custom-blue/5 ring-1 ring-custom-blue/30"
                       )}
                     >
-                      {group.tasks.map((entry, index) => {
+                      {displayedTasks.map((entry, index) => {
                         const isHighlighted = searchTask.trim()
                           ? matchesSearch(entry, searchTask.trim())
                           : false;
@@ -260,7 +298,7 @@ export default function AssignedTasksSequenceSummary({
                             key={`${group.id}-${entry.taskId}`}
                             draggableId={String(entry.taskId)}
                             index={index}
-                            isDragDisabled={isDragDisabled}
+                            isDragDisabled={isGroupDragDisabled}
                           >
                             {(dragProvided, dragSnapshot) => (
                               <li
@@ -277,7 +315,7 @@ export default function AssignedTasksSequenceSummary({
                                     ? "border-amber-400 bg-amber-50 dark:bg-amber-950/30"
                                     : "border-border/70 bg-background",
                                   dragSnapshot.isDragging && "shadow-lg ring-2 ring-custom-blue/40",
-                                  !isDragDisabled && "cursor-grab active:cursor-grabbing"
+                                  !isGroupDragDisabled && "cursor-grab active:cursor-grabbing"
                                 )}
                               >
                                 {isTimelineViolated && (
@@ -367,7 +405,8 @@ export default function AssignedTasksSequenceSummary({
                 </div>
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       </div>
       </div>

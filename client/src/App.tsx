@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import GenerateAssignments from "@/pages/generate-assignments";
 import GenerateLogisticsAssignments from "@/pages/generate-logistics-assignments";
+import LogisticsDriverSheet from "@/pages/logistics-driver-sheet";
 import Convocazioni from "@/pages/convocazioni";
 import UnconfirmedTasks from "@/pages/unconfirmed-tasks";
 import HomeGate from "@/pages/home-gate";
@@ -153,6 +154,9 @@ function Router() {
       </Route>
       <Route path="/generate-assignments">
         {() => <ProtectedRoute component={GenerateAssignments} />}
+      </Route>
+      <Route path="/generate-logistics-assignments/driver/:driverId">
+        {() => <ProtectedRoute component={LogisticsDriverSheet} />}
       </Route>
       <Route path="/generate-logistics-assignments">
         {() => <ProtectedRoute component={GenerateLogisticsAssignments} />}

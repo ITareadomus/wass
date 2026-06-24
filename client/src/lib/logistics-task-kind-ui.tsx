@@ -103,13 +103,13 @@ export function logisticsSequenceBadgeClass(
 
   if (size === "inline") {
     return cn(
-      "inline-flex shrink-0 items-center justify-center box-border rounded-full border border-border/80 bg-background/95 p-0 font-extrabold leading-none text-foreground shadow-sm",
+      "inline-flex shrink-0 items-center justify-center box-border rounded-full border border-border/80 bg-background p-0 font-extrabold leading-none text-foreground shadow-sm",
       multi ? "h-[15px] min-w-[15px] max-h-[15px] px-0.5 text-[8px]" : "size-[15px] text-[9px]"
     );
   }
 
   return cn(
-    "flex shrink-0 items-center justify-center box-border rounded-full border border-border/80 bg-background/95 p-0 font-extrabold leading-none text-foreground shadow-sm",
+    "flex shrink-0 items-center justify-center box-border rounded-full border border-border/80 bg-background p-0 font-extrabold leading-none text-foreground shadow-sm",
     multi ? "h-4 min-w-4 max-h-4 px-0.5 text-[9px]" : "size-4 max-h-4 text-[10px]"
   );
 }
