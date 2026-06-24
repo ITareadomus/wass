@@ -1052,6 +1052,47 @@ const displayClickableInputClass =
     isContinuazioneStraordinariaTask(task) ||
     isOfficeStraordinariaOperation(task);
 
+  type HousekeepingTypeTier = "straordinaria" | "premium" | "standard" | "altro";
+
+  const getHousekeepingTypeTier = (
+    taskObj: any,
+    isStraord: boolean,
+    isPrem: boolean
+  ): HousekeepingTypeTier => {
+    if (isStraord) return "straordinaria";
+    if (isPrem) return "premium";
+    if (getExternalInterventionBadgeLabel(taskObj, isStraord, isPrem)) return "altro";
+    if (isOfficeOtherOperation(taskObj)) return "altro";
+    return "standard";
+  };
+
+  const HOUSEKEEPING_STRIPE_CLASS: Record<HousekeepingTypeTier, string> = {
+    straordinaria: "bg-red-500",
+    premium: "bg-yellow-500",
+    standard: "bg-green-500",
+    altro: "bg-gray-400",
+  };
+
+  const HOUSEKEEPING_BADGE_CLASS: Record<HousekeepingTypeTier, string> = {
+    straordinaria: "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500",
+    premium:
+      "bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400",
+    standard:
+      "bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400",
+    altro: "bg-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500 dark:border-gray-400",
+  };
+
+  const HOUSEKEEPING_CORNER_BADGE_CLASS: Record<HousekeepingTypeTier, string> = {
+    straordinaria: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border-red-500",
+    premium:
+      "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400",
+    standard:
+      "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200 border-green-600 dark:border-green-400",
+    altro: "bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300 border-gray-400 dark:border-gray-500",
+  };
+
+  const cardHousekeepingTier = getHousekeepingTypeTier(task, cardIsStraordinaria, cardIsPremium);
+
   // Il modale invece usa displayTask (vedi più sotto)
 
   const getTaskTypeStyle = (isStraord: boolean, isPrem: boolean) => {
@@ -1084,11 +1125,7 @@ const displayClickableInputClass =
   const categoryStripeClass =
     operationsScope === "logistics"
       ? logisticsKindStripeClass(cardLogisticsTaskKind)
-      : cardIsStraordinaria
-        ? "bg-red-500"
-        : cardIsPremium
-          ? "bg-yellow-500"
-          : "bg-green-500";
+      : HOUSEKEEPING_STRIPE_CLASS[cardHousekeepingTier];
 
   const cardLogisticsSequenceRaw =
     operationsScope === "logistics"
@@ -2343,18 +2380,17 @@ const displayClickableInputClass =
         : isContinuazioneStraordinariaTask(displayTask)
           ? "CONTINUAZIONE PS"
           : getTaskTypeStyle(dialogDisplayIsStraordinaria, dialogDisplayIsPremium).label;
+  const dialogHousekeepingTier = getHousekeepingTypeTier(
+    displayTask,
+    dialogDisplayIsStraordinaria,
+    dialogDisplayIsPremium
+  );
   const dialogHousekeepingTypeBadge = (
     <Badge
       variant="outline"
       className={cn(
         "text-xs shrink-0 px-2 py-0.5 rounded border font-medium",
-        dialogExternalBadgeLabel
-          ? "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700"
-          : (Boolean(displayTask.straordinaria) || isContinuazioneStraordinariaTask(displayTask))
-              ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
-              : Boolean(displayTask.premium)
-                ? "bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
-                : "bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400"
+        HOUSEKEEPING_BADGE_CLASS[dialogHousekeepingTier]
       )}
     >
       {dialogHousekeepingTypeLabel}
@@ -2365,13 +2401,7 @@ const displayClickableInputClass =
       variant="outline"
       className={cn(
         "text-xs shrink-0 px-2 py-0.5 rounded border font-medium",
-        dialogExternalBadgeLabel
-          ? "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200 border-sky-300 dark:border-sky-700"
-          : (Boolean(displayTask.straordinaria) || isContinuazioneStraordinariaTask(displayTask))
-              ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border-red-500"
-              : Boolean(displayTask.premium)
-                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
-                : "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200 border-green-600 dark:border-green-400"
+        HOUSEKEEPING_CORNER_BADGE_CLASS[dialogHousekeepingTier]
       )}
     >
       {dialogHousekeepingTypeLabel}
