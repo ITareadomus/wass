@@ -2,6 +2,7 @@ import { Droppable } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
 import { isWorkDateHistoricallyLocked } from "@shared/work-date-access";
 import TaskCard from "./task-card";
+import { ContainerTaskClip } from "./container-task-clip";
 import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -333,7 +334,7 @@ export default function PriorityColumn({
   };
 
   return (
-    <div className={`${getColumnClass(priority, tasks)} rounded-lg p-4 border-2`}>
+    <div className={`${getColumnClass(priority, tasks)} rounded-lg p-4 border-2 min-w-0`}>
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-semibold flex items-center text-custom-blue">
@@ -399,7 +400,7 @@ export default function PriorityColumn({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`
-              flex flex-wrap gap-2 min-h-[120px] transition-colors duration-200 content-start border-0
+              flex flex-wrap gap-2 min-h-[120px] min-w-0 overflow-x-hidden transition-colors duration-200 content-start border-0
               ${flushDropZone ? "p-0" : "p-2"}
               ${snapshot.isDraggingOver ? "drop-zone-active" : ""}
             `}
@@ -423,20 +424,22 @@ export default function PriorityColumn({
                         const currentIndex = draggableIndex++;
                         return (
                           <div key={`task-${task.id}`} className="duplicate-group-item">
-                            <TaskCard
-                              task={task}
-                              index={currentIndex}
-                              isInTimeline={false}
-                              allTasks={orderedTasks}
-                              currentContainer={droppableId}
-                              isDuplicate={true}
-                              isDragDisabled={isDragDisabled || isHistoricalDateLocked}
-                              isReadOnly={isHistoricalDateLocked}
-                              multiSelectContext={multiSelectCtx}
-                              isHighlighted={isHighlighted}
-                              operationsScope={operationsScope}
-                              onLogisticsTimelineMutated={onLogisticsTimelineMutated}
-                            />
+                            <ContainerTaskClip>
+                              <TaskCard
+                                task={task}
+                                index={currentIndex}
+                                isInTimeline={false}
+                                allTasks={orderedTasks}
+                                currentContainer={droppableId}
+                                isDuplicate={true}
+                                isDragDisabled={isDragDisabled || isHistoricalDateLocked}
+                                isReadOnly={isHistoricalDateLocked}
+                                multiSelectContext={multiSelectCtx}
+                                isHighlighted={isHighlighted}
+                                operationsScope={operationsScope}
+                                onLogisticsTimelineMutated={onLogisticsTimelineMutated}
+                              />
+                            </ContainerTaskClip>
                           </div>
                         );
                       })}
@@ -454,6 +457,7 @@ export default function PriorityColumn({
                         className={`duplicate-single-block duplicate-zone duplicate-zone-pulse ${block.colorClass}`}
                         data-duplicate-group-id={block.groupId || undefined}
                       >
+                      <ContainerTaskClip className="max-w-full">
                         <TaskCard
                           task={task}
                           index={currentIndex}
@@ -468,6 +472,7 @@ export default function PriorityColumn({
                           operationsScope={operationsScope}
                           onLogisticsTimelineMutated={onLogisticsTimelineMutated}
                         />
+                      </ContainerTaskClip>
                       </div>
                     </div>
                   );
@@ -479,21 +484,22 @@ export default function PriorityColumn({
                 const isHighlighted = highlightedTaskIds.has(String(task.id));
                 const currentIndex = draggableIndex++;
                 rendered.push(
-                  <TaskCard
-                    key={`plain-${task.id}`}
-                    task={task}
-                    index={currentIndex}
-                    isInTimeline={false}
-                    allTasks={orderedTasks}
-                    currentContainer={droppableId}
-                    isDuplicate={false}
-                    isDragDisabled={isDragDisabled || isHistoricalDateLocked}
-                    isReadOnly={isHistoricalDateLocked}
-                    multiSelectContext={multiSelectCtx}
-                    isHighlighted={isHighlighted}
-                    operationsScope={operationsScope}
-                    onLogisticsTimelineMutated={onLogisticsTimelineMutated}
-                  />
+                  <ContainerTaskClip key={`plain-${task.id}`}>
+                    <TaskCard
+                      task={task}
+                      index={currentIndex}
+                      isInTimeline={false}
+                      allTasks={orderedTasks}
+                      currentContainer={droppableId}
+                      isDuplicate={false}
+                      isDragDisabled={isDragDisabled || isHistoricalDateLocked}
+                      isReadOnly={isHistoricalDateLocked}
+                      multiSelectContext={multiSelectCtx}
+                      isHighlighted={isHighlighted}
+                      operationsScope={operationsScope}
+                      onLogisticsTimelineMutated={onLogisticsTimelineMutated}
+                    />
+                  </ContainerTaskClip>
                 );
               }
 
