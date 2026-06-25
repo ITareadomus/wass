@@ -22,6 +22,7 @@ import {
 import { format, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
 import { fetchWithOperation } from '@/lib/operationManager';
+import { openTimelineMapPanel } from "@/lib/timeline-map-panel";
 import {
   Dialog,
   DialogContent,
@@ -481,6 +482,7 @@ const displayClickableInputClass =
       } else {
         // Accendi animazione
         (window as any).mapFilteredTaskId = markerId;
+        openTimelineMapPanel();
       }
     } else {
       // Primo click: avvia timer

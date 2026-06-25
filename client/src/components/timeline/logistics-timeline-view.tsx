@@ -31,6 +31,7 @@ import TaskCard from "@/components/drag-drop/task-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { openTimelineMapPanel } from "@/lib/timeline-map-panel";
 import { getPersonnelHexColor } from "@/lib/cleaner-colors";
 import type { TaskType as Task } from "@shared/schema";
 import {
@@ -291,6 +292,7 @@ export default function LogisticsTimelineView({
   const [pendingVehicleId, setPendingVehicleId] = useState("");
   const [logisticsVehicles, setLogisticsVehicles] = useState<LogisticsVehicleOption[]>([]);
   const [isLoadingLogisticsVehicles, setIsLoadingLogisticsVehicles] = useState(false);
+  const [isConfirmingStartTimeAndAdd, setIsConfirmingStartTimeAndAdd] = useState(false);
   const [confirmUnavailableDialog, setConfirmUnavailableDialog] = useState<{
     open: boolean;
     driverId: number | null;
@@ -727,6 +729,7 @@ export default function LogisticsTimelineView({
 
   const globalTimeSlots = generateGlobalTimeSlots();
   const globalTimelineMinutes = getGlobalTimelineMinutes();
+  const timelineScaledWidth = timelineWidthPx > 0 ? `${timelineWidthPx}px` : "100%";
 
   const timeToMinutes = (t: string) => {
     const [h, m] = t.split(":").map(Number);
@@ -747,17 +750,35 @@ export default function LogisticsTimelineView({
   }, [globalTimelineMinutes, globalTimeSlots.length]);
 
   useEffect(() => {
+    let resizeObserver: ResizeObserver | null = null;
+    let attachTimer: ReturnType<typeof setTimeout> | null = null;
+
     const measureWidth = () => {
       if (timelineRowRef.current) {
         setTimelineWidthPx(timelineRowRef.current.offsetWidth);
       }
     };
-    measureWidth();
+
+    const attach = () => {
+      const node = timelineRowRef.current;
+      if (!node) return false;
+
+      measureWidth();
+      resizeObserver = new ResizeObserver(measureWidth);
+      resizeObserver.observe(node);
+      return true;
+    };
+
+    if (!attach()) {
+      attachTimer = setTimeout(attach, 100);
+    }
+
     window.addEventListener("resize", measureWidth);
-    const timer = setTimeout(measureWidth, 100);
+
     return () => {
+      resizeObserver?.disconnect();
+      if (attachTimer) clearTimeout(attachTimer);
       window.removeEventListener("resize", measureWidth);
-      clearTimeout(timer);
     };
   }, [drivers, globalTimeSlots.length]);
 
@@ -1006,7 +1027,12 @@ export default function LogisticsTimelineView({
         variant: "destructive",
       });
     },
+    onSettled: () => {
+      setIsConfirmingStartTimeAndAdd(false);
+    },
   });
+
+  const isAddingDriverToTimeline = isConfirmingStartTimeAndAdd || addDriverMutation.isPending;
 
   const handlePickDriver = (driverId: number, isAvailable: boolean) => {
     const d = availableDrivers.find((x) => x.id === driverId);
@@ -1029,6 +1055,7 @@ export default function LogisticsTimelineView({
     const payload = buildAddDriverPayload(driverId);
     if (!payload) return;
 
+    setIsConfirmingStartTimeAndAdd(true);
     try {
       const user = JSON.parse(localStorage.getItem("user") || "{}");
       const response = await fetch("/api/update-logistics-driver-start-time", {
@@ -1050,6 +1077,7 @@ export default function LogisticsTimelineView({
         description: "Impossibile salvare lo start time",
         variant: "destructive",
       });
+      setIsConfirmingStartTimeAndAdd(false);
       return;
     }
 
@@ -1058,6 +1086,7 @@ export default function LogisticsTimelineView({
     );
 
     if (!startTimeDialog.isAvailable) {
+      setIsConfirmingStartTimeAndAdd(false);
       setConfirmUnavailableDialog({ open: true, driverId });
       return;
     }
@@ -1220,6 +1249,7 @@ export default function LogisticsTimelineView({
           description: `Visualizzi solo le task di ${driverLabel}`,
           variant: "default",
         });
+        openTimelineMapPanel();
       }
       return;
     }
@@ -1421,11 +1451,13 @@ export default function LogisticsTimelineView({
   return (
     <>
       <div className="bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm relative overflow-hidden">
-        {(isLoadingOverlay || clearDriversMutation.isPending) && (
+        {(isLoadingOverlay || clearDriversMutation.isPending || isAddingDriverToTimeline) && (
           <div className="absolute inset-0 bg-black/20 dark:bg-black/40 rounded-lg flex items-center justify-center z-40 backdrop-blur-sm pointer-events-none">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
-              <p className="text-sm font-medium text-foreground">Aggiornamento…</p>
+              <p className="text-sm font-medium text-foreground">
+                {isAddingDriverToTimeline ? "La timeline sta ragionando..." : "Aggiornamento…"}
+              </p>
             </div>
           </div>
         )}
@@ -1479,7 +1511,7 @@ export default function LogisticsTimelineView({
               className="timeline-center-scroll min-w-0 flex-1 h-full"
             >
               {priorityWindows && (
-                <div className="relative h-full min-w-full">
+                <div className="relative h-full" style={{ width: timelineScaledWidth, minWidth: "100%" }}>
                   {(() => {
                     const hpStartMin = timeToMinutes(priorityWindows.hpStart);
                     const hpEndMin = timeToMinutes(priorityWindows.hpEnd);
@@ -1610,8 +1642,12 @@ export default function LogisticsTimelineView({
                 className="timeline-center-scroll h-full w-full"
               >
                 <div
-                  className="relative h-full grid min-w-full"
-                  style={{ gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
+                  className="relative h-full grid"
+                  style={{
+                    width: timelineScaledWidth,
+                    minWidth: "100%",
+                    gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)`,
+                  }}
                 >
                 {globalTimeSlots.map((slot, idx) => (
                   <div
@@ -1641,7 +1677,7 @@ export default function LogisticsTimelineView({
             </div>
           </div>
 
-          <div className="flex-1 overflow-x-hidden overflow-y-auto px-1 pb-1 pt-0">
+          <div className="timeline-rows-scroll flex-1 overflow-x-hidden overflow-y-auto px-1 pb-1 pt-0">
             {drivers.length === 0 && !isReadOnly ? (
               <div className="flex items-center justify-center h-64 bg-yellow-100 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
                 <div className="text-center p-6">
@@ -1773,8 +1809,12 @@ export default function LogisticsTimelineView({
                           )}
                         >
                           <div
-                            className="absolute inset-0 pointer-events-none grid"
-                            style={{ gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
+                            className="absolute inset-y-0 left-0 pointer-events-none grid"
+                            style={{
+                              width: timelineScaledWidth,
+                              minWidth: "100%",
+                              gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)`,
+                            }}
                           >
                             {globalTimeSlots.map((slot, idx) => (
                               <div
@@ -1788,7 +1828,10 @@ export default function LogisticsTimelineView({
                               />
                             ))}
                           </div>
-                          <div className="relative z-10 flex items-center h-full min-h-[45px] px-0 gap-0 flex-wrap">
+                          <div
+                            className="relative z-10 flex items-center h-full min-h-[45px] px-0 gap-0 flex-wrap"
+                            style={{ width: timelineScaledWidth, minWidth: "100%" }}
+                          >
                             {(() => {
                               const virtualMinutes = globalTimelineMinutes;
                               const timelineWidth = timelineWidthPx || 0;
@@ -2246,6 +2289,7 @@ export default function LogisticsTimelineView({
       <Dialog
         open={startTimeDialog.open}
         onOpenChange={(open) => {
+          if (isAddingDriverToTimeline) return;
           if (!open) {
             setStartTimeDialog({ open: false, driverId: null, driverName: "", isAvailable: true });
             setPendingVehicleId("");
@@ -2253,7 +2297,15 @@ export default function LogisticsTimelineView({
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md relative">
+          {isAddingDriverToTimeline && (
+            <div className="absolute inset-0 bg-background/80 rounded-lg flex items-center justify-center z-50 backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
+                <p className="text-sm font-medium text-foreground">La timeline sta ragionando...</p>
+              </div>
+            </div>
+          )}
           <DialogHeader>
             <DialogTitle>Start time e veicolo</DialogTitle>
             <DialogDescription>
@@ -2342,6 +2394,7 @@ export default function LogisticsTimelineView({
                 setPendingVehicleId("");
                 setAddDriverOpen(true);
               }}
+              disabled={isAddingDriverToTimeline}
               className="border-2 border-custom-blue"
             >
               Annulla
@@ -2351,14 +2404,21 @@ export default function LogisticsTimelineView({
               size="sm"
               onClick={() => void handleConfirmStartTimeAndAdd()}
               disabled={
-                addDriverMutation.isPending ||
+                isAddingDriverToTimeline ||
                 isLoadingLogisticsVehicles ||
                 !pendingVehicleId ||
                 selectableVehicles.length === 0
               }
               className="border-2 border-custom-blue"
             >
-              Conferma e aggiungi
+              {isAddingDriverToTimeline ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Aggiunta in corso...
+                </>
+              ) : (
+                "Conferma e aggiungi"
+              )}
             </Button>
           </div>
         </DialogContent>
@@ -2386,10 +2446,17 @@ export default function LogisticsTimelineView({
             </Button>
             <Button
               onClick={() => void handleConfirmAddUnavailableDriver()}
-              disabled={addDriverMutation.isPending}
+              disabled={isAddingDriverToTimeline}
               className="bg-custom-blue hover:bg-custom-blue/90 text-white"
             >
-              Conferma e aggiungi
+              {isAddingDriverToTimeline ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Aggiunta in corso...
+                </>
+              ) : (
+                "Conferma e aggiungi"
+              )}
             </Button>
           </div>
         </DialogContent>

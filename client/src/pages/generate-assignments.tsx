@@ -14,6 +14,10 @@ const dlog = (...args: any[]) => DEBUG && console.log(...args);
 import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
 import { CalendarIcon, Users, RefreshCw, Settings, Search, Map as MapIcon, BarChart3 } from "lucide-react";
 import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
+import {
+  registerTimelineMapPanelOpener,
+  unregisterTimelineMapPanelOpener,
+} from "@/lib/timeline-map-panel";
 import AssignmentTaskStatisticsPanel, {
   computeAssignmentTaskStatisticsFromTasks,
 } from "@/components/stats/assignment-task-statistics";
@@ -384,6 +388,11 @@ export default function GenerateAssignments() {
   const [searchTask, setSearchTask] = useState("");
   const timelineMapPanel = useTimelineFloatingPanel("right", getDefaultTimelineMapPanel);
   const timelineStatsPanel = useTimelineFloatingPanel("right", getDefaultTimelineStatsPanel);
+
+  useEffect(() => {
+    registerTimelineMapPanelOpener(() => timelineMapPanel.setIsOpen(true));
+    return unregisterTimelineMapPanelOpener;
+  }, [timelineMapPanel.setIsOpen]);
 
   // Stato per highlight task da mappa (doppio click su pallino grigio)
   const [containerHighlightTaskId, setContainerHighlightTaskId] = useState<string | null>(null);

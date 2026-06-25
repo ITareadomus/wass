@@ -16,6 +16,10 @@ import {
   BarChart3,
 } from "lucide-react";
 import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
+import {
+  registerTimelineMapPanelOpener,
+  unregisterTimelineMapPanelOpener,
+} from "@/lib/timeline-map-panel";
 import AssignmentTaskStatisticsPanel, {
   computeAssignmentTaskStatisticsFromTasks,
 } from "@/components/stats/assignment-task-statistics";
@@ -401,6 +405,12 @@ export default function GenerateLogisticsAssignments() {
   const [searchTask, setSearchTask] = useState("");
   const timelineMapPanel = useTimelineFloatingPanel("right", getDefaultTimelineMapPanel);
   const timelineStatsPanel = useTimelineFloatingPanel("right", getDefaultTimelineStatsPanel);
+
+  useEffect(() => {
+    registerTimelineMapPanelOpener(() => timelineMapPanel.setIsOpen(true));
+    return unregisterTimelineMapPanelOpener;
+  }, [timelineMapPanel.setIsOpen]);
+
   const [containerHighlightTaskId, setContainerHighlightTaskId] = useState<string | null>(null);
   const containerHighlightRef = useRef<string | null>(null);
 

@@ -33,6 +33,7 @@ import {
 } from "@/lib/taskValidation";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { openTimelineMapPanel } from "@/lib/timeline-map-panel";
 import { getPersonnelHexColor } from "@/lib/cleaner-colors";
 import {
   AlertDialog,
@@ -1075,24 +1076,37 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
   // Misura la larghezza della timeline row per TaskCard (state React → rerender)
   React.useEffect(() => {
+    let resizeObserver: ResizeObserver | null = null;
+    let attachTimer: ReturnType<typeof setTimeout> | null = null;
+
     const measureWidth = () => {
       if (timelineRowRef.current) {
-        const width = timelineRowRef.current.offsetWidth;
-        setTimelineWidthPx(width);
+        setTimelineWidthPx(timelineRowRef.current.offsetWidth);
       }
     };
 
-    measureWidth();
-    window.addEventListener('resize', measureWidth);
+    const attach = () => {
+      const node = timelineRowRef.current;
+      if (!node) return false;
 
-    // Rimisura dopo un breve delay per catturare layout post-render
-    const timer = setTimeout(measureWidth, 100);
+      measureWidth();
+      resizeObserver = new ResizeObserver(measureWidth);
+      resizeObserver.observe(node);
+      return true;
+    };
+
+    if (!attach()) {
+      attachTimer = setTimeout(attach, 100);
+    }
+
+    window.addEventListener("resize", measureWidth);
 
     return () => {
-      window.removeEventListener('resize', measureWidth);
-      clearTimeout(timer);
+      resizeObserver?.disconnect();
+      if (attachTimer) clearTimeout(attachTimer);
+      window.removeEventListener("resize", measureWidth);
     };
-  }, [cleaners, isFullscreen]);
+  }, [cleaners, isFullscreen, globalTimeSlots.length]);
 
   // Esponi gli start_time dei cleaner alla pagina per optimistic UI nel DnD
   // Quando droppi su un cleaner "vuoto", l'optimistic UI deve sapere da che ora parte
@@ -1334,6 +1348,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           title: "Filtro attivato",
           description: `Visualizzi solo gli appartamenti di ${cleaner.name} ${cleaner.lastname}`,
         });
+        openTimelineMapPanel();
       }
     } else {
       // Primo click: avvia timer
@@ -2367,7 +2382,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             </div>
           </div>
         </div>
-        <div className="px-1 pt-4 pb-4 overflow-hidden">
+        <div className="flex min-h-0 flex-col overflow-hidden px-1 pt-4 pb-4">
 
 {/* Graffe fasce orarie (EO / HP / LP) sopra gli orari */}
 <div className="flex items-stretch mb-0 px-1 h-[40px]">
@@ -2469,9 +2484,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 </div>
 
           {/* Header con orari - unico per tutti i cleaner */}
-          <div className="flex items-stretch my-0.5 px-1 h-[40px]">
+          <div className="relative z-20 flex items-stretch my-0.5 px-1 h-[40px]">
             <div
-              className="relative flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden translate-y-2"
+              className="relative z-10 flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden translate-y-2"
               style={{ width: `${cleanerColumnWidth}px` }}
             >
               <div
@@ -2569,30 +2584,36 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           </div>
 
           {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
-          <div className="flex-1 overflow-x-hidden overflow-y-auto px-1 pb-1 pt-0">
+          <div className="timeline-rows-scroll relative z-0 flex-1 overflow-x-hidden overflow-y-auto px-1 pb-2 pt-2">
             {allCleanersToShow.length === 0 && !isReadOnly ? (
-              <div className="flex items-center justify-center h-64 bg-yellow-100 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
-                <div className="text-center p-6">
-                  <Users className="mx-auto h-12 w-12 text-yellow-600 dark:text-yellow-400 mb-3" />
-                  <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
-                    Nessun cleaner convocato
-                  </h3>
-                  <p className="text-yellow-700 dark:text-yellow-300">
-                    Vai alla pagina Convocazioni per selezionare i cleaner da convocare
-                  </p>
+              <div className="mb-0.5 flex min-w-0">
+                <div className="flex min-w-0 flex-1 items-center justify-center rounded-lg border-2 border-yellow-300 bg-yellow-100 dark:border-yellow-700 dark:bg-yellow-950/50 h-64">
+                  <div className="text-center p-6">
+                    <Users className="mx-auto h-12 w-12 text-yellow-600 dark:text-yellow-400 mb-3" />
+                    <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
+                      Nessun cleaner convocato
+                    </h3>
+                    <p className="text-yellow-700 dark:text-yellow-300">
+                      Vai alla pagina Convocazioni per selezionare i cleaner da convocare
+                    </p>
+                  </div>
                 </div>
+                <div className="w-20 flex-shrink-0" aria-hidden />
               </div>
             ) : allCleanersToShow.length === 0 && isReadOnly ? (
-              <div className="flex items-center justify-center h-64 bg-red-50 dark:bg-red-950/20 border-2 border-red-300 dark:border-blue-800 rounded-lg">
-                <div className="text-center p-6">
-                  <CalendarIcon className="mx-auto h-12 w-12 text-red-600 dark:text-red-400 mb-3" />
-                  <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
-                    Nessuna assegnazione presente per questa data
-                  </h3>
-                  <p className="text-red-700 dark:text-red-300">
-                    Non sono disponibili dati salvati per questa data passata
-                  </p>
+              <div className="mb-0.5 flex min-w-0">
+                <div className="flex min-w-0 flex-1 items-center justify-center rounded-lg border-2 border-red-300 bg-red-50 dark:border-blue-800 dark:bg-red-950/20 h-64">
+                  <div className="text-center p-6">
+                    <CalendarIcon className="mx-auto h-12 w-12 text-red-600 dark:text-red-400 mb-3" />
+                    <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
+                      Nessuna assegnazione presente per questa data
+                    </h3>
+                    <p className="text-red-700 dark:text-red-300">
+                      Non sono disponibili dati salvati per questa data passata
+                    </p>
+                  </div>
                 </div>
+                <div className="w-20 flex-shrink-0" aria-hidden />
               </div>
             ) : (
               allCleanersToShow.map((cleaner, index) => {
@@ -2627,22 +2648,21 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 const cleanerStartTime = cleaner.start_time || "10:00";
 
                 return (
-                  <div key={cleaner.id} className="flex mb-0.5 h-[50px] min-w-0">
+                  <div key={cleaner.id} className="mb-0.5 flex h-[50px] min-w-0 overflow-hidden">
                     {/* Info cleaner */}
                     <div
-                      className="flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-custom-blue-light cursor-pointer hover:bg-muted/35 transition-colors"
+                      className={cn(
+                        "flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-custom-blue-light cursor-pointer hover:bg-muted/35 transition-colors",
+                        filteredCleanerId === cleaner.id &&
+                          "ring-2 ring-inset ring-blue-500 border-blue-500",
+                        hasIncompatibleTasks &&
+                          !isRemoved &&
+                          "ring-2 ring-inset ring-yellow-500 border-yellow-500 animate-pulse"
+                      )}
                       style={{
                         width: `${cleanerColumnWidth}px`,
-                        boxShadow: hasIncompatibleTasks && !isRemoved
-                          ? 'inset 0 0 0 2px #EAB308, 0 0 10px 2px rgba(234, 179, 8, 0.35)'
-                          : filteredCleanerId === cleaner.id ? 'inset 0 0 0 2px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)' : 'none',
-                        transform: filteredCleanerId === cleaner.id ? 'scale(1.03)' : hasIncompatibleTasks && !isRemoved ? 'scale(1.01)' : 'none',
-                        zIndex: filteredCleanerId === cleaner.id ? 20 : hasIncompatibleTasks && !isRemoved ? 16 : 'auto',
-                        position: 'relative',
-                        userSelect: 'none',
+                        userSelect: "none",
                         opacity: isRemoved ? 0.7 : 1,
-                        borderColor: hasIncompatibleTasks && !isRemoved ? '#EAB308' : filteredCleanerId === cleaner.id ? '#3B82F6' : undefined,
-                        animation: hasIncompatibleTasks && !isRemoved ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none'
                       }}
                       onClick={(e) => {
                         e.preventDefault();
@@ -2734,9 +2754,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                               ? 'bg-blue-200/40 dark:bg-blue-900/40 border-l-2 border-blue-400 dark:border-blue-600'
                               : 'bg-background'
                           }`}
-                          style={{
-                            zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 15 : 'auto'
-                          }}
                         >
                           {/* Griglia oraria di sfondo (solo visiva) con alternanza colori */}
                           <div
@@ -2993,13 +3010,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 );
               })
             )}
+          </div>
 
-            {/* Riga finale con pulsanti */}
-            <div className="pt-0"></div>
-              <div className="relative flex items-stretch mb-0 h-[40px]">
-                {/* Pulsante + sotto il nome dell'ultimo cleaner */}
+          {/* Riga finale con pulsanti — fuori dallo scroll delle righe cleaner */}
+          <div className="relative z-20 flex shrink-0 items-stretch px-1 pb-1 pt-0 h-[40px]">
+                {/* Pulsante + sotto il nome dell'ultimo cleaner (speculare all'header UserMinus) */}
                 <div
-                  className="relative flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible"
+                  className="relative z-10 flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden -translate-y-2"
                   style={{ width: `${cleanerColumnWidth}px` }}
                 >
                   <div
@@ -3071,7 +3088,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     })()}` : "Nessun salvataggio su ADAM"}
                   </span>
                 </div>
-              </div>
           </div>
         </div>
       </div>
