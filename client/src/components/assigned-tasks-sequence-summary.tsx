@@ -430,7 +430,7 @@ export default function AssignedTasksSequenceSummary({
             readOnly
             tabIndex={-1}
             value={customerNoteDialog.note}
-            className="mt-2 min-h-[120px] resize-none cursor-default whitespace-pre-wrap break-words border-slate-600 bg-slate-950 text-slate-50 focus-visible:ring-0 focus-visible:ring-offset-0 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-50"
+            className="mt-2 min-h-[120px] resize-none cursor-default whitespace-pre-wrap break-words border-slate-300 bg-white text-foreground focus-visible:ring-0 focus-visible:ring-offset-0 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-50"
           />
           <div className="mt-4 flex justify-end">
             <Button
