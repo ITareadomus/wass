@@ -2945,10 +2945,8 @@ const displayClickableInputClass =
                       />
                     )}
                     {operationsScope === "logistics" && isInTimeline ? (
-                      <div className="absolute inset-0 flex items-center justify-center overflow-hidden px-1">
-                        <span
-                          className="text-foreground font-extrabold text-[13px] truncate max-w-full leading-none text-center -translate-x-0.5"
-                        >
+                      <div className="absolute inset-y-0 right-0 left-[10px] flex items-center justify-center overflow-hidden pl-0.5 pr-1">
+                        <span className="text-foreground font-extrabold text-[13px] truncate max-w-full leading-none text-center">
                           {logisticsAdamCode}
                         </span>
                       </div>
