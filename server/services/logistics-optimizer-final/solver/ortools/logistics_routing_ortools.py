@@ -56,8 +56,9 @@ def solve_payload(payload):
     routing = pywrapcp.RoutingModel(manager)
 
     vehicle_task_penalties = payload.get("vehicleTaskPenalties")
+    vehicle_arc_penalties = payload.get("vehicleArcPenalties")
 
-    if vehicle_task_penalties:
+    if vehicle_task_penalties or vehicle_arc_penalties:
         for vehicle_id in range(num_vehicles):
             def make_cost_callback(vid):
                 def vehicle_cost_callback(from_index, to_index):
@@ -66,8 +67,13 @@ def solve_payload(payload):
 
                     from_node = manager.IndexToNode(from_index)
                     to_node = manager.IndexToNode(to_index)
-                    territory_penalty = int(vehicle_task_penalties[vid][to_node])
-                    return int(cost[from_node][to_node]) + territory_penalty
+                    territory_penalty = 0
+                    if vehicle_task_penalties:
+                        territory_penalty = int(vehicle_task_penalties[vid][to_node])
+                    arc_penalty = 0
+                    if vehicle_arc_penalties:
+                        arc_penalty = int(vehicle_arc_penalties[vid][from_node][to_node])
+                    return int(cost[from_node][to_node]) + territory_penalty + arc_penalty
 
                 return vehicle_cost_callback
 

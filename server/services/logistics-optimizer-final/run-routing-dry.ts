@@ -14,6 +14,11 @@ import { validateRoutingProblemInput } from "./validation";
 import type { RoutingProblemValidationResult, ValidationMode } from "./validation-contract";
 import type { RoutingSolutionValidationResult } from "./solution-validation-contract";
 import { computeTerritoryDiagnostics } from "./groups/territory-diagnostics";
+import {
+  buildVehicleArcPenalties,
+  computeRouteSequenceDiagnostics,
+} from "./groups/route-sequence-penalties";
+import { polishRoutingSolution } from "./route-polishing";
 
 export interface RunLogisticsRoutingDryOptions extends BuildLogisticsRoutingInputOptions {
   debug?: boolean;
@@ -91,12 +96,21 @@ export async function runLogisticsRoutingDry(
   }
 
   const solverId = options.solver ?? ORTOOLS_SOLVER_ID;
-  const solution = await solveRouting(input, { solverId });
+  const solverSolution = await solveRouting(input, { solverId });
+  const solution = polishRoutingSolution(input, solverSolution);
   const solutionValidation = validateRoutingSolution(input, solution);
   const applyGate = evaluateSolutionApplyGate(solution);
   const droppedDiagnostics =
     solution.droppedTasks.length > 0 ? diagnoseDroppedTasks(input, solution) : [];
   const territoryDiagnostics = computeTerritoryDiagnostics(input, solution);
+  const arcPenaltyBuild = buildVehicleArcPenalties({ input });
+  const routeSequenceDiagnostics = arcPenaltyBuild
+    ? computeRouteSequenceDiagnostics({
+        input,
+        solution,
+        arcPenaltyDetails: arcPenaltyBuild.details,
+      })
+    : null;
 
   const debugEnabled = isLogisticsOptimizerFinalDebugEnabled(options.debug);
   let debugDir: string | null = null;
@@ -113,6 +127,7 @@ export async function runLogisticsRoutingDry(
         applyGate,
         droppedDiagnostics,
         ...(territoryDiagnostics ? { territoryDiagnostics } : {}),
+        ...(routeSequenceDiagnostics ? { routeSequenceDiagnostics } : {}),
       },
     });
     console.log(`📋 Logistics optimizer final dry-run scritto in: ${debugDir}`);

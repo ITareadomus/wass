@@ -71,6 +71,7 @@ export interface OrToolsRoutingPayload {
   softTimeWindows: OrToolsSoftTimeWindow[];
   balanceDriverLoadWeight: number;
   vehicleTaskPenalties?: number[][];
+  vehicleArcPenalties?: number[][][];
   territoryDebug?: RoutingProblemInput["metadata"]["dailyTerritoryAssignment"];
   options: { timeLimitSec: number };
 }

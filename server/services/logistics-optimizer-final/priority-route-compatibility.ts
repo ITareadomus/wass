@@ -9,19 +9,45 @@ export interface EoEarlyDecision {
   reasons: string[];
 }
 
+export const EO_EARLY_CONFIG = {
+  tightCheckinLatestStartMin: 14 * 60,
+  tightCheckinSlackFromDayStartMin: 180,
+  defaultDayStartMin: 10 * 60,
+} as const;
+
 export interface ResolveEoEarlyDecisionInput {
   priority: "EO" | "HP" | "LP" | null;
   logisticsTaskKind: LogisticsTaskKind | null;
   customerCheckinMin: Minutes | null;
   cleanerTaskStartMin: Minutes | null;
+  latestStartMin: Minutes | null;
+}
+
+export function hasTightCheckinDeadline(args: {
+  customerCheckinMin: Minutes | null;
+  latestStartMin: Minutes | null;
+}): boolean {
+  if (args.customerCheckinMin === null) return false;
+
+  const effectiveLatestStart =
+    args.latestStartMin ?? args.customerCheckinMin - 15;
+
+  if (effectiveLatestStart <= EO_EARLY_CONFIG.tightCheckinLatestStartMin) {
+    return true;
+  }
+
+  return (
+    effectiveLatestStart - EO_EARLY_CONFIG.defaultDayStartMin <=
+    EO_EARLY_CONFIG.tightCheckinSlackFromDayStartMin
+  );
 }
 
 export function resolveEoEarlyDecision(input: ResolveEoEarlyDecisionInput): EoEarlyDecision | null {
   if (input.priority !== "EO") return null;
 
   const reasons: string[] = [];
-  if (input.customerCheckinMin !== null) {
-    reasons.push("EO_HAS_CHECKIN_DEADLINE");
+  if (hasTightCheckinDeadline(input)) {
+    reasons.push("EO_HAS_TIGHT_CHECKIN_DEADLINE");
   }
   if (requiresDriverBeforeCleaner(input.logisticsTaskKind) && input.cleanerTaskStartMin !== null) {
     reasons.push("EO_DRIVER_BEFORE_CLEANER_REQUIRED");
@@ -30,11 +56,21 @@ export function resolveEoEarlyDecision(input: ResolveEoEarlyDecisionInput): EoEa
     return { mode: "urgent", penaltyPerMin: 1, reasons };
   }
 
-  if (input.logisticsTaskKind === "pick-up") {
+  if (input.customerCheckinMin !== null) {
+    reasons.push("EO_HAS_LOOSE_CHECKIN_DEADLINE");
+  }
+
+  if (input.logisticsTaskKind === "pick-up" || input.customerCheckinMin !== null) {
     return {
       mode: "flexible",
       penaltyPerMin: 0,
-      reasons: ["EO_PICKUP_NO_TIGHT_CHECKIN", "EO_EARLY_CAN_CREATE_ROUTE_ZIGZAG"],
+      reasons: [
+        ...reasons,
+        input.logisticsTaskKind === "pick-up"
+          ? "EO_PICKUP_NO_TIGHT_CHECKIN"
+          : "EO_LOOSE_CHECKIN_NOT_URGENT",
+        "EO_EARLY_CAN_CREATE_ROUTE_ZIGZAG",
+      ],
     };
   }
 

@@ -71,6 +71,7 @@ function addPriorityWindow(
   context: {
     customerCheckinMin: Minutes | null;
     cleanerTaskStartMin: Minutes | null;
+    latestStartMin: Minutes;
   }
 ): void {
   if (!input.priority || !input.priorityWindows) return;
@@ -88,6 +89,7 @@ function addPriorityWindow(
       logisticsTaskKind: input.logisticsTaskKind,
       customerCheckinMin: context.customerCheckinMin,
       cleanerTaskStartMin: context.cleanerTaskStartMin,
+      latestStartMin: context.latestStartMin,
     });
     if (!decision) return;
 
@@ -185,13 +187,14 @@ export function buildTaskWindow(input: BuildTaskWindowInput): BuiltTaskWindow {
     }
   }
 
+  const earliestStartMin = Math.max(...earliestStartCandidates);
+  const latestStartMin = Math.min(...latestStartCandidates);
+
   addPriorityWindow(input, softWindows, ruleTrace, {
     customerCheckinMin,
     cleanerTaskStartMin,
+    latestStartMin,
   });
-
-  const earliestStartMin = Math.max(...earliestStartCandidates);
-  const latestStartMin = Math.min(...latestStartCandidates);
   const latestEndMin = Math.min(...latestEndCandidates);
   const hardWindow: TaskHardWindow = {
     earliestStartMin,
