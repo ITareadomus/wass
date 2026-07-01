@@ -522,6 +522,7 @@ function validateBusinessGroups(
 ): Map<string, RoutingBusinessGroup> {
   const taskById = new Map(input.tasks.map((task) => [task.taskId, task]));
   const taskIds = new Set(taskById.keys());
+  const driverIds = new Set(input.drivers.map((driver) => driver.id));
   const groupsById = new Map<string, RoutingBusinessGroup>();
   const seenGroupIds = new Set<string>();
 
@@ -691,6 +692,62 @@ function validateBusinessGroups(
             message: `NEARBY_CLUSTER ${group.groupId} references unknown hubTaskId ${group.hubTaskId}`,
             taskId: group.hubTaskId,
             path: `businessGroups[${index}].hubTaskId`,
+          });
+        }
+        break;
+      }
+      case "DAILY_TERRITORY": {
+        const { lat, lng } = group.centroid ?? {};
+        if (
+          !isFiniteNumber(lat) ||
+          !isFiniteNumber(lng) ||
+          lat < -90 ||
+          lat > 90 ||
+          lng < -180 ||
+          lng > 180
+        ) {
+          pushError(errors, {
+            code: "INVALID_BUSINESS_GROUP",
+            message: `DAILY_TERRITORY ${group.groupId} has invalid centroid`,
+            path: `businessGroups[${index}].centroid`,
+            actual: group.centroid,
+          });
+        }
+        if (!isFiniteNumber(group.radiusMeters) || group.radiusMeters <= 0) {
+          pushError(errors, {
+            code: "INVALID_BUSINESS_GROUP",
+            message: `DAILY_TERRITORY ${group.groupId} requires radiusMeters > 0`,
+            path: `businessGroups[${index}].radiusMeters`,
+            actual: group.radiusMeters,
+          });
+        }
+        if (!isFiniteNumber(group.penaltyRadiusMeters) || group.penaltyRadiusMeters <= 0) {
+          pushError(errors, {
+            code: "INVALID_BUSINESS_GROUP",
+            message: `DAILY_TERRITORY ${group.groupId} requires penaltyRadiusMeters > 0`,
+            path: `businessGroups[${index}].penaltyRadiusMeters`,
+            actual: group.penaltyRadiusMeters,
+          });
+        }
+        if (
+          isFiniteNumber(group.penaltyRadiusMeters) &&
+          isFiniteNumber(group.radiusMeters) &&
+          group.penaltyRadiusMeters > group.radiusMeters
+        ) {
+          pushError(errors, {
+            code: "INVALID_BUSINESS_GROUP",
+            message: `DAILY_TERRITORY ${group.groupId} penaltyRadiusMeters must be <= radiusMeters`,
+            path: `businessGroups[${index}].penaltyRadiusMeters`,
+            expected: group.radiusMeters,
+            actual: group.penaltyRadiusMeters,
+          });
+        }
+        if (!driverIds.has(group.assignedDriverId)) {
+          pushError(errors, {
+            code: "INVALID_BUSINESS_GROUP",
+            message: `DAILY_TERRITORY ${group.groupId} references unknown assignedDriverId ${group.assignedDriverId}`,
+            path: `businessGroups[${index}].assignedDriverId`,
+            actual: group.assignedDriverId,
           });
         }
         break;

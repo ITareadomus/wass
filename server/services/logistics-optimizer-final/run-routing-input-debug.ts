@@ -56,6 +56,7 @@ export async function runLogisticsRoutingInputDebug(
     CLEANER_SEQUENCE: 0,
     PRIORITY_COMPATIBLE: 0,
     NEARBY_CLUSTER: 0,
+    DAILY_TERRITORY: 0,
   };
   for (const group of input.businessGroups) {
     businessGroupsByType[group.type] += 1;

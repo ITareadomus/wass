@@ -6,6 +6,7 @@ import type { OrToolsRoutingPayload } from "./solver/ortools/ortools-adapter";
 import type { RoutingSolution } from "./solution-contract";
 import type { RoutingSolutionValidationResult } from "./solution-validation-contract";
 import type { RoutingProblemValidationResult } from "./validation-contract";
+import { buildTerritoriesGeoJson, enrichTerritoriesGeoJsonWithSolution } from "./groups/territory-geojson";
 
 export function isLogisticsOptimizerFinalDebugEnabled(explicit?: boolean): boolean {
   if (explicit === true) return true;
@@ -33,6 +34,7 @@ function countBusinessGroupsByType(
     CLEANER_SEQUENCE: 0,
     PRIORITY_COMPATIBLE: 0,
     NEARBY_CLUSTER: 0,
+    DAILY_TERRITORY: 0,
   };
 
   for (const group of groups) {
@@ -58,6 +60,9 @@ export async function writeRoutingProblemInputDebug(
   const runId = options?.runId ?? createLogisticsOptimizerFinalRunId(new Date(startedAt));
   const dir = path.join(debugRootDir(), input.workDate, runId);
   await fs.mkdir(dir, { recursive: true });
+  const territoriesGeoJson = buildTerritoriesGeoJson(input);
+  const files = ["01-routing-input.json"];
+  if (territoriesGeoJson) files.push("territories.geojson");
 
   const manifest = {
     workDate: input.workDate,
@@ -84,20 +89,33 @@ export async function writeRoutingProblemInputDebug(
         (constraint) => constraint.type === "REQUIRED_DRIVER_TASK"
       ).length,
       excludedTasks: input.metadata.excludedTasks.length,
+      dailyTerritories: input.metadata.dailyTerritoryAssignment?.territories.length ?? 0,
     },
     businessGroupsByType: countBusinessGroupsByType(input.businessGroups),
     businessSoftConstraints: extractBusinessSoftConstraints(input.softConstraints),
-    files: ["01-routing-input.json"],
+    files,
   };
 
-  await Promise.all([
+  const writes: Promise<void>[] = [
     fs.writeFile(path.join(dir, "manifest.json"), JSON.stringify(manifest, null, 2), "utf8"),
     fs.writeFile(
       path.join(dir, "01-routing-input.json"),
       JSON.stringify(input, null, 2),
       "utf8"
     ),
-  ]);
+  ];
+
+  if (territoriesGeoJson) {
+    writes.push(
+      fs.writeFile(
+        path.join(dir, "territories.geojson"),
+        JSON.stringify(territoriesGeoJson, null, 2),
+        "utf8"
+      )
+    );
+  }
+
+  await Promise.all(writes);
 
   return dir;
 }
@@ -121,8 +139,16 @@ export async function writeRoutingDryRunDebug(
   const runId = args.runId ?? createLogisticsOptimizerFinalRunId(new Date(startedAt));
   const dir = path.join(debugRootDir(), input.workDate, runId);
   await fs.mkdir(dir, { recursive: true });
+  const territoriesGeoJson = buildTerritoriesGeoJson(input);
+  const enrichedTerritoriesGeoJson = territoriesGeoJson
+    ? enrichTerritoriesGeoJsonWithSolution(territoriesGeoJson, input, solution)
+    : null;
 
   const assignedTasks = solution.routes.reduce((sum, route) => sum + route.stops.length, 0);
+  const files = ortoolsPayload
+    ? ["01-routing-input.json", "02-routing-solution.json", "03-ortools-payload.json"]
+    : ["01-routing-input.json", "02-routing-solution.json"];
+  if (enrichedTerritoriesGeoJson) files.push("territories.geojson");
 
   const manifest = {
     workDate: input.workDate,
@@ -158,13 +184,12 @@ export async function writeRoutingDryRunDebug(
         (constraint) => constraint.type === "REQUIRED_DRIVER_TASK"
       ).length,
       excludedTasks: input.metadata.excludedTasks.length,
+      dailyTerritories: input.metadata.dailyTerritoryAssignment?.territories.length ?? 0,
     },
     solutionStatus: solution.status,
     businessGroupsByType: countBusinessGroupsByType(input.businessGroups),
     businessSoftConstraints: extractBusinessSoftConstraints(input.softConstraints),
-    files: ortoolsPayload
-      ? ["01-routing-input.json", "02-routing-solution.json", "03-ortools-payload.json"]
-      : ["01-routing-input.json", "02-routing-solution.json"],
+    files,
   };
 
   if (extra && Object.keys(extra).length > 0) {
@@ -191,6 +216,16 @@ export async function writeRoutingDryRunDebug(
       fs.writeFile(
         path.join(dir, "03-ortools-payload.json"),
         JSON.stringify(ortoolsPayload, null, 2),
+        "utf8"
+      )
+    );
+  }
+
+  if (enrichedTerritoriesGeoJson) {
+    writes.push(
+      fs.writeFile(
+        path.join(dir, "territories.geojson"),
+        JSON.stringify(enrichedTerritoriesGeoJson, null, 2),
         "utf8"
       )
     );

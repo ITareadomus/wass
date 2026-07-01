@@ -20,6 +20,7 @@ import {
   resolveEarliestServiceStartMin,
   type RuleTrace,
 } from "./business-rules";
+import { resolveEoEarlyDecision } from "./priority-route-compatibility";
 
 const END_OF_DAY_MIN = 20 * 60;
 export const DRIVER_BRINGS_BAG_TOLERANCE_REASON =
@@ -65,7 +66,12 @@ function getCleanerTaskStartTime(input: BuildTaskWindowInput): string | null {
 
 function addPriorityWindow(
   input: BuildTaskWindowInput,
-  softWindows: TaskSoftWindow[]
+  softWindows: TaskSoftWindow[],
+  ruleTrace: RuleTrace[],
+  context: {
+    customerCheckinMin: Minutes | null;
+    cleanerTaskStartMin: Minutes | null;
+  }
 ): void {
   if (!input.priority || !input.priorityWindows) return;
 
@@ -77,12 +83,42 @@ function addPriorityWindow(
   }
 
   if (input.priority === "EO" && window.endMin !== null) {
+    const decision = resolveEoEarlyDecision({
+      priority: input.priority,
+      logisticsTaskKind: input.logisticsTaskKind,
+      customerCheckinMin: context.customerCheckinMin,
+      cleanerTaskStartMin: context.cleanerTaskStartMin,
+    });
+    if (!decision) return;
+
+    if (decision.mode === "flexible") {
+      ruleTrace.push({
+        code: "EO_EARLY_FLEXIBLE_SUPPRESSED",
+        value: {
+          mode: decision.mode,
+          reasons: decision.reasons,
+        },
+      });
+      return;
+    }
+
     softWindows.push({
       type: "preferred_start",
       startMin: window.startMin,
       endMin: window.endMin,
-      penaltyPerMin: 1,
-      reason: "EO_CAN_START_BEFORE_HP_START_SOFT_PREFERENCE",
+      penaltyPerMin: decision.penaltyPerMin,
+      reason:
+        decision.mode === "urgent"
+          ? "EO_EARLY_URGENT_SOFT_PREFERENCE"
+          : "EO_EARLY_IF_ROUTE_COMPATIBLE_SOFT_PREFERENCE",
+    });
+    ruleTrace.push({
+      code: decision.mode === "urgent" ? "EO_EARLY_URGENT" : "EO_EARLY_ROUTE_COMPATIBLE",
+      value: {
+        mode: decision.mode,
+        penaltyPerMin: decision.penaltyPerMin,
+        reasons: decision.reasons,
+      },
     });
   }
 }
@@ -117,8 +153,6 @@ export function buildTaskWindow(input: BuildTaskWindowInput): BuiltTaskWindow {
   reasons.push(...earliestStartRule.trace.map((trace) => trace.code));
   ruleTrace.push(...earliestStartRule.trace);
 
-  addPriorityWindow(input, softWindows);
-
   if (isCheckinApplicableOnWorkDate(input.checkinDate, input.workDate) && input.checkinTime) {
     const checkinMin = parseTime(input.checkinTime, null);
     if (checkinMin !== null) {
@@ -150,6 +184,11 @@ export function buildTaskWindow(input: BuildTaskWindowInput): BuiltTaskWindow {
       ruleTrace.push(...latestAllowedStart.trace);
     }
   }
+
+  addPriorityWindow(input, softWindows, ruleTrace, {
+    customerCheckinMin,
+    cleanerTaskStartMin,
+  });
 
   const earliestStartMin = Math.max(...earliestStartCandidates);
   const latestStartMin = Math.min(...latestStartCandidates);

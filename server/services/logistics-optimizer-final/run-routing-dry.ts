@@ -13,6 +13,7 @@ import { diagnoseDroppedTasks, type DroppedTaskDiagnostic } from "./unassigned-d
 import { validateRoutingProblemInput } from "./validation";
 import type { RoutingProblemValidationResult, ValidationMode } from "./validation-contract";
 import type { RoutingSolutionValidationResult } from "./solution-validation-contract";
+import { computeTerritoryDiagnostics } from "./groups/territory-diagnostics";
 
 export interface RunLogisticsRoutingDryOptions extends BuildLogisticsRoutingInputOptions {
   debug?: boolean;
@@ -95,6 +96,7 @@ export async function runLogisticsRoutingDry(
   const applyGate = evaluateSolutionApplyGate(solution);
   const droppedDiagnostics =
     solution.droppedTasks.length > 0 ? diagnoseDroppedTasks(input, solution) : [];
+  const territoryDiagnostics = computeTerritoryDiagnostics(input, solution);
 
   const debugEnabled = isLogisticsOptimizerFinalDebugEnabled(options.debug);
   let debugDir: string | null = null;
@@ -110,6 +112,7 @@ export async function runLogisticsRoutingDry(
       extra: {
         applyGate,
         droppedDiagnostics,
+        ...(territoryDiagnostics ? { territoryDiagnostics } : {}),
       },
     });
     console.log(`📋 Logistics optimizer final dry-run scritto in: ${debugDir}`);

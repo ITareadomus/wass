@@ -55,16 +55,35 @@ def solve_payload(payload):
     manager = pywrapcp.RoutingIndexManager(n, num_vehicles, 0)
     routing = pywrapcp.RoutingModel(manager)
 
-    def cost_callback(from_index, to_index):
-        if routing.IsEnd(to_index):
-            return 0
+    vehicle_task_penalties = payload.get("vehicleTaskPenalties")
 
-        from_node = manager.IndexToNode(from_index)
-        to_node = manager.IndexToNode(to_index)
-        return int(cost[from_node][to_node])
+    if vehicle_task_penalties:
+        for vehicle_id in range(num_vehicles):
+            def make_cost_callback(vid):
+                def vehicle_cost_callback(from_index, to_index):
+                    if routing.IsEnd(to_index):
+                        return 0
 
-    cost_callback_index = routing.RegisterTransitCallback(cost_callback)
-    routing.SetArcCostEvaluatorOfAllVehicles(cost_callback_index)
+                    from_node = manager.IndexToNode(from_index)
+                    to_node = manager.IndexToNode(to_index)
+                    territory_penalty = int(vehicle_task_penalties[vid][to_node])
+                    return int(cost[from_node][to_node]) + territory_penalty
+
+                return vehicle_cost_callback
+
+            callback_index = routing.RegisterTransitCallback(make_cost_callback(vehicle_id))
+            routing.SetArcCostEvaluatorOfVehicle(callback_index, vehicle_id)
+    else:
+        def cost_callback(from_index, to_index):
+            if routing.IsEnd(to_index):
+                return 0
+
+            from_node = manager.IndexToNode(from_index)
+            to_node = manager.IndexToNode(to_index)
+            return int(cost[from_node][to_node])
+
+        cost_callback_index = routing.RegisterTransitCallback(cost_callback)
+        routing.SetArcCostEvaluatorOfAllVehicles(cost_callback_index)
 
     def time_callback(from_index, to_index):
         from_node = manager.IndexToNode(from_index)
