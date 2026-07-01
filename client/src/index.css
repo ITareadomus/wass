@@ -281,6 +281,10 @@
     scrollbar-gutter: auto;
   }
 
+  html:has(.logistics-driver-sheet-page) {
+    scrollbar-gutter: auto;
+  }
+
   .convocazioni-page :is(.overflow-y-auto, .overflow-y-scroll, .overflow-auto) {
     scrollbar-width: none;
     -ms-overflow-style: none;

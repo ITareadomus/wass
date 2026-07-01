@@ -12,6 +12,7 @@ export type SequenceSummaryEntry = {
   sequence: number;
   taskId: string;
   logisticCode: string;
+  customerAlias?: string | null;
   address: string;
   hkWindow: string;
   lgWindow: string;
@@ -170,6 +171,11 @@ export function formatSofabedSummaryLabel(
   return `DV: ${parts.join(", ")}`;
 }
 
+function resolveCustomerAlias(task: any): string | null {
+  const alias = String(task?.alias ?? task?.customer_alias ?? task?.customerAlias ?? "").trim();
+  return alias || null;
+}
+
 function resolveCustomerNote(task: any): string | null {
   const fromHistory = extractLatestCustomerNoteFromHistory(
     task?.customer_note_history ?? task?.customerNoteHistory
@@ -217,6 +223,7 @@ function mapTaskToSummaryEntry(
     sequence: Number.isFinite(sequence) && sequence > 0 ? sequence : fallbackSequence,
     taskId: getTaskId(task),
     logisticCode: getTaskLogisticCode(task),
+    customerAlias: resolveCustomerAlias(task),
     address: String(task?.address ?? "").trim().toUpperCase(),
     hkWindow: resolveHkWindow(task),
     lgWindow: resolveLgWindow(task),

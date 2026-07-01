@@ -34,6 +34,7 @@ function matchesSearch(entry: SequenceSummaryGroup["tasks"][number], query: stri
   return (
     entry.taskId.toLowerCase().includes(lowerSearch) ||
     entry.logisticCode.toLowerCase().includes(lowerSearch) ||
+    String(entry.customerAlias ?? "").toLowerCase().includes(lowerSearch) ||
     entry.address.toLowerCase().includes(lowerSearch)
   );
 }
@@ -336,6 +337,12 @@ export default function AssignedTasksSequenceSummary({
                                       <span className="shrink-0 font-semibold text-foreground">
                                         {entry.logisticCode || "N/D"}
                                       </span>
+                                      {entry.customerAlias && (
+                                        <>
+                                          <span className="shrink-0 text-muted-foreground/60">|</span>
+                                          <span className="shrink-0 text-muted-foreground">{entry.customerAlias}</span>
+                                        </>
+                                      )}
                                       {entry.address && (
                                         <>
                                           <span className="shrink-0 text-muted-foreground/60">|</span>

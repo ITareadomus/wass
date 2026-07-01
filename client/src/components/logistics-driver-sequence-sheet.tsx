@@ -123,10 +123,14 @@ export default function LogisticsDriverSequenceSheet({
   );
 
   return (
-    <div className={cn("flex w-full min-w-0 flex-col overflow-hidden bg-background", PAGE_BELOW_HEADER_MIN_H)}>
-      <div className="shrink-0 border-b border-custom-blue/30 bg-custom-blue-light px-4 py-3 print:border-black/20 print:bg-white">
-        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-wrap items-center gap-3">
+    <div className={cn("logistics-driver-sheet-page flex w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-background", PAGE_BELOW_HEADER_MIN_H)}>
+      <header className="relative shrink-0 print:bg-white">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 top-0 h-full w-screen -translate-x-1/2 border-b border-custom-blue/30 bg-custom-blue-light print:border-black/20 print:bg-white"
+        />
+        <div className="relative mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-3">
             <Link href={backHref}>
               <Button
                 variant="outline"
@@ -157,22 +161,23 @@ export default function LogisticsDriverSequenceSheet({
             type="button"
             variant="outline"
             size="sm"
-            className="flex h-7 shrink-0 items-center gap-1 border-2 border-custom-blue px-2 text-[10px] font-semibold print:hidden"
+            className="ml-auto flex h-7 shrink-0 items-center gap-1 border-2 border-custom-blue px-2 text-[10px] font-semibold print:hidden"
             onClick={() => setIsLoadOrder((prev) => !prev)}
           >
             {isLoadOrder ? "Ordine di sequenza" : "Ordine di carico"}
           </Button>
         </div>
-      </div>
+      </header>
 
-      <div className="relative min-h-0 flex-1 overflow-auto px-4 py-4">
+      <div className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
         {isLoading && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/60">
             <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
           </div>
         )}
 
-        <div className="mx-auto max-w-[1600px] overflow-hidden rounded-lg border border-custom-blue/40 bg-background shadow-sm">
+        <div className="mx-auto w-full min-w-0 max-w-[1600px] px-4 py-4">
+          <div className="min-w-0 overflow-x-auto rounded-lg border border-custom-blue/40 bg-background shadow-sm">
           <table className="w-full border-collapse text-xs">
             <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur-sm print:bg-gray-100">
               <tr className="border-b border-custom-blue/30">
@@ -181,6 +186,9 @@ export default function LogisticsDriverSequenceSheet({
                 </th>
                 <th className="h-9 min-w-[88px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Codice adam
+                </th>
+                <th className="h-9 min-w-[100px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Alias cliente
                 </th>
                 <th className="h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Indirizzo
@@ -245,6 +253,9 @@ export default function LogisticsDriverSequenceSheet({
                     <td className="border-r border-border/40 px-2 py-2 text-center align-middle font-semibold">
                       {entry.logisticCode || "N/D"}
                     </td>
+                    <td className="border-r border-border/40 px-2 py-2 text-center align-middle">
+                      {entry.customerAlias || "—"}
+                    </td>
                     <td className="border-r border-border/40 px-2 py-2 align-top">
                       {entry.address || "—"}
                     </td>
@@ -287,6 +298,7 @@ export default function LogisticsDriverSequenceSheet({
               })}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 

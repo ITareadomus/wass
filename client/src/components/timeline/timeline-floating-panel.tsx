@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type {
@@ -70,6 +70,75 @@ export default function TimelineFloatingPanel({
   fitContentWidth = false,
   toggleVerticalOffset = 0,
 }: TimelineFloatingPanelProps) {
+  const [closedToggleTop, setClosedToggleTop] = useState<number | null>(null);
+  const suppressClosedToggleClickRef = useRef(false);
+  const closedToggleDragRef = useRef<{
+    pointerId: number;
+    startY: number;
+    startTop: number;
+    maxTop: number;
+    hasMoved: boolean;
+  } | null>(null);
+  const wasOpenRef = useRef(isOpen);
+
+  useEffect(() => {
+    if (wasOpenRef.current && !isOpen) {
+      setClosedToggleTop(null);
+    }
+    wasOpenRef.current = isOpen;
+  }, [isOpen]);
+
+  const handleClosedTogglePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (event.button !== 0) return;
+
+      const button = event.currentTarget;
+      const parent = button.offsetParent instanceof HTMLElement ? button.offsetParent : null;
+      const parentHeight = parent?.clientHeight ?? window.innerHeight;
+      const buttonRect = button.getBoundingClientRect();
+      const parentRect = parent?.getBoundingClientRect();
+      const currentTop =
+        closedToggleTop ??
+        (parentRect
+          ? buttonRect.top - parentRect.top
+          : buttonRect.top);
+
+      closedToggleDragRef.current = {
+        pointerId: event.pointerId,
+        startY: event.clientY,
+        startTop: currentTop,
+        maxTop: Math.max(0, parentHeight - buttonRect.height),
+        hasMoved: false,
+      };
+      button.setPointerCapture(event.pointerId);
+    },
+    [closedToggleTop]
+  );
+
+  const handleClosedTogglePointerMove = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = closedToggleDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    const dy = event.clientY - drag.startY;
+    if (Math.abs(dy) > 3) {
+      drag.hasMoved = true;
+    }
+    if (!drag.hasMoved) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    setClosedToggleTop(Math.max(0, Math.min(drag.maxTop, drag.startTop + dy)));
+  }, []);
+
+  const handleClosedTogglePointerEnd = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = closedToggleDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    suppressClosedToggleClickRef.current = drag.hasMoved;
+    closedToggleDragRef.current = null;
+  }, []);
+
   const panelPositionStyle =
     side === "right"
       ? {
@@ -106,9 +175,20 @@ export default function TimelineFloatingPanel({
       {!isOpen && (
         <button
           type="button"
-          onClick={() => onOpenChange(true)}
+          onClick={(event) => {
+            if (suppressClosedToggleClickRef.current) {
+              suppressClosedToggleClickRef.current = false;
+              event.preventDefault();
+              return;
+            }
+            onOpenChange(true);
+          }}
+          onPointerDown={handleClosedTogglePointerDown}
+          onPointerMove={handleClosedTogglePointerMove}
+          onPointerUp={handleClosedTogglePointerEnd}
+          onPointerCancel={handleClosedTogglePointerEnd}
           className={cn(
-            "absolute z-50 inline-flex border-2 border-custom-blue bg-background px-2 py-3 text-custom-blue shadow-lg transition-colors hover:bg-accent",
+            "absolute z-50 inline-flex cursor-grab touch-none select-none border-2 border-custom-blue bg-background px-2 py-3 text-custom-blue shadow-lg transition-colors hover:bg-accent active:cursor-grabbing",
             side === "right"
               ? "right-0 translate-x-1/2 rounded-l-lg"
               : "left-0 -translate-x-1/2 rounded-r-lg"
@@ -117,11 +197,18 @@ export default function TimelineFloatingPanel({
           title={toggleTitle}
           style={{
             writingMode: "vertical-rl",
-            top: `calc(50% + ${toggleVerticalOffset}px)`,
+            top:
+              closedToggleTop == null
+                ? `calc(50% + ${toggleVerticalOffset}px)`
+                : `${closedToggleTop}px`,
             transform:
               side === "right"
-                ? "translateY(-50%) translateX(50%)"
-                : "translateY(-50%) translateX(-50%)",
+                ? closedToggleTop == null
+                  ? "translateY(-50%) translateX(50%)"
+                  : "translateX(50%)"
+                : closedToggleTop == null
+                  ? "translateY(-50%) translateX(-50%)"
+                  : "translateX(-50%)",
           }}
         >
           {toggleIcon}

@@ -537,14 +537,32 @@ export default function Convocazioni() {
     };
   }, []);
 
-  // Canonical URL: rimuovi il parametro date dalla querystring
+  // Canonical URL: rimuovi il parametro date dalla querystring (replace, non push)
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (!params.has("date")) return;
     const kind = params.get("kind");
-    setLocation(kind ? `/convocazioni?kind=${kind}` : "/convocazioni");
+    setLocation(kind ? `/convocazioni?kind=${kind}` : "/convocazioni", { replace: true });
   }, [location, setLocation]);
+
+  // Convocazioni logistica: indietro del browser → home logistica (come pulsante Home)
+  useEffect(() => {
+    if (!isDrivers || typeof window === "undefined") return;
+
+    const handleDriversBack = () => {
+      const path = window.location.pathname;
+      const kind = new URLSearchParams(window.location.search).get("kind");
+
+      if (path === "/generate-logistics-assignments") return;
+      if (path === "/convocazioni" && kind === "drivers") return;
+
+      setLocation("/generate-logistics-assignments", { replace: true });
+    };
+
+    window.addEventListener("popstate", handleDriversBack);
+    return () => window.removeEventListener("popstate", handleDriversBack);
+  }, [isDrivers, setLocation]);
   const handleDateSelect = (date: Date | undefined) => {
     if (!date) return;
     setSelectedDate(date);
