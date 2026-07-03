@@ -271,20 +271,24 @@ export default function AssignedTasksSequenceSummary({
                 </div>
               </div>
 
-              <div className="sequence-summary-driver-scroll flex min-h-0 min-w-0 flex-1 flex-col rounded-md bg-background/70 pb-0.5">
-                <div className="flex min-w-max flex-col">
-                <Droppable
-                  droppableId={`summary-${group.id}`}
-                  direction="vertical"
-                  isDropDisabled={isGroupDragDisabled}
-                >
-                  {(provided, snapshot) => (
+              <Droppable
+                droppableId={`summary-${group.id}`}
+                direction="vertical"
+                isDropDisabled={isGroupDragDisabled}
+              >
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={cn(
+                      "sequence-summary-driver-scroll flex min-h-0 min-w-0 flex-1 flex-col rounded-md bg-background/70 pb-0.5",
+                      snapshot.isDraggingOver && "ring-1 ring-custom-blue/30"
+                    )}
+                  >
                     <ol
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
                       className={cn(
-                        "flex flex-col gap-1.5",
-                        snapshot.isDraggingOver && "rounded-md bg-custom-blue/5 ring-1 ring-custom-blue/30"
+                        "flex min-w-max flex-col gap-1.5",
+                        snapshot.isDraggingOver && "rounded-md bg-custom-blue/5"
                       )}
                     >
                       {displayedTasks.map((entry, index) => {
@@ -297,7 +301,7 @@ export default function AssignedTasksSequenceSummary({
                         return (
                           <Draggable
                             key={`${group.id}-${entry.taskId}`}
-                            draggableId={String(entry.taskId)}
+                            draggableId={`${entry.taskId}-summary-${group.id}`}
                             index={index}
                             isDragDisabled={isGroupDragDisabled}
                           >
@@ -407,10 +411,9 @@ export default function AssignedTasksSequenceSummary({
                       })}
                       {provided.placeholder}
                     </ol>
-                  )}
-                </Droppable>
-                </div>
-              </div>
+                  </div>
+                )}
+              </Droppable>
             </div>
           );
           })}

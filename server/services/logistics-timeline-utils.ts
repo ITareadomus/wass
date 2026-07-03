@@ -197,11 +197,9 @@ export async function recalculateLogisticsDriverTimes(
     entry.driver.start_time = startTime;
   }
 
-  const tasks: any[] = Array.isArray(entry.tasks)
-    ? [...entry.tasks].sort(
-        (left, right) => Number(left?.sequence || 0) - Number(right?.sequence || 0)
-      )
-    : [];
+  // Preserve array order: DnD mutations splice entry.tasks directly; sorting by stale
+  // sequence values would undo manual reorders before times are recalculated.
+  const tasks: any[] = Array.isArray(entry.tasks) ? [...entry.tasks] : [];
   if (tasks.length === 0) {
     entry.tasks = [];
     entry.return_travel_time = 0;

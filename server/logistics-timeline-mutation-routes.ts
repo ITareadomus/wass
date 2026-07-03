@@ -166,6 +166,10 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       const targetIndex =
         insertAt !== undefined ? Math.max(0, Math.min(insertAt, driverEntry.tasks.length)) : driverEntry.tasks.length;
       driverEntry.tasks.splice(targetIndex, 0, taskForTimeline);
+      driverEntry.tasks.forEach((t: any, i: number) => {
+        t.sequence = i + 1;
+        t.followup = i > 0;
+      });
 
       try {
         const sel = await workspaceFiles.loadSelectedLogisticsDrivers(workDate);
@@ -403,6 +407,10 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       }
       const [task] = driverEntry.tasks.splice(actualFrom, 1);
       driverEntry.tasks.splice(toIndex, 0, task);
+      driverEntry.tasks.forEach((t: any, i: number) => {
+        t.sequence = i + 1;
+        t.followup = i > 0;
+      });
       try {
         await recalculateLogisticsDriverEntry(driverEntry, workDate);
       } catch (e: any) {
@@ -506,6 +514,10 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       const targetIndex =
         destIndex !== undefined ? Math.max(0, Math.min(destIndex, destEntry.tasks.length)) : destEntry.tasks.length;
       destEntry.tasks.splice(targetIndex, 0, taskToMove);
+      destEntry.tasks.forEach((t: any, i: number) => {
+        t.sequence = i + 1;
+        t.followup = i > 0;
+      });
 
       try {
         if (sourceEntry && sourceEntry.tasks.length > 0) {
@@ -668,6 +680,10 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       markTasks(destEntry.tasks);
 
       for (const entry of [sourceEntry, destEntry]) {
+        entry.tasks.forEach((t: any, i: number) => {
+          t.sequence = i + 1;
+          t.followup = i > 0;
+        });
         try {
           if (entry.tasks.length > 0) {
             await recalculateLogisticsDriverEntry(entry, workDate);

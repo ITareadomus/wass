@@ -2217,8 +2217,13 @@ const displayClickableInputClass =
       ? "top-1/2 -translate-y-1/2"
       : "top-[5px]";
 
-  // Determina se il drag è disabilitato in base alla data, se la task è già salvata, o se è bloccata
-  const shouldDisableDrag = isDragDisabled || (displayTask as any).checkin_date || isLocked || isPreAssignedReadonly;
+  // Determina se il drag è disabilitato in base alla data, se la task è già salvata, o se è bloccata.
+  // In logistica checkin_date è la finestra prevista, non un blocco di riordino.
+  const shouldDisableDrag =
+    isDragDisabled ||
+    (operationsScope !== "logistics" && Boolean((displayTask as any).checkin_date)) ||
+    isLocked ||
+    isPreAssignedReadonly;
 
   const currentDetailsTaskKey = getTaskKey(displayTask) || getTaskKey(task);
   const taskAny = task as any;

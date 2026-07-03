@@ -946,6 +946,14 @@ export default function GenerateLogisticsAssignments() {
     return [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks, ...timelineTasks];
   }, [earlyOutTasks, highPriorityTasks, lowPriorityTasks, logisticsDriversAssignments]);
 
+  const parseLogisticsDraggableTaskId = (draggableId: string): string => {
+    const cleanerIdx = draggableId.indexOf("-cleaner-");
+    if (cleanerIdx !== -1) return draggableId.slice(0, cleanerIdx);
+    const summaryIdx = draggableId.indexOf("-summary-");
+    if (summaryIdx !== -1) return draggableId.slice(0, summaryIdx);
+    return draggableId;
+  };
+
   const parseDriverId = (droppableId: string | undefined | null) => {
     if (!droppableId) return null;
     for (const prefix of ["timeline-", "summary-"]) {
@@ -1055,7 +1063,7 @@ export default function GenerateLogisticsAssignments() {
     const fromContainer = parseContainerKey(source.droppableId);
     const fromDriverId = parseDriverId(source.droppableId);
 
-    const taskId = draggableId.includes("-cleaner-") ? draggableId.split("-cleaner-")[0] : draggableId;
+    const taskId = parseLogisticsDraggableTaskId(draggableId);
     const task = allTasksWithAssignments.find((t) => String(t.id) === String(taskId));
     const logisticCode = task?.name;
 
@@ -1327,7 +1335,6 @@ export default function GenerateLogisticsAssignments() {
                   searchTask={searchTask}
                   isReadOnly={isTimelineReadOnly}
                   isLoadingOverlay={isLoadingDragDrop}
-                  suppressTaskDrag={!showContainers}
                   onRefresh={reloadLogisticsPage}
                 />
                 <TimelineFloatingPanel
