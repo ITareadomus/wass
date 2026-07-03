@@ -417,10 +417,10 @@ export default function GenerateLogisticsAssignments() {
   /** Solo sul pulsante refresh (come generate-assignments), nessun overlay pagina */
   const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
   const [isRunningLogisticsOptimizer, setIsRunningLogisticsOptimizer] = useState(false);
-  const [showMissingCleanerWarningDialog, setShowMissingCleanerWarningDialog] = useState(false);
-  const [missingCleanerTaskCount, setMissingCleanerTaskCount] = useState(0);
-  const [missingCleanerTaskCodes, setMissingCleanerTaskCodes] = useState<string[]>([]);
-  const [showMissingCleanerTaskCodesList, setShowMissingCleanerTaskCodesList] = useState(false);
+  const [showMissingLogisticsKindWarningDialog, setShowMissingLogisticsKindWarningDialog] = useState(false);
+  const [missingLogisticsKindTaskCount, setMissingLogisticsKindTaskCount] = useState(0);
+  const [missingLogisticsKindTaskCodes, setMissingLogisticsKindTaskCodes] = useState<string[]>([]);
+  const [showMissingLogisticsKindTaskCodesList, setShowMissingLogisticsKindTaskCodesList] = useState(false);
   const [logisticsTaskLists, setLogisticsTaskLists] = useState<LogisticsTaskLists>(EMPTY_LOGISTICS_TASK_LISTS);
   const [logisticsDrivers, setLogisticsDrivers] = useState<
     Array<{ id: number; name?: string; lastname?: string; role?: string; premium?: boolean; start_time?: string | null }>
@@ -836,10 +836,10 @@ export default function GenerateLogisticsAssignments() {
         : [];
 
       if (count > 0) {
-        setMissingCleanerTaskCount(count);
-        setMissingCleanerTaskCodes(taskCodes);
-        setShowMissingCleanerTaskCodesList(false);
-        setShowMissingCleanerWarningDialog(true);
+        setMissingLogisticsKindTaskCount(count);
+        setMissingLogisticsKindTaskCodes(taskCodes);
+        setShowMissingLogisticsKindTaskCodesList(false);
+        setShowMissingLogisticsKindWarningDialog(true);
         return;
       }
 
@@ -1088,7 +1088,8 @@ export default function GenerateLogisticsAssignments() {
       }
 
       if (fromDriverId !== null && toDriverId !== null && fromDriverId === toDriverId) {
-        await reorderLogisticsTimeline(taskId, logisticCode, fromDriverId, source.index, destination.index);
+        const idx = dropIndexSnapshot !== null ? dropIndexSnapshot : destination.index;
+        await reorderLogisticsTimeline(taskId, logisticCode, fromDriverId, source.index, idx);
         await reloadLogisticsPage();
         toast({ title: "Riordinata", variant: "success" });
         return;
@@ -1398,10 +1399,10 @@ export default function GenerateLogisticsAssignments() {
         </DragDropContext>
 
         <Dialog
-          open={showMissingCleanerWarningDialog}
+          open={showMissingLogisticsKindWarningDialog}
           onOpenChange={(open) => {
-            setShowMissingCleanerWarningDialog(open);
-            if (!open) setShowMissingCleanerTaskCodesList(false);
+            setShowMissingLogisticsKindWarningDialog(open);
+            if (!open) setShowMissingLogisticsKindTaskCodesList(false);
           }}
         >
           <DialogContent>
@@ -1413,23 +1414,23 @@ export default function GenerateLogisticsAssignments() {
                   type="button"
                   className="font-semibold underline underline-offset-2 text-foreground"
                   onClick={() =>
-                    setShowMissingCleanerTaskCodesList((prev) => !prev)
+                    setShowMissingLogisticsKindTaskCodesList((prev) => !prev)
                   }
                 >
-                  {missingCleanerTaskCount}
+                  {missingLogisticsKindTaskCount}
                 </button>{" "}
-                task a cui non è stato assegnato nessun cleaner.
+                task senza tipologia logistica. La tipologia logistica va inserita per tutti i task prima di avviare l&apos;assegnazione.
               </DialogDescription>
             </DialogHeader>
 
-            {showMissingCleanerTaskCodesList && (
+            {showMissingLogisticsKindTaskCodesList && (
               <div className="max-h-52 overflow-y-auto rounded-md border p-3 text-sm">
                 <p className="mb-2 font-medium">Codici ADAM:</p>
-                {missingCleanerTaskCodes.length === 0 ? (
+                {missingLogisticsKindTaskCodes.length === 0 ? (
                   <p className="text-muted-foreground">Nessun codice disponibile.</p>
                 ) : (
                   <ul className="space-y-1">
-                    {missingCleanerTaskCodes.map((code) => (
+                    {missingLogisticsKindTaskCodes.map((code) => (
                       <li key={code} className="font-mono">
                         {code}
                       </li>
@@ -1444,22 +1445,11 @@ export default function GenerateLogisticsAssignments() {
                 variant="outline"
                 className="border-2 border-custom-blue"
                 onClick={() => {
-                  setShowMissingCleanerWarningDialog(false);
-                  setShowMissingCleanerTaskCodesList(false);
+                  setShowMissingLogisticsKindWarningDialog(false);
+                  setShowMissingLogisticsKindTaskCodesList(false);
                 }}
               >
-                Annulla
-              </Button>
-              <Button
-                variant="outline"
-                className="border-2 border-custom-blue"
-                onClick={async () => {
-                  setShowMissingCleanerWarningDialog(false);
-                  setShowMissingCleanerTaskCodesList(false);
-                  await executeLogisticsOptimizer();
-                }}
-              >
-                Procedi
+                OK
               </Button>
             </DialogFooter>
           </DialogContent>

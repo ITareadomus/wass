@@ -24,7 +24,7 @@ import {
   buildVehicleArcPenalties,
   computeRouteSequenceDiagnostics,
 } from "./groups/route-sequence-penalties";
-import { polishRoutingSolution } from "./route-polishing";
+import { polishRoutingSolutionWithDiagnostics } from "./route-polishing";
 
 export interface RunLogisticsRoutingOptions extends BuildLogisticsRoutingInputOptions {
   solver?: RoutingSolverId;
@@ -91,7 +91,8 @@ export async function runLogisticsRouting(
   }
 
   const solverSolution = await solveRouting(input, { solverId });
-  const solution = polishRoutingSolution(input, solverSolution);
+  const polished = polishRoutingSolutionWithDiagnostics(input, solverSolution);
+  const solution = polished.solution;
   const solutionValidation = validateRoutingSolution(input, solution);
   const applyGate = evaluateSolutionApplyGate(solution, {
     allowPartial: options.allowPartial,
@@ -124,6 +125,7 @@ export async function runLogisticsRouting(
         droppedDiagnostics,
         ...(territoryDiagnostics ? { territoryDiagnostics } : {}),
         ...(routeSequenceDiagnostics ? { routeSequenceDiagnostics } : {}),
+        ...(polished.diagnostics ? { routePolishingDiagnostics: polished.diagnostics } : {}),
       },
     });
   }

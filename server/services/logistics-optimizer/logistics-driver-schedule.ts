@@ -1,9 +1,11 @@
 import {
+  computeEarlyRouteWaitAbsorptionMin,
   isCheckinApplicableOnWorkDate,
   isCheckinEndViolation,
   isCheckoutApplicableOnWorkDate,
   isCheckoutWaitFeasible,
   isStartAtOrAfterCheckin,
+  LOGISTICS_MAX_CHECKOUT_WAIT_MIN,
   LOGISTICS_SERVICE_DURATION_MIN,
   minutesToHm,
   parseHmToMinutes,
@@ -22,6 +24,8 @@ export interface LogisticsScheduleTaskInput {
   checkoutDate?: string | null;
   checkinTime?: string | null;
   checkinDate?: string | null;
+  /** Se presente, usa questo travel invece della stima da coordinate. */
+  travelMinutesFromPrevious?: number | null;
 }
 
 export interface LogisticsScheduledTaskRow {
@@ -54,6 +58,8 @@ export interface BuildLogisticsScheduleForDriverResult {
   projectedClockMin: number;
   lastLat: number | null;
   lastLng: number | null;
+  /** Partenza effettiva dopo assorbimento wait sui primi due task. */
+  effectiveDriverStartMin: number;
 }
 
 function toFiniteCoord(value: unknown): number | null {
@@ -62,17 +68,14 @@ function toFiniteCoord(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/**
- * Motore temporale unico: stesso calcolo usato in Phase2 (simulazione winner) e in apply (recalculate).
- */
-export function buildLogisticsScheduleForDriver(args: {
+function buildLogisticsScheduleForDriverOnce(args: {
   tasks: LogisticsScheduleTaskInput[];
   driverStartMin: number;
   workDate: string;
-  startFromDepot?: boolean;
-  priorityWindows?: PriorityWindows | null;
+  startFromDepot: boolean;
+  priorityWindows: PriorityWindows | null;
 }): BuildLogisticsScheduleForDriverResult {
-  const { tasks, driverStartMin, workDate, startFromDepot = true, priorityWindows = null } = args;
+  const { tasks, driverStartMin, workDate, startFromDepot, priorityWindows } = args;
   const scheduled: LogisticsScheduledTaskRow[] = [];
   const checkinViolations: LogisticsScheduleViolationRow[] = [];
   const checkoutWaitViolations: LogisticsScheduleViolationRow[] = [];
@@ -85,22 +88,20 @@ export function buildLogisticsScheduleForDriver(args: {
     const task = tasks[i];
     const lat = toFiniteCoord(task.lat);
     const lng = toFiniteCoord(task.lng);
+    const travelOverride = Number(task.travelMinutesFromPrevious);
     let travel = 0;
-    if (prevLat !== null && prevLng !== null && lat !== null && lng !== null) {
+    if (Number.isFinite(travelOverride) && travelOverride >= 0) {
+      travel = travelOverride;
+    } else if (prevLat !== null && prevLng !== null && lat !== null && lng !== null) {
       travel = estimateCarTravelMinutes({ lat: prevLat, lng: prevLng }, { lat, lng });
     }
 
     const arrivalMin = clockMin + travel;
-    let checkoutWaitMinutes = 0;
-    let checkoutWaitExceeded = false;
     let startMin = arrivalMin;
 
     if (isCheckoutApplicableOnWorkDate(task.checkoutTime, task.checkoutDate, workDate)) {
       const checkoutMin = parseHmToMinutes(task.checkoutTime, 0) ?? 0;
-      const resolved = resolveCheckoutSchedule(arrivalMin, checkoutMin);
-      startMin = resolved.startMin;
-      checkoutWaitMinutes = resolved.checkoutWaitMinutes;
-      checkoutWaitExceeded = resolved.checkoutWaitExceeded;
+      startMin = resolveCheckoutSchedule(arrivalMin, checkoutMin).startMin;
     }
 
     // Keep logistics aligned with housekeeping priority windows:
@@ -111,6 +112,9 @@ export function buildLogisticsScheduleForDriver(args: {
         startMin = Math.max(startMin, window.startMin);
       }
     }
+
+    const checkoutWaitMinutes = Math.max(0, startMin - arrivalMin);
+    const checkoutWaitExceeded = checkoutWaitMinutes > LOGISTICS_MAX_CHECKOUT_WAIT_MIN;
 
     const endMin = startMin + LOGISTICS_SERVICE_DURATION_MIN;
 
@@ -169,6 +173,54 @@ export function buildLogisticsScheduleForDriver(args: {
     projectedClockMin: clockMin,
     lastLat: prevLat,
     lastLng: prevLng,
+    effectiveDriverStartMin: driverStartMin,
+  };
+}
+
+/**
+ * Motore temporale unico: stesso calcolo usato in Phase2 (simulazione winner) e in apply (recalculate).
+ * Wait prima del task 1 o tra task 1 e 2 viene assorbito spostando la partenza del driver.
+ */
+export function buildLogisticsScheduleForDriver(args: {
+  tasks: LogisticsScheduleTaskInput[];
+  driverStartMin: number;
+  workDate: string;
+  startFromDepot?: boolean;
+  priorityWindows?: PriorityWindows | null;
+}): BuildLogisticsScheduleForDriverResult {
+  const { tasks, driverStartMin, workDate, startFromDepot = true, priorityWindows = null } = args;
+  const firstPass = buildLogisticsScheduleForDriverOnce({
+    tasks,
+    driverStartMin,
+    workDate,
+    startFromDepot,
+    priorityWindows,
+  });
+
+  const absorptionMin = computeEarlyRouteWaitAbsorptionMin(
+    driverStartMin,
+    firstPass.tasks.map((row) => ({
+      startMin: row.startMin,
+      endMin: row.endMin,
+      travelMinutes: row.travelMinutes,
+    }))
+  );
+
+  if (absorptionMin <= 0) {
+    return firstPass;
+  }
+
+  const secondPass = buildLogisticsScheduleForDriverOnce({
+    tasks,
+    driverStartMin: driverStartMin + absorptionMin,
+    workDate,
+    startFromDepot,
+    priorityWindows,
+  });
+
+  return {
+    ...secondPass,
+    effectiveDriverStartMin: driverStartMin + absorptionMin,
   };
 }
 

@@ -1,6 +1,15 @@
 import type { DriverId, RoutingProblemInput, TaskId, TaskNode } from "../input-contract";
 import type { RoutingSolution } from "../solution-contract";
 import { haversineMeters } from "./geo-utils";
+import type { HistoricalTerritoryKey } from "./historical-territory-profiles";
+
+const SEVERE_FOREIGN_TERRITORY_RATIO = 1.3;
+
+const HISTORICAL_TERRITORY_ADJACENCY: Record<HistoricalTerritoryKey, HistoricalTerritoryKey[]> = {
+  north: ["center_south_east", "center_south_west"],
+  center_south_east: ["north"],
+  center_south_west: ["north"],
+};
 
 export interface TerritoryDiagnostics {
   territoryMode: "historical_template_3_drivers" | "dynamic_clustering" | null;
@@ -49,6 +58,13 @@ export interface TerritoryDiagnostics {
     territoryIndex: number;
     preferredDriverId: DriverId;
     actualDriverId: DriverId;
+    actualDriverTerritoryIndex: number | null;
+    preferredTerritoryKey?: string;
+    actualDriverTerritoryKey?: string;
+    preferredTerritoryRatio: number | null;
+    actualDriverTerritoryRatio: number | null;
+    adjacentTerritory: boolean | null;
+    severity: "warning" | "severe";
   }>;
 }
 
@@ -208,6 +224,32 @@ function distanceBetweenTasks(taskA: TaskNode, taskB: TaskNode): number {
   );
 }
 
+function territoryRatio(
+  task: TaskNode,
+  territory: {
+    centroid: { lat: number; lng: number };
+    penaltyRadiusMeters: number;
+  }
+): number {
+  return (
+    haversineMeters(
+      task.location.lat,
+      task.location.lng,
+      territory.centroid.lat,
+      territory.centroid.lng
+    ) / Math.max(territory.penaltyRadiusMeters, 1)
+  );
+}
+
+function territoryKeysAdjacent(
+  preferredKey: HistoricalTerritoryKey | undefined,
+  actualKey: HistoricalTerritoryKey | undefined
+): boolean | null {
+  if (!preferredKey || !actualKey) return null;
+  if (preferredKey === actualKey) return true;
+  return HISTORICAL_TERRITORY_ADJACENCY[preferredKey]?.includes(actualKey) ?? true;
+}
+
 function requiredDriverTerritoryConflicts(
   input: RoutingProblemInput,
   preferredDriverByTaskId: Map<TaskId, DriverId>,
@@ -232,12 +274,21 @@ function requiredDriverTerritoryConflicts(
 }
 
 function solverTerritoryViolations(
+  input: RoutingProblemInput,
   solution: RoutingSolution | undefined,
   preferredDriverByTaskId: Map<TaskId, DriverId>,
   territoryByTaskId: Map<TaskId, number>
 ): TerritoryDiagnostics["solverTerritoryViolations"] {
   if (!solution) return [];
 
+  const assignment = input.metadata.dailyTerritoryAssignment;
+  const taskById = new Map(input.tasks.map((task) => [task.taskId, task]));
+  const territoryByIndex = new Map(
+    assignment?.territories.map((territory) => [territory.territoryIndex, territory]) ?? []
+  );
+  const territoryByDriverId = new Map(
+    assignment?.territories.map((territory) => [territory.assignedDriverId, territory]) ?? []
+  );
   const violations: TerritoryDiagnostics["solverTerritoryViolations"] = [];
   for (const route of solution.routes) {
     for (const stop of route.stops) {
@@ -248,11 +299,36 @@ function solverTerritoryViolations(
         territoryIndex !== undefined &&
         route.driverId !== preferredDriverId
       ) {
+        const task = taskById.get(stop.taskId);
+        const preferredTerritory = territoryByIndex.get(territoryIndex);
+        const actualDriverTerritory = territoryByDriverId.get(route.driverId);
+        const preferredTerritoryRatio =
+          task && preferredTerritory ? territoryRatio(task, preferredTerritory) : null;
+        const actualDriverTerritoryRatio =
+          task && actualDriverTerritory ? territoryRatio(task, actualDriverTerritory) : null;
+        const adjacentTerritory = territoryKeysAdjacent(
+          preferredTerritory?.territoryKey,
+          actualDriverTerritory?.territoryKey
+        );
+        const severity =
+          actualDriverTerritoryRatio !== null &&
+          actualDriverTerritoryRatio > SEVERE_FOREIGN_TERRITORY_RATIO
+            ? "severe"
+            : adjacentTerritory === false
+              ? "severe"
+              : "warning";
         violations.push({
           taskId: stop.taskId,
           territoryIndex,
           preferredDriverId,
           actualDriverId: route.driverId,
+          actualDriverTerritoryIndex: actualDriverTerritory?.territoryIndex ?? null,
+          preferredTerritoryKey: preferredTerritory?.territoryKey,
+          actualDriverTerritoryKey: actualDriverTerritory?.territoryKey,
+          preferredTerritoryRatio,
+          actualDriverTerritoryRatio,
+          adjacentTerritory,
+          severity,
         });
       }
     }
@@ -285,6 +361,7 @@ export function computeTerritoryDiagnostics(
       territoryByTaskId
     ),
     solverTerritoryViolations: solverTerritoryViolations(
+      input,
       solution,
       preferredDriverByTaskId,
       territoryByTaskId

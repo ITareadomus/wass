@@ -2560,7 +2560,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!tasks?.length) continue;
           tasks.sort((a: any, b: any) => (a.sequence ?? 9999) - (b.sequence ?? 9999));
         }
-        await recalculateLogisticsTimeline(timeline, workDate);
+        const scheduleChanged = await recalculateLogisticsTimeline(timeline, workDate);
         const { enrichDriverTasksWithLogisticsKind } = await import(
           "./services/logistics-task-kind-enrichment"
         );
@@ -2577,6 +2577,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         await enrichLogisticsTimelineStructureSofabeds(timeline);
         await enrichLogisticsTimelineCustomerNotes(workDate, timeline);
+        if (scheduleChanged) {
+          await workspaceFiles.saveLogisticsTimeline(
+            workDate,
+            timeline,
+            false,
+            "system",
+            "schedule_absorption_recalc"
+          );
+        }
       }
       res.json(timeline);
     } catch (error: any) {
@@ -10318,60 +10327,74 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     }
   });
 
+  async function buildMissingLogisticsKindPrecheck(workDate: string): Promise<{
+    date: string;
+    count: number;
+    taskCodes: string[];
+  }> {
+    const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+    const [containersData, timelineData, locksMap] = await Promise.all([
+      workspaceFiles.loadLogisticsContainers(workDate),
+      workspaceFiles.loadLogisticsTimeline(workDate),
+      pgDailyAssignmentsService.getLocksMap(workDate),
+    ]);
+
+    const containerTasks = [
+      ...(containersData?.containers?.early_out?.tasks || []),
+      ...(containersData?.containers?.high_priority?.tasks || []),
+      ...(containersData?.containers?.low_priority?.tasks || []),
+    ];
+    const timelineTasks = Array.isArray(timelineData?.drivers_assignments)
+      ? timelineData.drivers_assignments.flatMap((entry: any) =>
+          Array.isArray(entry?.tasks) ? entry.tasks : []
+        )
+      : [];
+
+    const taskById = new Map<string, any>();
+    for (const task of [...containerTasks, ...timelineTasks]) {
+      const taskId = String(task?.task_id ?? task?.id ?? "").trim();
+      const logisticCode = String(task?.logistic_code ?? task?.name ?? "").trim();
+      const key = taskId || logisticCode;
+      if (!key) continue;
+      taskById.set(key, task);
+    }
+
+    const isLockedTask = (task: any): boolean => {
+      if (task?.locked === true) return true;
+      const taskId = Number(task?.task_id ?? task?.id);
+      if (!Number.isFinite(taskId)) return false;
+      return locksMap.get(taskId)?.locked === true;
+    };
+
+    const list = Array.from(taskById.values()).filter((task: any) => {
+      if (isLockedTask(task)) return false;
+      const kind = String(task?.logistics_task_kind ?? task?.logisticsTaskKind ?? "").trim();
+      return !kind;
+    });
+    const taskCodes = Array.from(
+      new Set(
+        list
+          .map((row: any) => row?.logistic_code)
+          .filter((value: any) => value !== null && value !== undefined && String(value).trim() !== "")
+          .map((value: any) => String(value).trim())
+      )
+    );
+
+    return {
+      date: workDate,
+      count: list.length,
+      taskCodes,
+    };
+  }
+
   // ========== LOGISTICS OPTIMIZER (INITIAL CONSTRAINTS) ==========
   app.get("/api/logistics-optimizer/precheck", async (req, res) => {
-    let connection: mysql.Connection | null = null;
     try {
       const workDate = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
-      connection = await mysql.createConnection({
-        host: databaseConfig.mysql.host,
-        port: databaseConfig.mysql.port,
-        user: databaseConfig.mysql.user,
-        password: databaseConfig.mysql.password,
-        database: databaseConfig.mysql.database,
-      });
-
-      const [rows]: any = await connection.execute(
-        `
-          SELECT
-            h.id AS task_id,
-            s.logistic_code AS logistic_code
-          FROM app_housekeeping h
-          JOIN app_structures s
-            ON s.id = h.structure_id
-          LEFT JOIN app_structure_operation o
-            ON o.id = h.operation_id
-          WHERE h.checkout = ?
-            AND h.deleted_at IS NULL
-            AND h.deleted_at_client IS NULL
-            AND s.lat IS NOT NULL
-            AND s.lng IS NOT NULL
-            AND s.lat != ''
-            AND s.lng != ''
-            AND s.lat != '0'
-            AND s.lng != '0'
-            AND COALESCE(o.enable_wass_route, 0) = 1
-            AND (h.cleaned_by_us IS NULL OR h.cleaned_by_us <= 0)
-          ORDER BY h.id ASC
-        `,
-        [workDate]
-      );
-
-      const list = Array.isArray(rows) ? rows : [];
-      const taskCodes = Array.from(
-        new Set(
-          list
-            .map((row: any) => row?.logistic_code)
-            .filter((value: any) => value !== null && value !== undefined && String(value).trim() !== "")
-            .map((value: any) => String(value).trim())
-        )
-      );
-
+      const precheck = await buildMissingLogisticsKindPrecheck(workDate);
       return res.json({
         success: true,
-        date: workDate,
-        count: list.length,
-        taskCodes,
+        ...precheck,
       });
     } catch (error: any) {
       console.error("❌ Errore logistics-optimizer precheck:", error);
@@ -10379,70 +10402,16 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         success: false,
         error: error.message,
       });
-    } finally {
-      if (connection) {
-        try {
-          await connection.end();
-        } catch {
-          /* ignore */
-        }
-      }
     }
   });
 
   app.get("/api/logistics-optimizer-final/precheck", async (req, res) => {
-    let connection: mysql.Connection | null = null;
     try {
       const workDate = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
-      connection = await mysql.createConnection({
-        host: databaseConfig.mysql.host,
-        port: databaseConfig.mysql.port,
-        user: databaseConfig.mysql.user,
-        password: databaseConfig.mysql.password,
-        database: databaseConfig.mysql.database,
-      });
-
-      const [rows]: any = await connection.execute(
-        `
-          SELECT
-            h.id AS task_id,
-            s.logistic_code AS logistic_code
-          FROM app_housekeeping h
-          JOIN app_structures s
-            ON s.id = h.structure_id
-          LEFT JOIN app_structure_operation o
-            ON o.id = h.operation_id
-          WHERE h.checkout = ?
-            AND h.deleted_at IS NULL
-            AND h.deleted_at_client IS NULL
-            AND s.lat IS NOT NULL
-            AND s.lng IS NOT NULL
-            AND s.lat != ''
-            AND s.lng != ''
-            AND s.lat != '0'
-            AND s.lng != '0'
-            AND COALESCE(o.enable_wass_route, 0) = 1
-            AND (h.cleaned_by_us IS NULL OR h.cleaned_by_us <= 0)
-          ORDER BY h.id ASC
-        `,
-        [workDate]
-      );
-
-      const list = Array.isArray(rows) ? rows : [];
-      const taskCodes = Array.from(
-        new Set(
-          list
-            .map((row: any) => row?.logistic_code)
-            .filter((value: any) => value !== null && value !== undefined && String(value).trim() !== "")
-            .map((value: any) => String(value).trim())
-        )
-      );
-
+      const precheck = await buildMissingLogisticsKindPrecheck(workDate);
       return res.json({
         success: true,
-        date: workDate,
-        count: list.length,
-        taskCodes,
+        ...precheck,
       });
     } catch (error: any) {
       console.error("❌ Errore logistics-optimizer-final precheck:", error);
@@ -10450,14 +10419,6 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         success: false,
         error: error.message,
       });
-    } finally {
-      if (connection) {
-        try {
-          await connection.end();
-        } catch {
-          /* ignore */
-        }
-      }
     }
   });
 

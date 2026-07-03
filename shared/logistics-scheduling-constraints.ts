@@ -32,6 +32,35 @@ export function minutesToHm(totalMinutes: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+export interface LogisticsTaskWorkedTimeFields {
+  start_time?: string | null;
+  startTime?: string | null;
+  end_time?: string | null;
+  endTime?: string | null;
+}
+
+/** Somma i minuti di servizio logistica di ogni task (end − start, fallback 15 min). */
+export function sumLogisticsTaskWorkedMinutes(
+  tasks: LogisticsTaskWorkedTimeFields[]
+): number {
+  return tasks.reduce((sum, task) => {
+    const startMin = parseHmToMinutes(task.start_time ?? task.startTime, null);
+    const endMin = parseHmToMinutes(task.end_time ?? task.endTime, null);
+    if (startMin != null && endMin != null && endMin > startMin) {
+      return sum + (endMin - startMin);
+    }
+    return sum + LOGISTICS_SERVICE_DURATION_MIN;
+  }, 0);
+}
+
+/** Formato ore lavorate timeline logistica, es. 1:30 per 90 minuti. */
+export function formatLogisticsWorkedHours(totalMinutes: number): string {
+  const bounded = Math.max(0, Math.round(totalMinutes));
+  const hours = Math.floor(bounded / 60);
+  const minutes = bounded % 60;
+  return `${hours}:${String(minutes).padStart(2, "0")}`;
+}
+
 export function normalizeYmd(value: unknown): string | null {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
@@ -398,6 +427,35 @@ export function shouldBlinkLogisticsBagRule(task: LogisticsTaskTimeFields): bool
  * Minuti di attesa prima del checkout da mostrare come wait gap (come housekeeping).
  * Preferisce checkout_wait_minutes dal ricalcolo; fallback HK se assente.
  */
+export interface EarlyRouteWaitStop {
+  startMin: number;
+  endMin: number;
+  travelMinutes: number;
+}
+
+/**
+ * Minuti di attesa assorbibili spostando la partenza del driver (e quindi il primo task)
+ * invece di mostrare wait prima del task 1 o tra task 1 e 2.
+ */
+export function computeEarlyRouteWaitAbsorptionMin(
+  driverStartMin: number,
+  stops: EarlyRouteWaitStop[]
+): number {
+  if (stops.length === 0) return 0;
+
+  const first = stops[0];
+  const firstArrivalMin = driverStartMin + first.travelMinutes;
+  let absorptionMin = Math.max(0, first.startMin - firstArrivalMin);
+
+  if (stops.length >= 2) {
+    const second = stops[1];
+    const secondArrivalMin = first.endMin + second.travelMinutes;
+    absorptionMin += Math.max(0, second.startMin - secondArrivalMin);
+  }
+
+  return absorptionMin;
+}
+
 export function computeLogisticsCheckoutWaitGap(args: {
   workDate: string;
   sequence: number;

@@ -18,7 +18,7 @@ import {
   buildVehicleArcPenalties,
   computeRouteSequenceDiagnostics,
 } from "./groups/route-sequence-penalties";
-import { polishRoutingSolution } from "./route-polishing";
+import { polishRoutingSolutionWithDiagnostics } from "./route-polishing";
 
 export interface RunLogisticsRoutingDryOptions extends BuildLogisticsRoutingInputOptions {
   debug?: boolean;
@@ -97,7 +97,8 @@ export async function runLogisticsRoutingDry(
 
   const solverId = options.solver ?? ORTOOLS_SOLVER_ID;
   const solverSolution = await solveRouting(input, { solverId });
-  const solution = polishRoutingSolution(input, solverSolution);
+  const polished = polishRoutingSolutionWithDiagnostics(input, solverSolution);
+  const solution = polished.solution;
   const solutionValidation = validateRoutingSolution(input, solution);
   const applyGate = evaluateSolutionApplyGate(solution);
   const droppedDiagnostics =
@@ -128,6 +129,7 @@ export async function runLogisticsRoutingDry(
         droppedDiagnostics,
         ...(territoryDiagnostics ? { territoryDiagnostics } : {}),
         ...(routeSequenceDiagnostics ? { routeSequenceDiagnostics } : {}),
+        ...(polished.diagnostics ? { routePolishingDiagnostics: polished.diagnostics } : {}),
       },
     });
     console.log(`📋 Logistics optimizer final dry-run scritto in: ${debugDir}`);

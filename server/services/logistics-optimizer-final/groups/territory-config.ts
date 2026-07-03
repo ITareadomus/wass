@@ -14,9 +14,9 @@ export const TERRITORY_ALGO_CONFIG = {
 };
 
 export const HISTORICAL_TEMPLATE_PENALTY_CONFIG = {
-  coreMismatchPenaltyMin: 120,
-  normalMismatchPenaltyMin: 70,
-  borderMismatchPenaltyMin: 20,
+  coreMismatchPenaltyMin: 300,
+  normalMismatchPenaltyMin: 220,
+  borderMismatchPenaltyMin: 120,
 };
 
 export type TerritoryMode = "historical_template_3_drivers" | "dynamic_clustering";
