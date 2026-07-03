@@ -83,6 +83,81 @@ function toFiniteNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function getLogisticsTaskKey(task: any): string | null {
+  const taskId = Number(task?.task_id);
+  if (Number.isFinite(taskId) && taskId > 0) return `task:${taskId}`;
+  const logisticCode = Number(task?.logistic_code);
+  if (Number.isFinite(logisticCode) && logisticCode > 0) return `code:${logisticCode}`;
+  return null;
+}
+
+export function dedupeLogisticsTimelineAssignments(
+  timeline: { drivers_assignments?: any[] } | null | undefined
+): boolean {
+  if (!Array.isArray(timeline?.drivers_assignments)) return false;
+
+  let changed = false;
+  const mergedByDriver = new Map<number, any>();
+  const mergedEntries: any[] = [];
+
+  for (const entry of timeline.drivers_assignments) {
+    const driverId = Number(entry?.driver?.id);
+    if (!Number.isFinite(driverId)) {
+      mergedEntries.push(entry);
+      continue;
+    }
+
+    const existing = mergedByDriver.get(driverId);
+    if (existing) {
+      existing.tasks = [
+        ...(Array.isArray(existing.tasks) ? existing.tasks : []),
+        ...(Array.isArray(entry?.tasks) ? entry.tasks : []),
+      ];
+      changed = true;
+      continue;
+    }
+
+    const normalizedEntry = {
+      ...entry,
+      tasks: Array.isArray(entry?.tasks) ? [...entry.tasks] : [],
+    };
+    mergedByDriver.set(driverId, normalizedEntry);
+    mergedEntries.push(normalizedEntry);
+  }
+
+  const seenTasks = new Set<string>();
+  for (const entry of mergedEntries) {
+    if (!Array.isArray(entry?.tasks)) {
+      entry.tasks = [];
+      continue;
+    }
+
+    const dedupedTasks: any[] = [];
+    for (const task of entry.tasks) {
+      const key = getLogisticsTaskKey(task);
+      if (key && seenTasks.has(key)) {
+        changed = true;
+        continue;
+      }
+      if (key) seenTasks.add(key);
+      dedupedTasks.push(task);
+    }
+
+    entry.tasks = dedupedTasks
+      .sort((left, right) => Number(left?.sequence || 0) - Number(right?.sequence || 0))
+      .map((task, index) => ({
+        ...task,
+        sequence: index + 1,
+        followup: index > 0,
+      }));
+  }
+
+  if (changed) {
+    timeline.drivers_assignments = mergedEntries;
+  }
+  return changed;
+}
+
 export function snapshotLogisticsTimelineSchedule(
   timeline: { drivers_assignments?: any[] } | null | undefined
 ): string {
@@ -187,6 +262,7 @@ export async function recalculateLogisticsTimeline(
   if (!Array.isArray(entries)) return false;
 
   const before = snapshotLogisticsTimelineSchedule(timeline);
+  dedupeLogisticsTimelineAssignments(timeline);
 
   let priorityWindows: PriorityWindows | null = null;
   try {
@@ -195,11 +271,11 @@ export async function recalculateLogisticsTimeline(
     console.warn("⚠️ recalculateLogisticsTimeline: priority windows unavailable, proceeding without them", error);
   }
 
-  for (let i = 0; i < entries.length; i++) {
-    const entry = entries[i];
+  for (let i = 0; i < timeline.drivers_assignments.length; i++) {
+    const entry = timeline.drivers_assignments[i];
     if (!entry?.tasks?.length) continue;
     await hydrateTasksFromLogisticsContainers(entry, workDate);
-    entries[i] = await recalculateLogisticsDriverTimes(entry, workDate, priorityWindows);
+    timeline.drivers_assignments[i] = await recalculateLogisticsDriverTimes(entry, workDate, priorityWindows);
   }
 
   return snapshotLogisticsTimelineSchedule(timeline) !== before;

@@ -595,7 +595,7 @@
 @media print {
   @page {
     size: landscape;
-    margin: 0.3cm;
+    margin: 0.45cm 0.75cm;
   }
 
   body {
@@ -610,7 +610,9 @@
 
   /* MOSTRA SOLO LA TIMELINE E I SUOI FIGLI */
   [data-print-timeline],
-  [data-print-timeline] * {
+  [data-print-timeline] *,
+  [data-print-driver-sheet],
+  [data-print-driver-sheet] * {
     visibility: visible !important;
   }
 
@@ -747,6 +749,172 @@
 
   [data-print-timeline] .gap-2 {
     gap: 0.15rem !important;
+  }
+
+  /* Scheda driver logistics (ordine di carico / sequenza) */
+  html:has([data-print-driver-sheet]),
+  body:has([data-print-driver-sheet]) {
+    overflow: visible !important;
+    width: auto !important;
+    height: auto !important;
+  }
+
+  [data-print-driver-sheet] {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #000 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    box-sizing: border-box !important;
+    padding-right: 2mm !important;
+  }
+
+  [data-print-driver-sheet] *,
+  [data-print-driver-sheet] *::before,
+  [data-print-driver-sheet] *::after {
+    box-sizing: border-box !important;
+  }
+
+  [data-print-driver-sheet] .flex-1 {
+    flex: none !important;
+    min-height: 0 !important;
+  }
+
+  [data-print-driver-sheet] .overflow-y-auto,
+  [data-print-driver-sheet] .overflow-x-auto,
+  [data-print-driver-sheet] .overflow-x-hidden {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  [data-print-driver-sheet] .max-w-\[1600px\] {
+    max-width: none !important;
+  }
+
+  [data-print-driver-sheet] header {
+    background: #fff !important;
+    border-bottom: 1px solid #333 !important;
+    margin-bottom: 0.25rem !important;
+  }
+
+  [data-print-driver-sheet] .driver-sheet-print-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  [data-print-driver-sheet] table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    font-size: 8px !important;
+    page-break-inside: auto;
+    border-collapse: collapse !important;
+  }
+
+  [data-print-driver-sheet] th:nth-child(1),
+  [data-print-driver-sheet] td:nth-child(1) { width: 4% !important; }
+  [data-print-driver-sheet] th:nth-child(2),
+  [data-print-driver-sheet] td:nth-child(2) { width: 6% !important; }
+  [data-print-driver-sheet] th:nth-child(3),
+  [data-print-driver-sheet] td:nth-child(3) { width: 6% !important; }
+  [data-print-driver-sheet] th:nth-child(4),
+  [data-print-driver-sheet] td:nth-child(4) { width: 13% !important; }
+  [data-print-driver-sheet] th:nth-child(5),
+  [data-print-driver-sheet] td:nth-child(5) { width: 9% !important; }
+  [data-print-driver-sheet] th:nth-child(6),
+  [data-print-driver-sheet] td:nth-child(6) { width: 9% !important; }
+  [data-print-driver-sheet] th:nth-child(7),
+  [data-print-driver-sheet] td:nth-child(7) { width: 8% !important; }
+  [data-print-driver-sheet] th:nth-child(8),
+  [data-print-driver-sheet] td:nth-child(8) { width: 9% !important; }
+  [data-print-driver-sheet] th:nth-child(9),
+  [data-print-driver-sheet] td:nth-child(9) { width: 8% !important; }
+  [data-print-driver-sheet] th:nth-child(10),
+  [data-print-driver-sheet] td:nth-child(10) { width: 28% !important; }
+
+  [data-print-driver-sheet] col {
+    width: auto !important;
+  }
+
+  [data-print-driver-sheet] thead {
+    position: static !important;
+    display: table-header-group !important;
+  }
+
+  [data-print-driver-sheet] tbody {
+    display: table-row-group !important;
+  }
+
+  [data-print-driver-sheet] tr {
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  [data-print-driver-sheet] th,
+  [data-print-driver-sheet] td {
+    min-width: 0 !important;
+    max-width: none !important;
+    padding: 0.15rem 0.2rem !important;
+    border: 1px solid #666 !important;
+    color: #000 !important;
+    background: #fff !important;
+    vertical-align: top !important;
+    overflow: visible !important;
+    word-wrap: break-word !important;
+    overflow-wrap: anywhere !important;
+    hyphens: auto !important;
+  }
+
+  [data-print-driver-sheet] th {
+    background: #eee !important;
+    font-weight: 700 !important;
+    letter-spacing: 0 !important;
+  }
+
+  [data-print-driver-sheet] td:last-child,
+  [data-print-driver-sheet] th:last-child {
+    padding-right: 0.25rem !important;
+  }
+
+  [data-print-driver-sheet] .shadow-sm {
+    box-shadow: none !important;
+  }
+
+  [data-print-driver-sheet] .line-clamp-2 {
+    -webkit-line-clamp: unset !important;
+    line-clamp: unset !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  [data-print-driver-sheet] .whitespace-nowrap {
+    white-space: normal !important;
+  }
+
+  [data-print-driver-sheet] h1 .whitespace-nowrap,
+  [data-print-driver-sheet] .cleaner-sequence-badge,
+  [data-print-driver-sheet] .sheet-cleaner-cell {
+    white-space: nowrap !important;
+  }
+
+  [data-print-driver-sheet] .cleaner-sequence-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid #000 !important;
+    box-shadow: none !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 }
 
