@@ -20,6 +20,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
+import { SequenceSummaryGroupHeading } from "@/components/sequence-summary-group-heading";
 
 interface AssignedTasksSequenceSummaryProps {
   groups: SequenceSummaryGroup[];
@@ -202,21 +203,9 @@ export default function AssignedTasksSequenceSummary({
                 </div>
               )}
               <div className="mb-2 flex shrink-0 items-start justify-between gap-2 border-b border-border pb-2">
-                <h4 className="flex min-w-0 flex-nowrap items-center gap-x-2 whitespace-nowrap text-sm font-semibold text-foreground">
-                  <span>{group.label}</span>
-                  <span className="inline-flex items-center gap-x-1 font-normal text-foreground">
-                    {group.vehicleName && (
-                      <span className="text-muted-foreground">{group.vehicleName}</span>
-                    )}
-                    {group.vehiclePlate && (
-                      <span className="shrink-0 rounded border border-custom-blue/40 bg-background/80 px-1.5 text-[10px] font-semibold leading-4 text-custom-blue">
-                        {group.vehiclePlate}
-                      </span>
-                    )}
-                    <span className="shrink-0 text-foreground">-</span>
-                    <span className="text-foreground">{group.tasks.length} task</span>
-                  </span>
-                </h4>
+                <div className="min-w-0">
+                  <SequenceSummaryGroupHeading group={group} />
+                </div>
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
                   <div className="flex flex-wrap items-center justify-end gap-1.5">
                     {workDate && (

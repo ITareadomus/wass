@@ -277,7 +277,9 @@ function resolveDriverVehicleName(driver: {
   vehicle_name?: string | null;
 }): string | undefined {
   const name = String(driver?.assigned_vehicle_name ?? driver?.vehicle_name ?? "").trim();
-  return name || undefined;
+  if (!name) return undefined;
+  const firstWord = name.split(/\s+/)[0]?.trim();
+  return firstWord || undefined;
 }
 
 function resolveDriverVehiclePlate(driver: {

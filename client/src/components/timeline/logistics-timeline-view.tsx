@@ -1998,7 +1998,7 @@ export default function LogisticsTimelineView({
               })
             )}
 
-            {/* Riga finale: +, indicatore salvataggio / storico, trasferimento ADAM */}
+            {/* Riga finale: +, indicatore salvataggio / storico */}
             <div className="pt-0" />
             <div className="relative flex items-stretch mb-0 h-[40px]">
               <div
@@ -2029,32 +2029,7 @@ export default function LogisticsTimelineView({
                   <UserPlus className="w-4 h-4" />
                 </Button>
               </div>
-              <div className="flex-1 pl-2 pr-0 h-full grid grid-cols-[1fr_auto] items-center">
-                <Button
-                  onClick={() => setShowAdamTransferDialog(true)}
-                  size="sm"
-                  variant="outline"
-                  className="col-start-2 justify-self-end h-[38px] px-3 border-2 border-custom-blue"
-                  disabled={isReadOnly || !hasTasksInTimeline || isTransferringToAdam}
-                  title={
-                    isReadOnly
-                      ? "Non puoi trasferire in modalità storico"
-                      : !hasTasksInTimeline
-                        ? "Nessuna task assegnata nella timeline"
-                        : "Trasferisci le assegnazioni sul database ADAM"
-                  }
-                  data-testid="button-transfer-logistics-adam"
-                >
-                  {isTransferringToAdam ? (
-                    <RefreshCw className="mr-1 h-4 w-4 animate-spin" />
-                  ) : (
-                    <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                  )}
-                  {isTransferringToAdam ? "Trasferimento..." : "Trasferisci su ADAM"}
-                </Button>
-              </div>
+              <div className="flex-1 pl-2 pr-0 h-full" />
               <div
                 className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 text-sm leading-none font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap"
                 data-testid="indicator-logistics-adam-last-save"

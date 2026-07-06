@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import type { SequenceSummaryEntry, SequenceSummaryGroup } from "@/lib/sequence-summary";
 import { logisticsKindSequenceDotClass, LogisticsSequenceBadge } from "@/lib/logistics-task-kind-ui";
 import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
+import { SequenceSummaryGroupHeading } from "@/components/sequence-summary-group-heading";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -162,24 +163,16 @@ export default function LogisticsDriverSequenceSheet({
             </Link>
             <div className="min-w-0 print:w-full">
               <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
-                <h1 className="text-sm font-semibold text-foreground print:text-base print:text-black">
-                  <span className="inline-flex flex-nowrap items-center gap-x-1.5 whitespace-nowrap">
-                    <span>{group.label}</span>
-                    {group.vehicleName && (
-                      <span className="font-normal text-muted-foreground print:text-black/70">
-                        {group.vehicleName}
-                      </span>
-                    )}
-                    {group.vehiclePlate && (
-                      <span className="shrink-0 rounded border border-custom-blue/40 bg-background/80 px-1.5 text-[10px] font-semibold leading-4 text-custom-blue print:border-black print:bg-white print:text-[11px] print:text-black">
-                        {group.vehiclePlate}
-                      </span>
-                    )}
-                  </span>
-                  <span className="ml-1.5 font-normal text-foreground print:text-black">
-                    - {group.tasks.length} task
-                  </span>
-                </h1>
+                <div className="min-w-0">
+                  <SequenceSummaryGroupHeading
+                    group={group}
+                    as="h1"
+                    className="print:text-base print:text-black"
+                    vehicleNameClassName="print:text-black/70"
+                    plateClassName="print:border-black print:bg-white print:text-[11px] print:text-black"
+                    taskCountClassName="print:text-black"
+                  />
+                </div>
                 {(group.warehouseDepartureTime || group.warehouseReturnTime) && (
                   <div className="flex flex-col gap-0.5 text-[11px] text-muted-foreground print:hidden">
                     {group.warehouseDepartureTime && (
