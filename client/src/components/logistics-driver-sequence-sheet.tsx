@@ -4,6 +4,7 @@ import { ArrowLeft, Loader2, MessageCircle, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SequenceSummaryEntry, SequenceSummaryGroup } from "@/lib/sequence-summary";
 import { logisticsKindSequenceDotClass, LogisticsSequenceBadge } from "@/lib/logistics-task-kind-ui";
+import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -89,7 +90,10 @@ function SheetCustomerNoteCell({
       <button
         type="button"
         className="group inline-flex max-w-[220px] items-start gap-1 text-left hover:text-custom-blue print:hidden"
-        onClick={() => onOpen(text, logisticCode)}
+        onClick={(event) => {
+          event.stopPropagation();
+          onOpen(text, logisticCode);
+        }}
       >
         <MessageCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground group-hover:text-custom-blue" />
         <span className="line-clamp-2 whitespace-pre-wrap break-words text-xs">{text}</span>
@@ -209,11 +213,11 @@ export default function LogisticsDriverSequenceSheet({
         )}
 
         <div className="mx-auto w-full min-w-0 max-w-[1600px] px-4 py-4 print:max-w-none print:px-2 print:py-2">
-          <div className="driver-sheet-print-table min-w-0 overflow-x-auto rounded-lg border border-custom-blue/40 bg-background shadow-sm print:overflow-visible print:rounded-none print:border-0 print:shadow-none">
+          <div className="driver-sheet-print-table min-w-0 overflow-x-auto overflow-y-visible rounded-lg border border-custom-blue/40 bg-background shadow-sm print:overflow-visible print:rounded-none print:border-0 print:p-0 print:shadow-none">
           <table className="w-full border-collapse text-xs print:table-fixed print:text-[8px]">
             <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur-sm print:static print:bg-[#eee]">
               <tr className="border-b border-custom-blue/30 print:border-black/40">
-                <th className="h-9 w-[52px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:normal-case print:text-black">
+                <th className="h-9 w-[52px] min-w-[52px] max-w-[52px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:normal-case print:text-black">
                   Seq.
                 </th>
                 <th className="h-9 min-w-[88px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:normal-case print:text-black">
@@ -258,32 +262,48 @@ export default function LogisticsDriverSequenceSheet({
                   <tr
                     key={`${group.id}-${entry.taskId}`}
                     className={cn(
-                      "border-b border-border/60 transition-colors hover:bg-muted/50",
-                      rowIndex % 2 === 1 && !isTimelineViolated && "bg-muted/20",
-                      isTimelineViolated && "bg-red-50 dark:bg-red-950/30"
+                      "border-b border-border/60 transition-colors",
+                      !isTimelineViolated && "hover:bg-muted/50",
+                      rowIndex % 2 === 1 && "bg-muted/20",
+                      isTimelineViolated && "driver-sheet-row--violated"
                     )}
-                  >
-                    <td className="border-r border-border/40 px-2 py-2 text-center align-middle">
-                      <div className="flex items-center justify-center gap-1">
+                    role={isTimelineViolated ? "button" : undefined}
+                    tabIndex={isTimelineViolated ? 0 : undefined}
+                    aria-label={
+                      isTimelineViolated
+                        ? `Mostra violazione timeline per task ${entry.logisticCode || "N/D"}`
+                        : undefined
+                    }
+                    onClick={() => {
+                      if (!isTimelineViolated) return;
+                      setViolationDialog({
+                        open: true,
+                        logisticCode: entry.logisticCode || "N/D",
+                        messages: violationMessages,
+                      });
+                    }}
+                    onKeyDown={(event) => {
+                      if (!isTimelineViolated) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setViolationDialog({
+                          open: true,
+                          logisticCode: entry.logisticCode || "N/D",
+                          messages: violationMessages,
+                        });
+                      }
+                    }}
+                    >
+                    <td className="relative w-[52px] min-w-[52px] max-w-[52px] overflow-visible border-r border-border/40 px-2 py-2 text-center align-middle print:static print:overflow-hidden">
+                      {isTimelineViolated && (
+                        <span className="print:hidden">
+                          <SequenceSummaryViolationIndicator />
+                        </span>
+                      )}
+                      <div className="flex items-center justify-center">
                         <span className={logisticsKindSequenceDotClass(entry.logisticsTaskKind)}>
                           {entry.sequence}
                         </span>
-                        {isTimelineViolated && (
-                          <button
-                            type="button"
-                            className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white hover:bg-red-700 print:hidden"
-                            onClick={() =>
-                              setViolationDialog({
-                                open: true,
-                                logisticCode: entry.logisticCode || "N/D",
-                                messages: violationMessages,
-                              })
-                            }
-                            aria-label="Mostra violazione timeline"
-                          >
-                            !
-                          </button>
-                        )}
                       </div>
                     </td>
                     <td className="border-r border-border/40 px-2 py-2 text-center align-middle font-semibold">

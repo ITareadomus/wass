@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { Draggable } from "react-beautiful-dnd";
 import { useQuery } from "@tanstack/react-query";
 import { TaskType as Task } from "@shared/schema";
@@ -249,6 +249,95 @@ interface AssignedTask {
   start_time: string;
   end_time: string;
   travel_time?: number;
+}
+
+const LOGISTICS_ADAM_MAX_FONT_PX = 10;
+const LOGISTICS_ADAM_MIN_FONT_PX = 8;
+const LOGISTICS_ADAM_BASE_SCALE = 0.82;
+const LOGISTICS_ADAM_MIN_SCALE = 0.58;
+const LOGISTICS_ADAM_HEIGHT_BOOST = 1.12;
+const LOGISTICS_ADAM_FIT_SAFETY_PX = 3;
+
+function LogisticsAdamCodeLabel({ code }: { code: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [labelStyle, setLabelStyle] = useState<{ fontSize: number; scaleX: number }>({
+    fontSize: LOGISTICS_ADAM_MAX_FONT_PX,
+    scaleX: LOGISTICS_ADAM_BASE_SCALE,
+  });
+
+  const fitLabel = useCallback(() => {
+    const container = containerRef.current;
+    const text = textRef.current;
+    if (!container || !text) return;
+
+    const available = container.clientWidth;
+    if (available <= 0) return;
+
+    const targetWidth = Math.max(available - LOGISTICS_ADAM_FIT_SAFETY_PX, 1);
+
+    const measureAt = (fontSize: number) => {
+      text.style.fontSize = `${fontSize}px`;
+      text.style.transform = "scale(1)";
+      text.style.transformOrigin = "center";
+      void text.offsetWidth;
+      return text.getBoundingClientRect().width;
+    };
+
+    let chosenFont = LOGISTICS_ADAM_MIN_FONT_PX;
+    for (
+      let fontSize = LOGISTICS_ADAM_MAX_FONT_PX;
+      fontSize >= LOGISTICS_ADAM_MIN_FONT_PX;
+      fontSize -= 0.5
+    ) {
+      if (measureAt(fontSize) <= targetWidth) {
+        chosenFont = fontSize;
+        break;
+      }
+    }
+
+    const measuredWidth = measureAt(chosenFont);
+    const fitScale = targetWidth / Math.max(measuredWidth, 1);
+    const chosenScale = Math.max(
+      LOGISTICS_ADAM_MIN_SCALE,
+      Math.min(LOGISTICS_ADAM_BASE_SCALE, fitScale)
+    );
+
+    setLabelStyle((prev) =>
+      prev.fontSize === chosenFont && prev.scaleX === chosenScale
+        ? prev
+        : { fontSize: chosenFont, scaleX: chosenScale }
+    );
+  }, [code]);
+
+  useLayoutEffect(() => {
+    fitLabel();
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver(() => fitLabel());
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [fitLabel, code]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="absolute inset-y-0 left-[8px] right-[1px] z-30 flex items-center justify-center overflow-hidden"
+    >
+      <span
+        ref={textRef}
+        className="inline-block max-w-full whitespace-nowrap text-center font-extrabold leading-none tracking-[-0.04em] text-foreground drop-shadow-[0_1px_1px_rgba(255,255,255,0.85)] dark:drop-shadow-[0_1px_1px_rgba(0,0,0,0.85)]"
+        style={{
+          fontSize: `${labelStyle.fontSize}px`,
+          transform: `scale(${labelStyle.scaleX}, ${labelStyle.scaleX * LOGISTICS_ADAM_HEIGHT_BOOST})`,
+          transformOrigin: "center",
+        }}
+      >
+        {code}
+      </span>
+    </div>
+  );
 }
 
 export default function TaskCard({
@@ -2930,7 +3019,14 @@ const displayClickableInputClass =
                       minHeight: "40px",
                       maxHeight: isInTimeline ? "40px" : undefined,
                       overflow: isInTimeline ? "visible" : undefined,
-                      zIndex: isMapFiltered ? 10 : 'auto',
+                      zIndex:
+                        snapshot.isDragging
+                          ? 9999
+                          : operationsScope === "logistics" && isInTimeline
+                            ? 20
+                            : isMapFiltered
+                              ? 10
+                              : 'auto',
                     }}
                     data-testid={`task-card-${getTaskKey(task)}`}
                     onClick={(e) => {
@@ -2950,11 +3046,7 @@ const displayClickableInputClass =
                       />
                     )}
                     {operationsScope === "logistics" && isInTimeline ? (
-                      <div className="absolute inset-y-0 right-0 left-[10px] flex items-center justify-center overflow-hidden pl-0.5 pr-1">
-                        <span className="text-foreground font-extrabold text-[13px] truncate max-w-full leading-none text-center">
-                          {logisticsAdamCode}
-                        </span>
-                      </div>
+                      <LogisticsAdamCodeLabel code={logisticsAdamCode} />
                     ) : (
                       <>
                     {/* Selection indicator (top-left) */}

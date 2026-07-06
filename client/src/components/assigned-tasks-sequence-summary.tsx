@@ -19,6 +19,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
 
 interface AssignedTasksSequenceSummaryProps {
   groups: SequenceSummaryGroup[];
@@ -129,33 +130,6 @@ function SequenceSummaryCustomerNoteIndicator({
         Note del cliente da leggere
       </TooltipContent>
     </Tooltip>
-  );
-}
-
-function SequenceSummaryViolationIndicator({
-  messages,
-  logisticCode,
-  onOpen,
-}: {
-  messages: string[];
-  logisticCode: string;
-  onOpen: (messages: string[], logisticCode: string) => void;
-}) {
-  if (messages.length === 0) return null;
-
-  return (
-    <button
-      type="button"
-      className="absolute right-1 top-1 z-10 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold leading-none text-white shadow-sm ring-1 ring-background hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-1"
-      onClick={(event) => {
-        event.stopPropagation();
-        onOpen(messages, logisticCode);
-      }}
-      aria-label="Mostra spiegazione violazione"
-      title="Violazione timeline"
-    >
-      !
-    </button>
   );
 }
 
@@ -287,7 +261,7 @@ export default function AssignedTasksSequenceSummary({
                   >
                     <ol
                       className={cn(
-                        "flex min-w-max flex-col gap-1.5",
+                        "sequence-summary-task-list flex min-w-max flex-col gap-1.5",
                         snapshot.isDraggingOver && "rounded-md bg-custom-blue/5"
                       )}
                     >
@@ -313,24 +287,45 @@ export default function AssignedTasksSequenceSummary({
                                 style={dragProvided.draggableProps.style}
                                 className={cn(
                                   "sequence-summary-task relative rounded-md border px-2 py-1.5 text-xs",
-                                  "pr-6",
                                   isTimelineViolated
-                                    ? "animate-blink-inset border-red-500 bg-red-50 dark:bg-red-950/30"
+                                    ? "sequence-summary-task--violated animate-blink-inset border-red-500 bg-red-50 dark:bg-red-950/30"
                                     : isHighlighted
                                     ? "border-amber-400 bg-amber-50 dark:bg-amber-950/30"
                                     : "border-border/70 bg-background",
                                   dragSnapshot.isDragging && "shadow-lg ring-2 ring-custom-blue/40",
-                                  !isGroupDragDisabled && "cursor-grab active:cursor-grabbing"
+                                  !isGroupDragDisabled &&
+                                    !isTimelineViolated &&
+                                    "cursor-grab active:cursor-grabbing"
                                 )}
+                                role={isTimelineViolated ? "button" : undefined}
+                                tabIndex={isTimelineViolated ? 0 : undefined}
+                                aria-label={
+                                  isTimelineViolated
+                                    ? `Mostra violazione timeline per task ${entry.logisticCode || "N/D"}`
+                                    : undefined
+                                }
+                                onClick={() => {
+                                  if (!isTimelineViolated || dragSnapshot.isDragging) return;
+                                  setViolationDialog({
+                                    open: true,
+                                    messages: violationMessages,
+                                    logisticCode: entry.logisticCode || "N/D",
+                                  });
+                                }}
+                                onKeyDown={(event) => {
+                                  if (!isTimelineViolated) return;
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    setViolationDialog({
+                                      open: true,
+                                      messages: violationMessages,
+                                      logisticCode: entry.logisticCode || "N/D",
+                                    });
+                                  }
+                                }}
                               >
                                 {isTimelineViolated && (
-                                  <SequenceSummaryViolationIndicator
-                                    messages={violationMessages}
-                                    logisticCode={entry.logisticCode || "N/D"}
-                                    onOpen={(messages, logisticCode) =>
-                                      setViolationDialog({ open: true, messages, logisticCode })
-                                    }
-                                  />
+                                  <SequenceSummaryViolationIndicator />
                                 )}
                                 <div className="min-w-max">
                                   <div className="flex flex-nowrap items-center gap-x-1 whitespace-nowrap text-[11px]">
