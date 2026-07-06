@@ -243,7 +243,7 @@ export default function LogisticsDriverSequenceSheet({
         )}
 
         <div className="mx-auto w-full min-w-0 max-w-[1600px] px-4 py-4 print:max-w-none print:px-1 print:py-0">
-          <div className="driver-sheet-print-table min-w-0 overflow-x-auto overflow-y-visible rounded-lg border border-custom-blue/40 bg-background shadow-sm print:overflow-visible print:rounded-none print:border-0 print:p-0 print:shadow-none">
+          <div className="driver-sheet-print-table min-w-0 overflow-x-auto overflow-y-visible rounded-lg border border-custom-blue/40 bg-background shadow-sm print:overflow-visible print:rounded-none print:p-0 print:shadow-none">
           <table className="w-full border-collapse text-xs print:table-fixed print:text-[8px]">
             <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur-sm print:static print:bg-[#eee]">
               <tr className="border-b border-custom-blue/30 print:border-black/40">

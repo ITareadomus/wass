@@ -869,15 +869,36 @@
   }
 
   [data-print-driver-sheet] .driver-sheet-print-table {
+    position: relative !important;
     width: 100% !important;
     max-width: 100% !important;
     overflow: visible !important;
     padding: 0 !important;
-    border-top: 1px solid #666 !important;
+    border: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
   }
 
-  [data-print-driver-sheet] thead th {
+  [data-print-driver-sheet] .driver-sheet-print-table::before,
+  [data-print-driver-sheet] .driver-sheet-print-table::after {
+    content: "" !important;
+    position: absolute !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 20 !important;
+    display: block !important;
     border-top: 1px solid #666 !important;
+    pointer-events: none !important;
+  }
+
+  [data-print-driver-sheet] .driver-sheet-print-table::before {
+    top: 0 !important;
+  }
+
+  [data-print-driver-sheet] .driver-sheet-print-table::after {
+    bottom: 0 !important;
   }
 
   [data-print-driver-sheet] tr.driver-sheet-row--violated {
@@ -898,6 +919,8 @@
     font-size: 8px !important;
     page-break-inside: auto;
     border-collapse: collapse !important;
+    border-top: none !important;
+    border-bottom: none !important;
   }
 
   [data-print-driver-sheet] th:nth-child(1),
@@ -934,6 +957,11 @@
     display: table-row-group !important;
   }
 
+  [data-print-driver-sheet] thead tr,
+  [data-print-driver-sheet] tbody tr {
+    border: none !important;
+  }
+
   [data-print-driver-sheet] tr {
     page-break-inside: auto !important;
     break-inside: auto !important;
@@ -952,6 +980,14 @@
     word-wrap: break-word !important;
     overflow-wrap: anywhere !important;
     hyphens: auto !important;
+  }
+
+  [data-print-driver-sheet] thead th {
+    border-top: none !important;
+  }
+
+  [data-print-driver-sheet] tbody tr:last-child td {
+    border-bottom: none !important;
   }
 
   [data-print-driver-sheet] th {
