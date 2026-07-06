@@ -19,6 +19,12 @@ import { diagnoseDroppedTasks, type DroppedTaskDiagnostic } from "./unassigned-d
 import { RoutingInputValidationError } from "./run-routing-dry";
 import { validateRoutingProblemInput } from "./validation";
 import type { RoutingProblemValidationResult } from "./validation-contract";
+import { computeTerritoryDiagnostics } from "./groups/territory-diagnostics";
+import {
+  buildVehicleArcPenalties,
+  computeRouteSequenceDiagnostics,
+} from "./groups/route-sequence-penalties";
+import { polishRoutingSolutionWithDiagnostics } from "./route-polishing";
 
 export interface RunLogisticsRoutingOptions extends BuildLogisticsRoutingInputOptions {
   solver?: RoutingSolverId;
@@ -84,13 +90,24 @@ export async function runLogisticsRouting(
     throw new GreedySolverNotAllowedForApplyError();
   }
 
-  const solution = await solveRouting(input, { solverId });
+  const solverSolution = await solveRouting(input, { solverId });
+  const polished = polishRoutingSolutionWithDiagnostics(input, solverSolution);
+  const solution = polished.solution;
   const solutionValidation = validateRoutingSolution(input, solution);
   const applyGate = evaluateSolutionApplyGate(solution, {
     allowPartial: options.allowPartial,
   });
   const droppedDiagnostics =
     solution.droppedTasks.length > 0 ? diagnoseDroppedTasks(input, solution) : [];
+  const territoryDiagnostics = computeTerritoryDiagnostics(input, solution);
+  const arcPenaltyBuild = buildVehicleArcPenalties({ input });
+  const routeSequenceDiagnostics = arcPenaltyBuild
+    ? computeRouteSequenceDiagnostics({
+        input,
+        solution,
+        arcPenaltyDetails: arcPenaltyBuild.details,
+      })
+    : null;
 
   const debugEnabled = isLogisticsOptimizerFinalDebugEnabled(options.debug);
   let debugDir: string | null = null;
@@ -106,6 +123,9 @@ export async function runLogisticsRouting(
       extra: {
         applyGate,
         droppedDiagnostics,
+        ...(territoryDiagnostics ? { territoryDiagnostics } : {}),
+        ...(routeSequenceDiagnostics ? { routeSequenceDiagnostics } : {}),
+        ...(polished.diagnostics ? { routePolishingDiagnostics: polished.diagnostics } : {}),
       },
     });
   }

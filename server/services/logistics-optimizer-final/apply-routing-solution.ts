@@ -1,4 +1,4 @@
-import { minutesToHm } from "../../../shared/logistics-scheduling-constraints";
+import { minutesToHm, parseHmToMinutes } from "../../../shared/logistics-scheduling-constraints";
 import { enrichLogisticsTimelineTask } from "../logistics-task-kind-enrichment";
 import {
   assertLogisticsTimelineValidAfterRecalc,
@@ -6,6 +6,7 @@ import {
   type LogisticsFinalTimelineValidation,
   writeFinalTimelineValidationDebugFile,
 } from "../logistics-optimizer/apply-validation";
+import { loadPriorityStartWindows } from "../optimizer/priorityWindows";
 import { recalculateLogisticsTimeline } from "../logistics-timeline-utils";
 import { pgDailyAssignmentsService } from "../pg-daily-assignments-service";
 import {
@@ -14,6 +15,7 @@ import {
   saveLogisticsContainers,
   saveLogisticsTimeline,
 } from "../workspace-files";
+import { applyEarlyRouteWaitAbsorptionToRoute } from "./apply-early-route-wait-absorption";
 import type { RoutingProblemInput } from "./input-contract";
 import { assertSolutionCanBeApplied } from "./solution-apply-gate";
 import type { RoutingSolution, RoutingStopSolution } from "./solution-contract";
@@ -250,36 +252,49 @@ export async function applyLogisticsRoutingSolution(
   }
 
   const driverAssignments = new Map<number, { driver: any; tasks: any[] }>();
+  const priorityWindows = await loadPriorityStartWindows().catch(() => null);
 
   for (const route of solution.routes) {
     const driverId = route.driverId;
     if (!Number.isFinite(driverId)) continue;
     const driverRow = driverById.get(driverId);
     const inputDriver = input.drivers.find((driver) => driver.id === driverId);
+    const nominalDriverStartMin =
+      parseHmToMinutes(
+        driverRow?.start_time ??
+          (inputDriver ? minutesToHm(inputDriver.workWindow.startMin) : "10:00"),
+        10 * 60
+      ) ?? 10 * 60;
     const driver = {
       id: driverId,
       name: driverRow?.name ?? "Driver",
       lastname: driverRow?.lastname ?? String(driverId),
       role: driverRow?.role ?? "Driver",
       premium: driverRow?.role === "Premium",
-      start_time:
-        driverRow?.start_time ??
-        (inputDriver ? minutesToHm(inputDriver.workWindow.startMin) : "10:00"),
+      start_time: minutesToHm(nominalDriverStartMin),
     };
 
     const preservedTasks = [...(preservedByDriver.get(driverId) || [])].sort(
       (a: any, b: any) => Number(a?.sequence || 0) - Number(b?.sequence || 0)
     );
 
-    const optimizedTasks = [...route.stops]
-      .sort((a, b) => a.sequence - b.sequence)
-      .map((stop) =>
-        buildTimelineTaskFromStop({
-          stop,
-          inputTask: inputTaskById.get(stop.taskId),
-          containerTask: taskById.get(stop.taskId) || {},
-        })
-      );
+    const { route: absorbedRoute, effectiveDriverStartMin } = applyEarlyRouteWaitAbsorptionToRoute({
+      route,
+      driverStartMin: nominalDriverStartMin,
+      input,
+      containerTaskById: taskById,
+      workDate,
+      priorityWindows,
+    });
+    driver.start_time = minutesToHm(effectiveDriverStartMin);
+
+    const optimizedTasks = absorbedRoute.stops.map((stop) =>
+      buildTimelineTaskFromStop({
+        stop,
+        inputTask: inputTaskById.get(stop.taskId),
+        containerTask: taskById.get(stop.taskId) || {},
+      })
+    );
 
     const sortedFinalTasks = [...preservedTasks, ...optimizedTasks]
       .map((task: any, originalIndex: number) => ({ task, originalIndex }))

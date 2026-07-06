@@ -1,11 +1,12 @@
-import type { Minutes, TaskId } from "../input-contract";
+import type { DriverId, Minutes, TaskId } from "../input-contract";
 
 export type BusinessGroupType =
   | "SAME_COORDINATES_BUILDING"
   | "SAME_CLEANER"
   | "CLEANER_SEQUENCE"
   | "PRIORITY_COMPATIBLE"
-  | "NEARBY_CLUSTER";
+  | "NEARBY_CLUSTER"
+  | "DAILY_TERRITORY";
 
 export type BusinessGroupConfidence = "high" | "medium" | "low";
 
@@ -52,9 +53,22 @@ export interface NearbyClusterGroup extends BaseBusinessGroup {
   source: "travel_matrix";
 }
 
+export interface DailyTerritoryGroup extends BaseBusinessGroup {
+  type: "DAILY_TERRITORY";
+  territoryIndex: number;
+  territoryKey?: "north" | "center_south_west" | "center_south_east";
+  centroid: { lat: number; lng: number };
+  radiusMeters: number;
+  penaltyRadiusMeters: number;
+  softBoundaryMeters: number;
+  assignedDriverId: DriverId;
+  source: "balanced_geo_cluster" | "historical_territory_template";
+}
+
 export type RoutingBusinessGroup =
   | SameCoordinatesBuildingGroup
   | SameCleanerGroup
   | CleanerSequenceGroup
   | PriorityCompatibleGroup
-  | NearbyClusterGroup;
+  | NearbyClusterGroup
+  | DailyTerritoryGroup;

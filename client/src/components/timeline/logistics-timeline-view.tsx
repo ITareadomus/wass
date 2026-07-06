@@ -36,9 +36,11 @@ import { getPersonnelHexColor } from "@/lib/cleaner-colors";
 import type { TaskType as Task } from "@shared/schema";
 import {
   computeLogisticsCheckoutWaitGap,
+  formatLogisticsWorkedHours,
   LOGISTICS_SERVICE_DURATION_MIN,
   parseHmToMinutes,
   pickLogisticsViolationFields,
+  sumLogisticsTaskWorkedMinutes,
 } from "@shared/logistics-scheduling-constraints";
 import { estimateLogisticsReturnToDepotMinutes } from "@shared/logistics-travel-estimate";
 import {
@@ -157,10 +159,12 @@ function LogisticsRouteLineSegment({
   widthPx,
   title,
   showEndCap = false,
+  showStartCap = false,
 }: {
   widthPx: number;
   title?: string;
   showEndCap?: boolean;
+  showStartCap?: boolean;
 }) {
   if (widthPx <= 0) return null;
   return (
@@ -170,6 +174,12 @@ function LogisticsRouteLineSegment({
       title={title}
     >
       <div className="relative flex w-full items-center">
+        {showStartCap && (
+          <div
+            aria-hidden
+            className="h-3 w-0.5 shrink-0 rounded-full bg-orange-500 dark:bg-orange-400"
+          />
+        )}
         <div aria-hidden className="h-0.5 flex-1 bg-slate-500/55 dark:bg-slate-400/40" />
         {showEndCap && (
           <div
@@ -1910,7 +1920,14 @@ export default function LogisticsTimelineView({
                                   )}
                                   <LogisticsRouteLineSegment
                                     widthPx={travelWidthPx}
-                                    title={travelTime > 0 ? `${travelTime} min` : undefined}
+                                    title={
+                                      travelTime > 0
+                                        ? seq === 1
+                                          ? `Partenza da magazzino: ${travelTime} min`
+                                          : `${travelTime} min`
+                                        : undefined
+                                    }
+                                    showStartCap={seq === 1 && travelTime > 0}
                                   />
                                   {checkoutWait > 0 && waitingGapWidthPx > 0 && raw?.checkout_time && (
                                     <div
@@ -1972,19 +1989,9 @@ export default function LogisticsTimelineView({
                       )}
                     </Droppable>
                     <div className="flex-shrink-0 w-20 h-[50px] flex items-center justify-center border-l border-border bg-sky-100/30 dark:bg-sky-900/10 text-center">
-                      {(() => {
-                        const totalMinutes = rawTasks.reduce((sum, raw) => {
-                          const ct = (raw as any).cleaning_time || 0;
-                          return sum + (typeof ct === "number" ? ct : parseInt(ct, 10) || 0);
-                        }, 0);
-                        const hours = Math.floor(totalMinutes / 60);
-                        const minutes = totalMinutes % 60;
-                        return (
-                          <span className="text-[13px] font-medium tabular-nums text-foreground">
-                            {hours}:{String(minutes).padStart(2, "0")}
-                          </span>
-                        );
-                      })()}
+                      <span className="text-[13px] font-medium tabular-nums text-foreground">
+                        {formatLogisticsWorkedHours(sumLogisticsTaskWorkedMinutes(rawTasks))}
+                      </span>
                     </div>
                   </div>
                 );

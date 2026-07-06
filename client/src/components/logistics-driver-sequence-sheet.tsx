@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
-import { ArrowLeft, Loader2, MessageCircle } from "lucide-react";
+import { ArrowLeft, Loader2, MessageCircle, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SequenceSummaryEntry, SequenceSummaryGroup } from "@/lib/sequence-summary";
 import { logisticsKindSequenceDotClass, LogisticsSequenceBadge } from "@/lib/logistics-task-kind-ui";
+import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -59,10 +60,14 @@ function SheetCleanerCell({
   if (!label && sequence == null) return <span className="text-muted-foreground">—</span>;
 
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+    <span className="sheet-cleaner-cell inline-flex items-center gap-1 whitespace-nowrap">
       {label && <span className="font-medium">{label}</span>}
       {sequence != null && (
-        <LogisticsSequenceBadge sequence={sequence} size="inline" className="text-foreground/90" />
+        <LogisticsSequenceBadge
+          sequence={sequence}
+          size="inline"
+          className="cleaner-sequence-badge text-foreground/90 print:border print:border-black print:bg-white print:text-black print:shadow-none"
+        />
       )}
     </span>
   );
@@ -81,14 +86,20 @@ function SheetCustomerNoteCell({
   if (!text) return <span className="text-muted-foreground">—</span>;
 
   return (
-    <button
-      type="button"
-      className="group inline-flex max-w-[220px] items-start gap-1 text-left hover:text-custom-blue"
-      onClick={() => onOpen(text, logisticCode)}
-    >
-      <MessageCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground group-hover:text-custom-blue" />
-      <span className="line-clamp-2 whitespace-pre-wrap break-words text-xs">{text}</span>
-    </button>
+    <>
+      <button
+        type="button"
+        className="group inline-flex max-w-[220px] items-start gap-1 text-left hover:text-custom-blue print:hidden"
+        onClick={(event) => {
+          event.stopPropagation();
+          onOpen(text, logisticCode);
+        }}
+      >
+        <MessageCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground group-hover:text-custom-blue" />
+        <span className="line-clamp-2 whitespace-pre-wrap break-words text-xs">{text}</span>
+      </button>
+      <span className="hidden whitespace-pre-wrap break-words text-xs print:inline">{text}</span>
+    </>
   );
 }
 
@@ -123,13 +134,20 @@ export default function LogisticsDriverSequenceSheet({
   );
 
   return (
-    <div className={cn("logistics-driver-sheet-page flex w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-background", PAGE_BELOW_HEADER_MIN_H)}>
+    <div
+      data-print-driver-sheet
+      className={cn(
+        "logistics-driver-sheet-page flex w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-background",
+        PAGE_BELOW_HEADER_MIN_H,
+        "print:min-h-0 print:max-w-none print:overflow-visible"
+      )}
+    >
       <header className="relative shrink-0 print:bg-white">
         <div
           aria-hidden
-          className="pointer-events-none absolute left-1/2 top-0 h-full w-screen -translate-x-1/2 border-b border-custom-blue/30 bg-custom-blue-light print:border-black/20 print:bg-white"
+          className="pointer-events-none absolute left-1/2 top-0 h-full w-screen -translate-x-1/2 border-b border-custom-blue/30 bg-custom-blue-light print:hidden"
         />
-        <div className="relative mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3 px-4 py-3">
+        <div className="relative mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3 px-4 py-3 print:max-w-none print:px-1 print:py-1">
           <div className="flex min-w-0 items-center gap-3">
             <Link href={backHref}>
               <Button
@@ -142,74 +160,128 @@ export default function LogisticsDriverSequenceSheet({
                 <ArrowLeft className="h-3 w-3 shrink-0" aria-hidden />
               </Button>
             </Link>
-            <div className="min-w-0">
-              <h1 className="flex min-w-0 flex-nowrap items-center gap-x-2 whitespace-nowrap text-sm font-semibold text-foreground">
-                <span>{group.label}</span>
-                <span className="inline-flex items-center gap-x-1 font-normal text-foreground">
-                  {group.vehiclePlate && (
-                    <span className="shrink-0 rounded border border-custom-blue/40 bg-background/80 px-1.5 text-[10px] font-semibold leading-4 text-custom-blue">
-                      {group.vehiclePlate}
-                    </span>
-                  )}
-                  <span className="shrink-0 text-foreground">-</span>
-                  <span className="text-foreground">{group.tasks.length} task</span>
-                </span>
-              </h1>
+            <div className="min-w-0 print:w-full">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+                <h1 className="text-sm font-semibold text-foreground print:text-base print:text-black">
+                  <span className="inline-flex flex-nowrap items-center gap-x-1.5 whitespace-nowrap">
+                    <span>{group.label}</span>
+                    {group.vehiclePlate && (
+                      <span className="shrink-0 rounded border border-custom-blue/40 bg-background/80 px-1.5 text-[10px] font-semibold leading-4 text-custom-blue print:border-black print:bg-white print:text-[11px] print:text-black">
+                        {group.vehiclePlate}
+                      </span>
+                    )}
+                  </span>
+                  <span className="ml-1.5 font-normal text-foreground print:text-black">
+                    - {group.tasks.length} task
+                  </span>
+                </h1>
+                {(group.warehouseDepartureTime || group.warehouseReturnTime) && (
+                  <div className="flex flex-col gap-0.5 text-[11px] text-muted-foreground print:hidden">
+                    {group.warehouseDepartureTime && (
+                      <span className="whitespace-nowrap">
+                        Partenza dal magazzino: {group.warehouseDepartureTime}
+                      </span>
+                    )}
+                    {group.warehouseReturnTime && (
+                      <span className="whitespace-nowrap">
+                        Ritorno al magazzino: {group.warehouseReturnTime}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <p className="mt-0.5 hidden text-[11px] text-muted-foreground print:block print:text-black/70">
+                {workDate} · {isLoadOrder ? "Ordine di carico" : "Ordine di sequenza"}
+              </p>
             </div>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="ml-auto flex h-7 shrink-0 items-center gap-1 border-2 border-custom-blue px-2 text-[10px] font-semibold print:hidden"
-            onClick={() => setIsLoadOrder((prev) => !prev)}
-          >
-            {isLoadOrder ? "Ordine di sequenza" : "Ordine di carico"}
-          </Button>
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
+            {(group.warehouseDepartureTime || group.warehouseReturnTime) && (
+              <div className="hidden flex-col items-end gap-0.5 text-right print:flex">
+                {group.warehouseDepartureTime && (
+                  <p className="whitespace-nowrap text-[11px] text-black">
+                    <span className="font-semibold">Partenza magazzino stimata:</span>{" "}
+                    {group.warehouseDepartureTime}
+                  </p>
+                )}
+                {group.warehouseReturnTime && (
+                  <p className="whitespace-nowrap text-[11px] text-black">
+                    <span className="font-semibold">Ritorno magazzino stimato:</span>{" "}
+                    {group.warehouseReturnTime}
+                  </p>
+                )}
+              </div>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="flex h-7 shrink-0 items-center gap-1 border-2 border-custom-blue px-2 text-[10px] font-semibold print:hidden"
+              onClick={() => window.print()}
+              title="Stampa scheda"
+              aria-label="Stampa scheda"
+            >
+              <Printer className="h-3 w-3 shrink-0" aria-hidden />
+              Stampa
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="flex h-7 shrink-0 items-center gap-1 border-2 border-custom-blue px-2 text-[10px] font-semibold print:hidden"
+              onClick={() => setIsLoadOrder((prev) => !prev)}
+            >
+              {isLoadOrder ? "Ordine di sequenza" : "Ordine di carico"}
+            </Button>
+          </div>
         </div>
       </header>
 
-      <div className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden print:overflow-visible">
         {isLoading && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/60">
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/60 print:hidden">
             <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
           </div>
         )}
 
-        <div className="mx-auto w-full min-w-0 max-w-[1600px] px-4 py-4">
-          <div className="min-w-0 overflow-x-auto rounded-lg border border-custom-blue/40 bg-background shadow-sm">
-          <table className="w-full border-collapse text-xs">
-            <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur-sm print:bg-gray-100">
-              <tr className="border-b border-custom-blue/30">
-                <th className="h-9 w-[52px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="mx-auto w-full min-w-0 max-w-[1600px] px-4 py-4 print:max-w-none print:px-1 print:py-0">
+          <div className="driver-sheet-print-table min-w-0 overflow-x-auto overflow-y-visible rounded-lg border border-custom-blue/40 bg-background shadow-sm print:overflow-visible print:rounded-none print:border-0 print:p-0 print:shadow-none">
+          <table className="w-full border-collapse text-xs print:table-fixed print:text-[8px]">
+            <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur-sm print:static print:bg-[#eee]">
+              <tr className="border-b border-custom-blue/30 print:border-black/40">
+                <th className="h-9 w-[52px] min-w-[52px] max-w-[52px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   Seq.
                 </th>
-                <th className="h-9 min-w-[88px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Codice adam
+                <th className="h-9 min-w-[88px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                  <span className="print:hidden">Codice adam</span>
+                  <span className="hidden print:inline">Codice</span>
                 </th>
-                <th className="h-9 min-w-[100px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Alias cliente
+                <th className="h-9 min-w-[100px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                  Cliente
                 </th>
-                <th className="h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <th className="h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   Indirizzo
                 </th>
-                <th className="h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Finestra di lavoro driver
+                <th className="h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                  <span className="print:hidden">Finestra di lavoro driver</span>
+                  <span className="hidden print:inline">Fin. driver</span>
                 </th>
-                <th className="h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Finestra di lavoro cleaner
+                <th className="h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                  <span className="print:hidden">Finestra di lavoro cleaner</span>
+                  <span className="hidden print:inline">Fin. cleaner</span>
                 </th>
-                <th className="h-9 min-w-[120px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Check-out / Check-in
+                <th className="h-9 min-w-[120px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                  <span className="print:hidden">Check-out / Check-in</span>
+                  <span className="hidden print:inline">Out/In</span>
                 </th>
-                <th className="h-9 min-w-[120px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Cleaner / Sequenza
+                <th className="h-9 min-w-[120px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                  Cleaner
                 </th>
-                <th className="h-9 min-w-[100px] border-r border-border/60 px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Divani letto
+                <th className="h-9 min-w-[100px] border-r border-border/60 px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                  Divani
                 </th>
-                <th className="h-9 min-w-[160px] px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Note cliente
+                <th className="h-9 min-w-[160px] px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                  Note
                 </th>
               </tr>
             </thead>
@@ -222,32 +294,48 @@ export default function LogisticsDriverSequenceSheet({
                   <tr
                     key={`${group.id}-${entry.taskId}`}
                     className={cn(
-                      "border-b border-border/60 transition-colors hover:bg-muted/50",
-                      rowIndex % 2 === 1 && !isTimelineViolated && "bg-muted/20",
-                      isTimelineViolated && "bg-red-50 dark:bg-red-950/30"
+                      "border-b border-border/60 transition-colors",
+                      !isTimelineViolated && "hover:bg-muted/50",
+                      rowIndex % 2 === 1 && "bg-muted/20",
+                      isTimelineViolated && "driver-sheet-row--violated"
                     )}
-                  >
-                    <td className="border-r border-border/40 px-2 py-2 text-center align-middle">
-                      <div className="flex items-center justify-center gap-1">
+                    role={isTimelineViolated ? "button" : undefined}
+                    tabIndex={isTimelineViolated ? 0 : undefined}
+                    aria-label={
+                      isTimelineViolated
+                        ? `Mostra violazione timeline per task ${entry.logisticCode || "N/D"}`
+                        : undefined
+                    }
+                    onClick={() => {
+                      if (!isTimelineViolated) return;
+                      setViolationDialog({
+                        open: true,
+                        logisticCode: entry.logisticCode || "N/D",
+                        messages: violationMessages,
+                      });
+                    }}
+                    onKeyDown={(event) => {
+                      if (!isTimelineViolated) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setViolationDialog({
+                          open: true,
+                          logisticCode: entry.logisticCode || "N/D",
+                          messages: violationMessages,
+                        });
+                      }
+                    }}
+                    >
+                    <td className="relative w-[52px] min-w-[52px] max-w-[52px] overflow-visible border-r border-border/40 px-2 py-2 text-center align-middle print:static print:overflow-hidden">
+                      {isTimelineViolated && (
+                        <span className="print:hidden">
+                          <SequenceSummaryViolationIndicator />
+                        </span>
+                      )}
+                      <div className="flex items-center justify-center">
                         <span className={logisticsKindSequenceDotClass(entry.logisticsTaskKind)}>
                           {entry.sequence}
                         </span>
-                        {isTimelineViolated && (
-                          <button
-                            type="button"
-                            className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white hover:bg-red-700"
-                            onClick={() =>
-                              setViolationDialog({
-                                open: true,
-                                logisticCode: entry.logisticCode || "N/D",
-                                messages: violationMessages,
-                              })
-                            }
-                            aria-label="Mostra violazione timeline"
-                          >
-                            !
-                          </button>
-                        )}
                       </div>
                     </td>
                     <td className="border-r border-border/40 px-2 py-2 text-center align-middle font-semibold">
@@ -259,10 +347,10 @@ export default function LogisticsDriverSequenceSheet({
                     <td className="border-r border-border/40 px-2 py-2 align-top">
                       {entry.address || "—"}
                     </td>
-                    <td className="border-r border-border/40 px-2 py-2 text-center align-middle whitespace-nowrap">
+                    <td className="border-r border-border/40 px-2 py-2 text-center align-middle whitespace-nowrap print:min-w-0 print:whitespace-normal print:px-1 print:py-1">
                       {entry.lgWindow}
                     </td>
-                    <td className="border-r border-border/40 px-2 py-2 text-center align-middle whitespace-nowrap">
+                    <td className="border-r border-border/40 px-2 py-2 text-center align-middle whitespace-nowrap print:min-w-0 print:whitespace-normal print:px-1 print:py-1">
                       {entry.hkWindow}
                     </td>
                     <td className="border-r border-border/40 px-2 py-2 text-center align-middle">
@@ -281,10 +369,10 @@ export default function LogisticsDriverSequenceSheet({
                         />
                       </div>
                     </td>
-                    <td className="border-r border-border/40 px-2 py-2 align-top whitespace-nowrap">
+                    <td className="border-r border-border/40 px-2 py-2 align-top whitespace-nowrap print:min-w-0 print:whitespace-normal print:px-1 print:py-1">
                       {entry.sofabedLabel || "—"}
                     </td>
-                    <td className="px-2 py-2 align-top">
+                    <td className="px-2 py-2 align-top print:min-w-0 print:whitespace-pre-wrap print:break-words print:px-1 print:py-1">
                       <SheetCustomerNoteCell
                         note={entry.customerNote ?? ""}
                         logisticCode={entry.logisticCode || "N/D"}

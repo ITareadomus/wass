@@ -1,5 +1,6 @@
 import type { DriverNode, RoutingProblemInput, TaskNode } from "../../input-contract";
 import { BUSINESS_GROUP_THRESHOLDS } from "../../groups/group-weights";
+import { buildVehicleTaskPenalties } from "../../groups/territory-penalties";
 import {
   ORTOOLS_SOLVER_ID,
   ROUTING_SOLUTION_SCHEMA_VERSION,
@@ -69,6 +70,9 @@ export interface OrToolsRoutingPayload {
   };
   softTimeWindows: OrToolsSoftTimeWindow[];
   balanceDriverLoadWeight: number;
+  vehicleTaskPenalties?: number[][];
+  vehicleArcPenalties?: number[][][];
+  territoryDebug?: RoutingProblemInput["metadata"]["dailyTerritoryAssignment"];
   options: { timeLimitSec: number };
 }
 
@@ -334,6 +338,10 @@ export function buildOrToolsPayload(
   const { softGroups, softTimeWindows, balanceDriverLoadWeight } = extractSoftConstraints(input);
   const travelMatrixMin = input.travelMatrixMin;
   const costMatrixMin = buildCostMatrixMin(travelMatrixMin, softGroups, maps.taskIdToNodeIndex);
+  const vehicleTaskPenalties = buildVehicleTaskPenalties({
+    input,
+    driverIdToVehicleIndex: maps.driverIdToVehicleIndex,
+  });
 
   const nodes = [
     { nodeIndex: DEPOT_NODE_INDEX, kind: "DEPOT" as const },
@@ -386,6 +394,10 @@ export function buildOrToolsPayload(
       softGroups,
       softTimeWindows,
       balanceDriverLoadWeight,
+      ...(vehicleTaskPenalties ? { vehicleTaskPenalties } : {}),
+      ...(input.metadata.dailyTerritoryAssignment
+        ? { territoryDebug: input.metadata.dailyTerritoryAssignment }
+        : {}),
       options: { timeLimitSec: options?.timeLimitSec ?? 30 },
     },
   };

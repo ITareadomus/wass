@@ -8,6 +8,7 @@ import type {
   RawLogisticsTaskInput,
   TimelineAssignmentHint,
 } from "./input-contract";
+import { extractDriverOperationalCode } from "./groups/historical-territory-profiles";
 import { loadTimelineAssignmentHints } from "./timeline-assignment-hints";
 import { normalizeEndTime, normalizeStartTime, toFiniteNumber } from "./normalizers";
 
@@ -19,6 +20,7 @@ export interface SelectedLogisticsDriverInput {
   startTimeSource: "driver_row" | "default";
   endTime: string;
   endTimeSource: "driver_row" | "default";
+  operationalCode?: string;
 }
 
 export interface SchedulableLogisticsTaskInput extends RawLogisticsTaskInput {
@@ -182,14 +184,20 @@ export async function loadSelectedDrivers(workDate: string): Promise<SelectedLog
   const byId = new Map<number, any>((rows || []).map((row: any) => [Number(row.id), row]));
 
   return uniqueIdsInOrder.map((id) => {
-    const start = normalizeStartTime(byId.get(id)?.start_time);
-    const end = normalizeEndTime(byId.get(id)?.end_time);
+    const row = byId.get(id);
+    const start = normalizeStartTime(row?.start_time);
+    const end = normalizeEndTime(row?.end_time);
     return {
       id,
       startTime: start.time,
       startTimeSource: start.source,
       endTime: end.time,
       endTimeSource: end.source,
+      operationalCode: extractDriverOperationalCode({
+        name: row?.name,
+        lastname: row?.lastname,
+        alias: row?.alias,
+      }),
     };
   });
 }

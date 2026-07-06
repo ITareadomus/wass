@@ -24,6 +24,7 @@ import {
   buildBusinessGroupSoftConstraints,
   buildBusinessGroups,
 } from "./groups/build-business-groups";
+import { buildDailyTerritoryAssignment } from "./groups/daily-territory-groups";
 import { buildDepotNode, buildLocationNodes, buildTravelMatrixMin } from "./travel-matrix";
 import { buildRequiredDriverConstraints } from "./timeline-assignment-hints";
 import {
@@ -80,6 +81,7 @@ function buildDriverNodes(sourceData: LogisticsRoutingSourceData): DriverNode[] 
     return {
       id: driver.id,
       startLocationNodeId: "depot",
+      operationalCode: driver.operationalCode,
       workWindow: {
         startMin,
         endMin,
@@ -304,18 +306,29 @@ export function buildRoutingProblemInputFromSource(
   });
   const nodes = buildLocationNodes(tasks);
   const travelMatrixMin = buildTravelMatrixMin(nodes);
-  const businessGroups = buildBusinessGroups(tasks, travelMatrixMin);
-  const businessSoftConstraints = buildBusinessGroupSoftConstraints(businessGroups);
+  const baseBusinessGroups = buildBusinessGroups(tasks, travelMatrixMin);
   const existingRequiredDriverByTaskId = buildRequiredDriverByTaskIdFromConstraints(
     requiredDriverBuild.constraints
   );
   const sameBuildingDriverBuild = buildSameBuildingDriverConstraints({
-    businessGroups,
+    businessGroups: baseBusinessGroups,
     tasks,
     drivers,
     travelMatrixMin,
     existingRequiredDriverByTaskId,
   });
+  const requiredDriverByTaskId = buildRequiredDriverByTaskIdFromConstraints([
+    ...requiredDriverBuild.constraints,
+    ...sameBuildingDriverBuild.constraints,
+  ]);
+  const territoryBuild = buildDailyTerritoryAssignment({
+    tasks,
+    drivers,
+    travelMatrixMin,
+    requiredDriverByTaskId,
+  });
+  const businessGroups = [...baseBusinessGroups, ...territoryBuild.groups];
+  const businessSoftConstraints = buildBusinessGroupSoftConstraints(businessGroups);
   const metadata = buildMetadata({
     sourceData,
     preAssignedRequiredCount: requiredDriverBuild.constraints.length,
@@ -324,6 +337,9 @@ export function buildRoutingProblemInputFromSource(
     skippedSameBuildingGroupsCount: sameBuildingDriverBuild.skippedGroups.length,
     autoConvokeResult: options?.autoConvokeResult,
   });
+  if (territoryBuild.assignment) {
+    metadata.dailyTerritoryAssignment = territoryBuild.assignment;
+  }
 
   const input: RoutingProblemInput = {
     schemaVersion: "logistics-routing-input/v1",

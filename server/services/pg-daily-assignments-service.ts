@@ -202,6 +202,25 @@ export class PgDailyAssignmentsService {
     }
   }
 
+  /** Locked tasks stay at the end of each priority bucket; relative order within each group is preserved. */
+  private sortContainerBucketsLockedLast(tasksByPriority: {
+    early_out?: any[];
+    high_priority?: any[];
+    low_priority?: any[];
+  }): void {
+    for (const key of ['early_out', 'high_priority', 'low_priority'] as const) {
+      const tasks = tasksByPriority[key];
+      if (!tasks?.length) continue;
+      const unlocked: any[] = [];
+      const locked: any[] = [];
+      for (const task of tasks) {
+        if (task?.locked === true) locked.push(task);
+        else unlocked.push(task);
+      }
+      tasksByPriority[key] = [...unlocked, ...locked];
+    }
+  }
+
   /**
    * Ensure aliases and selected_cleaners_revisions tables exist
    */
@@ -1577,12 +1596,21 @@ export class PgDailyAssignmentsService {
     if (!timeline?.drivers_assignments || !Array.isArray(timeline.drivers_assignments)) {
       return rows;
     }
+    const seenTaskKeys = new Set<string>();
     for (const assignment of timeline.drivers_assignments) {
       const driver = assignment.driver;
       if (!driver?.id) continue;
       const tasks = assignment.tasks || [];
       for (const task of tasks) {
         if (!task.task_id) continue;
+        const taskKey = `task:${Number(task.task_id)}`;
+        if (seenTaskKeys.has(taskKey)) {
+          console.warn(
+            `⚠️ PG Logistics: task duplicata ignorata in saveLogisticsTimeline (${workDate}, task_id=${task.task_id})`
+          );
+          continue;
+        }
+        seenTaskKeys.add(taskKey);
         rows.push({
           work_date: workDate,
           driver_id: Number(driver.id),
@@ -2140,6 +2168,7 @@ export class PgDailyAssignmentsService {
 
       // Build structure matching create_containers.py format
       this.annotateActiveDuplicateMetadata(tasksByPriority);
+      this.sortContainerBucketsLockedLast(tasksByPriority);
 
       const containers = {
         early_out: {
@@ -2336,6 +2365,7 @@ export class PgDailyAssignmentsService {
       }
 
       this.annotateActiveDuplicateMetadata(tasksByPriority);
+      this.sortContainerBucketsLockedLast(tasksByPriority);
 
       const containers = {
         early_out: { tasks: tasksByPriority.early_out, count: tasksByPriority.early_out.length },

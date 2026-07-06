@@ -63,6 +63,7 @@ export interface DriverNode {
   id: DriverId;
   startLocationNodeId: string;
   endLocationNodeId?: string;
+  operationalCode?: string;
   workWindow: {
     startMin: Minutes;
     endMin: Minutes;
@@ -257,6 +258,47 @@ export interface RoutingProblemMetadata {
   autoConvokeMissingInDbDriversCount: number;
   sameBuildingDriverLockCount: number;
   skippedSameBuildingGroupsCount: number;
+  dailyTerritoryAssignment?: {
+    debugTerritoriesEnabled: boolean;
+    routingPenaltiesEnabled: boolean;
+    territoryMode: "historical_template_3_drivers" | "dynamic_clustering";
+    penaltyConfig?: {
+      coreMismatchPenaltyMin: number;
+      normalMismatchPenaltyMin: number;
+      borderMismatchPenaltyMin: number;
+    };
+    territories: Array<{
+      territoryId: string;
+      territoryIndex: number;
+      territoryKey?: "north" | "center_south_west" | "center_south_east";
+      label?: string;
+      taskIds: TaskId[];
+      centroid: { lat: number; lng: number };
+      radiusMeters: number;
+      penaltyRadiusMeters: number;
+      historicalCentroid?: { lat: number; lng: number };
+      historicalPenaltyRadiusMeters?: number;
+      assignedDriverId: DriverId;
+      suggestedColor: string;
+      coreTasks?: number;
+      borderTasks?: number;
+    }>;
+    profiles?: Array<{
+      territoryKey: "north" | "center_south_west" | "center_south_east";
+      label: string;
+      assignedDriverId: DriverId;
+      taskCount: number;
+      coreTasks: number;
+      borderTasks: number;
+    }>;
+    taskTerritoryIndex: Array<{ taskId: TaskId; territoryIndex: number }>;
+    taskPreferredDriverId: Array<{ taskId: TaskId; driverId: DriverId }>;
+    taskAssignmentDetails?: Array<{
+      taskId: TaskId;
+      territoryIndex: number;
+      assignmentSource: "historical_score" | "border_rebalance";
+    }>;
+  };
   lockedAssignmentsSolverIntegration: "integrated_v4b" | "pending";
   validation: RoutingProblemValidationResult;
 }

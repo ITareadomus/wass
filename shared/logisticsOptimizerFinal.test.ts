@@ -231,7 +231,7 @@ describe("buildTaskWindow", () => {
     ).toBe(880);
   });
 
-  it("keeps EO early start soft and HP/LP lower bounds hard", () => {
+  it("keeps route-compatible EO early soft and HP/LP lower bounds hard", () => {
     const eo = buildTaskWindow({
       taskId: 1,
       priority: "EO",
@@ -262,8 +262,92 @@ describe("buildTaskWindow", () => {
     });
 
     expect(eo.hardWindow.earliestStartMin).toBe(0);
-    expect(eo.softWindows[0]?.reason).toBe("EO_CAN_START_BEFORE_HP_START_SOFT_PREFERENCE");
+    expect(eo.softWindows[0]?.reason).toBe("EO_EARLY_IF_ROUTE_COMPATIBLE_SOFT_PREFERENCE");
+    expect(eo.ruleTrace.some((trace) => trace.code === "EO_EARLY_ROUTE_COMPATIBLE")).toBe(true);
     expect(hp.hardWindow.earliestStartMin).toBe(660);
+  });
+
+  it("does not push flexible EO pick-ups early", () => {
+    const result = buildTaskWindow({
+      taskId: 3,
+      priority: "EO",
+      logisticsTaskKind: "pick-up",
+      workDate: "2026-06-04",
+      cleaningTime: null,
+      checkoutDate: null,
+      checkoutTime: null,
+      checkinDate: null,
+      checkinTime: null,
+      cleanerStartTime: null,
+      cleanerTaskStartTime: null,
+      priorityWindows,
+    });
+
+    expect(result.hardWindow.earliestStartMin).toBe(0);
+    expect(result.softWindows).toEqual([]);
+    expect(result.ruleTrace.some((trace) => trace.code === "EO_EARLY_FLEXIBLE_SUPPRESSED")).toBe(true);
+  });
+
+  it("keeps early pressure for urgent EO delivery/pick-up tasks", () => {
+    const result = buildTaskWindow({
+      taskId: 4,
+      priority: "EO",
+      logisticsTaskKind: "delivery/pick-up",
+      workDate: "2026-06-04",
+      cleaningTime: 60,
+      checkoutDate: null,
+      checkoutTime: null,
+      checkinDate: null,
+      checkinTime: null,
+      cleanerStartTime: "12:00",
+      cleanerTaskStartTime: "12:00",
+      priorityWindows,
+    });
+
+    expect(result.softWindows[0]?.reason).toBe("EO_EARLY_URGENT_SOFT_PREFERENCE");
+    expect(result.softWindows[0]?.penaltyPerMin).toBe(1);
+    expect(result.ruleTrace.some((trace) => trace.code === "EO_EARLY_URGENT")).toBe(true);
+  });
+
+  it("does not treat a late-evening check-in EO as urgent", () => {
+    const result = buildTaskWindow({
+      taskId: 5,
+      priority: "EO",
+      logisticsTaskKind: "pick-up",
+      workDate: "2026-06-04",
+      cleaningTime: null,
+      checkoutDate: null,
+      checkoutTime: null,
+      checkinDate: "2026-06-04",
+      checkinTime: "22:45",
+      cleanerStartTime: null,
+      cleanerTaskStartTime: null,
+      priorityWindows,
+    });
+
+    expect(result.softWindows).toEqual([]);
+    expect(result.ruleTrace.some((trace) => trace.code === "EO_EARLY_FLEXIBLE_SUPPRESSED")).toBe(true);
+    expect(result.ruleTrace.some((trace) => trace.code === "EO_EARLY_URGENT")).toBe(false);
+  });
+
+  it("treats a midday check-in EO as urgent", () => {
+    const result = buildTaskWindow({
+      taskId: 6,
+      priority: "EO",
+      logisticsTaskKind: "pick-up",
+      workDate: "2026-06-04",
+      cleaningTime: null,
+      checkoutDate: null,
+      checkoutTime: null,
+      checkinDate: "2026-06-04",
+      checkinTime: "13:00",
+      cleanerStartTime: null,
+      cleanerTaskStartTime: null,
+      priorityWindows,
+    });
+
+    expect(result.softWindows[0]?.reason).toBe("EO_EARLY_URGENT_SOFT_PREFERENCE");
+    expect(result.ruleTrace.some((trace) => trace.code === "EO_EARLY_URGENT")).toBe(true);
   });
 
   it("does not use EO priority window as a hard lower bound", () => {
