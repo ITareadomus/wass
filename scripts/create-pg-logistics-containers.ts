@@ -21,6 +21,7 @@ async function createLogisticsContainersTables() {
         id SERIAL PRIMARY KEY,
         work_date DATE NOT NULL,
         priority VARCHAR(20) NOT NULL,
+        sort_order INTEGER,
         task_id INTEGER NOT NULL,
         logistic_code INTEGER NOT NULL,
         client_id INTEGER,
@@ -88,6 +89,7 @@ async function createLogisticsContainersTables() {
         work_date DATE NOT NULL,
         revision INTEGER NOT NULL,
         priority VARCHAR(20) NOT NULL,
+        sort_order INTEGER,
         task_id INTEGER NOT NULL,
         logistic_code INTEGER NOT NULL,
         client_id INTEGER,
@@ -128,6 +130,12 @@ async function createLogisticsContainersTables() {
       ON lg_containers_history(task_id);
     `);
 
+    await client.query(
+      `ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS sort_order INTEGER`
+    );
+    await client.query(
+      `ALTER TABLE IF EXISTS lg_containers_history ADD COLUMN IF NOT EXISTS sort_order INTEGER`
+    );
     await client.query(
       `ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS logistics_task_kind VARCHAR(50)`
     );

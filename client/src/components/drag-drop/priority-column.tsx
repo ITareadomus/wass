@@ -148,6 +148,9 @@ export default function PriorityColumn({
       const duplicateMeta = getTaskDuplicateMeta(task);
       return { task, originalIndex, duplicateMeta };
     });
+    if (operationsScope === "logistics") {
+      return indexed;
+    }
 
     const duplicateItems = indexed.filter((entry) => entry.duplicateMeta.isDuplicateActive);
     const nonDuplicateItems = indexed.filter((entry) => !entry.duplicateMeta.isDuplicateActive);
@@ -170,7 +173,7 @@ export default function PriorityColumn({
     });
 
     return [...duplicateItems, ...nonDuplicateItems];
-  }, [tasks]);
+  }, [tasks, operationsScope]);
 
   const orderedTasks = useMemo(
     () => orderedEntries.map((entry) => entry.task),
@@ -178,6 +181,10 @@ export default function PriorityColumn({
   );
 
   const groupedDuplicateEntries = useMemo(() => {
+    if (operationsScope === "logistics") {
+      return { duplicateBlocks: [], nonDuplicateEntries: orderedEntries };
+    }
+
     const duplicatesByGroup = new Map<string, typeof orderedEntries>();
     for (const entry of orderedEntries) {
       if (!entry.duplicateMeta.isDuplicateActive) continue;
@@ -213,7 +220,13 @@ export default function PriorityColumn({
 
     const nonDuplicateEntries = orderedEntries.filter((entry) => !entry.duplicateMeta.isDuplicateActive);
     return { duplicateBlocks, nonDuplicateEntries };
-  }, [orderedEntries]);
+  }, [orderedEntries, operationsScope]);
+
+  const getContainerDraggableId = (task: Task, index: number) => {
+    if (operationsScope !== "logistics") return undefined;
+    const taskKey = String((task as any).task_id ?? task.id ?? task.name ?? "");
+    return `${taskKey}-container-${droppableId}-${index}`;
+  };
 
   // Funzione modificata per usare hasAssigned e stato di loading
   const handleAssign = async () => {
@@ -436,6 +449,7 @@ export default function PriorityColumn({
                                 isReadOnly={isHistoricalDateLocked}
                                 multiSelectContext={multiSelectCtx}
                                 isHighlighted={isHighlighted}
+                                draggableId={getContainerDraggableId(task, currentIndex)}
                                 operationsScope={operationsScope}
                                 onLogisticsTimelineMutated={onLogisticsTimelineMutated}
                               />
@@ -469,6 +483,7 @@ export default function PriorityColumn({
                           isReadOnly={isHistoricalDateLocked}
                           multiSelectContext={multiSelectCtx}
                           isHighlighted={isHighlighted}
+                          draggableId={getContainerDraggableId(task, currentIndex)}
                           operationsScope={operationsScope}
                           onLogisticsTimelineMutated={onLogisticsTimelineMutated}
                         />
@@ -496,6 +511,7 @@ export default function PriorityColumn({
                       isReadOnly={isHistoricalDateLocked}
                       multiSelectContext={multiSelectCtx}
                       isHighlighted={isHighlighted}
+                      draggableId={getContainerDraggableId(task, currentIndex)}
                       operationsScope={operationsScope}
                       onLogisticsTimelineMutated={onLogisticsTimelineMutated}
                     />

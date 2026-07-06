@@ -1799,10 +1799,11 @@ export default function GenerateAssignments() {
       // Caso: Riordino nella stessa timeline
       if (fromCleanerId === toCleanerId && fromCleanerId !== null && toCleanerId !== null) {
         const cleanerId = toCleanerId;
-        console.log(`🔄 Riordino task ${taskId} per cleaner ${cleanerId} da ${source.index} a ${destination.index}`);
+        const correctIndex = dragIndexSnapshot !== null ? dragIndexSnapshot : destination.index;
+        console.log(`🔄 Riordino task ${taskId} per cleaner ${cleanerId} da ${source.index} a ${correctIndex}`);
 
         try {
-          await reorderTimelineAssignment(taskId, logisticCode, cleanerId, source.index, destination.index);
+          await reorderTimelineAssignment(taskId, logisticCode, cleanerId, source.index, correctIndex);
 
           // CRITICAL: Marca modifiche dopo riordino
           setHasUnsavedChanges(true);
@@ -1815,7 +1816,7 @@ export default function GenerateAssignments() {
 
           toast({
             title: "Task riordinata",
-            description: `Task ${logisticCode} spostata nella posizione ${destination.index + 1}`,
+            description: `Task ${logisticCode} spostata nella posizione ${correctIndex + 1}`,
             variant: "success",
           });
         } catch (err) {

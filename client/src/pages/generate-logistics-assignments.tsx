@@ -97,6 +97,8 @@ interface LogisticsTask {
   logistics_task_kind_source?: string | null;
   cleaner_id?: number | null;
   cleaner_sequence?: number | null;
+  priority?: string | null;
+  sort_order?: number | null;
 }
 
 interface LogisticsTaskLists {
@@ -104,6 +106,8 @@ interface LogisticsTaskLists {
   high_priority: LogisticsTask[];
   low_priority: LogisticsTask[];
 }
+
+type LogisticsContainerKey = keyof LogisticsTaskLists;
 
 const EMPTY_LOGISTICS_TASK_LISTS: LogisticsTaskLists = {
   early_out: [],
@@ -951,6 +955,8 @@ export default function GenerateLogisticsAssignments() {
     if (cleanerIdx !== -1) return draggableId.slice(0, cleanerIdx);
     const summaryIdx = draggableId.indexOf("-summary-");
     if (summaryIdx !== -1) return draggableId.slice(0, summaryIdx);
+    const containerIdx = draggableId.indexOf("-container-");
+    if (containerIdx !== -1) return draggableId.slice(0, containerIdx);
     return draggableId;
   };
 
@@ -1036,6 +1042,51 @@ export default function GenerateLogisticsAssignments() {
     if (!res.ok) throw new Error("Riordino fallito");
   };
 
+  const saveLogisticsContainerMove = async (
+    fromContainer: LogisticsContainerKey,
+    toContainer: LogisticsContainerKey,
+    fromIndex: number,
+    toIndex: number
+  ) => {
+    const nextLists: LogisticsTaskLists = {
+      early_out: [...logisticsTaskLists.early_out],
+      high_priority: [...logisticsTaskLists.high_priority],
+      low_priority: [...logisticsTaskLists.low_priority],
+    };
+
+    const sourceTasks = nextLists[fromContainer];
+    const [movedTask] = sourceTasks.splice(fromIndex, 1);
+    if (!movedTask) {
+      throw new Error("Task container non trovata");
+    }
+
+    const destinationTasks = nextLists[toContainer];
+    const insertAt = Math.max(0, Math.min(toIndex, destinationTasks.length));
+    destinationTasks.splice(insertAt, 0, {
+      ...movedTask,
+      priority: toContainer,
+    });
+
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    const res = await fetch("/api/logistics-containers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date: dateStr,
+        modified_by: getCurrentUsername(),
+        containers: {
+          metadata: { date: dateStr },
+          containers: {
+            early_out: { tasks: nextLists.early_out },
+            high_priority: { tasks: nextLists.high_priority },
+            low_priority: { tasks: nextLists.low_priority },
+          },
+        },
+      }),
+    });
+    if (!res.ok) throw new Error("Spostamento container fallito");
+  };
+
   const onDragUpdate = (update: { destination?: { droppableId: string; index: number } | null }) => {
     const { destination } = update;
     if (!destination) {
@@ -1087,6 +1138,18 @@ export default function GenerateLogisticsAssignments() {
     }, 10000);
 
     try {
+      if (fromContainer !== null && toContainer !== null && fromDriverId === null && toDriverId === null) {
+        await saveLogisticsContainerMove(
+          fromContainer as LogisticsContainerKey,
+          toContainer as LogisticsContainerKey,
+          source.index,
+          destination.index
+        );
+        await reloadLogisticsPage();
+        toast({ title: "Container aggiornato", variant: "success" });
+        return;
+      }
+
       if (fromContainer != null && toDriverId !== null && fromDriverId === null) {
         const idx = dropIndexSnapshot !== null ? dropIndexSnapshot : destination.index;
         await saveLogisticsAssignment(taskId, toDriverId, logisticCode, idx);

@@ -2207,8 +2207,9 @@ export class PgDailyAssignmentsService {
 
   async loadLogisticsContainers(workDate: string): Promise<any | null> {
     try {
+      await query(`ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS sort_order INTEGER`);
       const result = await query(
-        'SELECT * FROM lg_containers WHERE work_date = $1 ORDER BY priority, task_id',
+        'SELECT * FROM lg_containers WHERE work_date = $1 ORDER BY priority, sort_order NULLS LAST, task_id',
         [workDate]
       );
 
@@ -2263,6 +2264,7 @@ export class PgDailyAssignmentsService {
           logistic_code: row.logistic_code,
           priority: row.priority
         };
+        if (row.sort_order !== null) task.sort_order = row.sort_order;
         if (row.client_id) task.client_id = row.client_id;
         if (row.premium !== null) task.premium = row.premium;
         if (row.address) task.address = row.address;
@@ -2503,6 +2505,7 @@ export class PgDailyAssignmentsService {
   async saveLogisticsContainers(workDate: string, containersData: any): Promise<boolean> {
     const client = await pool.connect();
     try {
+      await client.query(`ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS sort_order INTEGER`);
       const containers = containersData?.containers || {};
       const priorityConfigs = [
         { dbName: 'early_out', keys: ['early_out'] },
@@ -2520,10 +2523,11 @@ export class PgDailyAssignmentsService {
             break;
           }
         }
-        for (const task of tasks) {
-          if (!task?.task_id) continue;
-          tasksWithPriority.push({ dbName: config.dbName, task });
-        }
+        tasks.forEach((task, index) => {
+          if (task?.task_id) {
+            tasksWithPriority.push({ dbName: config.dbName, task: { ...task, sort_order: index } });
+          }
+        });
       }
 
       const taskIds = tasksWithPriority
@@ -2559,20 +2563,21 @@ export class PgDailyAssignmentsService {
 
         await client.query(`
             INSERT INTO lg_containers (
-              work_date, priority,
+              work_date, priority, sort_order,
               task_id, logistic_code, client_id, premium, address, lat, lng,
               cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
               pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
               straordinaria, type_apt, alias, customer_name, customer_note, customer_note_history, reasons, customer_reference,
               locked, locked_reason, logistics_task_kind, logistics_task_kind_source
             ) VALUES (
-              $1, $2, $3, $4, $5, $6, $7, $8, $9,
-              $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-              $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31
+              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+              $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+              $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32
             )
           `, [
             workDate,
             dbName,
+            enrichedTask.sort_order ?? 0,
             enrichedTask.task_id,
             enrichedTask.logistic_code || 0,
             enrichedTask.client_id || null,
@@ -3030,6 +3035,8 @@ export class PgDailyAssignmentsService {
       }
 
       await client.query('BEGIN');
+      await client.query(`ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS sort_order INTEGER`);
+      await client.query(`ALTER TABLE IF EXISTS lg_containers_history ADD COLUMN IF NOT EXISTS sort_order INTEGER`);
       await client.query(
         'SELECT 1 FROM lg_containers_revision WHERE work_date = $1 FOR UPDATE',
         [workDate]
@@ -3052,7 +3059,7 @@ export class PgDailyAssignmentsService {
       for (const row of currentContainers.rows) {
         await client.query(`
           INSERT INTO lg_containers_history (
-            work_date, revision, priority,
+            work_date, revision, priority, sort_order,
             task_id, logistic_code, client_id, premium, address, lat, lng,
             cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
@@ -3061,12 +3068,13 @@ export class PgDailyAssignmentsService {
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
             $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-            $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33
+            $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34
           )
         `, [
           workDate,
           revision,
           row.priority,
+          row.sort_order ?? null,
           row.task_id,
           row.logistic_code,
           row.client_id,

@@ -223,6 +223,7 @@ interface TaskCardProps {
   waitingGapWidthPx?: number;
   isHighlighted?: boolean;
   cleanerId?: number | null;
+  draggableId?: string;
   /** housekeeping → /api/operations (enable_wass); logistics → enable_wass_route */
   operationsScope?: "housekeeping" | "office" | "logistics";
   /** Solo timeline logistica: nome driver (colonna sinistra). Non usare per HK — lì sarebbe il cleaner. */
@@ -360,6 +361,7 @@ export default function TaskCard({
   waitingGapWidthPx = 0,
   isHighlighted = false,
   cleanerId = null,
+  draggableId,
   operationsScope = "housekeeping",
   timelineRowStaffDisplayLabel = null,
   onLogisticsTimelineMutated,
@@ -2306,11 +2308,9 @@ const displayClickableInputClass =
       ? "top-1/2 -translate-y-1/2"
       : "top-[5px]";
 
-  // Determina se il drag è disabilitato in base alla data, se la task è già salvata, o se è bloccata.
-  // In logistica checkin_date è la finestra prevista, non un blocco di riordino.
+  // Il drag viene bloccato solo da stato pagina/task, non dai campi orari ADAM.
   const shouldDisableDrag =
     isDragDisabled ||
-    (operationsScope !== "logistics" && Boolean((displayTask as any).checkin_date)) ||
     isLocked ||
     isPreAssignedReadonly;
 
@@ -2976,7 +2976,7 @@ const displayClickableInputClass =
   return (
     <>
       <Draggable
-        draggableId={getUniqueDraggableId(task, cleanerId)}
+        draggableId={draggableId ?? getUniqueDraggableId(task, cleanerId)}
         index={index}
         isDragDisabled={shouldDisableDrag}
       >
