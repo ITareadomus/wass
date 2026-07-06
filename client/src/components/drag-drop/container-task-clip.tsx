@@ -19,7 +19,7 @@ export function ContainerTaskClip({ children, className }: ContainerTaskClipProp
     const update = () => {
       // Ignore tiny overhangs from borders/shadows/badges; only show the continuation
       // marker when the actual task body is wider than the available container.
-      setIsClipped(el.scrollWidth - el.clientWidth > 8);
+      setIsClipped(el.scrollWidth - el.clientWidth > 10);
     };
 
     update();
@@ -33,7 +33,10 @@ export function ContainerTaskClip({ children, className }: ContainerTaskClipProp
       className={cn("flex max-w-full min-w-0 items-center", className)}
       title={isClipped ? "Task più lungo dello spazio disponibile nel container" : undefined}
     >
-      <div ref={clipRef} className="relative min-w-0 max-w-full overflow-hidden">
+      <div
+        ref={clipRef}
+        className="relative -mr-1.5 -mt-1.5 min-w-0 max-w-full overflow-hidden pr-1.5 pt-1.5"
+      >
         {children}
         {isClipped && (
           <div
