@@ -35,6 +35,7 @@ export type SequenceSummaryEntry = {
 export type SequenceSummaryGroup = {
   id: number;
   label: string;
+  vehicleName?: string;
   vehiclePlate?: string;
   warehouseDepartureTime?: string | null;
   warehouseReturnTime?: string | null;
@@ -271,6 +272,14 @@ function resolveDriverLabel(driver: { id: number; name?: string; lastname?: stri
   return `ID ${driver.id}`;
 }
 
+function resolveDriverVehicleName(driver: {
+  assigned_vehicle_name?: string | null;
+  vehicle_name?: string | null;
+}): string | undefined {
+  const name = String(driver?.assigned_vehicle_name ?? driver?.vehicle_name ?? "").trim();
+  return name || undefined;
+}
+
 function resolveDriverVehiclePlate(driver: {
   assigned_vehicle_pms_code?: string | null;
   vehicle_pms_code?: string | null;
@@ -368,6 +377,8 @@ export function buildSequenceSummaryGroupsFromDriverAssignments(
       name?: string;
       lastname?: string;
       alias?: string;
+      assigned_vehicle_name?: string | null;
+      vehicle_name?: string | null;
       assigned_vehicle_pms_code?: string | null;
       vehicle_pms_code?: string | null;
       start_time?: string | null;
@@ -394,6 +405,7 @@ export function buildSequenceSummaryGroupsFromDriverAssignments(
     groups.push({
       id: row.driver.id,
       label: resolveDriverLabel(row.driver),
+      vehicleName: resolveDriverVehicleName(row.driver),
       vehiclePlate: resolveDriverVehiclePlate(row.driver),
       warehouseDepartureTime: warehouseTimes.warehouseDepartureTime,
       warehouseReturnTime: warehouseTimes.warehouseReturnTime,

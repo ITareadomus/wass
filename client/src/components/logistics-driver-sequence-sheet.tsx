@@ -165,6 +165,11 @@ export default function LogisticsDriverSequenceSheet({
                 <h1 className="text-sm font-semibold text-foreground print:text-base print:text-black">
                   <span className="inline-flex flex-nowrap items-center gap-x-1.5 whitespace-nowrap">
                     <span>{group.label}</span>
+                    {group.vehicleName && (
+                      <span className="font-normal text-muted-foreground print:text-black/70">
+                        {group.vehicleName}
+                      </span>
+                    )}
                     {group.vehiclePlate && (
                       <span className="shrink-0 rounded border border-custom-blue/40 bg-background/80 px-1.5 text-[10px] font-semibold leading-4 text-custom-blue print:border-black print:bg-white print:text-[11px] print:text-black">
                         {group.vehiclePlate}

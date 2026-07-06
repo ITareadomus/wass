@@ -205,6 +205,9 @@ export default function AssignedTasksSequenceSummary({
                 <h4 className="flex min-w-0 flex-nowrap items-center gap-x-2 whitespace-nowrap text-sm font-semibold text-foreground">
                   <span>{group.label}</span>
                   <span className="inline-flex items-center gap-x-1 font-normal text-foreground">
+                    {group.vehicleName && (
+                      <span className="text-muted-foreground">{group.vehicleName}</span>
+                    )}
                     {group.vehiclePlate && (
                       <span className="shrink-0 rounded border border-custom-blue/40 bg-background/80 px-1.5 text-[10px] font-semibold leading-4 text-custom-blue">
                         {group.vehiclePlate}
