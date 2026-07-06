@@ -17,7 +17,9 @@ export function ContainerTaskClip({ children, className }: ContainerTaskClipProp
     if (!el) return;
 
     const update = () => {
-      setIsClipped(el.scrollWidth > el.clientWidth + 1);
+      // Ignore tiny overhangs from borders/shadows/badges; only show the continuation
+      // marker when the actual task body is wider than the available container.
+      setIsClipped(el.scrollWidth - el.clientWidth > 8);
     };
 
     update();
