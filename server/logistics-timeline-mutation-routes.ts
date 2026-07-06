@@ -2,9 +2,10 @@ import type { Express } from "express";
 import { format } from "date-fns";
 import * as workspaceFiles from "./services/workspace-files";
 import {
-  hydrateTasksFromLogisticsContainers,
-  recalculateLogisticsDriverTimes,
+  pruneEmptyLogisticsDriverAssignments,
+  recalculateLogisticsDriverEntry,
 } from "./services/logistics-timeline-utils";
+import { enrichDriverTasksWithLogisticsKind } from "./services/logistics-task-kind-enrichment";
 
 type Deps = {
   getCurrentUsername: (req?: any) => string;
@@ -115,6 +116,7 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
             role: info?.role || "Standard",
             premium: info?.premium || false,
             start_time: info?.start_time || "10:00",
+            end_time: info?.end_time || "20:00",
           },
           tasks: [],
         };
@@ -164,19 +166,23 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       const targetIndex =
         insertAt !== undefined ? Math.max(0, Math.min(insertAt, driverEntry.tasks.length)) : driverEntry.tasks.length;
       driverEntry.tasks.splice(targetIndex, 0, taskForTimeline);
+      driverEntry.tasks.forEach((t: any, i: number) => {
+        t.sequence = i + 1;
+        t.followup = i > 0;
+      });
 
       try {
         const sel = await workspaceFiles.loadSelectedLogisticsDrivers(workDate);
         const sd = sel?.drivers?.find((d: any) => d.id === normalizedDriverId);
         driverEntry.driver.start_time = sd?.start_time || driverEntry.driver.start_time || "10:00";
+        driverEntry.driver.end_time = sd?.end_time || driverEntry.driver.end_time || "20:00";
       } catch {
         driverEntry.driver.start_time = driverEntry.driver.start_time || "10:00";
+        driverEntry.driver.end_time = driverEntry.driver.end_time || "20:00";
       }
 
       try {
-        await hydrateTasksFromLogisticsContainers(driverEntry, workDate);
-        const updated = await recalculateLogisticsDriverTimes(driverEntry, workDate);
-        driverEntry.tasks = updated.tasks;
+        await recalculateLogisticsDriverEntry(driverEntry, workDate);
       } catch (e: any) {
         driverEntry.tasks.forEach((t: any, i: number) => {
           t.sequence = i + 1;
@@ -184,15 +190,25 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
         });
       }
 
+      try {
+        await enrichDriverTasksWithLogisticsKind(driverEntry, workDate);
+      } catch {
+        /* kind enrichment is best-effort */
+      }
+
       const modifyingUser = req.body.modified_by || req.body.created_by || currentUsername;
       timelineData.metadata.last_updated = getRomeTimestamp();
       timelineData.metadata.date = workDate;
+      pruneEmptyLogisticsDriverAssignments(timelineData);
       timelineData.meta = timelineData.meta || {};
       timelineData.meta.total_drivers = timelineData.drivers_assignments.length;
       timelineData.meta.assigned_tasks = timelineData.drivers_assignments.reduce(
         (s: number, d: any) => s + d.tasks.length,
         0
       );
+      timelineData.meta.used_drivers = timelineData.drivers_assignments.filter(
+        (d: any) => (d.tasks?.length || 0) > 0
+      ).length;
 
       await workspaceFiles.saveLogisticsTimeline(workDate, timelineData, false, modifyingUser, modificationType);
 
@@ -274,15 +290,15 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       for (const driverEntry of assignmentsData.drivers_assignments) {
         if (driverEntry._needsRecalculation) {
           try {
-            await hydrateTasksFromLogisticsContainers(driverEntry, workDate);
-            const updated = await recalculateLogisticsDriverTimes(driverEntry, workDate);
-            Object.assign(driverEntry, updated);
+            await recalculateLogisticsDriverEntry(driverEntry, workDate);
           } catch (e: any) {
             console.warn(`recalc logistics driver ${driverEntry.driver?.id}:`, e.message);
           }
           delete driverEntry._needsRecalculation;
         }
       }
+
+      pruneEmptyLogisticsDriverAssignments(assignmentsData);
 
       assignmentsData.metadata = assignmentsData.metadata || {};
       assignmentsData.metadata.last_updated = getRomeTimestamp();
@@ -319,6 +335,7 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
           delete removedTask.start_time;
           delete removedTask.end_time;
           delete removedTask.travel_time;
+          delete removedTask.checkout_wait_minutes;
           delete removedTask.sequence;
           delete removedTask.followup;
           if (removedTask.reasons) {
@@ -372,7 +389,10 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       if (!timelineData) {
         return res.status(404).json({ success: false, message: "Timeline non trovata" });
       }
-      const driverEntry = timelineData.drivers_assignments.find((d: any) => d.driver.id === driverId);
+      const normalizedDriverId = Number(driverId);
+      const driverEntry = timelineData.drivers_assignments.find(
+        (d: any) => Number(d.driver?.id) === normalizedDriverId
+      );
       if (!driverEntry) {
         return res.status(404).json({ success: false, message: "Driver non trovato" });
       }
@@ -387,10 +407,12 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       }
       const [task] = driverEntry.tasks.splice(actualFrom, 1);
       driverEntry.tasks.splice(toIndex, 0, task);
+      driverEntry.tasks.forEach((t: any, i: number) => {
+        t.sequence = i + 1;
+        t.followup = i > 0;
+      });
       try {
-        await hydrateTasksFromLogisticsContainers(driverEntry, workDate);
-        const updated = await recalculateLogisticsDriverTimes(driverEntry, workDate);
-        driverEntry.tasks = updated.tasks;
+        await recalculateLogisticsDriverEntry(driverEntry, workDate);
       } catch (e: any) {
         driverEntry.tasks.forEach((t: any, i: number) => {
           t.sequence = i + 1;
@@ -402,6 +424,15 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       timelineData.metadata.last_updated = getRomeTimestamp();
       timelineData.metadata.date = workDate;
       for (const t of driverEntry.tasks) t.manually_moved = true;
+      timelineData.meta = timelineData.meta || {};
+      timelineData.meta.total_drivers = timelineData.drivers_assignments.length;
+      timelineData.meta.assigned_tasks = timelineData.drivers_assignments.reduce(
+        (s: number, d: any) => s + (d.tasks?.length || 0),
+        0
+      );
+      timelineData.meta.used_drivers = timelineData.drivers_assignments.filter(
+        (d: any) => (d.tasks?.length || 0) > 0
+      ).length;
       await workspaceFiles.saveLogisticsTimeline(workDate, timelineData, false, modifyingUser, "task_reordered_same_driver");
       res.json({ success: true });
     } catch (error: any) {
@@ -436,8 +467,13 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
         };
       }
 
+      const normalizedSourceDriverId = Number(sourceDriverId);
+      const normalizedDestDriverId = Number(destDriverId);
+
       let taskToMove: any = null;
-      const sourceEntry = timelineData.drivers_assignments.find((d: any) => d.driver.id === sourceDriverId);
+      const sourceEntry = timelineData.drivers_assignments.find(
+        (d: any) => Number(d.driver?.id) === normalizedSourceDriverId
+      );
       if (sourceEntry) {
         const ti = sourceEntry.tasks.findIndex(
           (t: any) => String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
@@ -454,10 +490,12 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
         return res.status(404).json({ success: false, message: "Task non trovata" });
       }
 
-      let destEntry = timelineData.drivers_assignments.find((d: any) => d.driver.id === destDriverId);
+      let destEntry = timelineData.drivers_assignments.find(
+        (d: any) => Number(d.driver?.id) === normalizedDestDriverId
+      );
       if (!destEntry) {
         const driversData = await workspaceFiles.loadSelectedLogisticsDrivers(workDate);
-        const info = driversData?.drivers?.find((d: any) => d.id === destDriverId);
+        const info = driversData?.drivers?.find((d: any) => Number(d.id) === normalizedDestDriverId);
         if (!info) {
           return res.status(404).json({ success: false, message: "Driver destinazione non trovato" });
         }
@@ -476,16 +514,16 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       const targetIndex =
         destIndex !== undefined ? Math.max(0, Math.min(destIndex, destEntry.tasks.length)) : destEntry.tasks.length;
       destEntry.tasks.splice(targetIndex, 0, taskToMove);
+      destEntry.tasks.forEach((t: any, i: number) => {
+        t.sequence = i + 1;
+        t.followup = i > 0;
+      });
 
       try {
         if (sourceEntry && sourceEntry.tasks.length > 0) {
-          await hydrateTasksFromLogisticsContainers(sourceEntry, workDate);
-          const u = await recalculateLogisticsDriverTimes(sourceEntry, workDate);
-          sourceEntry.tasks = u.tasks;
+          await recalculateLogisticsDriverEntry(sourceEntry, workDate);
         }
-        await hydrateTasksFromLogisticsContainers(destEntry, workDate);
-        const u2 = await recalculateLogisticsDriverTimes(destEntry, workDate);
-        destEntry.tasks = u2.tasks;
+        await recalculateLogisticsDriverEntry(destEntry, workDate);
       } catch (e: any) {
         if (sourceEntry && sourceEntry.tasks.length > 0) {
           sourceEntry.tasks.forEach((t: any, i: number) => {
@@ -499,6 +537,8 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
         });
       }
 
+      pruneEmptyLogisticsDriverAssignments(timelineData);
+
       const modifyingUser = modified_by || getCurrentUsername(req);
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = getRomeTimestamp();
@@ -506,9 +546,12 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       timelineData.meta = timelineData.meta || {};
       timelineData.meta.total_drivers = timelineData.drivers_assignments.length;
       timelineData.meta.assigned_tasks = timelineData.drivers_assignments.reduce(
-        (s: number, d: any) => s + d.tasks.length,
+        (s: number, d: any) => s + (d.tasks?.length || 0),
         0
       );
+      timelineData.meta.used_drivers = timelineData.drivers_assignments.filter(
+        (d: any) => (d.tasks?.length || 0) > 0
+      ).length;
 
       await workspaceFiles.saveLogisticsTimeline(workDate, timelineData, false, modifyingUser, "dnd_between_drivers");
       res.json({ success: true });
@@ -567,6 +610,7 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
           role: row.role || "Driver",
           premium: Boolean(row.premium || row.role === "Premium"),
           start_time: row.start_time || "10:00",
+          end_time: row.end_time || "20:00",
         };
       };
 
@@ -636,11 +680,13 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       markTasks(destEntry.tasks);
 
       for (const entry of [sourceEntry, destEntry]) {
+        entry.tasks.forEach((t: any, i: number) => {
+          t.sequence = i + 1;
+          t.followup = i > 0;
+        });
         try {
           if (entry.tasks.length > 0) {
-            await hydrateTasksFromLogisticsContainers(entry, workDate);
-            const updated = await recalculateLogisticsDriverTimes(entry, workDate);
-            entry.tasks = updated.tasks;
+            await recalculateLogisticsDriverEntry(entry, workDate);
           }
         } catch (e: any) {
           console.warn(`swap-drivers recalc ${entry.driver?.id}:`, e?.message);
@@ -650,6 +696,8 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
           });
         }
       }
+
+      pruneEmptyLogisticsDriverAssignments(timelineData);
 
       timelineData.metadata = timelineData.metadata || {};
       timelineData.metadata.last_updated = getRomeTimestamp();

@@ -10,6 +10,13 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { formatInTimeZone } from "date-fns-tz";
 import { databaseConfig } from "../config/database";
+import {
+  buildSchedulingWindows,
+  classifyTaskPriority,
+  parsePrioritySettings,
+  priorityToContainerFormat,
+  PrioritySettingsError,
+} from "../shared/taskPriorityClassification";
 
 const isTrue = (v: any) => v === true || v === 1 || v === "1" || v === "true";
 const OFFICE_SCOPE_ENABLED = false;
@@ -102,6 +109,7 @@ import * as workspaceFiles from "./services/workspace-files";
 import {
   hydrateTasksFromLogisticsContainers,
   recalculateLogisticsDriverTimes,
+  recalculateLogisticsTimeline,
 } from "./services/logistics-timeline-utils";
 import { registerLogisticsTimelineMutationRoutes } from "./logistics-timeline-mutation-routes";
 import * as mysql from 'mysql2/promise';
@@ -546,6 +554,7 @@ async function rehydratePreassignedAssignmentsFromAdam(
           role: cleanerInfo?.role || "Standard",
           premium: Boolean(cleanerInfo?.premium),
           start_time: cleanerInfo?.start_time || "10:00",
+          end_time: cleanerInfo?.end_time || "20:00",
         },
         tasks: [],
       };
@@ -559,6 +568,7 @@ async function rehydratePreassignedAssignmentsFromAdam(
         role: cleanerEntry?.cleaner?.role || "Standard",
         premium: Boolean(cleanerEntry?.cleaner?.premium),
         start_time: cleanerEntry?.cleaner?.start_time || "10:00",
+        end_time: cleanerEntry?.cleaner?.end_time || "20:00",
       });
     }
 
@@ -696,6 +706,17 @@ function isValidWorkDate(dateStr: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
 }
 
+function isValidHHmm(value: string): boolean {
+  if (!/^\d{2}:\d{2}$/.test(value)) return false;
+  const [hh, mm] = value.split(":").map(Number);
+  return hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59;
+}
+
+function toMinutesHHmm(value: string): number {
+  const [hh, mm] = value.split(":").map(Number);
+  return hh * 60 + mm;
+}
+
 /**
  * Helper: Load cleaner start_time from PostgreSQL (selected cleaners)
  * Falls back to filesystem if PostgreSQL fails
@@ -716,6 +737,25 @@ async function getCleanerStartTime(
     }
   } catch (err) {
     console.warn(`⚠️ Could not load start_time from PostgreSQL for cleaner ${cleanerId}`);
+  }
+  return null;
+}
+
+async function getCleanerEndTime(
+  cleanerId: number,
+  workDate: string,
+  scope: "housekeeping" | "office" = "housekeeping"
+): Promise<string | null> {
+  try {
+    const selectedCleaners = await workspaceFiles.loadSelectedCleaners(workDate, scope);
+    if (selectedCleaners?.cleaners) {
+      const cleaner = selectedCleaners.cleaners.find((c: any) => c.id === cleanerId);
+      if (cleaner?.end_time) {
+        return cleaner.end_time;
+      }
+    }
+  } catch (err) {
+    console.warn(`⚠️ Could not load end_time from PostgreSQL for cleaner ${cleanerId}`);
   }
   return null;
 }
@@ -889,20 +929,46 @@ function buildKey(isoDate: string) {
 async function recalculateCleanerTimes(cleanerData: any, workDate?: string): Promise<any> {
   try {
     const { spawn } = await import('child_process');
+    const { pgSettingsService } = await import("./services/pg-settings-service");
 
     // CRITICAL: Load start_time from PostgreSQL to ensure it's up-to-date
     const dateToUse = workDate || format(new Date(), 'yyyy-MM-dd');
     const startTime = await getCleanerStartTime(cleanerData.cleaner.id, dateToUse);
+    const endTime = await getCleanerEndTime(cleanerData.cleaner.id, dateToUse);
     if (startTime) {
       cleanerData.cleaner.start_time = startTime;
       console.log(`✅ Loaded start_time ${startTime} from PostgreSQL for cleaner ${cleanerData.cleaner.id}`);
     } else {
       console.warn(`⚠️ Could not load start_time from PostgreSQL for cleaner ${cleanerData.cleaner.id}, using default`);
     }
+    if (endTime) {
+      cleanerData.cleaner.end_time = endTime;
+      console.log(`✅ Loaded end_time ${endTime} from PostgreSQL for cleaner ${cleanerData.cleaner.id}`);
+    } else {
+      console.warn(`⚠️ Could not load end_time from PostgreSQL for cleaner ${cleanerData.cleaner.id}, using default`);
+    }
+
+    let priorityWindows: Record<string, { start_min: number }> | undefined;
+    try {
+      await pgSettingsService.ensureTables();
+      const appSettings = await pgSettingsService.getSettings("app_settings");
+      const parsedPrioritySettings = parsePrioritySettings(appSettings ?? {});
+      const windows = buildSchedulingWindows(parsedPrioritySettings);
+      priorityWindows = {
+        EO: { start_min: windows.EO.startMin },
+        HP: { start_min: windows.HP.startMin },
+        LP: { start_min: windows.LP.startMin },
+      };
+    } catch (settingsError) {
+      console.warn("⚠️ Unable to load priority windows from app_settings for manual recalc:", settingsError);
+    }
 
     return new Promise((resolve, reject) => {
       const scriptPath = path.join(process.cwd(), 'client/public/scripts/recalculate_times.py');
-      const cleanerDataJson = JSON.stringify(cleanerData);
+      const cleanerDataJson = JSON.stringify({
+        ...cleanerData,
+        ...(priorityWindows ? { priority_windows: priorityWindows } : {}),
+      });
 
       // Usa spawn con stdin per evitare ARG_MAX limit e command injection
       const pythonProcess = spawn('python3', [scriptPath], {
@@ -2488,6 +2554,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
           meta: { total_drivers: 0, used_drivers: 0, assigned_tasks: 0 },
         });
       }
+      if (Array.isArray(timeline.drivers_assignments)) {
+        for (const entry of timeline.drivers_assignments) {
+          const tasks = entry?.tasks;
+          if (!tasks?.length) continue;
+          tasks.sort((a: any, b: any) => (a.sequence ?? 9999) - (b.sequence ?? 9999));
+        }
+        const scheduleChanged = await recalculateLogisticsTimeline(timeline, workDate);
+        const { enrichDriverTasksWithLogisticsKind } = await import(
+          "./services/logistics-task-kind-enrichment"
+        );
+        for (const entry of timeline.drivers_assignments) {
+          if (entry?.tasks?.length) {
+            await enrichDriverTasksWithLogisticsKind(entry, workDate);
+          }
+        }
+        const { enrichLogisticsTimelineStructureSofabeds } = await import(
+          "./services/adam-structure-sofabeds"
+        );
+        const { enrichLogisticsTimelineCustomerNotes } = await import(
+          "./services/logistics-customer-notes-enrichment"
+        );
+        await enrichLogisticsTimelineStructureSofabeds(timeline);
+        await enrichLogisticsTimelineCustomerNotes(workDate, timeline);
+        if (scheduleChanged) {
+          await workspaceFiles.saveLogisticsTimeline(
+            workDate,
+            timeline,
+            false,
+            "system",
+            "schedule_absorption_recalc"
+          );
+        }
+      }
       res.json(timeline);
     } catch (error: any) {
       console.error("GET /api/logistics-timeline:", error);
@@ -2507,8 +2606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata: { ...timeline.metadata, date: workDate, last_updated: getRomeTimestamp() },
       };
       if (timelineData.drivers_assignments && Array.isArray(timelineData.drivers_assignments)) {
-        for (let idx = 0; idx < timelineData.drivers_assignments.length; idx++) {
-          let entry = timelineData.drivers_assignments[idx];
+        for (const entry of timelineData.drivers_assignments) {
           const tasks = entry.tasks;
           if (!tasks?.length) continue;
           tasks.sort((a: any, b: any) => (a.sequence ?? 9999) - (b.sequence ?? 9999));
@@ -2516,10 +2614,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             tasks[i].sequence = i + 1;
             tasks[i].followup = i > 0;
           }
-          await hydrateTasksFromLogisticsContainers(entry, workDate);
-          entry = await recalculateLogisticsDriverTimes(entry, workDate);
-          timelineData.drivers_assignments[idx] = entry;
         }
+        await recalculateLogisticsTimeline(timelineData, workDate);
       }
       await workspaceFiles.saveLogisticsTimeline(workDate, timelineData, false, "python_script", "api_save_logistics_timeline");
       const taskCount =
@@ -2531,6 +2627,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("POST /api/logistics-timeline:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/update-logistics-task-kind", async (req, res) => {
+    try {
+      const { date, taskId, kind, modified_by: modifiedByBody } = req.body ?? {};
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const normalizedTaskId = Number(taskId);
+      if (!Number.isFinite(normalizedTaskId)) {
+        return res.status(400).json({ success: false, error: "taskId required" });
+      }
+
+      const { buildManualLogisticsTaskKindPayload, normalizeLogisticsTaskKind } = await import(
+        "../shared/logistics-task-kind"
+      );
+      const normalizedKind = normalizeLogisticsTaskKind(kind, "manual");
+      if (!normalizedKind) {
+        return res.status(400).json({ success: false, error: "Invalid logistics task kind" });
+      }
+
+      const kindPayload = buildManualLogisticsTaskKindPayload(normalizedKind);
+      const currentUsername = modifiedByBody || getCurrentUsername(req);
+
+      const timeline = await workspaceFiles.loadLogisticsTimeline(workDate);
+      let previousKind: string | null = null;
+      let foundInTimeline = false;
+
+      if (timeline?.drivers_assignments?.length) {
+        for (const entry of timeline.drivers_assignments) {
+          for (const task of entry.tasks || []) {
+            if (Number(task?.task_id) !== normalizedTaskId) continue;
+            previousKind = task.logistics_task_kind != null ? String(task.logistics_task_kind) : null;
+            Object.assign(task, kindPayload);
+            foundInTimeline = true;
+            break;
+          }
+          if (foundInTimeline) break;
+        }
+      }
+
+      if (foundInTimeline) {
+        const saved = await workspaceFiles.saveLogisticsTimeline(
+          workDate,
+          timeline,
+          false,
+          currentUsername,
+          "manual",
+          {
+            editedField: "logistics_task_kind",
+            oldValue: previousKind ?? "",
+            newValue: normalizedKind,
+          }
+        );
+
+        if (!saved) {
+          return res.status(500).json({ success: false, error: "Failed to save logistics timeline" });
+        }
+
+        return res.json({
+          success: true,
+          taskId: normalizedTaskId,
+          location: "timeline",
+          ...kindPayload,
+        });
+      }
+
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const containerUpdate = await pgDailyAssignmentsService.updateLogisticsContainerTaskKind(
+        workDate,
+        normalizedTaskId,
+        kindPayload.logistics_task_kind,
+        kindPayload.logistics_task_kind_source,
+        currentUsername
+      );
+
+      if (!containerUpdate.success) {
+        return res.status(404).json({
+          success: false,
+          error: "Task not found in logistics timeline or containers",
+        });
+      }
+
+      res.json({
+        success: true,
+        taskId: normalizedTaskId,
+        location: "container",
+        ...kindPayload,
+      });
+    } catch (error: any) {
+      console.error("POST /api/update-logistics-task-kind:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -2687,6 +2874,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           SELECT
             lt.driver_id,
             lt.sequence,
+            lt.start_time::text AS start_time,
+            lt.end_time::text AS end_time,
+            lt.travel_time,
             lt.id,
             lt.task_id,
             lt.logistic_code,
@@ -2947,6 +3137,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         driverId,
         driverBadge: `${driverLabel} - ${vehicleName}`,
         sequence: row.sequence ?? null,
+        startTime: row.start_time ?? null,
+        endTime: row.end_time ?? null,
+        travelTime: row.travel_time ?? null,
         housekeepingNotes,
         structureBeds,
         structureAlertKeys,
@@ -3044,16 +3237,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const existing = await pgDailyAssignmentsService.loadLgDriversForDate(workDate);
       const existingStartTimes = new Map<number, string>();
+      const existingEndTimes = new Map<number, string>();
       if (existing && existing.length > 0) {
         for (const d of existing) {
           if (d.id && d.start_time) {
             existingStartTimes.set(d.id, d.start_time);
+          }
+          if (d.id && d.end_time) {
+            existingEndTimes.set(d.id, d.end_time);
           }
         }
       }
       const merged = drivers.map((d: any) => ({
         ...d,
         start_time: existingStartTimes.get(d.id) ?? d.start_time ?? "10:00",
+        end_time: existingEndTimes.get(d.id) ?? d.end_time ?? "20:00",
       }));
       const ok = await pgDailyAssignmentsService.saveLgDriversForDate(
         workDate,
@@ -3087,6 +3285,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } = await import("./services/adam-logistics-vehicle-service");
       const fullRows = await pgDailyAssignmentsService.loadLgDriversByIds(driverIds, workDate);
       const rowById = new Map<number, any>(fullRows.map((r: any) => [Number(r.id), r]));
+      const existingVehicleAssignments =
+        await pgDailyAssignmentsService.loadSelectedLogisticsDriverVehicleAssignments(workDate);
       const baseEnriched = selectedDrivers.map((d: any) => {
         const id = typeof d === "number" ? d : d.id;
         const row = rowById.get(id);
@@ -3094,10 +3294,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           typeof d === "object" && d && d.start_time != null
             ? d.start_time
             : row?.start_time || "10:00";
-        const rawVid =
-          typeof d === "object" && d && d.assigned_vehicle_id != null && d.assigned_vehicle_id !== ""
-            ? Number(d.assigned_vehicle_id)
-            : null;
+        const et =
+          typeof d === "object" && d && d.end_time != null
+            ? d.end_time
+            : row?.end_time || "20:00";
+
+        const hasVehicleField =
+          typeof d === "object" && d && Object.prototype.hasOwnProperty.call(d, "assigned_vehicle_id");
+        const existingAssignment = existingVehicleAssignments?.[String(id)];
+        let rawVid: number | null = null;
+        let vehicleName: string | null = null;
+        let vehiclePmsCode: string | null = null;
+        if (hasVehicleField) {
+          if (d.assigned_vehicle_id != null && d.assigned_vehicle_id !== "") {
+            rawVid = Number(d.assigned_vehicle_id);
+            vehicleName = d.assigned_vehicle_name ?? null;
+            vehiclePmsCode = d.assigned_vehicle_pms_code ?? null;
+          }
+        } else if (existingAssignment?.vehicle_id != null && existingAssignment?.vehicle_id !== "") {
+          rawVid = Number(existingAssignment.vehicle_id);
+          vehicleName = existingAssignment.vehicle_name ?? null;
+          vehiclePmsCode = existingAssignment.vehicle_pms_code ?? null;
+        }
+
         const structureId = normalizeVehicleStructureId(rawVid);
         if (row) {
           return {
@@ -3107,11 +3326,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             role: row.role || "Driver",
             premium: row.role === "Premium",
             start_time: st,
+            end_time: et,
             assigned_vehicle_id: structureId,
-            assigned_vehicle_name:
-              typeof d === "object" && d ? d.assigned_vehicle_name ?? null : null,
-            assigned_vehicle_pms_code:
-              typeof d === "object" && d ? d.assigned_vehicle_pms_code ?? null : null,
+            assigned_vehicle_name: vehicleName,
+            assigned_vehicle_pms_code: vehiclePmsCode,
           };
         }
         return typeof d === "number"
@@ -3122,9 +3340,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               role: "Driver",
               premium: false,
               start_time: st,
+              end_time: et,
               assigned_vehicle_id: structureId,
-              assigned_vehicle_name: null,
-              assigned_vehicle_pms_code: null,
+              assigned_vehicle_name: vehicleName,
+              assigned_vehicle_pms_code: vehiclePmsCode,
             }
           : {
               id: d.id,
@@ -3133,9 +3352,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               role: d.role || "Driver",
               premium: Boolean(d.premium),
               start_time: st,
+              end_time: et,
               assigned_vehicle_id: structureId,
-              assigned_vehicle_name: d.assigned_vehicle_name ?? null,
-              assigned_vehicle_pms_code: d.assigned_vehicle_pms_code ?? null,
+              assigned_vehicle_name: vehicleName,
+              assigned_vehicle_pms_code: vehiclePmsCode,
             };
       });
 
@@ -3483,6 +3703,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const workDate = date;
       const currentUsername = modified_by || getCurrentUsername(req);
+      if (!isValidHHmm(startTime)) {
+        return res.status(400).json({ success: false, message: "startTime deve essere nel formato HH:mm" });
+      }
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
 
       const selectedResult = await workspaceFiles.loadSelectedLogisticsDrivers(workDate);
@@ -3496,6 +3719,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         ids = [...ids, Number(driverId)];
+      }
+      const driverRowsForValidation = await pgDailyAssignmentsService.loadLgDriversByIds([Number(driverId)], workDate);
+      const currentEndTime = driverRowsForValidation[0]?.end_time || "20:00";
+      if (isValidHHmm(currentEndTime) && toMinutesHHmm(startTime) >= toMinutesHHmm(currentEndTime)) {
+        return res.status(400).json({
+          success: false,
+          message: "startTime deve essere precedente a endTime",
+        });
       }
 
       await pgDailyAssignmentsService.updateLgDriverField(Number(driverId), workDate, "start_time", startTime);
@@ -3537,9 +3768,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/update-logistics-driver-end-time", async (req, res) => {
+    try {
+      const { driverId, endTime, date, modified_by } = req.body;
+      if (driverId == null || !endTime || !date) {
+        return res.status(400).json({
+          success: false,
+          message: "driverId, endTime e date sono richiesti",
+        });
+      }
+      const workDate = date;
+      const currentUsername = modified_by || getCurrentUsername(req);
+      if (!isValidHHmm(endTime)) {
+        return res.status(400).json({ success: false, message: "endTime deve essere nel formato HH:mm" });
+      }
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+
+      const selectedResult = await workspaceFiles.loadSelectedLogisticsDrivers(workDate);
+      let ids: number[] = selectedResult?.drivers?.map((d: any) => d.id) ?? [];
+      if (!ids.includes(Number(driverId))) {
+        const rows = await pgDailyAssignmentsService.loadLgDriversByIds([Number(driverId)], workDate);
+        if (!rows.length) {
+          return res.status(404).json({
+            success: false,
+            message: "Driver non trovato in lg_drivers per questa data",
+          });
+        }
+        ids = [...ids, Number(driverId)];
+      }
+      const driverRowsForValidation = await pgDailyAssignmentsService.loadLgDriversByIds([Number(driverId)], workDate);
+      const currentStartTime = driverRowsForValidation[0]?.start_time || "10:00";
+      if (isValidHHmm(currentStartTime) && toMinutesHHmm(endTime) <= toMinutesHHmm(currentStartTime)) {
+        return res.status(400).json({
+          success: false,
+          message: "endTime deve essere successivo a startTime",
+        });
+      }
+
+      await pgDailyAssignmentsService.updateLgDriverField(Number(driverId), workDate, "end_time", endTime);
+
+      await workspaceFiles.saveSelectedLogisticsDrivers(
+        workDate,
+        {
+          drivers: ids.map((id) => ({ id })),
+          total_selected: ids.length,
+          metadata: { date: workDate },
+        },
+        true,
+        currentUsername,
+        "END_TIME"
+      );
+
+      try {
+        const timelineData = await workspaceFiles.loadLogisticsTimeline(workDate);
+        if (timelineData?.drivers_assignments) {
+          const row = timelineData.drivers_assignments.find(
+            (da: any) => da.driver?.id === Number(driverId)
+          );
+          if (row?.driver) {
+            row.driver.end_time = endTime;
+            timelineData.metadata = timelineData.metadata || {};
+            timelineData.metadata.last_updated = getRomeTimestamp();
+            timelineData.metadata.date = workDate;
+            await workspaceFiles.saveLogisticsTimeline(workDate, timelineData, true);
+          }
+        }
+      } catch {
+        /* timeline assente */
+      }
+
+      res.json({ success: true, message: "End time aggiornato" });
+    } catch (error: any) {
+      console.error("POST /api/update-logistics-driver-end-time:", error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
   app.post("/api/add-driver-to-timeline", async (req, res) => {
     try {
-      const { driverId, date, modified_by, created_by } = req.body;
+      const {
+        driverId,
+        date,
+        modified_by,
+        created_by,
+        assigned_vehicle_id,
+        assigned_vehicle_name,
+        assigned_vehicle_pms_code,
+      } = req.body;
       if (driverId == null) {
         return res.status(400).json({ success: false, error: "driverId richiesto" });
       }
@@ -3557,6 +3872,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingFromSelected = selectedDriversData?.drivers?.find((d: any) => d.id === Number(driverId));
       if (existingFromSelected?.start_time) {
         driverData.start_time = existingFromSelected.start_time;
+      }
+      if (existingFromSelected?.end_time) {
+        driverData.end_time = existingFromSelected.end_time;
       }
 
       const selectedDriverIds = new Set(
@@ -3595,6 +3913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: driverData.role || "Driver",
         premium: driverData.role === "Premium",
         start_time: driverData.start_time || "10:00",
+        end_time: driverData.end_time || "20:00",
       };
 
       if (driverToReplace) {
@@ -3649,11 +3968,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ids.push(did);
       }
 
+      const existingById = new Map(
+        (selectedDriversData?.drivers || []).map((d: any) => [Number(d.id), d])
+      );
+      const vehicleAssignmentsFromPg =
+        await pgDailyAssignmentsService.loadSelectedLogisticsDriverVehicleAssignments(workDate);
+      const newVehicleId =
+        assigned_vehicle_id != null && assigned_vehicle_id !== ""
+          ? Number(assigned_vehicle_id)
+          : null;
+
+      const vehicleFieldsForDriver = (numId: number, existing: any) => {
+        if (numId === did && newVehicleId != null && Number.isFinite(newVehicleId)) {
+          return {
+            assigned_vehicle_id: newVehicleId,
+            assigned_vehicle_name: assigned_vehicle_name ?? null,
+            assigned_vehicle_pms_code: assigned_vehicle_pms_code ?? null,
+          };
+        }
+        if (existing?.assigned_vehicle_id != null && existing.assigned_vehicle_id !== "") {
+          return {
+            assigned_vehicle_id: existing.assigned_vehicle_id,
+            assigned_vehicle_name: existing.assigned_vehicle_name ?? null,
+            assigned_vehicle_pms_code: existing.assigned_vehicle_pms_code ?? null,
+            assigned_vehicle_task_id: existing.assigned_vehicle_task_id ?? null,
+          };
+        }
+        const fromPg = vehicleAssignmentsFromPg?.[String(numId)];
+        if (fromPg?.vehicle_id != null && fromPg?.vehicle_id !== "") {
+          return {
+            assigned_vehicle_id: fromPg.vehicle_id,
+            assigned_vehicle_name: fromPg.vehicle_name ?? null,
+            assigned_vehicle_pms_code: fromPg.vehicle_pms_code ?? null,
+            assigned_vehicle_task_id: fromPg.vehicle_task_id ?? null,
+          };
+        }
+        return {
+          assigned_vehicle_id: null,
+          assigned_vehicle_name: null,
+          assigned_vehicle_pms_code: null,
+          assigned_vehicle_task_id: null,
+        };
+      };
+
+      const driversToSave = ids.map((id) => {
+        const numId = Number(id);
+        const existing = existingById.get(numId);
+        const base = existing ? { ...existing, id: numId } : { id: numId };
+        if (numId === did) {
+          return {
+            ...base,
+            start_time: driverData.start_time || base.start_time || "10:00",
+            end_time: driverData.end_time || base.end_time || "20:00",
+            ...vehicleFieldsForDriver(numId, existing),
+          };
+        }
+        return {
+          ...base,
+          ...vehicleFieldsForDriver(numId, existing),
+        };
+      });
+
       await workspaceFiles.saveSelectedLogisticsDrivers(
         workDate,
         {
-          drivers: ids.map((id) => ({ id })),
-          total_selected: ids.length,
+          drivers: driversToSave,
+          total_selected: driversToSave.length,
           metadata: { date: workDate },
         },
         false,
@@ -3840,28 +4220,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       
-      // CRITICAL: Carica gli start_time esistenti da PostgreSQL PRIMA di sovrascrivere
-      // Questo preserva gli start_time custom impostati dall'utente
+      // CRITICAL: Carica gli orari turno esistenti da PostgreSQL PRIMA di sovrascrivere
       const existingCleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate, resolvedScope);
       const existingStartTimes = new Map<number, string>();
+      const existingEndTimes = new Map<number, string>();
       if (existingCleaners && existingCleaners.length > 0) {
         for (const c of existingCleaners) {
           if (c.id && c.start_time) {
             existingStartTimes.set(c.id, c.start_time);
           }
+          if (c.id && c.end_time) {
+            existingEndTimes.set(c.id, c.end_time);
+          }
         }
         console.log(`✅ Preservati ${existingStartTimes.size} start_time custom da PostgreSQL`);
       }
       
-      // Merge: usa lo start_time esistente se presente e non nullo, altrimenti usa quello passato
+      // Merge: usa gli orari esistenti se presenti, altrimenti fallback default
       const mergedCleaners = cleaners.map((c: any) => {
         const existingStartTime = existingStartTimes.get(c.id);
-        // Preserva lo start_time esistente solo se è custom (diverso da '10:00' o tw_start da ADAM)
-        // Se il cleaner passato ha start_time e anche PostgreSQL ha uno start_time diverso dal default,
-        // usa quello di PostgreSQL (è quello impostato dall'utente)
+        const existingEndTime = existingEndTimes.get(c.id);
         return {
           ...c,
-          start_time: existingStartTime ?? c.start_time ?? '10:00'
+          start_time: existingStartTime ?? c.start_time ?? '10:00',
+          end_time: existingEndTime ?? c.end_time ?? '20:00',
         };
       });
       
@@ -4243,7 +4625,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       cleanerEntry.tasks.splice(targetIndex, 0, taskForTimeline);
 
-      // CRITICAL: Carica start_time aggiornato da PostgreSQL PRIMA di ricalcolare
+      // CRITICAL: Carica orari turno aggiornati da PostgreSQL PRIMA di ricalcolare
       try {
         const selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate, resolvedScope);
         const selectedCleaner = selectedCleanersData?.cleaners?.find((c: any) => c.id === normalizedCleanerId);
@@ -4255,9 +4637,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.warn(`⚠️ No start_time found for cleaner ${normalizedCleanerId}, using default 10:00`);
           cleanerEntry.cleaner.start_time = "10:00";
         }
+        if (selectedCleaner?.end_time) {
+          cleanerEntry.cleaner.end_time = selectedCleaner.end_time;
+          console.log(`✅ Loaded end_time ${selectedCleaner.end_time} from PostgreSQL for cleaner ${normalizedCleanerId}`);
+        } else {
+          cleanerEntry.cleaner.end_time = "20:00";
+        }
       } catch (err) {
         console.warn(`⚠️ Could not load start_time from PostgreSQL for cleaner ${normalizedCleanerId}, using default`);
         cleanerEntry.cleaner.start_time = "10:00";
+        cleanerEntry.cleaner.end_time = "20:00";
       }
 
       // Ricalcola travel_time, start_time, end_time usando lo script Python
@@ -4924,19 +5313,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Arricchisci i cleaners con i dati completi da PostgreSQL
-      // Preserva solo lo start_time se è stato modificato dall'utente
+      // Preserva gli orari turno custom se sono stati modificati dall'utente
       const enrichedCleaners = selectedCleaners.map((c: any) => {
         const cleanerId = typeof c === 'number' ? c : c.id;
         const fullCleaner = cleanersMap.get(cleanerId);
         if (fullCleaner) {
-          // Usa l'oggetto completo, ma preserva start_time custom se presente
+          // Usa l'oggetto completo, ma preserva start_time/end_time custom se presenti
           return {
             ...fullCleaner,
-            start_time: c.start_time || fullCleaner.start_time
+            start_time: c.start_time || fullCleaner.start_time || "10:00",
+            end_time: c.end_time || fullCleaner.end_time || "20:00",
           };
         }
         // Fallback: usa i dati passati se non trovato in PostgreSQL
-        return typeof c === 'number' ? { id: c, name: 'Unknown', start_time: '10:00' } : c;
+        return typeof c === 'number'
+          ? { id: c, name: 'Unknown', start_time: '10:00', end_time: '20:00' }
+          : { ...c, end_time: c.end_time || "20:00" };
       });
 
       const dataToSave = {
@@ -5024,6 +5416,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         console.log(`ℹ️ Nessun start_time pre-esistente, usando default ${cleanerData.start_time || '10:00'}`);
       }
+      if (existingCleaner?.end_time) {
+        cleanerData.end_time = existingCleaner.end_time;
+      } else if (!cleanerData.end_time) {
+        cleanerData.end_time = "20:00";
+      }
 
       const selectedCleanerIds = new Set(selectedCleanersData.cleaners.map((c: any) => c.id));
 
@@ -5067,7 +5464,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: cleanerData.name,
           lastname: cleanerData.lastname,
           role: cleanerData.role,
-          premium: cleanerData.role === "Premium"
+          premium: cleanerData.role === "Premium",
+          start_time: cleanerData.start_time || "10:00",
+          end_time: cleanerData.end_time || "20:00",
         };
 
         // Ricalcola i tempi per le task con il nuovo cleaner
@@ -5095,7 +5494,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             name: cleanerData.name,
             lastname: cleanerData.lastname,
             role: cleanerData.role,
-            premium: cleanerData.role === "Premium"
+            premium: cleanerData.role === "Premium",
+            start_time: cleanerData.start_time || "10:00",
+            end_time: cleanerData.end_time || "20:00",
           },
           tasks: []
         };
@@ -5259,6 +5660,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cleaner_role: cleaner.role,
         cleaner_contract_type: cleaner.contract_type,
         cleaner_start_time: cleaner.start_time,
+        cleaner_end_time: cleaner.end_time,
 
         // Campi specifici dell'assegnazione
         total_tasks: tasks.length,
@@ -5453,6 +5855,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Trova e aggiorna il cleaner se esiste
       const cleanerIndex = selectedCleanersData.cleaners.findIndex((c: any) => Number(c.id) === cleanerIdNum);
+      const currentEndTime =
+        cleanerIndex !== -1
+          ? selectedCleanersData.cleaners[cleanerIndex].end_time || "20:00"
+          : "20:00";
+      if (isValidHHmm(currentEndTime) && toMinutesHHmm(startTime) >= toMinutesHHmm(currentEndTime)) {
+        return res.status(400).json({
+          success: false,
+          message: "startTime deve essere precedente a endTime",
+        });
+      }
       if (cleanerIndex !== -1) {
         selectedCleanersData.cleaners[cleanerIndex].start_time = startTime;
       } else {
@@ -5521,6 +5933,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         message: error.message || "Errore nel salvataggio dello start time"
+      });
+    }
+  });
+
+  app.post("/api/update-cleaner-end-time", async (req, res) => {
+    try {
+      const { cleanerId, endTime, date, modified_by } = req.body;
+      const cleanerIdNum = Number(cleanerId);
+
+      if (!Number.isFinite(cleanerIdNum) || !endTime || !date) {
+        return res.status(400).json({
+          success: false,
+          message: "cleanerId, endTime e date sono richiesti"
+        });
+      }
+
+      const workDate = date;
+      const currentUsername = modified_by || getCurrentUsername(req);
+
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const selectedCleanersResult = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
+      let selectedCleanersData = selectedCleanersResult || {
+        cleaners: [],
+        total_selected: 0,
+        metadata: { date: workDate }
+      };
+
+      const cleanerIndex = selectedCleanersData.cleaners.findIndex((c: any) => Number(c.id) === cleanerIdNum);
+      const currentStartTime =
+        cleanerIndex !== -1
+          ? selectedCleanersData.cleaners[cleanerIndex].start_time || "10:00"
+          : "10:00";
+      if (isValidHHmm(currentStartTime) && toMinutesHHmm(endTime) <= toMinutesHHmm(currentStartTime)) {
+        return res.status(400).json({
+          success: false,
+          message: "endTime deve essere successivo a startTime",
+        });
+      }
+      if (cleanerIndex !== -1) {
+        selectedCleanersData.cleaners[cleanerIndex].end_time = endTime;
+      } else {
+        const cleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate, resolveScopeFromReq(req));
+        let cleanerData = cleaners?.find((c: any) => Number(c.id) === cleanerIdNum);
+
+        if (!cleanerData) {
+          return res.status(404).json({
+            success: false,
+            message: "Cleaner non trovato in PostgreSQL"
+          });
+        }
+
+        cleanerData.end_time = endTime;
+        selectedCleanersData.cleaners.push(cleanerData);
+        selectedCleanersData.total_selected = selectedCleanersData.cleaners.length;
+        console.log(`✅ Cleaner ${cleanerId} aggiunto a selected_cleaners con end_time ${endTime}`);
+      }
+
+      await pgDailyAssignmentsService.updateCleanerField(cleanerIdNum, workDate, 'end_time', endTime);
+      await workspaceFiles.saveSelectedCleaners(workDate, selectedCleanersData, true, 'system', 'INIT', resolveScopeFromReq(req));
+
+      try {
+        const timelineData = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
+        if (timelineData) {
+          const cleanerAssignment = timelineData.cleaners_assignments?.find((ca: any) => Number(ca.cleaner?.id) === cleanerIdNum);
+          if (cleanerAssignment && cleanerAssignment.cleaner) {
+            cleanerAssignment.cleaner.end_time = endTime;
+
+            timelineData.metadata = timelineData.metadata || {};
+            timelineData.metadata.last_updated = getRomeTimestamp();
+            timelineData.metadata.date = workDate;
+            if (!timelineData.metadata.created_by) {
+              timelineData.metadata.created_by = currentUsername;
+            }
+            timelineData.metadata.modified_by = timelineData.metadata.modified_by || [];
+            if (currentUsername && currentUsername !== 'system' && currentUsername !== 'unknown' && !timelineData.metadata.modified_by.includes(currentUsername)) {
+              timelineData.metadata.modified_by.push(currentUsername);
+            }
+
+            await workspaceFiles.saveTimeline(workDate, timelineData, true, 'system', 'manual', undefined, resolveScopeFromReq(req));
+          }
+        }
+      } catch (error) {
+        console.log('Timeline non trovata o non aggiornata');
+      }
+
+      console.log(`✅ End time aggiornato per cleaner ${cleanerId}: ${endTime}`);
+      res.json({
+        success: true,
+        message: "End time aggiornato con successo"
+      });
+    } catch (error: any) {
+      console.error('Errore aggiornamento end time:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Errore nel salvataggio dell'end time"
       });
     }
   });
@@ -5958,11 +6465,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (tasksResult.rows.length === 0) continue;
 
           const cleanerStartTime = await getCleanerStartTime(cId, workDate) || '10:00';
+          const cleanerEndTime = await getCleanerEndTime(cId, workDate) || '20:00';
 
           const cleanerData = {
             cleaner: {
               id: cId,
-              start_time: cleanerStartTime
+              start_time: cleanerStartTime,
+              end_time: cleanerEndTime
             },
             tasks: tasksResult.rows.map((r: any) => ({
               task_id: r.task_id,
@@ -6204,11 +6713,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (tasksResult.rows.length === 0) continue;
 
           const cleanerStartTime = await getCleanerStartTime(Number(cId), workDate) || '10:00';
+          const cleanerEndTime = await getCleanerEndTime(Number(cId), workDate) || '20:00';
           
           const cleanerData = {
             cleaner: {
               id: Number(cId),
-              start_time: cleanerStartTime
+              start_time: cleanerStartTime,
+              end_time: cleanerEndTime
             },
             tasks: tasksResult.rows.map((r: any) => ({
               task_id: r.task_id,
@@ -6400,9 +6911,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (tasksResult.rows.length === 0) continue;
 
           const cleanerStartTime = await getCleanerStartTime(cId, workDate) || '10:00';
+          const cleanerEndTime = await getCleanerEndTime(cId, workDate) || '20:00';
           
           const cleanerData = {
-            cleaner: { id: cId, start_time: cleanerStartTime },
+            cleaner: { id: cId, start_time: cleanerStartTime, end_time: cleanerEndTime },
             tasks: tasksResult.rows.map((r: any) => ({
               task_id: r.task_id,
               logistic_code: r.logistic_code,
@@ -6579,9 +7091,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           const cleanerStartTime = await getCleanerStartTime(cleanerId, workDate) || '10:00';
+          const cleanerEndTime = await getCleanerEndTime(cleanerId, workDate) || '20:00';
           
           const cleanerData = {
-            cleaner: { id: cleanerId, start_time: cleanerStartTime },
+            cleaner: { id: cleanerId, start_time: cleanerStartTime, end_time: cleanerEndTime },
             tasks: tasksResult.rows.map((r: any) => ({
               task_id: r.task_id,
               logistic_code: r.logistic_code,
@@ -6798,29 +7311,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const d = String(parsed.getDate()).padStart(2, '0');
         return `${y}-${m}-${d}`;
       };
-      const parseMinutesFromHm = (value: unknown): number | null => {
-        const raw = String(value ?? '').trim();
-        if (!raw) return null;
-        const match = raw.match(/^(\d{1,2}):(\d{2})/);
-        if (!match) return null;
-        const h = Number(match[1]);
-        const m = Number(match[2]);
-        if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
-        if (h < 0 || h > 23 || m < 0 || m > 59) return null;
-        return h * 60 + m;
-      };
-      const isTimeWithinWindow = (minutes: number, start: number, end: number): boolean => {
-        if (start <= end) return minutes >= start && minutes <= end;
-        return minutes >= start || minutes <= end;
-      };
-      const toIntSet = (values: unknown): Set<number> => {
-        if (!Array.isArray(values)) return new Set<number>();
-        return new Set(
-          values
-            .map((v) => Number(v))
-            .filter((n) => Number.isFinite(n))
-        );
-      };
       const ensureContainersShape = (payload: any, effectiveDate: string) => {
         const data = payload || {};
         data.metadata = data.metadata || {};
@@ -6853,47 +7343,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       const classifyContainerPriority = (
         task: any,
-        appSettings: any
+        prioritySettings: ReturnType<typeof parsePrioritySettings>
       ): 'early_out' | 'high_priority' | 'low_priority' => {
-        const earlyOutConfig = appSettings?.['early-out'] || {};
-        const highPriorityConfig = appSettings?.['high-priority'] || {};
-
-        const eoStart = parseMinutesFromHm(earlyOutConfig?.eo_start_time) ?? (10 * 60);
-        const eoEnd = parseMinutesFromHm(earlyOutConfig?.eo_end_time) ?? (10 * 60 + 59);
-        const hpStart = parseMinutesFromHm(highPriorityConfig?.hp_start_time) ?? (11 * 60);
-        const hpEnd =
-          parseMinutesFromHm(highPriorityConfig?.hp_end_time) ??
-          parseMinutesFromHm(highPriorityConfig?.hp_time) ??
-          (15 * 60 + 30);
-
-        const clientIdNum = Number(task?.client_id);
-        const isPremium = Boolean(task?.premium);
-        const eoClients = toIntSet(earlyOutConfig?.eo_clients);
-        const hpClients = toIntSet(highPriorityConfig?.hp_clients);
-
-        const checkoutMinutes = parseMinutesFromHm(task?.checkout_time);
-        const checkinMinutes = parseMinutesFromHm(task?.checkin_time);
-        const checkinYmd = normalizeDateYmd(task?.checkin_date);
-        const checkoutYmd = normalizeDateYmd(task?.checkout_date);
-        const sameDayTurnover =
-          Boolean(checkinYmd) &&
-          Boolean(checkoutYmd) &&
-          checkinYmd === checkoutYmd;
-
-        const eoByTime =
-          checkoutMinutes != null &&
-          (isTimeWithinWindow(checkoutMinutes, eoStart, eoEnd) || checkoutMinutes < eoStart);
-        const eoByClient = Number.isFinite(clientIdNum) && eoClients.has(clientIdNum);
-        if (eoByTime || eoByClient) return 'early_out';
-
-        const hpByTime =
-          sameDayTurnover &&
-          checkinMinutes != null &&
-          isTimeWithinWindow(checkinMinutes, hpStart, hpEnd);
-        const hpByClient = Number.isFinite(clientIdNum) && hpClients.has(clientIdNum);
-        if (hpByTime || isPremium || hpByClient) return 'high_priority';
-
-        return 'low_priority';
+        return priorityToContainerFormat(classifyTaskPriority(task, prioritySettings));
       };
       let previousAdamCustomerNote: string | null = null;
       const appendCustomerNoteHistory = (
@@ -6971,6 +7423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const containersData = ensureContainersShape(containersDataRaw, workDate);
       const { pgSettingsService } = await import("./services/pg-settings-service");
       const appSettings = await pgSettingsService.getSettings('app_settings').catch(() => ({}));
+      const prioritySettings = parsePrioritySettings(appSettings);
 
       let taskUpdated = false;
       let customerNoteChanged = false;
@@ -7087,7 +7540,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (updatedContainerTask && updatedContainerSourceType) {
-        const destinationPriority = classifyContainerPriority(updatedContainerTask, appSettings || {});
+        const destinationPriority = classifyContainerPriority(updatedContainerTask, prioritySettings);
         const destinationDate = normalizeDateYmd(updatedContainerTask.checkout_date) || workDate;
         const sourceBuckets = ['early_out', 'high_priority', 'low_priority'] as const;
 
@@ -8912,6 +9365,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
   app.post("/api/save-settings", async (req, res) => {
     try {
       const settingsData = req.body;
+      parsePrioritySettings(settingsData);
+
       const { pgSettingsService } = await import("./services/pg-settings-service");
       await pgSettingsService.ensureTables();
       
@@ -8923,6 +9378,9 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       });
     } catch (error: any) {
       console.error("Errore nel salvataggio delle impostazioni:", error);
+      if (error instanceof PrioritySettingsError) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -9866,6 +10324,335 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     } catch (error: any) {
       console.error("Errore nel conteggio task non confermate:", error);
       res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  async function buildMissingLogisticsKindPrecheck(workDate: string): Promise<{
+    date: string;
+    count: number;
+    taskCodes: string[];
+  }> {
+    const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+    const [containersData, timelineData, locksMap] = await Promise.all([
+      workspaceFiles.loadLogisticsContainers(workDate),
+      workspaceFiles.loadLogisticsTimeline(workDate),
+      pgDailyAssignmentsService.getLocksMap(workDate),
+    ]);
+
+    const containerTasks = [
+      ...(containersData?.containers?.early_out?.tasks || []),
+      ...(containersData?.containers?.high_priority?.tasks || []),
+      ...(containersData?.containers?.low_priority?.tasks || []),
+    ];
+    const timelineTasks = Array.isArray(timelineData?.drivers_assignments)
+      ? timelineData.drivers_assignments.flatMap((entry: any) =>
+          Array.isArray(entry?.tasks) ? entry.tasks : []
+        )
+      : [];
+
+    const taskById = new Map<string, any>();
+    for (const task of [...containerTasks, ...timelineTasks]) {
+      const taskId = String(task?.task_id ?? task?.id ?? "").trim();
+      const logisticCode = String(task?.logistic_code ?? task?.name ?? "").trim();
+      const key = taskId || logisticCode;
+      if (!key) continue;
+      taskById.set(key, task);
+    }
+
+    const isLockedTask = (task: any): boolean => {
+      if (task?.locked === true) return true;
+      const taskId = Number(task?.task_id ?? task?.id);
+      if (!Number.isFinite(taskId)) return false;
+      return locksMap.get(taskId)?.locked === true;
+    };
+
+    const list = Array.from(taskById.values()).filter((task: any) => {
+      if (isLockedTask(task)) return false;
+      const kind = String(task?.logistics_task_kind ?? task?.logisticsTaskKind ?? "").trim();
+      return !kind;
+    });
+    const taskCodes = Array.from(
+      new Set(
+        list
+          .map((row: any) => row?.logistic_code)
+          .filter((value: any) => value !== null && value !== undefined && String(value).trim() !== "")
+          .map((value: any) => String(value).trim())
+      )
+    );
+
+    return {
+      date: workDate,
+      count: list.length,
+      taskCodes,
+    };
+  }
+
+  // ========== LOGISTICS OPTIMIZER (INITIAL CONSTRAINTS) ==========
+  app.get("/api/logistics-optimizer/precheck", async (req, res) => {
+    try {
+      const workDate = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const precheck = await buildMissingLogisticsKindPrecheck(workDate);
+      return res.json({
+        success: true,
+        ...precheck,
+      });
+    } catch (error: any) {
+      console.error("❌ Errore logistics-optimizer precheck:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  app.get("/api/logistics-optimizer-final/precheck", async (req, res) => {
+    try {
+      const workDate = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const precheck = await buildMissingLogisticsKindPrecheck(workDate);
+      return res.json({
+        success: true,
+        ...precheck,
+      });
+    } catch (error: any) {
+      console.error("❌ Errore logistics-optimizer-final precheck:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  app.post("/api/logistics-optimizer/run", async (req, res) => {
+    return res.status(410).json({
+      success: false,
+      error: "LEGACY_LOGISTICS_OPTIMIZER_DISABLED",
+      message: "Legacy logistics optimizer disabled. Use /api/logistics-optimizer-final/run.",
+    });
+  });
+
+  // ========== LOGISTICS OPTIMIZER FINAL (pre-solver routing input debug) ==========
+  app.post("/api/logistics-optimizer-final/routing-input-debug", async (req, res) => {
+    try {
+      const { date, debug: debugBody } = req.body || {};
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const hasDebugBody = Object.prototype.hasOwnProperty.call(req.body || {}, "debug");
+      const debugExplicit = hasDebugBody
+        ? debugBody === true ||
+          debugBody === 1 ||
+          String(debugBody ?? "").toLowerCase() === "true"
+        : undefined;
+
+      const { runLogisticsRoutingInputDebug } = await import(
+        "./services/logistics-optimizer-final/run-routing-input-debug"
+      );
+      const { isLogisticsOptimizerFinalDebugEnabled } = await import(
+        "./services/logistics-optimizer-final/debug-writer"
+      );
+      const debugEnabled = isLogisticsOptimizerFinalDebugEnabled(debugExplicit);
+      console.log(
+        `🚀 POST /api/logistics-optimizer-final/routing-input-debug - ${workDate}` +
+          (debugEnabled ? " (debug JSON attivo)" : "")
+      );
+
+      const result = await runLogisticsRoutingInputDebug(workDate, {
+        debug: debugExplicit,
+        performedBy: getCurrentUsername(req),
+      });
+
+      return res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error: any) {
+      console.error("❌ Errore logistics-optimizer-final routing-input-debug:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  app.post("/api/logistics-optimizer-final/run-dry", async (req, res) => {
+    try {
+      const { date, debug: debugBody, solver: solverBody } = req.body || {};
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const solver =
+        solverBody === "ortools-v1" || solverBody === "greedy-v1" ? solverBody : undefined;
+      if (solverBody !== undefined && solver === undefined) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid solver. Use "greedy-v1" or "ortools-v1".',
+        });
+      }
+      const hasDebugBody = Object.prototype.hasOwnProperty.call(req.body || {}, "debug");
+      const debugExplicit = hasDebugBody
+        ? debugBody === true ||
+          debugBody === 1 ||
+          String(debugBody ?? "").toLowerCase() === "true"
+        : undefined;
+
+      const { runLogisticsRoutingDry, RoutingInputValidationError } = await import(
+        "./services/logistics-optimizer-final/run-routing-dry"
+      );
+      const { isLogisticsOptimizerFinalDebugEnabled } = await import(
+        "./services/logistics-optimizer-final/debug-writer"
+      );
+      const debugEnabled = isLogisticsOptimizerFinalDebugEnabled(debugExplicit);
+      console.log(
+        `🚀 POST /api/logistics-optimizer-final/run-dry - ${workDate}` +
+          (debugEnabled ? " (debug JSON attivo)" : "")
+      );
+
+      const result = await runLogisticsRoutingDry(workDate, {
+        debug: debugExplicit,
+        solver,
+        performedBy: getCurrentUsername(req),
+      });
+
+      return res.json({
+        success: true,
+        ok: result.solutionValidation.valid,
+        ...result,
+      });
+    } catch (error: any) {
+      if (error?.name === "RoutingInputValidationError") {
+        return res.status(400).json({
+          success: false,
+          error: error.message,
+          inputValidation: error.inputValidation,
+        });
+      }
+
+      if (error?.name === "OrToolsUnavailableError" || error?.code === "ORTOOLS_UNAVAILABLE") {
+        return res.status(503).json({
+          success: false,
+          error: "ORTOOLS_UNAVAILABLE",
+          message: error.message,
+          reason: error.reason,
+        });
+      }
+
+      console.error("❌ Errore logistics-optimizer-final run-dry:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  app.post("/api/logistics-optimizer-final/run", async (req, res) => {
+    try {
+      const {
+        date,
+        debug: debugBody,
+        solver: solverBody,
+        apply: applyBody,
+        allowPartial: allowPartialBody,
+      } = req.body || {};
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const solver =
+        solverBody === "ortools-v1" || solverBody === "greedy-v1" ? solverBody : undefined;
+      if (solverBody !== undefined && solver === undefined) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid solver. Use "greedy-v1" or "ortools-v1".',
+        });
+      }
+      const hasDebugBody = Object.prototype.hasOwnProperty.call(req.body || {}, "debug");
+      const debugExplicit = hasDebugBody
+        ? debugBody === true ||
+          debugBody === 1 ||
+          String(debugBody ?? "").toLowerCase() === "true"
+        : undefined;
+      const apply =
+        applyBody === true || applyBody === 1 || String(applyBody ?? "").toLowerCase() === "true";
+      const allowPartial =
+        allowPartialBody === true ||
+        allowPartialBody === 1 ||
+        String(allowPartialBody ?? "").toLowerCase() === "true";
+
+      const { runLogisticsRouting } = await import(
+        "./services/logistics-optimizer-final/run-routing"
+      );
+      const { RoutingInputValidationError } = await import(
+        "./services/logistics-optimizer-final/run-routing-dry"
+      );
+
+      console.log(
+        `🚀 POST /api/logistics-optimizer-final/run - ${workDate}` +
+          (apply ? " (apply)" : "") +
+          (allowPartial ? " (allowPartial)" : "")
+      );
+
+      const result = await runLogisticsRouting(workDate, {
+        debug: debugExplicit,
+        solver,
+        apply,
+        allowPartial,
+        performedBy: getCurrentUsername(req),
+      });
+
+      return res.json({
+        success: true,
+        ok: result.solutionValidation.valid && result.applyGate.canApply,
+        validation: {
+          input: result.inputValidation,
+          solution: result.solutionValidation,
+        },
+        applyGate: result.applyGate,
+        apply: result.applyResult,
+        droppedDiagnostics: result.droppedDiagnostics,
+        solutionSummary: result.solutionSummary,
+        debugDir: result.debugDir,
+        solution: result.solution,
+      });
+    } catch (error: any) {
+      if (error?.name === "RoutingInputValidationError") {
+        return res.status(400).json({
+          success: false,
+          error: error.message,
+          inputValidation: error.inputValidation,
+        });
+      }
+
+      if (error?.name === "OrToolsUnavailableError" || error?.code === "ORTOOLS_UNAVAILABLE") {
+        return res.status(503).json({
+          success: false,
+          error: "ORTOOLS_UNAVAILABLE",
+          message: error.message,
+          reason: error.reason,
+        });
+      }
+
+      if (error?.name === "SolutionCannotBeAppliedError") {
+        return res.status(409).json({
+          success: false,
+          error: error.message,
+          applyGate: error.gate,
+        });
+      }
+
+      if (error?.name === "RoutingSolutionValidationError") {
+        return res.status(409).json({
+          success: false,
+          error: error.message,
+          solutionValidation: error.solutionValidation,
+        });
+      }
+
+      if (error?.name === "GreedySolverNotAllowedForApplyError" || error?.code === "GREEDY_SOLVER_NOT_ALLOWED_FOR_APPLY") {
+        return res.status(400).json({
+          success: false,
+          error: "GREEDY_SOLVER_NOT_ALLOWED_FOR_APPLY",
+          message: error.message,
+        });
+      }
+
+      console.error("❌ Errore logistics-optimizer-final run:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
     }
   });
 

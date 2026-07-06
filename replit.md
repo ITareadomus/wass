@@ -35,19 +35,19 @@ Preferred communication style: Simple, everyday language.
 - **Frontend/Python Interaction**: All data access for both frontend and integrated Python scripts (e.g., `assign_eo.py`, `create_containers.py`) is exclusively via API endpoints, with Python scripts requiring an `--use-api` flag.
 
 ## Task Management
-- **Priority System**: Three-tier (early-out, high, low) with visual indicators.
+- **Priority System**: Three-tier (early-out, high, low) classified from HP Start/End, premium flag, EO/HP client lists, and dedupe strategy.
 - **Task Identification**: Unique `task_id` for each task, with `logistic_code` used for deduplication logic during auto-assignment, ensuring only one task per `logistic_code` is automatically assigned.
 
 ## Assignment Optimization
 - **Fairness**: Global parameters for `NEARBY_TRAVEL_THRESHOLD`, `NEW_CLEANER_PENALTY_MIN`, and `FAIRNESS_DELTA_HOURS` are tightened to ensure more balanced work distribution and safer travel times.
-- **Time Window Constraints**: Early-Out (EO) and High Priority (HP) tasks have configurable start/end time windows, loaded dynamically from application settings, restricting when tasks can be assigned. Low Priority (LP) tasks have no time constraints.
+- **Time Window Constraints**: Priority scheduling windows are derived from HP Start/End in `app_settings`: EO before HP Start, HP inside HP Start/End, LP after HP End.
 
 ## Optimizer System (Five-Phase)
 - **PHASE 0**: Filters locked tasks from processing. Locked tasks in `daily_task_locks` are excluded from optimization.
 - **PHASE 1**: Groups nearby tasks using dual thresholds (15min→20min), creates single-task groups for isolated tasks, includes logistic_codes for deduplication.
 - **PHASE 2**: Assigns groups to compatible cleaners from daily_selected_cleaners, scores by travel/load/preference, preserves group_logistic_codes.
 - **PHASE 3**: Chronological scheduling with time windows and priority soft rules.
-  - **Priority Windows** (from app_settings DB): EO 10:00-10:59, HP 11:00-15:30, LP 11:00+
+  - **Priority Windows** (from app_settings DB): EO ends before HP Start, HP uses HP Start/End, LP starts after HP End.
   - **Soft Rules**: Penalties calculated based on distance from preferred windows (k=2 for EO, k=1 for HP/LP)
   - **Max Penalties**: EO: 120, HP: 90, LP: 60
   - **Permutation Selection**: Considers endTime → priorityPenalty → totalWait → totalTravel

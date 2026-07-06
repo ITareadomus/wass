@@ -1,0 +1,12 @@
+{
+  "workDate": "2026-06-18",
+  "runId": "2026-06-17T08-49-38-626Z",
+  "startedAt": "2026-06-17T08:49:38.626Z",
+  "files": [
+    "01-groups-created.json",
+    "02-group-decisions.json",
+    "03-unassigned-tasks.json",
+    "04-summary.json",
+    "05-final-timeline-validation.json"
+  ]
+}

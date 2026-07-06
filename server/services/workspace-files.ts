@@ -1,4 +1,5 @@
 import { formatInTimeZone } from 'date-fns-tz';
+import { isPastWorkDateServerGuardBlocked } from '../../shared/work-date-access';
 
 /**
  * Workspace Files Helper
@@ -26,6 +27,7 @@ function getNormalizedCleaner(cleaner: any): any {
   if (cleaner.role !== undefined) normalizedCleaner.role = cleaner.role;
   if (cleaner.premium !== undefined) normalizedCleaner.premium = cleaner.premium;
   normalizedCleaner.start_time = cleaner.start_time ?? "10:00";
+  normalizedCleaner.end_time = cleaner.end_time ?? "20:00";
   
   return normalizedCleaner;
 }
@@ -74,7 +76,11 @@ function getNormalizedTask(task: any): any {
   if (task.followup !== undefined) normalizedTask.followup = task.followup;
   if (task.sequence !== undefined) normalizedTask.sequence = task.sequence;
   if (task.travel_time !== undefined) normalizedTask.travel_time = task.travel_time;
-  
+  if (task.logistics_task_kind !== undefined) normalizedTask.logistics_task_kind = task.logistics_task_kind;
+  if (task.logistics_task_kind_source !== undefined) {
+    normalizedTask.logistics_task_kind_source = task.logistics_task_kind_source;
+  }
+
   return normalizedTask;
 }
 
@@ -106,6 +112,7 @@ function getNormalizedDriver(driver: any): any {
   if (driver.role !== undefined) n.role = driver.role;
   if (driver.premium !== undefined) n.premium = driver.premium;
   n.start_time = driver.start_time ?? '10:00';
+  n.end_time = driver.end_time ?? '20:00';
   return n;
 }
 
@@ -118,6 +125,9 @@ function getNormalizedLogisticsTimeline(data: any): any {
   cloned.drivers_assignments = cloned.drivers_assignments.map((entry: any) => ({
     driver: getNormalizedDriver(entry.driver),
     tasks: (entry.tasks || []).map((task: any) => getNormalizedTask(task)),
+    ...(entry.return_travel_time != null
+      ? { return_travel_time: Number(entry.return_travel_time) }
+      : {}),
   }));
   return cloned;
 }
@@ -405,6 +415,7 @@ export async function loadSelectedCleaners(
           role: c?.role || null,
           premium: Boolean(c?.premium),
           start_time: c?.start_time ?? '10:00',
+          end_time: c?.end_time ?? '20:00',
           active: c?.active !== false,
           available: c?.available !== false,
           ranking: c?.ranking || 0,
@@ -576,11 +587,7 @@ export async function resetLogisticsTimeline(
   modificationType: string = 'reset'
 ): Promise<boolean> {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const targetDate = new Date(workDate);
-    targetDate.setHours(0, 0, 0, 0);
-    if (targetDate < today) {
+    if (isPastWorkDateServerGuardBlocked(workDate)) {
       console.log(`🚫 resetLogisticsTimeline data passata ${workDate} — bloccato`);
       return false;
     }
@@ -630,6 +637,7 @@ export async function loadSelectedLogisticsDrivers(workDate: string): Promise<an
             role: row.role ?? 'Driver',
             premium: row.role === 'Premium',
             start_time: row.start_time ?? '10:00',
+            end_time: row.end_time ?? '20:00',
             active: row.active !== false,
             available: row.available !== false,
             counter_hours: row.counter_hours ?? 0,
@@ -649,6 +657,7 @@ export async function loadSelectedLogisticsDrivers(workDate: string): Promise<an
           role: 'Driver',
           premium: false,
           start_time: '10:00',
+          end_time: '20:00',
           active: true,
           available: true,
           counter_hours: 0,
@@ -691,11 +700,23 @@ export async function saveSelectedLogisticsDrivers(
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
     const arr = data.drivers || [];
     const driverIds = arr.map((d: any) => (typeof d === 'number' ? d : d.id)).filter((id: any) => id != null);
+    const existingVehicleAssignments =
+      await pgDailyAssignmentsService.loadSelectedLogisticsDriverVehicleAssignments(workDate);
     const vehicleAssignments: Record<string, any> = {};
     for (const d of arr) {
       if (!d || typeof d !== 'object' || d.id == null) continue;
       const driverId = String(d.id);
+      const hasVehicleField = Object.prototype.hasOwnProperty.call(d, 'assigned_vehicle_id');
       const vehicleIdRaw = d.assigned_vehicle_id;
+
+      if (!hasVehicleField) {
+        const existing = existingVehicleAssignments?.[driverId];
+        if (existing?.vehicle_id != null && existing?.vehicle_id !== '') {
+          vehicleAssignments[driverId] = { ...existing };
+        }
+        continue;
+      }
+
       if (vehicleIdRaw == null || vehicleIdRaw === '') continue;
       const vehicleId = Number(vehicleIdRaw);
       if (!Number.isFinite(vehicleId)) continue;
@@ -733,12 +754,7 @@ export async function resetTimeline(
   scope: 'housekeeping' | 'office' = 'housekeeping'
 ): Promise<boolean> {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const targetDate = new Date(workDate);
-    targetDate.setHours(0, 0, 0, 0);
-
-    if (targetDate < today) {
+    if (isPastWorkDateServerGuardBlocked(workDate)) {
       console.log(`🚫 Tentativo di reset timeline per data passata ${workDate} - BLOCCATO`);
       return false;
     }

@@ -74,6 +74,7 @@ export interface PgDailyAssignmentRow {
   cleaner_role?: string | null;
   cleaner_premium?: boolean | null;
   cleaner_start_time?: string | null;
+  cleaner_end_time?: string | null;
   task_id: number;
   logistic_code: number;
   client_id?: number | null;
@@ -120,6 +121,7 @@ export interface PgLogisticsAssignmentRow {
   driver_role?: string | null;
   driver_premium?: boolean | null;
   driver_start_time?: string | null;
+  driver_end_time?: string | null;
   task_id: number;
   logistic_code: number;
   client_id?: number | null;
@@ -152,7 +154,10 @@ export interface PgLogisticsAssignmentRow {
   followup?: boolean | null;
   sequence: number;
   travel_time: number;
+  checkout_wait_minutes?: number;
   manually_moved?: boolean;
+  logistics_task_kind?: string | null;
+  logistics_task_kind_source?: string | null;
 }
 
 export class PgDailyAssignmentsService {
@@ -194,6 +199,25 @@ export class PgDailyAssignmentsService {
       task.duplicate_group_id = duplicateGroupId ?? undefined;
       task.duplicate_group_size_active = duplicateGroupSizeActive;
       task.is_duplicate_active = !task?.locked && duplicateGroupSizeActive > 1;
+    }
+  }
+
+  /** Locked tasks stay at the end of each priority bucket; relative order within each group is preserved. */
+  private sortContainerBucketsLockedLast(tasksByPriority: {
+    early_out?: any[];
+    high_priority?: any[];
+    low_priority?: any[];
+  }): void {
+    for (const key of ['early_out', 'high_priority', 'low_priority'] as const) {
+      const tasks = tasksByPriority[key];
+      if (!tasks?.length) continue;
+      const unlocked: any[] = [];
+      const locked: any[] = [];
+      for (const task of tasks) {
+        if (task?.locked === true) locked.push(task);
+        else unlocked.push(task);
+      }
+      tasksByPriority[key] = [...unlocked, ...locked];
     }
   }
 
@@ -550,6 +574,7 @@ export class PgDailyAssignmentsService {
           driver_role VARCHAR(100),
           driver_premium BOOLEAN DEFAULT FALSE,
           driver_start_time VARCHAR(10) DEFAULT '10:00',
+          driver_end_time VARCHAR(10) DEFAULT '20:00',
           task_id INTEGER NOT NULL,
           logistic_code INTEGER NOT NULL,
           client_id INTEGER,
@@ -602,6 +627,7 @@ export class PgDailyAssignmentsService {
           driver_role VARCHAR(100),
           driver_premium BOOLEAN DEFAULT FALSE,
           driver_start_time VARCHAR(10) DEFAULT '10:00',
+          driver_end_time VARCHAR(10) DEFAULT '20:00',
           task_id INTEGER NOT NULL,
           logistic_code INTEGER NOT NULL,
           client_id INTEGER,
@@ -651,6 +677,42 @@ export class PgDailyAssignmentsService {
       await query(`ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
       await query(`ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
       await query(`ALTER TABLE IF EXISTS lg_containers_history ADD COLUMN IF NOT EXISTS customer_note_history JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await query(
+        `ALTER TABLE IF EXISTS lg_timeline ADD COLUMN IF NOT EXISTS checkout_wait_minutes INTEGER NOT NULL DEFAULT 0`
+      );
+      await query(
+        `ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS checkout_wait_minutes INTEGER NOT NULL DEFAULT 0`
+      );
+      await query(`ALTER TABLE IF EXISTS lg_timeline ADD COLUMN IF NOT EXISTS driver_end_time VARCHAR(10) DEFAULT '20:00'`);
+      await query(`ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS driver_end_time VARCHAR(10) DEFAULT '20:00'`);
+      await query(`ALTER TABLE IF EXISTS lg_drivers ADD COLUMN IF NOT EXISTS end_time VARCHAR(10) NOT NULL DEFAULT '20:00'`);
+      await query(`UPDATE lg_timeline SET driver_end_time = '20:00' WHERE driver_end_time IS NULL`);
+      await query(`UPDATE lg_timeline_history SET driver_end_time = '20:00' WHERE driver_end_time IS NULL`);
+      await query(
+        `ALTER TABLE IF EXISTS lg_timeline ADD COLUMN IF NOT EXISTS logistics_task_kind VARCHAR(50)`
+      );
+      await query(
+        `ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS logistics_task_kind VARCHAR(50)`
+      );
+      await query(
+        `ALTER TABLE IF EXISTS lg_timeline ADD COLUMN IF NOT EXISTS logistics_task_kind_source VARCHAR(20)`
+      );
+      await query(
+        `ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS logistics_task_kind_source VARCHAR(20)`
+      );
+      await query(
+        `ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS logistics_task_kind VARCHAR(50)`
+      );
+      await query(
+        `ALTER TABLE IF EXISTS lg_containers_history ADD COLUMN IF NOT EXISTS logistics_task_kind VARCHAR(50)`
+      );
+      await query(
+        `ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS logistics_task_kind_source VARCHAR(20)`
+      );
+      await query(
+        `ALTER TABLE IF EXISTS lg_containers_history ADD COLUMN IF NOT EXISTS logistics_task_kind_source VARCHAR(20)`
+      );
+      await query(`UPDATE lg_drivers SET end_time = '20:00' WHERE end_time IS NULL`);
 
       await query(`
         CREATE TABLE IF NOT EXISTS lg_drivers (
@@ -669,6 +731,7 @@ export class PgDailyAssignmentsService {
           preferred_customers INTEGER[] DEFAULT '{}',
           telegram_id BIGINT,
           start_time VARCHAR(10) DEFAULT '10:00',
+          end_time VARCHAR(10) NOT NULL DEFAULT '20:00',
           can_do_straordinaria BOOLEAN DEFAULT false,
           created_at TIMESTAMPTZ DEFAULT NOW(),
           updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -831,6 +894,7 @@ export class PgDailyAssignmentsService {
           cleaner_role: cleaner.role || null,
           cleaner_premium: cleaner.premium != null ? Boolean(cleaner.premium) : null,
           cleaner_start_time: cleaner.start_time ?? '10:00',
+          cleaner_end_time: cleaner.end_time ?? '20:00',
           // Task data
           task_id: Number(task.task_id),
           logistic_code: Number(task.logistic_code || 0),
@@ -913,7 +977,7 @@ export class PgDailyAssignmentsService {
         await client.query(`
           INSERT INTO daily_assignments_current (
             scope,
-            work_date, cleaner_id, cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time,
+            work_date, cleaner_id, cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time, cleaner_end_time,
             task_id, logistic_code, client_id,
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
@@ -922,13 +986,13 @@ export class PgDailyAssignmentsService {
             start_time, end_time, followup, sequence, travel_time
           ) VALUES (
             $1,
-            $2, $3, $4, $5, $6, $7, $8,
-            $9, $10, $11,
-            $12, $13, $14, $15, $16, $17,
-            $18, $19, $20, $21,
-            $22, $23, $24, $25, $26, $27,
-            $28, $29, $30, $31, $32, $33, $34, $35, $36,
-            $37, $38, $39, $40, $41
+            $2, $3, $4, $5, $6, $7, $8, $9,
+            $10, $11, $12,
+            $13, $14, $15, $16, $17, $18,
+            $19, $20, $21, $22,
+            $23, $24, $25, $26, $27, $28,
+            $29, $30, $31, $32, $33, $34, $35, $36, $37,
+            $38, $39, $40, $41, $42
           )
         `, [
           normalizedScope,
@@ -939,6 +1003,7 @@ export class PgDailyAssignmentsService {
           row.cleaner_role,
           row.cleaner_premium,
           row.cleaner_start_time,
+          row.cleaner_end_time,
           row.task_id,
           row.logistic_code,
           row.client_id,
@@ -1063,6 +1128,7 @@ export class PgDailyAssignmentsService {
           if (rosterCleaner?.alias) cleaner.alias = rosterCleaner.alias;
           if (row.cleaner_premium !== null) cleaner.premium = row.cleaner_premium;
           cleaner.start_time = row.cleaner_start_time ?? '10:00';
+          cleaner.end_time = row.cleaner_end_time ?? '20:00';
 
           cleanerMap.set(row.cleaner_id, {
             cleaner,
@@ -1287,7 +1353,7 @@ export class PgDailyAssignmentsService {
         await client.query(`
           INSERT INTO daily_assignments_history (
             scope,
-            work_date, revision, cleaner_id, cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time,
+            work_date, revision, cleaner_id, cleaner_name, cleaner_lastname, cleaner_role, cleaner_premium, cleaner_start_time, cleaner_end_time,
             task_id, logistic_code, client_id,
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
@@ -1296,13 +1362,13 @@ export class PgDailyAssignmentsService {
             start_time, end_time, followup, sequence, travel_time, created_by
           ) VALUES (
             $1,
-            $2, $3, $4, $5, $6, $7, $8, $9,
-            $10, $11, $12,
-            $13, $14, $15, $16, $17, $18,
-            $19, $20, $21, $22,
-            $23, $24, $25, $26, $27, $28,
-            $29, $30, $31, $32, $33, $34, $35, $36, $37,
-            $38, $39, $40, $41, $42, $43
+            $2, $3, $4, $5, $6, $7, $8, $9, $10,
+            $11, $12, $13,
+            $14, $15, $16, $17, $18, $19,
+            $20, $21, $22, $23,
+            $24, $25, $26, $27, $28, $29,
+            $30, $31, $32, $33, $34, $35, $36, $37, $38,
+            $39, $40, $41, $42, $43, $44
           )
         `, [
           normalizedScope,
@@ -1314,6 +1380,7 @@ export class PgDailyAssignmentsService {
           row.cleaner_role,
           row.cleaner_premium,
           row.cleaner_start_time,
+          row.cleaner_end_time,
           row.task_id,
           row.logistic_code,
           row.client_id,
@@ -1529,12 +1596,21 @@ export class PgDailyAssignmentsService {
     if (!timeline?.drivers_assignments || !Array.isArray(timeline.drivers_assignments)) {
       return rows;
     }
+    const seenTaskKeys = new Set<string>();
     for (const assignment of timeline.drivers_assignments) {
       const driver = assignment.driver;
       if (!driver?.id) continue;
       const tasks = assignment.tasks || [];
       for (const task of tasks) {
         if (!task.task_id) continue;
+        const taskKey = `task:${Number(task.task_id)}`;
+        if (seenTaskKeys.has(taskKey)) {
+          console.warn(
+            `⚠️ PG Logistics: task duplicata ignorata in saveLogisticsTimeline (${workDate}, task_id=${task.task_id})`
+          );
+          continue;
+        }
+        seenTaskKeys.add(taskKey);
         rows.push({
           work_date: workDate,
           driver_id: Number(driver.id),
@@ -1543,6 +1619,7 @@ export class PgDailyAssignmentsService {
           driver_role: driver.role || null,
           driver_premium: driver.premium != null ? Boolean(driver.premium) : null,
           driver_start_time: driver.start_time ?? '10:00',
+          driver_end_time: driver.end_time ?? '20:00',
           task_id: Number(task.task_id),
           logistic_code: Number(task.logistic_code || 0),
           client_id: task.client_id ? Number(task.client_id) : null,
@@ -1575,7 +1652,15 @@ export class PgDailyAssignmentsService {
           followup: task.followup != null ? Boolean(task.followup) : null,
           sequence: Number(task.sequence || 0),
           travel_time: Number(task.travel_time || 0),
+          checkout_wait_minutes:
+            task.checkout_wait_minutes != null ? Number(task.checkout_wait_minutes) : 0,
           manually_moved: Boolean(task.manually_moved),
+          logistics_task_kind:
+            task.logistics_task_kind != null ? String(task.logistics_task_kind) : null,
+          logistics_task_kind_source:
+            task.logistics_task_kind_source != null
+              ? String(task.logistics_task_kind_source)
+              : null,
         });
       }
     }
@@ -1585,6 +1670,12 @@ export class PgDailyAssignmentsService {
   async saveLogisticsTimeline(workDate: string, timeline: any): Promise<number> {
     const client = await pool.connect();
     try {
+      const { enrichLogisticsTimelineData, loadManualLogisticsTimelineTaskKinds } = await import(
+        "./logistics-task-kind-enrichment"
+      );
+      const manualKindsByTaskId = await loadManualLogisticsTimelineTaskKinds(workDate);
+      await enrichLogisticsTimelineData(workDate, timeline, { manualKindsByTaskId });
+
       const rows = this.logisticsTimelineToRows(workDate, timeline);
       await client.query('BEGIN');
       await client.query('DELETE FROM lg_timeline WHERE work_date = $1', [workDate]);
@@ -1595,21 +1686,23 @@ export class PgDailyAssignmentsService {
       for (const row of rows) {
         await client.query(`
           INSERT INTO lg_timeline (
-            work_date, driver_id, driver_name, driver_lastname, driver_role, driver_premium, driver_start_time,
+            work_date, driver_id, driver_name, driver_lastname, driver_role, driver_premium, driver_start_time, driver_end_time,
             task_id, logistic_code, client_id,
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
             type_apt, alias, customer_name, customer_reference, customer_note, customer_note_history, reasons, manually_moved, priority,
-            start_time, end_time, followup, sequence, travel_time
+            start_time, end_time, followup, sequence, travel_time, checkout_wait_minutes,
+            logistics_task_kind, logistics_task_kind_source
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7,
-            $8, $9, $10,
-            $11, $12, $13, $14, $15, $16,
-            $17, $18, $19, $20,
-            $21, $22, $23, $24, $25, $26,
-            $27, $28, $29, $30, $31, $32, $33, $34, $35,
-            $36, $37, $38, $39, $40
+            $1, $2, $3, $4, $5, $6, $7, $8,
+            $9, $10, $11,
+            $12, $13, $14, $15, $16, $17,
+            $18, $19, $20, $21,
+            $22, $23, $24, $25, $26, $27,
+            $28, $29, $30, $31, $32, $33, $34, $35, $36,
+            $37, $38, $39, $40, $41, $42,
+            $43, $44
           )
         `, [
           row.work_date,
@@ -1619,6 +1712,7 @@ export class PgDailyAssignmentsService {
           row.driver_role,
           row.driver_premium,
           row.driver_start_time,
+          row.driver_end_time,
           row.task_id,
           row.logistic_code,
           row.client_id,
@@ -1652,6 +1746,9 @@ export class PgDailyAssignmentsService {
           row.followup,
           row.sequence,
           row.travel_time,
+          row.checkout_wait_minutes ?? 0,
+          row.logistics_task_kind,
+          row.logistics_task_kind_source,
         ]);
       }
       await client.query('COMMIT');
@@ -1684,6 +1781,21 @@ export class PgDailyAssignmentsService {
       if (rows.length === 0) {
         return null;
       }
+
+      const taskIds = rows.map((row) => Number(row.task_id)).filter((id) => Number.isFinite(id));
+      const {
+        loadCleanerContextByTaskIds,
+        enrichLogisticsTimelineTask,
+        syncLogisticsTimelineAutoKinds,
+        attachCleanerContextFields,
+      } = await import("./logistics-task-kind-enrichment");
+      const { buildLogisticsContainerAutoKindPatches } = await import(
+        "../../shared/logistics-task-kind"
+      );
+      const cleanerContextByTaskId = await loadCleanerContextByTaskIds(workDate, taskIds);
+      const enrichedTasksById = new Map<number, any>();
+      const { attachLogisticsTaskWindowFields } = await import("./logistics-task-window-fields");
+
       const driverMap = new Map<number, { driver: any; tasks: any[] }>();
       for (const row of rows) {
         if (!driverMap.has(row.driver_id)) {
@@ -1693,6 +1805,7 @@ export class PgDailyAssignmentsService {
           if (row.driver_role) driver.role = row.driver_role;
           if (row.driver_premium !== null) driver.premium = row.driver_premium;
           driver.start_time = row.driver_start_time ?? '10:00';
+          driver.end_time = row.driver_end_time ?? '20:00';
           driverMap.set(row.driver_id, { driver, tasks: [] });
         }
         const task: any = {
@@ -1734,8 +1847,38 @@ export class PgDailyAssignmentsService {
         if (row.followup !== null) task.followup = row.followup;
         if (row.sequence !== null) task.sequence = row.sequence;
         if (row.travel_time !== null) task.travel_time = row.travel_time;
-        driverMap.get(row.driver_id)!.tasks.push(task);
+        const cw = Number((row as any).checkout_wait_minutes ?? 0);
+        if (cw > 0) task.checkout_wait_minutes = cw;
+        if ((row as any).logistics_task_kind != null) {
+          task.logistics_task_kind = String((row as any).logistics_task_kind);
+        }
+        if ((row as any).logistics_task_kind_source != null) {
+          task.logistics_task_kind_source = String((row as any).logistics_task_kind_source);
+        }
+
+        const cleanerCtx = cleanerContextByTaskId.get(Number(row.task_id));
+        attachCleanerContextFields(task, cleanerCtx);
+
+        const enrichedTask = enrichLogisticsTimelineTask(
+          task,
+          cleanerCtx?.cleanerId ?? null,
+          cleanerCtx?.cleanerSequence ?? null
+        );
+        attachLogisticsTaskWindowFields(enrichedTask, cleanerCtx);
+        enrichedTasksById.set(Number(row.task_id), enrichedTask);
+        driverMap.get(row.driver_id)!.tasks.push(enrichedTask);
       }
+
+      try {
+        const kindPatches = buildLogisticsContainerAutoKindPatches(rows, enrichedTasksById);
+        const synced = await syncLogisticsTimelineAutoKinds(workDate, kindPatches);
+        if (synced > 0) {
+          console.log(`✅ PG: Sincronizzati ${synced} logistics_task_kind auto su lg_timeline per ${workDate}`);
+        }
+      } catch (syncError) {
+        console.error('⚠️ PG: Errore sync logistics_task_kind su lg_timeline:', syncError);
+      }
+
       const drivers_assignments = Array.from(driverMap.values()).map((da) => ({
         ...da,
         tasks: da.tasks.sort((a, b) => (a.sequence || 0) - (b.sequence || 0)),
@@ -1771,6 +1914,9 @@ export class PgDailyAssignmentsService {
   ): Promise<number> {
     const client = await pool.connect();
     try {
+      const { enrichLogisticsTimelineData } = await import("./logistics-task-kind-enrichment");
+      await enrichLogisticsTimelineData(workDate, timeline);
+
       const rows = this.logisticsTimelineToRows(workDate, timeline);
       await client.query('BEGIN');
       await client.query(
@@ -1793,21 +1939,23 @@ export class PgDailyAssignmentsService {
         await client.query(
           `
           INSERT INTO lg_timeline_history (
-            work_date, revision, driver_id, driver_name, driver_lastname, driver_role, driver_premium, driver_start_time,
+            work_date, revision, driver_id, driver_name, driver_lastname, driver_role, driver_premium, driver_start_time, driver_end_time,
             task_id, logistic_code, client_id,
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
             type_apt, alias, customer_name, customer_reference, customer_note, customer_note_history, reasons, manually_moved, priority,
-            start_time, end_time, followup, sequence, travel_time, created_by
+            start_time, end_time, followup, sequence, travel_time, checkout_wait_minutes,
+            logistics_task_kind, logistics_task_kind_source, created_by
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8,
-            $9, $10, $11,
-            $12, $13, $14, $15, $16, $17,
-            $18, $19, $20, $21,
-            $22, $23, $24, $25, $26, $27,
-            $28, $29, $30, $31, $32, $33, $34, $35, $36,
-            $37, $38, $39, $40, $41, $42
+            $1, $2, $3, $4, $5, $6, $7, $8, $9,
+            $10, $11, $12,
+            $13, $14, $15, $16, $17, $18,
+            $19, $20, $21, $22,
+            $23, $24, $25, $26, $27, $28,
+            $29, $30, $31, $32, $33, $34, $35, $36, $37,
+            $38, $39, $40, $41, $42, $43,
+            $44, $45, $46
           )
         `,
           [
@@ -1819,6 +1967,7 @@ export class PgDailyAssignmentsService {
             row.driver_role,
             row.driver_premium,
             row.driver_start_time,
+            row.driver_end_time,
             row.task_id,
             row.logistic_code,
             row.client_id,
@@ -1852,6 +2001,9 @@ export class PgDailyAssignmentsService {
             row.followup,
             row.sequence,
             row.travel_time,
+            row.checkout_wait_minutes ?? 0,
+            row.logistics_task_kind,
+            row.logistics_task_kind_source,
             createdBy,
           ]
         );
@@ -2016,6 +2168,7 @@ export class PgDailyAssignmentsService {
 
       // Build structure matching create_containers.py format
       this.annotateActiveDuplicateMetadata(tasksByPriority);
+      this.sortContainerBucketsLockedLast(tasksByPriority);
 
       const containers = {
         early_out: {
@@ -2065,6 +2218,18 @@ export class PgDailyAssignmentsService {
       }
 
       const locksMap = await this.getLocksMap(workDate);
+      const taskIds = result.rows.map((row: any) => Number(row.task_id)).filter((id) => Number.isFinite(id));
+      const {
+        loadCleanerContextByTaskIds,
+        enrichLogisticsContainerTask,
+        syncLogisticsContainerAutoKinds,
+        attachCleanerContextFields,
+      } = await import("./logistics-task-kind-enrichment");
+      const { buildLogisticsContainerAutoKindPatches } = await import(
+        "../../shared/logistics-task-kind"
+      );
+      const cleanerContextByTaskId = await loadCleanerContextByTaskIds(workDate, taskIds);
+      const enrichedTasksById = new Map<number, any>();
 
       const tasksByPriority: { [key: string]: any[] } = {
         early_out: [],
@@ -2123,20 +2288,46 @@ export class PgDailyAssignmentsService {
         }
         if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
         if (row.customer_reference) task.customer_reference = row.customer_reference;
+        if (row.logistics_task_kind != null) {
+          task.logistics_task_kind = String(row.logistics_task_kind);
+        }
+        if (row.logistics_task_kind_source != null) {
+          task.logistics_task_kind_source = String(row.logistics_task_kind_source);
+        }
+
+        const cleanerCtx = cleanerContextByTaskId.get(Number(row.task_id));
+        attachCleanerContextFields(task, cleanerCtx);
+
+        const enrichedTask = enrichLogisticsContainerTask(
+          task,
+          cleanerCtx?.cleanerId ?? null,
+          cleanerCtx?.cleanerSequence ?? null
+        );
+        enrichedTasksById.set(Number(row.task_id), enrichedTask);
 
         const lockInfo = locksMap.get(row.task_id);
         if (lockInfo) {
-          task.locked = lockInfo.locked;
-          task.locked_reason = lockInfo.lockedReason;
-          task.locked_by = lockInfo.lockedBy;
+          enrichedTask.locked = lockInfo.locked;
+          enrichedTask.locked_reason = lockInfo.lockedReason;
+          enrichedTask.locked_by = lockInfo.lockedBy;
         } else {
-          task.locked = row.locked || false;
-          task.locked_reason = row.locked_reason || undefined;
+          enrichedTask.locked = row.locked || false;
+          enrichedTask.locked_reason = row.locked_reason || undefined;
         }
 
         const dbPriority = String(row.priority || 'low').toLowerCase();
         const frontendPriority = priorityMap[dbPriority] || 'low_priority';
-        tasksByPriority[frontendPriority].push(task);
+        tasksByPriority[frontendPriority].push(enrichedTask);
+      }
+
+      try {
+        const kindPatches = buildLogisticsContainerAutoKindPatches(result.rows, enrichedTasksById);
+        const synced = await syncLogisticsContainerAutoKinds(workDate, kindPatches);
+        if (synced > 0) {
+          console.log(`✅ PG: Sincronizzati ${synced} logistics_task_kind auto su lg_containers per ${workDate}`);
+        }
+      } catch (syncError) {
+        console.error('⚠️ PG: Errore sync logistics_task_kind su lg_containers:', syncError);
       }
 
       const allTasks = [...tasksByPriority.early_out, ...tasksByPriority.high_priority, ...tasksByPriority.low_priority];
@@ -2174,6 +2365,7 @@ export class PgDailyAssignmentsService {
       }
 
       this.annotateActiveDuplicateMetadata(tasksByPriority);
+      this.sortContainerBucketsLockedLast(tasksByPriority);
 
       const containers = {
         early_out: { tasks: tasksByPriority.early_out, count: tasksByPriority.early_out.length },
@@ -2311,18 +2503,14 @@ export class PgDailyAssignmentsService {
   async saveLogisticsContainers(workDate: string, containersData: any): Promise<boolean> {
     const client = await pool.connect();
     try {
-      await client.query('BEGIN');
-      await client.query('DELETE FROM lg_containers WHERE work_date = $1', [workDate]);
-
       const containers = containersData?.containers || {};
-      let totalInserted = 0;
-
       const priorityConfigs = [
         { dbName: 'early_out', keys: ['early_out'] },
         { dbName: 'high_priority', keys: ['high_priority', 'high'] },
         { dbName: 'low_priority', keys: ['low_priority', 'low'] }
       ];
 
+      const tasksWithPriority: Array<{ dbName: string; task: any }> = [];
       for (const config of priorityConfigs) {
         let tasks: any[] = [];
         for (const key of config.keys) {
@@ -2332,56 +2520,94 @@ export class PgDailyAssignmentsService {
             break;
           }
         }
-
         for (const task of tasks) {
-          if (!task.task_id) continue;
+          if (!task?.task_id) continue;
+          tasksWithPriority.push({ dbName: config.dbName, task });
+        }
+      }
 
-          await client.query(`
+      const taskIds = tasksWithPriority
+        .map(({ task }) => Number(task.task_id))
+        .filter((id) => Number.isFinite(id));
+      const {
+        loadCleanerContextByTaskIds,
+        loadManualLogisticsContainerTaskKinds,
+        enrichLogisticsContainerTask,
+      } = await import("./logistics-task-kind-enrichment");
+      const [cleanerContextByTaskId, manualKindsByTaskId] = await Promise.all([
+        loadCleanerContextByTaskIds(workDate, taskIds),
+        loadManualLogisticsContainerTaskKinds(workDate),
+      ]);
+
+      await client.query('BEGIN');
+      await client.query('DELETE FROM lg_containers WHERE work_date = $1', [workDate]);
+
+      let totalInserted = 0;
+      for (const { dbName, task } of tasksWithPriority) {
+        const taskId = Number(task.task_id);
+        const manualKind = manualKindsByTaskId.get(taskId);
+        const taskForPersist =
+          manualKind && task.logistics_task_kind_source !== "manual"
+            ? { ...task, ...manualKind }
+            : task;
+        const cleanerCtx = cleanerContextByTaskId.get(taskId);
+        const enrichedTask = enrichLogisticsContainerTask(
+          taskForPersist,
+          cleanerCtx?.cleanerId ?? null,
+          cleanerCtx?.cleanerSequence ?? null
+        );
+
+        await client.query(`
             INSERT INTO lg_containers (
               work_date, priority,
               task_id, logistic_code, client_id, premium, address, lat, lng,
               cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
               pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
               straordinaria, type_apt, alias, customer_name, customer_note, customer_note_history, reasons, customer_reference,
-              locked, locked_reason
+              locked, locked_reason, logistics_task_kind, logistics_task_kind_source
             ) VALUES (
               $1, $2, $3, $4, $5, $6, $7, $8, $9,
               $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-              $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
+              $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31
             )
           `, [
             workDate,
-            config.dbName,
-            task.task_id,
-            task.logistic_code || 0,
-            task.client_id || null,
-            task.premium || false,
-            task.address || null,
-            task.lat || null,
-            task.lng || null,
-            task.cleaning_time || 0,
-            normalizeDateToYmd(task.checkin_date),
-            normalizeDateToYmd(task.checkout_date),
-            task.checkin_time || null,
-            task.checkout_time || null,
-            task.pax_in ?? null,
-            task.pax_out ?? null,
-            task.small_equipment || false,
-            task.operation_id ?? null,
-            task.confirmed_operation || false,
-            task.straordinaria || false,
-            task.type_apt || null,
-            task.alias || null,
-            task.customer_name || null,
-            task.customer_note != null ? String(task.customer_note) : null,
-            toCustomerNoteHistoryJson(task.customer_note_history),
-            task.reasons || [],
-            task.customer_reference || null,
-            task.locked || false,
-            task.locked_reason || null
+            dbName,
+            enrichedTask.task_id,
+            enrichedTask.logistic_code || 0,
+            enrichedTask.client_id || null,
+            enrichedTask.premium || false,
+            enrichedTask.address || null,
+            enrichedTask.lat || null,
+            enrichedTask.lng || null,
+            enrichedTask.cleaning_time || 0,
+            normalizeDateToYmd(enrichedTask.checkin_date),
+            normalizeDateToYmd(enrichedTask.checkout_date),
+            enrichedTask.checkin_time || null,
+            enrichedTask.checkout_time || null,
+            enrichedTask.pax_in ?? null,
+            enrichedTask.pax_out ?? null,
+            enrichedTask.small_equipment || false,
+            enrichedTask.operation_id ?? null,
+            enrichedTask.confirmed_operation || false,
+            enrichedTask.straordinaria || false,
+            enrichedTask.type_apt || null,
+            enrichedTask.alias || null,
+            enrichedTask.customer_name || null,
+            enrichedTask.customer_note != null ? String(enrichedTask.customer_note) : null,
+            toCustomerNoteHistoryJson(enrichedTask.customer_note_history),
+            enrichedTask.reasons || [],
+            enrichedTask.customer_reference || null,
+            enrichedTask.locked || false,
+            enrichedTask.locked_reason || null,
+            enrichedTask.logistics_task_kind != null
+              ? String(enrichedTask.logistics_task_kind)
+              : null,
+            enrichedTask.logistics_task_kind_source != null
+              ? String(enrichedTask.logistics_task_kind_source)
+              : null,
           ]);
-          totalInserted++;
-        }
+        totalInserted++;
       }
 
       await client.query('COMMIT');
@@ -2394,6 +2620,41 @@ export class PgDailyAssignmentsService {
     } finally {
       client.release();
     }
+  }
+
+  async updateLogisticsContainerTaskKind(
+    workDate: string,
+    taskId: number,
+    kind: string,
+    source: string,
+    createdBy: string = "system"
+  ): Promise<{ success: boolean; previousKind: string | null }> {
+    const existing = await query(
+      `SELECT logistics_task_kind FROM lg_containers WHERE work_date = $1 AND task_id = $2`,
+      [workDate, taskId]
+    );
+    if (existing.rows.length === 0) {
+      return { success: false, previousKind: null };
+    }
+
+    const previousKind =
+      existing.rows[0].logistics_task_kind != null
+        ? String(existing.rows[0].logistics_task_kind)
+        : null;
+
+    await this.saveLogisticsContainersToHistory(workDate, createdBy, "manual");
+    await query(
+      `
+        UPDATE lg_containers
+        SET logistics_task_kind = $1,
+            logistics_task_kind_source = $2,
+            updated_at = NOW()
+        WHERE work_date = $3 AND task_id = $4
+      `,
+      [kind, source, workDate, taskId]
+    );
+
+    return { success: true, previousKind };
   }
 
   /**
@@ -2754,6 +3015,20 @@ export class PgDailyAssignmentsService {
   ): Promise<number> {
     const client = await pool.connect();
     try {
+      const { persistLogisticsContainerAutoKindsForDate } = await import(
+        "./logistics-task-kind-enrichment"
+      );
+      try {
+        const synced = await persistLogisticsContainerAutoKindsForDate(workDate);
+        if (synced > 0) {
+          console.log(
+            `✅ PG Logistics History: allineati ${synced} logistics_task_kind auto su lg_containers per ${workDate}`
+          );
+        }
+      } catch (syncError) {
+        console.error('⚠️ PG Logistics History: errore sync logistics_task_kind containers:', syncError);
+      }
+
       await client.query('BEGIN');
       await client.query(
         'SELECT 1 FROM lg_containers_revision WHERE work_date = $1 FOR UPDATE',
@@ -2782,11 +3057,11 @@ export class PgDailyAssignmentsService {
             cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
             straordinaria, type_apt, alias, customer_name, customer_note, customer_note_history, reasons, customer_reference, created_by,
-            locked, locked_reason
+            locked, locked_reason, logistics_task_kind, logistics_task_kind_source
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
             $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-            $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31
+            $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33
           )
         `, [
           workDate,
@@ -2819,7 +3094,9 @@ export class PgDailyAssignmentsService {
           row.customer_reference ?? null,
           createdBy,
           row.locked || false,
-          row.locked_reason || null
+          row.locked_reason || null,
+          row.logistics_task_kind ?? null,
+          row.logistics_task_kind_source ?? null,
         ]);
       }
       await client.query('COMMIT');
@@ -2925,11 +3202,11 @@ export class PgDailyAssignmentsService {
             cleaning_time, checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation,
             straordinaria, type_apt, alias, customer_name, customer_note, customer_note_history, reasons, customer_reference,
-            locked, locked_reason
+            locked, locked_reason, logistics_task_kind, logistics_task_kind_source
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9,
             $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-            $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
+            $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31
           )
         `, [
           workDate,
@@ -2960,7 +3237,9 @@ export class PgDailyAssignmentsService {
           row.reasons || [],
           row.customer_reference ?? null,
           row.locked || false,
-          row.locked_reason || null
+          row.locked_reason || null,
+          row.logistics_task_kind ?? null,
+          row.logistics_task_kind_source ?? null,
         ]);
       }
       await client.query('COMMIT');
@@ -3560,7 +3839,7 @@ export class PgDailyAssignmentsService {
         SELECT
           d.driver_id as id, d.name, d.lastname, d.role, d.active, d.ranking,
           d.counter_hours, d.counter_days, d.available, d.contract_type,
-          d.preferred_customers, d.telegram_id, d.start_time,
+          d.preferred_customers, d.telegram_id, d.start_time, d.end_time,
           ca.alias
         FROM lg_drivers d
         LEFT JOIN aliases ca ON ca.cleaner_id = d.driver_id
@@ -3589,7 +3868,7 @@ export class PgDailyAssignmentsService {
         SELECT
           d.driver_id as id, d.name, d.lastname, d.role, d.active, d.ranking,
           d.counter_hours, d.counter_days, d.available, d.contract_type,
-          d.preferred_customers, d.telegram_id, d.start_time,
+          d.preferred_customers, d.telegram_id, d.start_time, d.end_time,
           ca.alias
         FROM lg_drivers d
         LEFT JOIN aliases ca ON ca.cleaner_id = d.driver_id
@@ -3632,9 +3911,9 @@ export class PgDailyAssignmentsService {
           INSERT INTO lg_drivers
           (driver_id, work_date, name, lastname, role, active, ranking,
            counter_hours, counter_days, available, contract_type,
-           preferred_customers, telegram_id, start_time,
+           preferred_customers, telegram_id, start_time, end_time,
            created_at, updated_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
         `,
           [
             d.id,
@@ -3651,6 +3930,7 @@ export class PgDailyAssignmentsService {
             d.preferred_customers || [],
             d.telegram_id || null,
             d.start_time ?? '10:00',
+            d.end_time ?? '20:00',
           ]
         );
       }
@@ -3667,7 +3947,7 @@ export class PgDailyAssignmentsService {
   }
 
   async updateLgDriverField(driverId: number, workDate: string, field: string, value: any): Promise<boolean> {
-    const allowedFields = ['start_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days'];
+    const allowedFields = ['start_time', 'end_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days'];
     if (!allowedFields.includes(field)) {
       console.error(`❌ PG: Campo lg_drivers non consentito: ${field}`);
       return false;
@@ -3757,9 +4037,9 @@ export class PgDailyAssignmentsService {
           INSERT INTO cleaners 
           (cleaner_id, work_date, name, lastname, role, active, ranking,
            counter_hours, counter_days, available, contract_type,
-           preferred_customers, telegram_id, start_time,
+           preferred_customers, telegram_id, start_time, end_time,
            created_at, updated_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
         `, [
           cleaner.id,
           workDate,
@@ -3774,7 +4054,8 @@ export class PgDailyAssignmentsService {
           cleaner.contract_type || null,
           cleaner.preferred_customers || [],
           cleaner.telegram_id || null,
-          cleaner.start_time ?? '10:00'
+          cleaner.start_time ?? '10:00',
+          cleaner.end_time ?? '20:00'
         ]);
       }
 
@@ -3800,7 +4081,7 @@ export class PgDailyAssignmentsService {
    * NOTE: For alias updates, this also saves to aliases table
    */
   async updateCleanerField(cleanerId: number, workDate: string, field: string, value: any): Promise<boolean> {
-    const allowedFields = ['start_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days', 'alias'];
+    const allowedFields = ['start_time', 'end_time', 'available', 'active', 'ranking', 'counter_hours', 'counter_days', 'alias'];
     if (!allowedFields.includes(field)) {
       console.error(`❌ PG: Campo non consentito: ${field}`);
       return false;

@@ -1,10 +1,28 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { Draggable } from "react-beautiful-dnd";
 import { useQuery } from "@tanstack/react-query";
 import { TaskType as Task } from "@shared/schema";
+import {
+  pickLogisticsViolationFields,
+  shouldBlinkLogisticsTimelineTask,
+} from "@shared/logistics-scheduling-constraints";
+import {
+  resolveLogisticsTaskKind,
+  type LogisticsTaskKind,
+} from "@shared/logistics-task-kind";
+import {
+  DIALOG_SECTION_CORNER_BADGE_WRAP_CLASS,
+  LOGISTICS_KIND_BADGE_LABEL,
+  LogisticsKindAddBadge,
+  LogisticsKindBadge,
+  LogisticsKindPickerDialog,
+  LogisticsSequenceBadge,
+  logisticsKindStripeClass,
+} from "@/lib/logistics-task-kind-ui";
 import { format, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
 import { fetchWithOperation } from '@/lib/operationManager';
+import { openTimelineMapPanel } from "@/lib/timeline-map-panel";
 import {
   Dialog,
   DialogContent,
@@ -44,6 +62,10 @@ import { CleanerSelectorDialog } from "@/components/dialogs/cleaner-selector-dia
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
+import {
+  getHousekeepingTypeTier,
+  type HousekeepingTypeTier,
+} from "@/lib/housekeeping-intervention-type";
 import {
   Select,
   SelectContent,
@@ -193,17 +215,32 @@ interface TaskCardProps {
   multiSelectContext?: MultiSelectContextType | null;
   isIncompatible?: boolean;
   timelineWidthPx?: number;
+  timelinePxPerMinute?: number;
+  minTimelineTaskWidthPx?: number;
   travelTime?: number;
   travelWidthPx?: number;
   waitingGap?: number;
   waitingGapWidthPx?: number;
   isHighlighted?: boolean;
   cleanerId?: number | null;
-  isPriorityWindowViolation?: boolean;
   /** housekeeping → /api/operations (enable_wass); logistics → enable_wass_route */
   operationsScope?: "housekeeping" | "office" | "logistics";
   /** Solo timeline logistica: nome driver (colonna sinistra). Non usare per HK — lì sarebbe il cleaner. */
   timelineRowStaffDisplayLabel?: string | null;
+  /** Dopo mutazione timeline logistica (es. tipologia manuale). */
+  onLogisticsTimelineMutated?: () => void;
+}
+
+function getTaskMapMarkerId(task: Task): string {
+  const collaboratorIds = (task as any).collaborator_ids as number[] | null;
+  const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
+  const assignedCleaner = (task as any).assignedCleaner as number | null;
+  const baseTaskId = String(
+    (task as any).task_id ?? (task as any).taskId ?? (task as any).id ?? task.name ?? ""
+  );
+  return isCollaborativeTask && assignedCleaner != null
+    ? `${baseTaskId}:${assignedCleaner}`
+    : baseTaskId;
 }
 
 interface AssignedTask {
@@ -212,6 +249,95 @@ interface AssignedTask {
   start_time: string;
   end_time: string;
   travel_time?: number;
+}
+
+const LOGISTICS_ADAM_MAX_FONT_PX = 10;
+const LOGISTICS_ADAM_MIN_FONT_PX = 8;
+const LOGISTICS_ADAM_BASE_SCALE = 0.82;
+const LOGISTICS_ADAM_MIN_SCALE = 0.58;
+const LOGISTICS_ADAM_HEIGHT_BOOST = 1.12;
+const LOGISTICS_ADAM_FIT_SAFETY_PX = 3;
+
+function LogisticsAdamCodeLabel({ code }: { code: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [labelStyle, setLabelStyle] = useState<{ fontSize: number; scaleX: number }>({
+    fontSize: LOGISTICS_ADAM_MAX_FONT_PX,
+    scaleX: LOGISTICS_ADAM_BASE_SCALE,
+  });
+
+  const fitLabel = useCallback(() => {
+    const container = containerRef.current;
+    const text = textRef.current;
+    if (!container || !text) return;
+
+    const available = container.clientWidth;
+    if (available <= 0) return;
+
+    const targetWidth = Math.max(available - LOGISTICS_ADAM_FIT_SAFETY_PX, 1);
+
+    const measureAt = (fontSize: number) => {
+      text.style.fontSize = `${fontSize}px`;
+      text.style.transform = "scale(1)";
+      text.style.transformOrigin = "center";
+      void text.offsetWidth;
+      return text.getBoundingClientRect().width;
+    };
+
+    let chosenFont = LOGISTICS_ADAM_MIN_FONT_PX;
+    for (
+      let fontSize = LOGISTICS_ADAM_MAX_FONT_PX;
+      fontSize >= LOGISTICS_ADAM_MIN_FONT_PX;
+      fontSize -= 0.5
+    ) {
+      if (measureAt(fontSize) <= targetWidth) {
+        chosenFont = fontSize;
+        break;
+      }
+    }
+
+    const measuredWidth = measureAt(chosenFont);
+    const fitScale = targetWidth / Math.max(measuredWidth, 1);
+    const chosenScale = Math.max(
+      LOGISTICS_ADAM_MIN_SCALE,
+      Math.min(LOGISTICS_ADAM_BASE_SCALE, fitScale)
+    );
+
+    setLabelStyle((prev) =>
+      prev.fontSize === chosenFont && prev.scaleX === chosenScale
+        ? prev
+        : { fontSize: chosenFont, scaleX: chosenScale }
+    );
+  }, [code]);
+
+  useLayoutEffect(() => {
+    fitLabel();
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver(() => fitLabel());
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [fitLabel, code]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="absolute inset-y-0 left-[8px] right-[1px] z-30 flex items-center justify-center overflow-hidden"
+    >
+      <span
+        ref={textRef}
+        className="inline-block max-w-full whitespace-nowrap text-center font-extrabold leading-none tracking-[-0.04em] text-foreground drop-shadow-[0_1px_1px_rgba(255,255,255,0.85)] dark:drop-shadow-[0_1px_1px_rgba(0,0,0,0.85)]"
+        style={{
+          fontSize: `${labelStyle.fontSize}px`,
+          transform: `scale(${labelStyle.scaleX}, ${labelStyle.scaleX * LOGISTICS_ADAM_HEIGHT_BOOST})`,
+          transformOrigin: "center",
+        }}
+      >
+        {code}
+      </span>
+    </div>
+  );
 }
 
 export default function TaskCard({
@@ -226,15 +352,17 @@ export default function TaskCard({
   multiSelectContext = null,
   isIncompatible = false,
   timelineWidthPx = 0,
+  timelinePxPerMinute = 0,
+  minTimelineTaskWidthPx = 0,
   travelTime = 0,
   travelWidthPx = 0,
   waitingGap = 0,
   waitingGapWidthPx = 0,
   isHighlighted = false,
   cleanerId = null,
-  isPriorityWindowViolation = false,
   operationsScope = "housekeeping",
   timelineRowStaffDisplayLabel = null,
+  onLogisticsTimelineMutated,
 }: TaskCardProps) {
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -404,13 +532,8 @@ const displayClickableInputClass =
   useEffect(() => {
     const checkMapFilter = setInterval(() => {
       const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-      // Per task collaborativi, controlla sia ID composto che task.name semplice
-      const collaboratorIds = (task as any).collaborator_ids as number[] | null;
-      const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
-      const assignedCleaner = (task as any).assignedCleaner as number | null;
-      const markerId = isCollaborativeTask && assignedCleaner 
-        ? `${task.name}:${assignedCleaner}` 
-        : task.name;
+      // Per task collaborativi usa ID composto taskId:cleanerId.
+      const markerId = getTaskMapMarkerId(task);
       
       const shouldBeFiltered = currentFilteredTaskId === markerId;
       if (shouldBeFiltered !== isMapFiltered) {
@@ -419,7 +542,7 @@ const displayClickableInputClass =
     }, 100);
 
     return () => clearInterval(checkMapFilter);
-  }, [task.name, isMapFiltered, task]);
+  }, [task.id, isMapFiltered, task]);
 
   // Gestisce il click sulla card: se multi-select toggle selezione, altrimenti apri modale
   const handleCardClick = (e: React.MouseEvent) => {
@@ -438,13 +561,8 @@ const displayClickableInputClass =
       setClickTimer(null);
 
       // Toggle filtro mappa per questa task (attiva/disattiva animazione)
-      // Per task collaborativi usa ID composto "taskName:cleanerId" per identificare il marker specifico
-      const collaboratorIds = (task as any).collaborator_ids as number[] | null;
-      const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
-      const assignedCleaner = (task as any).assignedCleaner as number | null;
-      const markerId = isCollaborativeTask && assignedCleaner 
-        ? `${task.name}:${assignedCleaner}` 
-        : task.name;
+      // Per task collaborativi usa ID composto "taskId:cleanerId" per identificare il marker specifico
+      const markerId = getTaskMapMarkerId(task);
       
       const currentFilteredTaskId = (window as any).mapFilteredTaskId;
       if (currentFilteredTaskId === markerId) {
@@ -453,6 +571,7 @@ const displayClickableInputClass =
       } else {
         // Accendi animazione
         (window as any).mapFilteredTaskId = markerId;
+        openTimelineMapPanel();
       }
     } else {
       // Primo click: avvia timer
@@ -471,11 +590,15 @@ const displayClickableInputClass =
   const [logisticsDriverBadge, setLogisticsDriverBadge] = useState<string | null>(null);
   const [resolvedLogisticsDriverTaskKey, setResolvedLogisticsDriverTaskKey] = useState<string>("");
   const [logisticsHousekeepingCleanerLabel, setLogisticsHousekeepingCleanerLabel] = useState<string | null>(null);
+  const [logisticsHousekeepingCleanerId, setLogisticsHousekeepingCleanerId] = useState<number | null>(null);
   const [logisticsHousekeepingSequence, setLogisticsHousekeepingSequence] = useState<number | null>(null);
   const [logisticsHousekeepingStartTime, setLogisticsHousekeepingStartTime] = useState<string | null>(null);
   const [logisticsHousekeepingEndTime, setLogisticsHousekeepingEndTime] = useState<string | null>(null);
   const [logisticsHousekeepingTravelTime, setLogisticsHousekeepingTravelTime] = useState<number | null>(null);
   const [logisticsTimelineSequence, setLogisticsTimelineSequence] = useState<number | null>(null);
+  const [logisticsTimelineStartTime, setLogisticsTimelineStartTime] = useState<string | null>(null);
+  const [logisticsTimelineEndTime, setLogisticsTimelineEndTime] = useState<string | null>(null);
+  const [logisticsTimelineTravelTime, setLogisticsTimelineTravelTime] = useState<number | null>(null);
   const [logisticsHousekeepingNotes, setLogisticsHousekeepingNotes] = useState<string | null>(null);
   const [customerNotesByTaskKey, setCustomerNotesByTaskKey] = useState<Record<string, string>>({});
   const [logisticsStructureBeds, setLogisticsStructureBeds] = useState<{
@@ -492,6 +615,9 @@ const displayClickableInputClass =
   const lastCollaboratorsTaskIdRef = useRef<number | null>(null);
   const initializedEditFieldsTaskKeyRef = useRef<string>("");
   const isLogisticsTimelineDetails = operationsScope === "logistics" && isInTimeline;
+  const isHousekeepingDetails = operationsScope === "housekeeping";
+  const isHousekeepingTimelineDetails = operationsScope === "housekeeping" && isInTimeline;
+  const isLogisticsDetails = operationsScope === "logistics";
   // Dialog completo in tutte le pagine non-office (timeline + containers).
   const isTimelineDetailsDialog = !isOfficeScope;
   const { toast } = useToast();
@@ -669,6 +795,17 @@ const displayClickableInputClass =
   const [editingPaxInInDialog, setEditingPaxInInDialog] = useState("");
   const [isSavingPaxIn, setIsSavingPaxIn] = useState(false);
   const [customerNoteDialogOpen, setCustomerNoteDialogOpen] = useState(false);
+  const [logisticsKindPickerOpen, setLogisticsKindPickerOpen] = useState(false);
+  const [isSavingLogisticsKind, setIsSavingLogisticsKind] = useState(false);
+  const [logisticsKindOverridesByTaskId, setLogisticsKindOverridesByTaskId] = useState<
+    Record<
+      string,
+      {
+        kind: LogisticsTaskKind;
+        source: "manual";
+      }
+    >
+  >({});
   const [editingCustomerNoteInDialog, setEditingCustomerNoteInDialog] = useState("");
   const [isSavingCustomerNote, setIsSavingCustomerNote] = useState(false);
 
@@ -1004,37 +1141,94 @@ const displayClickableInputClass =
   const isConfirmedOperation = hasPendingOperationEdit || originalConfirmed;
 
   // Determina il tipo della CARD dai flag dell'oggetto *task* (non quelli della navigazione nel modale)
-  const cardIsPremium = Boolean(task.premium);
-  const cardIsStraordinaria =
-    Boolean(task.straordinaria) ||
-    isContinuazioneStraordinariaTask(task) ||
-    isOfficeStraordinariaOperation(task);
+
+  const HOUSEKEEPING_STRIPE_CLASS: Record<HousekeepingTypeTier, string> = {
+    straordinaria: "bg-red-500",
+    premium: "bg-yellow-500",
+    standard: "bg-green-500",
+    altro: "bg-gray-400",
+  };
+
+  const HOUSEKEEPING_BADGE_CLASS: Record<HousekeepingTypeTier, string> = {
+    straordinaria: "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500",
+    premium:
+      "bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400",
+    standard:
+      "bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400",
+    altro: "bg-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500 dark:border-gray-400",
+  };
+
+  const HOUSEKEEPING_CORNER_BADGE_CLASS: Record<HousekeepingTypeTier, string> = {
+    straordinaria: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border-red-500",
+    premium:
+      "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400",
+    standard:
+      "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200 border-green-600 dark:border-green-400",
+    altro: "bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300 border-gray-400 dark:border-gray-500",
+  };
+
+  const cardHousekeepingTier = getHousekeepingTypeTier(task, operationNames);
 
   // Il modale invece usa displayTask (vedi più sotto)
 
   const getTaskTypeStyle = (isStraord: boolean, isPrem: boolean) => {
     if (isStraord) {
-      return { label: "STRAORDINARIA", colorClass: "task-straordinaria" };
+      return { label: "STRAORDINARIA" };
     }
     if (isPrem) {
-      return { label: "PREMIUM", colorClass: "task-premium" };
+      return { label: "PREMIUM" };
     }
-    return { label: "STANDARD", colorClass: "task-standard" };
+    return { label: "STANDARD" };
   };
 
-  const { label: typeLabel, colorClass: baseCardColorClass } =
-    getTaskTypeStyle(cardIsStraordinaria, cardIsPremium);
+  const cardTaskAny = task as any;
+  const cardTaskIdKey = String(cardTaskAny.task_id ?? cardTaskAny.id ?? "");
+  const cardLogisticsKindOverride = logisticsKindOverridesByTaskId[cardTaskIdKey];
+  const cardLogisticsTaskKind =
+    operationsScope === "logistics"
+      ? resolveLogisticsTaskKind({
+          logisticsTaskKind:
+            cardLogisticsKindOverride?.kind ?? cardTaskAny.logistics_task_kind,
+          logisticsTaskKindSource:
+            cardLogisticsKindOverride?.source ?? cardTaskAny.logistics_task_kind_source,
+          cleanerId: cardTaskAny.cleaner_id ?? null,
+          cleanerSequence: cardTaskAny.cleaner_sequence ?? null,
+          premium: task.premium,
+          paxIn: cardTaskAny.pax_in,
+        })
+      : null;
 
-  const ripassoCardColorClass = (() => {
-    if (!isRipassoOperation(taskWithPendingEdits)) return null;
-    if (cardIsStraordinaria) return "task-straordinaria-ripasso";
-    if (cardIsPremium) return "task-premium-ripasso";
-    return "task-standard-ripasso";
-  })();
-  const resolvedCardTypeColor = ripassoCardColorClass ?? baseCardColorClass;
+  const categoryStripeClass =
+    operationsScope === "logistics"
+      ? logisticsKindStripeClass(cardLogisticsTaskKind)
+      : HOUSEKEEPING_STRIPE_CLASS[cardHousekeepingTier];
 
-  // Se la task è bloccata, usa grigio invece del colore normale
-  const cardColorClass = isLocked && !isInTimeline ? "bg-gray-100 opacity-70 dark:bg-gray-500 dark:opacity-90" : resolvedCardTypeColor;
+  const cardLogisticsSequenceRaw =
+    operationsScope === "logistics"
+      ? cardTaskAny.sequence ??
+        cardTaskAny.logistics_sequence ??
+        cardTaskAny.logisticsSequence
+      : null;
+  const cardLogisticsSequenceNum = Number(cardLogisticsSequenceRaw);
+  const cardLogisticsSequence =
+    operationsScope === "logistics" &&
+    Number.isFinite(cardLogisticsSequenceNum) &&
+    cardLogisticsSequenceNum > 0
+      ? cardLogisticsSequenceNum
+      : operationsScope === "logistics" && isInTimeline
+        ? index + 1
+        : null;
+  const cardLogisticsSequenceLabel =
+    cardLogisticsSequence != null ? String(cardLogisticsSequence) : null;
+
+  // Nei container: sfondo pagina per contrasto con la colonna; in timeline resta custom-blue-light.
+  const cardSurfaceClass =
+    isLocked && !isInTimeline
+      ? "bg-muted/80 border-border/60 opacity-70"
+      : !isInTimeline
+        ? "bg-background border-border shadow-sm"
+        : "bg-custom-blue-light border-border/60";
+
   useEffect(() => {
     if (!isModalOpen) return;
     const taskObj = displayTask as any;
@@ -1067,6 +1261,9 @@ const displayClickableInputClass =
           setResolvedLogisticsDriverTaskKey("");
           setLogisticsDriverBadge(null);
           setLogisticsTimelineSequence(null);
+          setLogisticsTimelineStartTime(null);
+          setLogisticsTimelineEndTime(null);
+          setLogisticsTimelineTravelTime(null);
           setLogisticsHousekeepingNotes(null);
           setLogisticsStructureBeds(null);
           setLogisticsStructureAlertKeys(null);
@@ -1081,6 +1278,9 @@ const displayClickableInputClass =
           setResolvedLogisticsDriverTaskKey(detailsTaskKey);
           setLogisticsDriverBadge(null);
           setLogisticsTimelineSequence(null);
+          setLogisticsTimelineStartTime(null);
+          setLogisticsTimelineEndTime(null);
+          setLogisticsTimelineTravelTime(null);
           setLogisticsHousekeepingNotes(null);
           setLogisticsStructureBeds(null);
           setLogisticsStructureAlertKeys(null);
@@ -1098,6 +1298,9 @@ const displayClickableInputClass =
           if (taskKeyChanged) {
             setLogisticsDriverBadge(null);
             setLogisticsTimelineSequence(null);
+            setLogisticsTimelineStartTime(null);
+            setLogisticsTimelineEndTime(null);
+            setLogisticsTimelineTravelTime(null);
             setLogisticsHousekeepingNotes(null);
             setLogisticsStructureBeds(null);
             setLogisticsStructureAlertKeys(null);
@@ -1113,12 +1316,18 @@ const displayClickableInputClass =
         const json = res.ok ? await res.json().catch(() => ({})) : {};
         const badge = String(json?.driverBadge ?? "").trim();
         const logisticsSeqNum = Number(json?.sequence);
+        const logisticsStartText = String(json?.startTime ?? "").trim();
+        const logisticsEndText = String(json?.endTime ?? "").trim();
+        const logisticsTravelNum = Number(json?.travelTime);
         const housekeepingNotesText = String(json?.housekeepingNotes ?? "").trim();
         const bedsRaw = json?.structureBeds;
         const alertKeysRaw = Number(json?.structureAlertKeys);
         setResolvedLogisticsDriverTaskKey(detailsTaskKey);
         setLogisticsDriverBadge(badge || null);
         setLogisticsTimelineSequence(Number.isFinite(logisticsSeqNum) ? logisticsSeqNum : null);
+        setLogisticsTimelineStartTime(logisticsStartText || null);
+        setLogisticsTimelineEndTime(logisticsEndText || null);
+        setLogisticsTimelineTravelTime(Number.isFinite(logisticsTravelNum) ? logisticsTravelNum : null);
         setLogisticsHousekeepingNotes(housekeepingNotesText || null);
         setLogisticsStructureBeds(
           bedsRaw && typeof bedsRaw === "object"
@@ -1136,6 +1345,9 @@ const displayClickableInputClass =
           setResolvedLogisticsDriverTaskKey(detailsTaskKey);
           setLogisticsDriverBadge(null);
           setLogisticsTimelineSequence(null);
+          setLogisticsTimelineStartTime(null);
+          setLogisticsTimelineEndTime(null);
+          setLogisticsTimelineTravelTime(null);
           setLogisticsHousekeepingNotes(null);
           setLogisticsStructureBeds(null);
           setLogisticsStructureAlertKeys(null);
@@ -1158,6 +1370,7 @@ const displayClickableInputClass =
           lastHousekeepingDetailsFetchTaskKeyRef.current = "";
           setResolvedHousekeepingTaskKey("");
           setLogisticsHousekeepingCleanerLabel(null);
+          setLogisticsHousekeepingCleanerId(null);
           setLogisticsHousekeepingSequence(null);
           setLogisticsHousekeepingStartTime(null);
           setLogisticsHousekeepingEndTime(null);
@@ -1175,6 +1388,7 @@ const displayClickableInputClass =
           lastHousekeepingDetailsFetchTaskKeyRef.current = detailsTaskKey;
           setResolvedHousekeepingTaskKey(detailsTaskKey);
           setLogisticsHousekeepingCleanerLabel(null);
+          setLogisticsHousekeepingCleanerId(null);
           setLogisticsHousekeepingSequence(null);
           setLogisticsHousekeepingStartTime(null);
           setLogisticsHousekeepingEndTime(null);
@@ -1191,6 +1405,7 @@ const displayClickableInputClass =
         lastHousekeepingDetailsFetchTaskKeyRef.current = detailsTaskKey;
         if (taskKeyChanged) {
           setLogisticsHousekeepingCleanerLabel(null);
+          setLogisticsHousekeepingCleanerId(null);
           setLogisticsHousekeepingSequence(null);
           setLogisticsHousekeepingStartTime(null);
           setLogisticsHousekeepingEndTime(null);
@@ -1209,6 +1424,12 @@ const displayClickableInputClass =
         const label = String(json?.cleanerLabel ?? "").trim();
         setResolvedHousekeepingTaskKey(detailsTaskKey);
         setLogisticsHousekeepingCleanerLabel(label || null);
+        const rawCleanerId = json?.cleanerId;
+        const cleanerIdNum =
+          rawCleanerId === null || rawCleanerId === undefined || rawCleanerId === ""
+            ? NaN
+            : Number(rawCleanerId);
+        setLogisticsHousekeepingCleanerId(Number.isFinite(cleanerIdNum) ? cleanerIdNum : null);
         const rawSeq = json?.sequence;
         const sequenceNum =
           rawSeq === null || rawSeq === undefined || rawSeq === "" ? NaN : Number(rawSeq);
@@ -1224,6 +1445,7 @@ const displayClickableInputClass =
         if (!cancelled) {
           setResolvedHousekeepingTaskKey(detailsTaskKey);
           setLogisticsHousekeepingCleanerLabel(null);
+          setLogisticsHousekeepingCleanerId(null);
           setLogisticsHousekeepingSequence(null);
           setLogisticsHousekeepingStartTime(null);
           setLogisticsHousekeepingEndTime(null);
@@ -1861,6 +2083,60 @@ const displayClickableInputClass =
     }
   };
 
+  const handleSelectLogisticsKind = async (kind: LogisticsTaskKind) => {
+    if (!Number.isFinite(dialogTaskId)) {
+      toast({
+        title: "Errore",
+        description: "Task non valida",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingLogisticsKind(true);
+    try {
+      const workDate =
+        localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const response = await fetch("/api/update-logistics-task-kind", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: workDate,
+          taskId: dialogTaskId,
+          kind,
+          modified_by: currentUser.username || "unknown",
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Errore nel salvataggio");
+      }
+
+      setLogisticsKindOverridesByTaskId((prev) => ({
+        ...prev,
+        [displayTaskIdKey]: {
+          kind,
+          source: "manual",
+        },
+      }));
+      setLogisticsKindPickerOpen(false);
+      toast({
+        title: "Tipologia logistica salvata",
+        description: LOGISTICS_KIND_BADGE_LABEL[kind],
+      });
+      onLogisticsTimelineMutated?.();
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile salvare la tipologia logistica",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingLogisticsKind(false);
+    }
+  };
+
   // Calcola la larghezza in base alla durata
   const calculateWidth = (duration: string | undefined, forTimeline: boolean) => {
     const safeDuration = duration || "0.0";
@@ -1873,18 +2149,32 @@ const displayClickableInputClass =
     const effectiveMinutes = totalMinutes === 0 ? 60 : totalMinutes;
 
     if (forTimeline) {
+      if (timelinePxPerMinute > 0) {
+        const widthPx = effectiveMinutes * timelinePxPerMinute;
+        return `${Math.max(widthPx, minTimelineTaskWidthPx)}px`;
+      }
+
       // Usa la larghezza della timeline in pixel (passata da timeline-view via props)
       const timelineWidth = timelineWidthPx || 0;
       const slotsCount = (window as any).globalTimeSlotsCount || 10;
-      const virtualMinutes = slotsCount * 60; // Minuti virtuali basati su slot
-      
+      const globalMinutes = Number((window as any).globalTimelineMinutes);
+      const virtualMinutes =
+        Number.isFinite(globalMinutes) && globalMinutes > 0
+          ? globalMinutes
+          : slotsCount * 60;
+
       if (timelineWidth > 0) {
-        // Calcola in pixel assoluti
-        const widthPx = (effectiveMinutes / virtualMinutes) * timelineWidth;
+        let widthPx = (effectiveMinutes / virtualMinutes) * timelineWidth;
+        if (operationsScope === "logistics") {
+          widthPx *= 1.08;
+        }
         return `${widthPx}px`;
       } else {
         // Fallback a percentuale se larghezza non disponibile
-        const widthPercentage = (effectiveMinutes / virtualMinutes) * 100;
+        let widthPercentage = (effectiveMinutes / virtualMinutes) * 100;
+        if (operationsScope === "logistics") {
+          widthPercentage *= 1.08;
+        }
         return `${widthPercentage}%`;
       }
     } else {
@@ -1911,45 +2201,60 @@ const displayClickableInputClass =
 
   // Mostra orari nel tooltip solo per task < 1 ora E quando le frecce sono nascoste
   const shouldShowTooltipTimes = totalMinutes < 60 && !shouldShowCheckInOutArrows;
+  const cardTooltipAddressLabel =
+    String(displayTask.address ?? "").trim().toUpperCase() || "INDIRIZZO NON DISPONIBILE";
+  const cardTooltipClientAlias = String(displayTask.alias ?? "").trim();
+  const cardTooltipAddressLine =
+    operationsScope === "logistics" && isInTimeline && cardTooltipClientAlias
+      ? `${cardTooltipAddressLabel} - ${cardTooltipClientAlias}`
+      : cardTooltipAddressLabel;
 
   // Verifica violazioni temporali (considerando le date!)
   // In timeline la barra deve riflettere la task che rappresenta (task), non la task nel dialog (displayTask)
+  const logisticsViolationInput =
+    operationsScope === "logistics" && isInTimeline
+      ? pickLogisticsViolationFields((task as Record<string, unknown>) ?? null)
+      : null;
+
   const isOverdue = (() => {
     const taskForBar = isInTimeline ? task : displayTask;
     const taskObj = taskForBar as any;
-    // CRITICAL: Normalizza TUTTI i tempi per evitare date invalide (es. "15:55:00" -> "15:55")
-    // In timeline usa solo i tempi della task della card; fuori timeline usa assignmentTimes per pending edits
+
+    if (!isInTimeline) return false;
+
+    if (operationsScope === "logistics") {
+      const selectedWorkDate = localStorage.getItem("selected_work_date");
+      if (!selectedWorkDate || !logisticsViolationInput) return false;
+      return shouldBlinkLogisticsTimelineTask(logisticsViolationInput, selectedWorkDate);
+    }
+
+    // Housekeeping / office: regole esistenti
     const startTime = normalizeTime(
-      isInTimeline ? (taskObj.start_time || taskObj.startTime) : (assignmentTimes.start_time || taskObj.start_time || taskObj.startTime)
+      assignmentTimes.start_time || taskObj.start_time || taskObj.startTime
     );
     const endTime = normalizeTime(
-      isInTimeline ? (taskObj.end_time || taskObj.endTime) : (assignmentTimes.end_time || taskObj.end_time || taskObj.endTime)
+      assignmentTimes.end_time || taskObj.end_time || taskObj.endTime
     );
     const checkoutTime = normalizeTime(taskObj.checkout_time);
     const checkinTime = normalizeTime(taskObj.checkin_time);
     const checkoutDate = normalizeDate(taskObj.checkout_date);
     const checkinDate = normalizeDate(taskObj.checkin_date);
 
-    if (!isInTimeline) return false;
-
-    // CRITICAL: Caso 1 - start_time PRIMA di checkout_time (cleaner arriva prima che proprietà sia libera)
     if (startTime && checkoutTime && checkoutDate) {
-      const taskStartDateTime = new Date(checkoutDate + 'T' + startTime + ':00');
-      const checkoutDateTime = new Date(checkoutDate + 'T' + checkoutTime + ':00');
+      const taskStartDateTime = new Date(checkoutDate + "T" + startTime + ":00");
+      const checkoutDateTime = new Date(checkoutDate + "T" + checkoutTime + ":00");
       if (taskStartDateTime < checkoutDateTime) return true;
     }
 
-    // Caso 2: end_time sfora checkin_time
     if (endTime && checkinTime && checkoutDate && checkinDate) {
-      const checkoutDateTime = new Date(checkoutDate + 'T' + endTime + ':00');
-      const checkinDateTime = new Date(checkinDate + 'T' + checkinTime + ':00');
+      const checkoutDateTime = new Date(checkoutDate + "T" + endTime + ":00");
+      const checkinDateTime = new Date(checkinDate + "T" + checkinTime + ":00");
       if (checkoutDateTime > checkinDateTime) return true;
     }
 
-    // Caso 3: start_time è dopo o uguale a checkin_time (task inizia quando ospiti sono già arrivati)
     if (startTime && checkinTime && checkoutDate && checkinDate) {
-      const taskStartDateTime = new Date(checkoutDate + 'T' + startTime + ':00');
-      const checkinDateTime = new Date(checkinDate + 'T' + checkinTime + ':00');
+      const taskStartDateTime = new Date(checkoutDate + "T" + startTime + ":00");
+      const checkinDateTime = new Date(checkinDate + "T" + checkinTime + ":00");
       if (taskStartDateTime >= checkinDateTime) return true;
     }
 
@@ -2001,15 +2306,22 @@ const displayClickableInputClass =
       ? "top-1/2 -translate-y-1/2"
       : "top-[5px]";
 
-  // Determina se il drag è disabilitato in base alla data, se la task è già salvata, o se è bloccata
-  const shouldDisableDrag = isDragDisabled || (displayTask as any).checkin_date || isLocked || isPreAssignedReadonly;
+  // Determina se il drag è disabilitato in base alla data, se la task è già salvata, o se è bloccata.
+  // In logistica checkin_date è la finestra prevista, non un blocco di riordino.
+  const shouldDisableDrag =
+    isDragDisabled ||
+    (operationsScope !== "logistics" && Boolean((displayTask as any).checkin_date)) ||
+    isLocked ||
+    isPreAssignedReadonly;
 
-  // Usa sequence per determinare se è la prima task o successive (più robusto di index)
-  // CRITICAL: In timeline usare sempre task (la card rappresenta questa task), non displayTask (dialog)
-  const seq = (task as any).sequence ?? (index + 1);
   const currentDetailsTaskKey = getTaskKey(displayTask) || getTaskKey(task);
   const taskAny = task as any;
+  const logisticsAdamCode = String(
+    taskAny.logistic_code ?? task.name ?? taskAny.logisticCode ?? taskAny.task_id ?? task.id ?? ""
+  ).trim();
   const displayTaskAny = displayTask as any;
+  const displayTaskIdKey = String(displayTaskAny.task_id ?? displayTaskAny.id ?? "");
+  const displayLogisticsKindOverride = logisticsKindOverridesByTaskId[displayTaskIdKey];
   const modalTaskAny = isModalOpen ? displayTaskAny : taskAny;
   const bedsInfo =
     resolvedLogisticsDriverTaskKey === currentDetailsTaskKey ? logisticsStructureBeds : null;
@@ -2034,8 +2346,15 @@ const displayClickableInputClass =
     const num = Number(value);
     return Number.isFinite(num) ? num : null;
   };
+  const resolvedLogisticsStartTime =
+    resolvedLogisticsDriverTaskKey === currentDetailsTaskKey ? logisticsTimelineStartTime : null;
+  const resolvedLogisticsEndTime =
+    resolvedLogisticsDriverTaskKey === currentDetailsTaskKey ? logisticsTimelineEndTime : null;
+  const resolvedLogisticsTravelTime =
+    resolvedLogisticsDriverTaskKey === currentDetailsTaskKey ? logisticsTimelineTravelTime : null;
 
   const logisticsTravelTimeRaw =
+    resolvedLogisticsTravelTime ??
     modalTaskAny.logistics_travel_time ??
     modalTaskAny.logisticsTravelTime ??
     modalTaskAny.driver_travel_time ??
@@ -2057,6 +2376,7 @@ const displayClickableInputClass =
   // "Schedulato alle" nel box logistica deve usare solo dati logistici dedicati.
   // Evita fallback su driver_start_time (orario turno) e su start_time housekeeping.
   const logisticsScheduledAtRaw =
+    resolvedLogisticsStartTime ??
     modalTaskAny.logistics_start_time ??
     modalTaskAny.logisticsStartTime ??
     modalTaskAny.logistics_scheduled_time ??
@@ -2074,6 +2394,20 @@ const displayClickableInputClass =
     (isLogisticsTimelineDetails ? (displayTaskAny.start_time ?? displayTaskAny.startTime) : null) ??
     null;
   const logisticsScheduledAt = String(logisticsScheduledAtRaw ?? "").trim();
+  // "Schedulato entro le" = fine slot logistica (start + 15 min). Solo end_time task, non turno driver.
+  const logisticsScheduledUntilRaw =
+    resolvedLogisticsEndTime ??
+    modalTaskAny.logistics_end_time ??
+    modalTaskAny.logisticsEndTime ??
+    (isLogisticsTimelineDetails ? (modalTaskAny.end_time ?? modalTaskAny.endTime) : null) ??
+    taskAny.logistics_end_time ??
+    taskAny.logisticsEndTime ??
+    (isLogisticsTimelineDetails ? (taskAny.end_time ?? taskAny.endTime) : null) ??
+    displayTaskAny.logistics_end_time ??
+    displayTaskAny.logisticsEndTime ??
+    (isLogisticsTimelineDetails ? (displayTaskAny.end_time ?? displayTaskAny.endTime) : null) ??
+    null;
+  const logisticsScheduledUntil = String(logisticsScheduledUntilRaw ?? "").trim();
   const fallbackTimelineSequence =
     (isLogisticsTimelineDetails
       ? (taskAny.sequence ??
@@ -2085,13 +2419,91 @@ const displayClickableInputClass =
       : null) ?? null;
   const effectiveLogisticsSequence = Number(logisticsTimelineSequence ?? fallbackTimelineSequence);
   const isSingleKeyStructure = Number(effectiveStructureAlertKeys) === 1;
-  const isFirstSequenceLogistics = Number.isFinite(effectiveLogisticsSequence) && effectiveLogisticsSequence === 1;
+  const effectiveLogisticsTaskKind =
+    isLogisticsDetails || isHousekeepingTimelineDetails
+      ? resolveLogisticsTaskKind({
+        cleanerId:
+          logisticsHousekeepingCleanerId ??
+          cleanerId ??
+          displayTaskAny.assignedCleaner ??
+          displayTaskAny.cleaner_id ??
+          null,
+        cleanerSequence:
+          logisticsHousekeepingSequence ??
+          displayTaskAny.sequence ??
+          displayTaskAny.cleaner_sequence ??
+          null,
+        premium: displayTask.premium,
+        paxIn: displayTaskAny.pax_in,
+        logisticsTaskKind:
+          displayLogisticsKindOverride?.kind ?? displayTaskAny.logistics_task_kind,
+        logisticsTaskKindSource:
+          displayLogisticsKindOverride?.source ?? displayTaskAny.logistics_task_kind_source,
+      })
+    : null;
+
+  const dialogDisplayIsPremium = Boolean(displayTask.premium);
+  const dialogDisplayIsStraordinaria =
+    Boolean(displayTask.straordinaria) ||
+    isContinuazioneStraordinariaTask(displayTask) ||
+    isOfficeStraordinariaOperation(displayTask);
+  const dialogExternalBadgeLabel = getExternalInterventionBadgeLabel(
+    displayTask,
+    dialogDisplayIsStraordinaria,
+    dialogDisplayIsPremium
+  );
+  const dialogHousekeepingTypeLabel = dialogExternalBadgeLabel
+    ? dialogExternalBadgeLabel
+    : isOfficeStraordinariaOperation(displayTask)
+      ? "PULIZIA UFFICI STRAORDINARIA"
+      : isOfficeOtherOperation(displayTask)
+        ? "PULIZIA UFFICI"
+        : isContinuazioneStraordinariaTask(displayTask)
+          ? "CONTINUAZIONE PS"
+          : getTaskTypeStyle(dialogDisplayIsStraordinaria, dialogDisplayIsPremium).label;
+  const dialogHousekeepingTier = getHousekeepingTypeTier(displayTask, operationNames);
+  const dialogHousekeepingTypeBadge = (
+    <Badge
+      variant="outline"
+      className={cn(
+        "text-xs shrink-0 px-2 py-0.5 rounded border font-medium",
+        HOUSEKEEPING_BADGE_CLASS[dialogHousekeepingTier]
+      )}
+    >
+      {dialogHousekeepingTypeLabel}
+    </Badge>
+  );
+  const dialogHousekeepingCornerTypeBadge = (
+    <Badge
+      variant="outline"
+      className={cn(
+        "text-xs shrink-0 px-2 py-0.5 rounded border font-medium",
+        HOUSEKEEPING_CORNER_BADGE_CLASS[dialogHousekeepingTier]
+      )}
+    >
+      {dialogHousekeepingTypeLabel}
+    </Badge>
+  );
+  const dialogLogisticsKindBadgeCorner =
+    effectiveLogisticsTaskKind != null ? (
+      <LogisticsKindBadge kind={effectiveLogisticsTaskKind} />
+    ) : isLogisticsDetails && !isTaskReadOnly ? (
+      <LogisticsKindAddBadge
+        onClick={() => setLogisticsKindPickerOpen(true)}
+        disabled={isSavingLogisticsKind}
+      />
+    ) : null;
+
   const logisticsAlertParts: string[] = [];
   if (isSingleKeyStructure) {
     logisticsAlertParts.push("Consegnare chiave al cleaner.");
   }
-  if (isFirstSequenceLogistics) {
+  if (effectiveLogisticsTaskKind === "pick-up") {
     logisticsAlertParts.push("Solo ritiro dello sporco, no borsone.");
+  } else if (effectiveLogisticsTaskKind === "delivery") {
+    logisticsAlertParts.push("Consegna dotazione o materiale al cleaner.");
+  } else if (effectiveLogisticsTaskKind === "delivery/pick-up") {
+    logisticsAlertParts.push("Consegna borsone e ritiro sporco al checkout.");
   }
   const alertText = logisticsAlertParts.join(" ");
   const notesText =
@@ -2149,14 +2561,12 @@ const displayClickableInputClass =
   const logisticsSequenceDisplayValue = String(
     logisticsTimelineSequence ?? fallbackTimelineSequence ?? "—"
   );
-  const logisticsTravelDisplayValue = !isInTimeline
-    ? "non assegnato"
-    : logisticsTravelMinutes !== null
+  const logisticsTravelDisplayValue =
+    logisticsTravelMinutes !== null
       ? `${logisticsTravelMinutes} minuti`
       : "non assegnato";
-  const logisticsScheduledDisplayValue = !isInTimeline
-    ? "non assegnato"
-    : logisticsScheduledAt || "non assegnato";
+  const logisticsScheduledDisplayValue = logisticsScheduledAt || "non assegnato";
+  const logisticsScheduledUntilDisplayValue = logisticsScheduledUntil || "non assegnato";
   const logisticsAlertDisplayValue = alertText || "—";
   const logisticsBedsDisplayValue = bedsSummaryText || "—";
   const hasCollaboration = Number((displayTask as any).collaborator_count || 0) > 1;
@@ -2207,13 +2617,11 @@ const displayClickableInputClass =
   const housekeepingStartDisplayValue =
     isLogisticsScope
       ? String(effectiveHousekeepingStartTime ?? "").trim() ||
-        String(assignmentTimes.start_time ?? "").trim() ||
         "non assegnato"
       : String(assignmentTimes.start_time ?? "non assegnato");
   const housekeepingEndDisplayValue =
     isLogisticsScope
       ? String(effectiveHousekeepingEndTime ?? "").trim() ||
-        String(assignmentTimes.end_time ?? "").trim() ||
         "non assegnato"
       : String(assignmentTimes.end_time ?? "non assegnato");
 
@@ -2475,23 +2883,33 @@ const displayClickableInputClass =
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-h-[56px]">
-        <div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-h-[56px]">
+        <div className="text-center">
           <p className="text-sm font-semibold text-muted-foreground">Travel Time</p>
           <Input
             value={logisticsTravelDisplayValue}
             readOnly
-            className={displayInputClass}
+            className={cn(displayInputClass, "text-center")}
             tabIndex={-1}
             onFocus={(e) => e.currentTarget.blur()}
           />
         </div>
-        <div>
-          <p className="text-sm font-semibold text-muted-foreground">Schedulato alle</p>
+        <div className="text-center">
+          <p className="text-sm font-semibold text-muted-foreground">Start Time</p>
           <Input
             value={logisticsScheduledDisplayValue}
             readOnly
-            className={displayInputClass}
+            className={cn(displayInputClass, "text-center")}
+            tabIndex={-1}
+            onFocus={(e) => e.currentTarget.blur()}
+          />
+        </div>
+        <div className="text-center">
+          <p className="text-sm font-semibold text-muted-foreground">End Time</p>
+          <Input
+            value={logisticsScheduledUntilDisplayValue}
+            readOnly
+            className={cn(displayInputClass, "text-center")}
             tabIndex={-1}
             onFocus={(e) => e.currentTarget.blur()}
           />
@@ -2582,22 +3000,17 @@ const displayClickableInputClass =
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div
-                    className={`
-                      ${cardColorClass}
-                      rounded-sm border px-2 py-1 transition-all duration-200
-                      ${snapshot.isDragging ? "shadow-lg" : "shadow-sm"}
-                      ${
-                        isSelected && isMultiSelectMode && !isInTimeline
-                          ? "z-[1] ring-2 ring-sky-500 ring-inset"
-                          : ""
-                      }
-                      ${isOverdue && isInTimeline ? "animate-blink" : ""}
-                      ${isPriorityWindowViolation && isInTimeline ? "animate-blink-orange" : ""}
-                      ${!snapshot.isDragging && isMapFiltered ? "task-border-map-filtered" : ""}
-                      ${!snapshot.isDragging && !isMapFiltered && isHighlighted ? "task-border-search-highlighted" : ""}
-                      hover:shadow-md cursor-pointer
-                      flex-shrink-0 relative group
-                    `}
+                    className={cn(
+                      cardSurfaceClass,
+                      "rounded-md border transition-colors duration-200",
+                      isLogisticsTimelineDetails ? "px-1 py-0" : "flex items-center px-2 py-1",
+                      snapshot.isDragging && "shadow-lg",
+                      isSelected && isMultiSelectMode && !isInTimeline && "z-[1] ring-2 ring-sky-500 ring-inset",
+                      isOverdue && isInTimeline && "animate-blink",
+                      !snapshot.isDragging && isMapFiltered && "task-border-map-filtered",
+                      !snapshot.isDragging && !isMapFiltered && isHighlighted && "task-border-search-highlighted",
+                      "cursor-pointer flex-shrink-0 relative group"
+                    )}
                     style={{
                       width: cardWidth,
                       minWidth: cardWidth,
@@ -2606,7 +3019,14 @@ const displayClickableInputClass =
                       minHeight: "40px",
                       maxHeight: isInTimeline ? "40px" : undefined,
                       overflow: isInTimeline ? "visible" : undefined,
-                      zIndex: isMapFiltered ? 10 : 'auto',
+                      zIndex:
+                        snapshot.isDragging
+                          ? 9999
+                          : operationsScope === "logistics" && isInTimeline
+                            ? 20
+                            : isMapFiltered
+                              ? 10
+                              : 'auto',
                     }}
                     data-testid={`task-card-${getTaskKey(task)}`}
                     onClick={(e) => {
@@ -2615,10 +3035,18 @@ const displayClickableInputClass =
                       }
                     }}
                   >
+                    <div
+                      className={`absolute left-[2px] top-[2px] bottom-[2px] w-1.5 rounded-sm ${categoryStripeClass}`}
+                      aria-hidden="true"
+                    />
+                    {operationsScope === "logistics" && cardLogisticsSequenceLabel && (
+                      <LogisticsSequenceBadge
+                        sequence={cardLogisticsSequenceLabel}
+                        className="absolute -top-1.5 -right-1.5 z-[65]"
+                      />
+                    )}
                     {operationsScope === "logistics" && isInTimeline ? (
-                      <div className="flex h-full min-h-[40px] w-full items-center justify-center text-[#ff0000] font-extrabold text-[13px]">
-                        {seq}
-                      </div>
+                      <LogisticsAdamCodeLabel code={logisticsAdamCode} />
                     ) : (
                       <>
                     {/* Selection indicator (top-left) */}
@@ -2711,10 +3139,10 @@ const displayClickableInputClass =
                               "flex flex-col items-end gap-0.5 min-h-[28px]",
                               // posizione verticale
                               linesCount === 2
-                                ? "top-[5px] justify-start"
+                                ? "inset-y-0 justify-center"
                                 : shouldBottomRightSingleLine
                                   ? "bottom-[5px] justify-end"
-                                  : "top-[5px] justify-center",
+                                  : "inset-y-0 justify-center",
                             ].join(" ")}
                           >
                             {hasCheckout && (
@@ -2753,18 +3181,16 @@ const displayClickableInputClass =
                         );
                       })()}
 
-                    <div
-                      className="flex flex-col items-start justify-start h-full gap-0 p-[0.5px] pl-0 overflow-visible"
-                    >
+                    <div className="flex flex-col items-start justify-center flex-1 min-w-0 gap-0.5 pl-2 pr-1 overflow-visible">
                       <div className="flex items-center gap-1 w-full min-w-0 overflow-visible">
                         <span
-                          className="text-[#ff0000] font-extrabold text-[13px] shrink-0"
+                          className="text-foreground font-extrabold text-[13px] leading-none shrink-0"
                           data-testid={`task-name-${getTaskKey(task)}`}
                         >
                           {task.name}
                         </span>
                         {(task as any).customer_reference && (
-                          <span className="text-[#ff0000] font-bold text-[11px] whitespace-nowrap">
+                          <span className="text-red-600 dark:text-red-400 font-bold text-[11px] whitespace-nowrap">
                             ({(task as any).customer_reference})
                           </span>
                         )}
@@ -2775,7 +3201,7 @@ const displayClickableInputClass =
                         )}
                       </div>
                       {task.alias && (
-                        <span className="opacity-70 leading-none mt-0.5 text-[#000000] font-bold text-[9px] whitespace-nowrap">
+                        <span className="opacity-80 leading-none text-foreground font-semibold text-[9px] whitespace-nowrap">
                           {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                         </span>
                       )}
@@ -2784,9 +3210,12 @@ const displayClickableInputClass =
                     )}
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-xs text-base px-3 py-2">
+                <TooltipContent
+                  side="top"
+                  className="z-[10000] max-w-xs text-base px-3 py-2 pointer-events-none"
+                >
                   <div className="flex flex-col items-center gap-2">
-                    <p className="font-semibold">{displayTask.address?.toUpperCase() || "INDIRIZZO NON DISPONIBILE"}</p>
+                    <p className="font-semibold">{cardTooltipAddressLine}</p>
                     {shouldShowTooltipTimes && ((displayTask as any).checkout_time || (displayTask as any).checkin_time) && (
                       <div className="flex items-center gap-3 text-sm">
                         {(displayTask as any).checkout_time && (
@@ -2837,45 +3266,7 @@ const displayClickableInputClass =
 
               <DialogTitle className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-2 text-center">
                 Dettagli Task #{getTaskKey(displayTask)}
-                {(() => {
-                  const displayIsPremium = Boolean(displayTask.premium);
-                  const displayIsStraordinaria =
-                    Boolean(displayTask.straordinaria) ||
-                    isContinuazioneStraordinariaTask(displayTask) ||
-                    isOfficeStraordinariaOperation(displayTask);
-                  const displayExternalBadgeLabel = getExternalInterventionBadgeLabel(
-                    displayTask,
-                    displayIsStraordinaria,
-                    displayIsPremium
-                  );
-                  const displayTypeLabel = displayExternalBadgeLabel
-                    ? displayExternalBadgeLabel
-                    : isOfficeStraordinariaOperation(displayTask)
-                      ? "PULIZIA UFFICI STRAORDINARIA"
-                      : isOfficeOtherOperation(displayTask)
-                        ? "PULIZIA UFFICI"
-                        : isContinuazioneStraordinariaTask(displayTask)
-                          ? "CONTINUAZIONE PS"
-                          : getTaskTypeStyle(displayIsStraordinaria, displayIsPremium).label;
-
-                  return (
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "text-xs shrink-0 px-2 py-0.5 rounded border font-medium",
-                    displayExternalBadgeLabel
-                      ? "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700"
-                    : (Boolean(displayTask.straordinaria) || isContinuazioneStraordinariaTask(displayTask))
-                        ? "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500"
-                        : Boolean(displayTask.premium)
-                          ? "bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400"
-                          : "bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400"
-                  )}
-                >
-                  {displayTypeLabel}
-                </Badge>
-                  );
-                })()}
+                {!isLogisticsDetails && !isHousekeepingDetails && dialogHousekeepingTypeBadge}
                 {(displayTask as any).priority && (
                   <Badge
                     variant="outline"
@@ -2927,6 +3318,11 @@ const displayClickableInputClass =
                       <Truck className="h-3.5 w-3.5 shrink-0" />
                       <span>Dettagli Logistica</span>
                     </div>
+                    {dialogLogisticsKindBadgeCorner && (
+                      <div className={DIALOG_SECTION_CORNER_BADGE_WRAP_CLASS}>
+                        {dialogLogisticsKindBadgeCorner}
+                      </div>
+                    )}
 
                     <div className="grid gap-3 pt-2">{logisticsTimelineDetailFields()}</div>
                   </div>
@@ -2973,8 +3369,11 @@ const displayClickableInputClass =
             {isTimelineDetailsDialog && (
               <div className="absolute -top-3 left-3 inline-flex items-center gap-1.5 rounded-t-md rounded-b-sm border border-border bg-background px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-foreground shadow-sm">
                 <Building2 className="h-3.5 w-3.5 shrink-0" />
-                <span>{isLogisticsTimelineDetails ? "Dettagli Housekeeping" : "Dettagli Task"}</span>
+                <span>{isLogisticsDetails || isHousekeepingDetails ? "Dettagli Housekeeping" : "Dettagli Task"}</span>
               </div>
+            )}
+            {(isLogisticsDetails || isHousekeepingDetails) && (
+              <div className={DIALOG_SECTION_CORNER_BADGE_WRAP_CLASS}>{dialogHousekeepingCornerTypeBadge}</div>
             )}
             <div
               className={cn(
@@ -3546,6 +3945,15 @@ const displayClickableInputClass =
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog scelta tipologia logistica (task non determinati) */}
+      <LogisticsKindPickerDialog
+        open={logisticsKindPickerOpen}
+        onOpenChange={setLogisticsKindPickerOpen}
+        taskLabel={`#${getTaskKey(displayTask)}`}
+        onSelect={handleSelectLogisticsKind}
+        isSaving={isSavingLogisticsKind}
+      />
 
       {/* Dialog Modifica Tipologia intervento - stesso stile di Pax-In / Check-out / Check-in */}
       <Dialog open={operationDialogOpen} onOpenChange={(open) => !open && setOperationDialogOpen(false)}>

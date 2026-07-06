@@ -101,6 +101,7 @@ class Cleaner:
     last_lat: Optional[float] = None
     last_lng: Optional[float] = None
     last_sequence: int = 0
+    end_time: str = "20:00"
     route: List[Task] = field(default_factory=list)
     total_daily_tasks: int = 0  # Totale task giornaliere (EO + HP + LP)
 
@@ -241,7 +242,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     if not route:
         return True, []
 
-    MAX_END_TIME = 19 * 60
+    max_end_time = hhmm_to_min(cleaner.end_time, default="20:00")
 
     schedule: List[Tuple[int, int, int]] = []
 
@@ -290,7 +291,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
             if finish > checkin_minutes:
                 return False, []
 
-    if finish > MAX_END_TIME:
+    if finish > max_end_time:
         return False, []
 
     schedule.append((int(arrival), int(start), int(finish)))
@@ -316,7 +317,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
                 if finish > checkin_minutes:
                     return False, []
 
-        if finish > MAX_END_TIME:
+        if finish > max_end_time:
             return False, []
 
         schedule.append((int(arrival), int(start), int(finish)))
@@ -638,6 +639,7 @@ def load_cleaners() -> List[Cleaner]:
                 name=c.get("name") or str(c.get("id")),
                 lastname=c.get("lastname", ""),
                 role=role,
+                end_time=c.get("end_time", "20:00"),
             ))
     return cleaners
 
@@ -1078,7 +1080,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "6. Straordinarie solo a premium cleaner, devono essere la prima task",
                 "7. Premium task solo a premium cleaner",
                 "8. Check-in strict: deve finire prima del check-in time (INFRANGIBILE)",
-                "9. Vincolo orario: nessuna task deve finire dopo le 19:00",
+                "9. Vincolo orario: nessuna task deve finire dopo end_time del cleaner",
                 "10. Seed da EO e HP: disponibilità e posizione dall'ultima task",
                 "11. FORMATORE: solo task type_apt A o B, MINIMO 3 task LP",
                 "12. CROSS-CONTAINER: Favorisce vicinanza con task EO e HP già assegnate"

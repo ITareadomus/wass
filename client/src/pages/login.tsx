@@ -65,7 +65,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background text-foreground relative">
+    <div className="min-h-screen flex items-center justify-center overflow-x-hidden bg-background text-foreground relative">
       <Card className="w-full max-w-md border-2 border-custom-blue bg-custom-blue-light">
         <CardHeader className="space-y-3 bg-custom-blue-light">
           <CardTitle className="text-3xl font-bold text-center text-custom-blue">WASS 2.0</CardTitle>

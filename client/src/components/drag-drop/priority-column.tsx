@@ -1,6 +1,8 @@
 import { Droppable } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
+import { isWorkDateHistoricallyLocked } from "@shared/work-date-access";
 import TaskCard from "./task-card";
+import { ContainerTaskClip } from "./container-task-clip";
 import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -35,6 +37,8 @@ interface PriorityColumnProps {
   flushDropZone?: boolean;
   /** Passato a TaskCard per caricare i nomi operazione (enable_wass vs enable_wass_route). */
   operationsScope?: "housekeeping" | "logistics";
+  /** Dopo mutazione tipologia logistica (container o timeline). */
+  onLogisticsTimelineMutated?: () => void;
 }
 
 export default function PriorityColumn({
@@ -51,9 +55,10 @@ export default function PriorityColumn({
   disableToolbar = false,
   flushDropZone = false,
   operationsScope = "housekeeping",
+  onLogisticsTimelineMutated,
 }: PriorityColumnProps) {
   const [isAssigning, setIsAssigning] = useState(false);
-  const [isDateInPast, setIsDateInPast] = useState(false);
+  const [isHistoricalDateLocked, setIsHistoricalDateLocked] = useState(false);
   const { toast } = useToast();
   
   // Usa lo stato passato dal parent
@@ -81,26 +86,22 @@ export default function PriorityColumn({
 
   // Verifica se la data selezionata è nel passato
   useEffect(() => {
-    const checkIfDateInPast = () => {
+    const checkIfDateLocked = () => {
       const savedDate = localStorage.getItem('selected_work_date');
       if (!savedDate) {
-        setIsDateInPast(false);
+        setIsHistoricalDateLocked(false);
         return;
       }
 
       const [year, month, day] = savedDate.split('-').map(Number);
       const selectedDate = new Date(year, month - 1, day);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      selectedDate.setHours(0, 0, 0, 0);
-
-      setIsDateInPast(selectedDate < today);
+      setIsHistoricalDateLocked(isWorkDateHistoricallyLocked(selectedDate));
     };
 
-    checkIfDateInPast();
+    checkIfDateLocked();
 
     // Ricontrolla quando cambia la data
-    const interval = setInterval(checkIfDateInPast, 1000);
+    const interval = setInterval(checkIfDateLocked, 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -333,7 +334,7 @@ export default function PriorityColumn({
   };
 
   return (
-    <div className={`${getColumnClass(priority, tasks)} rounded-lg p-4 border-2`}>
+    <div className={`${getColumnClass(priority, tasks)} min-w-0 overflow-visible rounded-lg border-2 p-4`}>
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-semibold flex items-center text-custom-blue">
@@ -364,7 +365,7 @@ export default function PriorityColumn({
             variant={isMultiSelectMode ? "default" : "outline"}
             size="sm"
             onClick={toggleMode}
-            disabled={tasks.length === 0 || isDateInPast || disableToolbar}
+            disabled={tasks.length === 0 || isHistoricalDateLocked || disableToolbar}
             className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
             title={isMultiSelectMode ? "Disattiva selezione multipla" : "Attiva selezione multipla"}
             data-testid="button-toggle-multiselect"
@@ -380,7 +381,7 @@ export default function PriorityColumn({
               !assignAction ||
               assignButtonDisabled ||
               tasks.length === 0 ||
-              isDateInPast ||
+              isHistoricalDateLocked ||
               isAssigning ||
               disableToolbar
             }
@@ -399,8 +400,8 @@ export default function PriorityColumn({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`
-              flex flex-wrap gap-2 min-h-[120px] transition-colors duration-200 content-start border-0
-              ${flushDropZone ? "p-0" : "p-2"}
+              flex flex-wrap gap-2 min-h-[120px] min-w-0 overflow-visible transition-colors duration-200 content-start border-0
+              ${flushDropZone ? "p-0" : "p-2 pt-4 pl-4"}
               ${snapshot.isDraggingOver ? "drop-zone-active" : ""}
             `}
             data-testid={`priority-column-${droppableId}`}
@@ -423,19 +424,22 @@ export default function PriorityColumn({
                         const currentIndex = draggableIndex++;
                         return (
                           <div key={`task-${task.id}`} className="duplicate-group-item">
-                            <TaskCard
-                              task={task}
-                              index={currentIndex}
-                              isInTimeline={false}
-                              allTasks={orderedTasks}
-                              currentContainer={droppableId}
-                              isDuplicate={true}
-                              isDragDisabled={isDragDisabled || isDateInPast}
-                              isReadOnly={isDateInPast}
-                              multiSelectContext={multiSelectCtx}
-                              isHighlighted={isHighlighted}
-                              operationsScope={operationsScope}
-                            />
+                            <ContainerTaskClip>
+                              <TaskCard
+                                task={task}
+                                index={currentIndex}
+                                isInTimeline={false}
+                                allTasks={orderedTasks}
+                                currentContainer={droppableId}
+                                isDuplicate={true}
+                                isDragDisabled={isDragDisabled || isHistoricalDateLocked}
+                                isReadOnly={isHistoricalDateLocked}
+                                multiSelectContext={multiSelectCtx}
+                                isHighlighted={isHighlighted}
+                                operationsScope={operationsScope}
+                                onLogisticsTimelineMutated={onLogisticsTimelineMutated}
+                              />
+                            </ContainerTaskClip>
                           </div>
                         );
                       })}
@@ -453,6 +457,7 @@ export default function PriorityColumn({
                         className={`duplicate-single-block duplicate-zone duplicate-zone-pulse ${block.colorClass}`}
                         data-duplicate-group-id={block.groupId || undefined}
                       >
+                      <ContainerTaskClip className="max-w-full">
                         <TaskCard
                           task={task}
                           index={currentIndex}
@@ -460,12 +465,14 @@ export default function PriorityColumn({
                           allTasks={orderedTasks}
                           currentContainer={droppableId}
                           isDuplicate={true}
-                          isDragDisabled={isDragDisabled || isDateInPast}
-                          isReadOnly={isDateInPast}
+                          isDragDisabled={isDragDisabled || isHistoricalDateLocked}
+                          isReadOnly={isHistoricalDateLocked}
                           multiSelectContext={multiSelectCtx}
                           isHighlighted={isHighlighted}
                           operationsScope={operationsScope}
+                          onLogisticsTimelineMutated={onLogisticsTimelineMutated}
                         />
+                      </ContainerTaskClip>
                       </div>
                     </div>
                   );
@@ -477,20 +484,22 @@ export default function PriorityColumn({
                 const isHighlighted = highlightedTaskIds.has(String(task.id));
                 const currentIndex = draggableIndex++;
                 rendered.push(
-                  <TaskCard
-                    key={`plain-${task.id}`}
-                    task={task}
-                    index={currentIndex}
-                    isInTimeline={false}
-                    allTasks={orderedTasks}
-                    currentContainer={droppableId}
-                    isDuplicate={false}
-                    isDragDisabled={isDragDisabled || isDateInPast}
-                    isReadOnly={isDateInPast}
-                    multiSelectContext={multiSelectCtx}
-                    isHighlighted={isHighlighted}
-                    operationsScope={operationsScope}
-                  />
+                  <ContainerTaskClip key={`plain-${task.id}`}>
+                    <TaskCard
+                      task={task}
+                      index={currentIndex}
+                      isInTimeline={false}
+                      allTasks={orderedTasks}
+                      currentContainer={droppableId}
+                      isDuplicate={false}
+                      isDragDisabled={isDragDisabled || isHistoricalDateLocked}
+                      isReadOnly={isHistoricalDateLocked}
+                      multiSelectContext={multiSelectCtx}
+                      isHighlighted={isHighlighted}
+                      operationsScope={operationsScope}
+                      onLogisticsTimelineMutated={onLogisticsTimelineMutated}
+                    />
+                  </ContainerTaskClip>
                 );
               }
 

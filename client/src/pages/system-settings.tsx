@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Home, Settings, Loader2 } from "lucide-react";
+import { Save, Home, Loader2 } from "lucide-react";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -76,16 +76,16 @@ function withSettingsDefaults(data: Partial<SettingsData>): SettingsData {
 
   return {
     "early-out": {
-      eo_start_time: data["early-out"]?.eo_start_time ?? "06:30",
-      eo_end_time: data["early-out"]?.eo_end_time ?? "13:30",
+      eo_start_time: data["early-out"]?.eo_start_time ?? "",
+      eo_end_time: data["early-out"]?.eo_end_time ?? "",
       eo_clients: data["early-out"]?.eo_clients ?? [],
     },
     "high-priority": {
-      hp_start_time: data["high-priority"]?.hp_start_time ?? "13:31",
-      hp_end_time: data["high-priority"]?.hp_end_time ?? "16:30",
+      hp_start_time: data["high-priority"]?.hp_start_time ?? "",
+      hp_end_time: data["high-priority"]?.hp_end_time ?? "",
       hp_clients: data["high-priority"]?.hp_clients ?? [],
     },
-    dedupe_strategy: data.dedupe_strategy ?? "eo_wins",
+    dedupe_strategy: data.dedupe_strategy ?? "",
     apartment_types: {
       standard_apt: data.apartment_types?.standard_apt ?? [],
       premium_apt: data.apartment_types?.premium_apt ?? [],
@@ -147,9 +147,8 @@ export default function SystemSettings() {
 
       if (response.ok) {
         const data = await response.json();
-        // Se vuoto, imposta valori default
         if (Object.keys(data).length === 0) {
-          setSettings(null);
+          setSettings(withSettingsDefaults({}));
         } else {
           setSettings(withSettingsDefaults(data));
         }
@@ -229,18 +228,30 @@ export default function SystemSettings() {
     setSettings(prev => {
       if (!prev) return prev;
 
-      const key = priority === "eo" ? "eo_clients" : "hp_clients";
-      const clients = prev[priority === "eo" ? "early-out" : "high-priority"][key];
+      const clients =
+        priority === "eo"
+          ? prev["early-out"].eo_clients
+          : prev["high-priority"].hp_clients;
       const newClients = clients.includes(clientId)
-        ? clients.filter(id => id !== clientId)
+        ? clients.filter((id: number) => id !== clientId)
         : [...clients, clientId];
+
+      if (priority === "eo") {
+        return {
+          ...prev,
+          "early-out": {
+            ...prev["early-out"],
+            eo_clients: newClients,
+          },
+        };
+      }
 
       return {
         ...prev,
-        [priority === "eo" ? "early-out" : "high-priority"]: {
-          ...prev[priority === "eo" ? "early-out" : "high-priority"],
-          [key]: newClients
-        }
+        "high-priority": {
+          ...prev["high-priority"],
+          hp_clients: newClients,
+        },
       };
     });
   };
@@ -295,199 +306,66 @@ export default function SystemSettings() {
 
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
       <div className="w-full px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Settings</h1>
         </div>
 
         <div className="space-y-4">
-          {/* Early-Out, High-Priority e Low-Priority in un'unica card full-width */}
+          {/* Algoritmo priorità hp-centrico */}
           <Card className="bg-custom-blue-light border-2 border-custom-blue">
             <CardHeader className="bg-custom-blue-light py-3">
-              <CardTitle className="text-lg">Priority Settings</CardTitle>
+              <CardTitle className="text-lg">Priority Types</CardTitle>
               <CardDescription className="text-s">
-                Configura i range d'orario in cui i task possono iniziare per essere considerati Early-Out, High-Priority o Low-Priority
               </CardDescription>
               <CardDescription className="text-xs">
-                (Questo modificherà il modo in cui i task verrano classificati e verrano assegnati automaticamente ai cleaner)
               </CardDescription>
             </CardHeader>
             <CardContent className="bg-custom-blue-light">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Early-Out */}
-                <div className="space-y-3">
-                  <div className="border-b pb-2 flex items-center justify-center gap-2">
-                    <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Apt</span>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500 text-white border-blue-700">
-                      EO
-                    </span>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="hp_start_time" className="text-sm">HP Start Time</Label>
+                      <Input
+                        id="hp_start_time"
+                        type="time"
+                        required
+                        value={settings["high-priority"].hp_start_time}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            "high-priority": {
+                              ...settings["high-priority"],
+                              hp_start_time: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="hp_end_time" className="text-sm">HP End Time</Label>
+                      <Input
+                        id="hp_end_time"
+                        type="time"
+                        required
+                        value={settings["high-priority"].hp_end_time}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            "high-priority": {
+                              ...settings["high-priority"],
+                              hp_end_time: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="eo_start_time" className="text-sm">Start Time</Label>
-                    <Input
-                      id="eo_start_time"
-                      type="time"
-                      value={settings["early-out"].eo_start_time}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          "early-out": {
-                            ...settings["early-out"],
-                            eo_start_time: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="eo_end_time" className="text-sm">End Time</Label>
-                    <Input
-                      id="eo_end_time"
-                      type="time"
-                      value={settings["early-out"].eo_end_time}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          "early-out": {
-                            ...settings["early-out"],
-                            eo_end_time: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="eo_clients" className="text-sm">EO Clients</Label>
-                    {/* Input nascosto, useremo i checkboxes */}
-                    <Input id="eo_clients" className="hidden" />
-                    <ScrollArea className="h-40 w-full rounded-md border p-4">
-                      {clients.map((client) => (
-                        <div key={`eo-client-${client.client_id}`} className="flex items-center space-x-2 mb-2">
-                          <Checkbox
-                            id={`eo-client-${client.client_id}`}
-                            checked={settings["early-out"].eo_clients.includes(client.client_id)}
-                            onCheckedChange={(checked) => {
-                              handleClientToggle(client.client_id, "eo");
-                            }}
-                          />
-                          <Label htmlFor={`eo-client-${client.client_id}`} className="text-sm cursor-pointer">
-                            {client.customer_name}
-                          </Label>
-                        </div>
-                      ))}
-                    </ScrollArea>
-                  </div>
-                </div>
 
-                {/* High-Priority */}
-                <div className="space-y-3">
-                  <div className="border-b pb-2 flex items-center justify-center gap-2">
-                    <span className="text-sm font-medium text-orange-800 dark:text-orange-200">Apt</span>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-500 text-white border-orange-700">
-                      HP
-                    </span>
-                  </div>
                   <div className="space-y-2">
-                    <Label htmlFor="hp_start_time" className="text-sm">Start Time</Label>
-                    <Input
-                      id="hp_start_time"
-                      type="time"
-                      value={settings["high-priority"].hp_start_time}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          "high-priority": {
-                            ...settings["high-priority"],
-                            hp_start_time: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="hp_end_time" className="text-sm">End Time</Label>
-                    <Input
-                      id="hp_end_time"
-                      type="time"
-                      value={settings["high-priority"].hp_end_time}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          "high-priority": {
-                            ...settings["high-priority"],
-                            hp_end_time: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="hp_clients" className="text-sm">HP Clients</Label>
-                    {/* Input nascosto, useremo i checkboxes */}
-                    <Input id="hp_clients" className="hidden" />
-                    <ScrollArea className="h-40 w-full rounded-md border p-4">
-                      {clients.map((client) => (
-                        <div key={`hp-client-${client.client_id}`} className="flex items-center space-x-2 mb-2">
-                          <Checkbox
-                            id={`hp-client-${client.client_id}`}
-                            checked={settings["high-priority"].hp_clients.includes(client.client_id)}
-                            onCheckedChange={(checked) => {
-                              handleClientToggle(client.client_id, "hp");
-                            }}
-                          />
-                          <Label htmlFor={`hp-client-${client.client_id}`} className="text-sm cursor-pointer">
-                            {client.customer_name}
-                          </Label>
-                        </div>
-                      ))}
-                    </ScrollArea>
-                  </div>
-                </div>
-
-                {/* Low-Priority */}
-                <div className="space-y-3">
-                  <div className="border-b pb-2 flex items-center justify-center gap-2">
-                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Apt</span>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-500 text-white border-gray-700">
-                      LP
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lp_start_time" className="text-sm text-muted-foreground">Start Time</Label>
-                    <Input
-                      id="lp_start_time"
-                      type="time"
-                      disabled
-                      placeholder="Non valorizzato"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lp_time" className="text-sm text-muted-foreground">End Time</Label>
-                    <Input
-                      id="lp_time"
-                      type="time"
-                      disabled
-                      placeholder="Non valorizzato"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lp_clients" className="text-sm text-muted-foreground">LP Clients</Label>
-                    <Input
-                      id="lp_clients"
-                      disabled
-                      placeholder="Non valorizzato"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Dedupe Strategy e Client Settings - sotto EO e HP */}
-              <div className="md:col-span-3 mt-4 pt-4 border-t">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Dedupe Strategy - 2/3 della larghezza */}
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="dedupe_strategy" className="text-sm font-semibold">Dedupe Strategy</Label>
+                    <Label htmlFor="dedupe_strategy" className="text-sm font-semibold">Task Duplex</Label>
                     <Select
                       value={settings.dedupe_strategy}
                       onValueChange={(value) =>
@@ -506,29 +384,64 @@ export default function SystemSettings() {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Strategia per le task duplex, cioè che rispecchiano entrambi i criteri EO e HP (eo_wins → le task duplex saranno EO - hp_wins → viceversa)
+                      eo_wins assegna a EO i task duplex; hp_wins assegna a HP gli stessi casi.
                     </p>
                   </div>
+                </div>
 
-                  {/* Client Settings - 1/3 della larghezza */}
-                  <div className="space-y-2 md:col-span-1">
-                    <Label className="text-sm font-semibold">Client Settings</Label>
-                    <Button
-                      onClick={() => setLocation("/client-settings")}
-                      variant="outline"
-                      className="w-full justify-start h-auto py-2 bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80 transition-colors"
-                    >
-                      <Settings className="w-4 h-4 mr-2 flex-shrink-0" />
-                      <div className="text-left">
-                        <p className="text-xs font-semibold">Vai a Client Settings</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          Modifica Check-in/out per cliente
-                        </p>
-                      </div>
-                    </Button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <div className="border-b pb-2 flex items-center justify-center gap-2">
+                      <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Lista clienti </span>
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500 text-white border-blue-700">
+                        EO
+                      </span>
+                    </div>
+                    <ScrollArea className="h-56 w-full rounded-md border p-4">
+                      {clients.map((client) => (
+                        <div key={`eo-client-${client.client_id}`} className="flex items-center space-x-2 mb-2">
+                          <Checkbox
+                            id={`eo-client-${client.client_id}`}
+                            checked={settings["early-out"].eo_clients.includes(client.client_id)}
+                            onCheckedChange={() => {
+                              handleClientToggle(client.client_id, "eo");
+                            }}
+                          />
+                          <Label htmlFor={`eo-client-${client.client_id}`} className="text-sm cursor-pointer">
+                            {client.customer_name}
+                          </Label>
+                        </div>
+                      ))}
+                    </ScrollArea>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="border-b pb-2 flex items-center justify-center gap-2">
+                      <span className="text-sm font-medium text-orange-800 dark:text-orange-200">Lista clienti </span>
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-500 text-white border-orange-700">
+                        HP
+                      </span>
+                    </div>
+                    <ScrollArea className="h-56 w-full rounded-md border p-4">
+                      {clients.map((client) => (
+                        <div key={`hp-client-${client.client_id}`} className="flex items-center space-x-2 mb-2">
+                          <Checkbox
+                            id={`hp-client-${client.client_id}`}
+                            checked={settings["high-priority"].hp_clients.includes(client.client_id)}
+                            onCheckedChange={() => {
+                              handleClientToggle(client.client_id, "hp");
+                            }}
+                          />
+                          <Label htmlFor={`hp-client-${client.client_id}`} className="text-sm cursor-pointer">
+                            {client.customer_name}
+                          </Label>
+                        </div>
+                      ))}
+                    </ScrollArea>
                   </div>
                 </div>
               </div>
+
             </CardContent>
           </Card>
 

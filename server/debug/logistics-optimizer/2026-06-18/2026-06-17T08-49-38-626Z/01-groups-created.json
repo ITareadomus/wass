@@ -1,0 +1,2685 @@
+{
+  "workDate": "2026-06-18",
+  "runId": "2026-06-17T08-49-38-626Z",
+  "totalGroups": 61,
+  "groupingStats": {
+    "competitiveGroupingEnabled": true,
+    "cleanerClusters": 10,
+    "geographicFallbackGroups": 0,
+    "singletonFallbackTasks": 1,
+    "fallbackTasks": 6,
+    "recoveredMissingTaskCount": 0,
+    "duplicateGroupedTaskCount": 0,
+    "strongLocationClusters": 2,
+    "strongLocationClusterTasks": 5,
+    "addressGroupsDetected": 2,
+    "competitiveCandidatesGenerated": 335,
+    "competitiveCandidatesSelectedByType": {
+      "CLEANER_SEQUENCE": 5,
+      "SAME_LOCATION": 2,
+      "NEARBY_MICRO": 3,
+      "SINGLETON": 3
+    },
+    "cleanerClusterBeatenBySameLocationCount": 1,
+    "sameLocationBeatenByCleanerClusterCount": 5,
+    "sameLocationSplitAcceptedCount": 0,
+    "sameLocationSplitAcceptedReasons": [],
+    "candidateOverlapInvalidationCount": 59,
+    "avgReturnToSameAddressAfterSplitMin": 0,
+    "selectedCandidateScoreGapP50": 9,
+    "selectedCandidateScoreGapP90": 31,
+    "sameLocationReturnEvents": [],
+    "initialGroupsProcessed": 14,
+    "queueGroupsProcessed": 0,
+    "partialGroupsAssigned": 0,
+    "groupsSplit": 0,
+    "repairInsertedTasks": 0,
+    "fragmentationPenaltyTotal": 0,
+    "fragmentationPenaltyAvgPerCandidate": 0,
+    "fragmentationCandidatesWithPenalty": 0,
+    "fragmentationCandidatesCapped": 0,
+    "fragmentationProtectedNearPairTotal": 0,
+    "fragmentationEventCount": 0,
+    "routeLinearityDeltaTotal": 0,
+    "routeLinearityDeltaAppliedTotal": 0,
+    "routeLinearityDeltaBonusAppliedCount": 0,
+    "routeLinearityEventCount": 0
+  },
+  "groups": [
+    {
+      "groupId": "same-location-0",
+      "origin": "STRONG_LOCATION_CLUSTER",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        223810,
+        223960
+      ],
+      "logisticCodes": [
+        1741,
+        1741
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 1439,
+        "hasDriverBringsBag": true,
+        "originPriority": 1,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "STRONG_LOCATION_CLUSTER",
+        "summary": "Stesso indirizzo (addressId=0): 2 task pre-aggregati",
+        "details": {
+          "addressId": 0,
+          "chunkIndex": 0,
+          "totalChunks": 1,
+          "reason": "tutti i task condividono logisticCode 1741",
+          "logisticCodes": [
+            1741
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "sameLocationTravelMaxMin": 1
+          },
+          "members": [
+            {
+              "taskId": 223810,
+              "logisticCode": 1741,
+              "lat": 45.4342758,
+              "lng": 9.1803654,
+              "priority": "low_priority",
+              "bagPolicy": "NORMAL_TASK"
+            },
+            {
+              "taskId": 223960,
+              "logisticCode": 1741,
+              "lat": 45.4342758,
+              "lng": 9.1803654,
+              "priority": "low_priority",
+              "bagPolicy": "NORMAL_TASK"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "groupId": "same-location-1",
+      "origin": "STRONG_LOCATION_CLUSTER",
+      "seedBandIndex": 1,
+      "cleanerId": null,
+      "taskIds": [
+        225570,
+        225782,
+        225996
+      ],
+      "logisticCodes": [
+        1637,
+        1637,
+        1637
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 1439,
+        "hasDriverBringsBag": true,
+        "originPriority": 1,
+        "sizeScore": -3
+      },
+      "groupingReason": {
+        "strategy": "STRONG_LOCATION_CLUSTER",
+        "summary": "Stesso indirizzo (addressId=1): 3 task pre-aggregati",
+        "details": {
+          "addressId": 1,
+          "chunkIndex": 0,
+          "totalChunks": 1,
+          "reason": "tutti i task condividono logisticCode 1637",
+          "logisticCodes": [
+            1637
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "sameLocationTravelMaxMin": 1
+          },
+          "members": [
+            {
+              "taskId": 225570,
+              "logisticCode": 1637,
+              "lat": 45.4709651,
+              "lng": 9.1566484,
+              "priority": "low_priority",
+              "bagPolicy": "NORMAL_TASK"
+            },
+            {
+              "taskId": 225782,
+              "logisticCode": 1637,
+              "lat": 45.4709651,
+              "lng": 9.1566484,
+              "priority": "low_priority",
+              "bagPolicy": "NORMAL_TASK"
+            },
+            {
+              "taskId": 225996,
+              "logisticCode": 1637,
+              "lat": 45.4709651,
+              "lng": 9.1566484,
+              "priority": "low_priority",
+              "bagPolicy": "NORMAL_TASK"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "groupId": "same-location-1-pair-0",
+      "origin": "STRONG_LOCATION_CLUSTER",
+      "seedBandIndex": 1,
+      "cleanerId": null,
+      "taskIds": [
+        225570,
+        225782
+      ],
+      "logisticCodes": [
+        1637,
+        1637
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 1439,
+        "hasDriverBringsBag": true,
+        "originPriority": 1,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "STRONG_LOCATION_CLUSTER",
+        "summary": "Stesso indirizzo (addressId=1): 3 task pre-aggregati",
+        "details": {
+          "addressId": 1,
+          "chunkIndex": 0,
+          "totalChunks": 1,
+          "reason": "tutti i task condividono logisticCode 1637",
+          "logisticCodes": [
+            1637
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "sameLocationTravelMaxMin": 1
+          },
+          "members": [
+            {
+              "taskId": 225570,
+              "logisticCode": 1637,
+              "lat": 45.4709651,
+              "lng": 9.1566484,
+              "priority": "low_priority",
+              "bagPolicy": "NORMAL_TASK"
+            },
+            {
+              "taskId": 225782,
+              "logisticCode": 1637,
+              "lat": 45.4709651,
+              "lng": 9.1566484,
+              "priority": "low_priority",
+              "bagPolicy": "NORMAL_TASK"
+            },
+            {
+              "taskId": 225996,
+              "logisticCode": 1637,
+              "lat": 45.4709651,
+              "lng": 9.1566484,
+              "priority": "low_priority",
+              "bagPolicy": "NORMAL_TASK"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "groupId": "same-location-1-pair-1",
+      "origin": "STRONG_LOCATION_CLUSTER",
+      "seedBandIndex": 1,
+      "cleanerId": null,
+      "taskIds": [
+        225782,
+        225996
+      ],
+      "logisticCodes": [
+        1637,
+        1637
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 1439,
+        "hasDriverBringsBag": true,
+        "originPriority": 1,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "STRONG_LOCATION_CLUSTER",
+        "summary": "Stesso indirizzo (addressId=1): 3 task pre-aggregati",
+        "details": {
+          "addressId": 1,
+          "chunkIndex": 0,
+          "totalChunks": 1,
+          "reason": "tutti i task condividono logisticCode 1637",
+          "logisticCodes": [
+            1637
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "sameLocationTravelMaxMin": 1
+          },
+          "members": [
+            {
+              "taskId": 225570,
+              "logisticCode": 1637,
+              "lat": 45.4709651,
+              "lng": 9.1566484,
+              "priority": "low_priority",
+              "bagPolicy": "NORMAL_TASK"
+            },
+            {
+              "taskId": 225782,
+              "logisticCode": 1637,
+              "lat": 45.4709651,
+              "lng": 9.1566484,
+              "priority": "low_priority",
+              "bagPolicy": "NORMAL_TASK"
+            },
+            {
+              "taskId": 225996,
+              "logisticCode": 1637,
+              "lat": 45.4709651,
+              "lng": 9.1566484,
+              "priority": "low_priority",
+              "bagPolicy": "NORMAL_TASK"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "groupId": "cleaner-469-cluster-0",
+      "origin": "CLEANER_CLUSTER",
+      "seedBandIndex": 0,
+      "cleanerId": 469,
+      "taskIds": [
+        231831,
+        231756
+      ],
+      "logisticCodes": [
+        1715,
+        1729
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 600,
+        "hasDriverBringsBag": true,
+        "originPriority": 0,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 469: 2 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 469,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231831,
+              "logisticCode": 1715,
+              "cleanerSequence": 1,
+              "bagPolicy": "CLEANER_HAS_BAG",
+              "lat": 45.465,
+              "lng": 9.185
+            },
+            {
+              "taskId": 231756,
+              "logisticCode": 1729,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.486673,
+              "lng": 9.1883911
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231831,
+              "toTaskId": 231756,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 8,
+              "centroidTravelMin": 8,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      }
+    },
+    {
+      "groupId": "cleaner-249-cluster-0",
+      "origin": "CLEANER_CLUSTER",
+      "seedBandIndex": 1,
+      "cleanerId": 249,
+      "taskIds": [
+        231778,
+        231903,
+        231750
+      ],
+      "logisticCodes": [
+        795,
+        1032,
+        1381
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 660,
+        "hasDriverBringsBag": true,
+        "originPriority": 0,
+        "sizeScore": -3
+      },
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 249: 3 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 249,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231778,
+              "logisticCode": 795,
+              "cleanerSequence": 1,
+              "bagPolicy": "CLEANER_HAS_BAG",
+              "lat": 45.4829072,
+              "lng": 9.2150899
+            },
+            {
+              "taskId": 231903,
+              "logisticCode": 1032,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4662468,
+              "lng": 9.2045849
+            },
+            {
+              "taskId": 231750,
+              "logisticCode": 1381,
+              "cleanerSequence": 3,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4901211,
+              "lng": 9.2057682
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231778,
+              "toTaskId": 231903,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 7,
+              "centroidTravelMin": 7,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            },
+            {
+              "fromTaskId": 231903,
+              "toTaskId": 231750,
+              "fromCleanerSequence": 2,
+              "toCleanerSequence": 3,
+              "stepTravelMin": 9,
+              "centroidTravelMin": 7,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      }
+    },
+    {
+      "groupId": "cleaner-249-cluster-0-pair-0",
+      "origin": "CLEANER_CLUSTER",
+      "seedBandIndex": 1,
+      "cleanerId": 249,
+      "taskIds": [
+        231778,
+        231903
+      ],
+      "logisticCodes": [
+        795,
+        1032
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 660,
+        "hasDriverBringsBag": true,
+        "originPriority": 0,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 249: 3 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 249,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231778,
+              "logisticCode": 795,
+              "cleanerSequence": 1,
+              "bagPolicy": "CLEANER_HAS_BAG",
+              "lat": 45.4829072,
+              "lng": 9.2150899
+            },
+            {
+              "taskId": 231903,
+              "logisticCode": 1032,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4662468,
+              "lng": 9.2045849
+            },
+            {
+              "taskId": 231750,
+              "logisticCode": 1381,
+              "cleanerSequence": 3,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4901211,
+              "lng": 9.2057682
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231778,
+              "toTaskId": 231903,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 7,
+              "centroidTravelMin": 7,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            },
+            {
+              "fromTaskId": 231903,
+              "toTaskId": 231750,
+              "fromCleanerSequence": 2,
+              "toCleanerSequence": 3,
+              "stepTravelMin": 9,
+              "centroidTravelMin": 7,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      }
+    },
+    {
+      "groupId": "cleaner-249-cluster-0-pair-1",
+      "origin": "CLEANER_CLUSTER",
+      "seedBandIndex": 1,
+      "cleanerId": 249,
+      "taskIds": [
+        231903,
+        231750
+      ],
+      "logisticCodes": [
+        1032,
+        1381
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 740,
+        "hasDriverBringsBag": true,
+        "originPriority": 0,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 249: 3 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 249,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231778,
+              "logisticCode": 795,
+              "cleanerSequence": 1,
+              "bagPolicy": "CLEANER_HAS_BAG",
+              "lat": 45.4829072,
+              "lng": 9.2150899
+            },
+            {
+              "taskId": 231903,
+              "logisticCode": 1032,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4662468,
+              "lng": 9.2045849
+            },
+            {
+              "taskId": 231750,
+              "logisticCode": 1381,
+              "cleanerSequence": 3,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4901211,
+              "lng": 9.2057682
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231778,
+              "toTaskId": 231903,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 7,
+              "centroidTravelMin": 7,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            },
+            {
+              "fromTaskId": 231903,
+              "toTaskId": 231750,
+              "fromCleanerSequence": 2,
+              "toCleanerSequence": 3,
+              "stepTravelMin": 9,
+              "centroidTravelMin": 7,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      }
+    },
+    {
+      "groupId": "cleaner-987-cluster-0",
+      "origin": "CLEANER_CLUSTER",
+      "seedBandIndex": 0,
+      "cleanerId": 987,
+      "taskIds": [
+        231850,
+        227684,
+        231165
+      ],
+      "logisticCodes": [
+        1516,
+        229,
+        273
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 660,
+        "hasDriverBringsBag": true,
+        "originPriority": 0,
+        "sizeScore": -3
+      },
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 987: 3 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 987,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231850,
+              "logisticCode": 1516,
+              "cleanerSequence": 1,
+              "bagPolicy": "CLEANER_HAS_BAG",
+              "lat": 45.4507041,
+              "lng": 9.1959097
+            },
+            {
+              "taskId": 227684,
+              "logisticCode": 229,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4510472,
+              "lng": 9.1910628
+            },
+            {
+              "taskId": 231165,
+              "logisticCode": 273,
+              "cleanerSequence": 3,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4510412,
+              "lng": 9.1910662
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231850,
+              "toTaskId": 227684,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 4,
+              "centroidTravelMin": 4,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            },
+            {
+              "fromTaskId": 227684,
+              "toTaskId": 231165,
+              "fromCleanerSequence": 2,
+              "toCleanerSequence": 3,
+              "stepTravelMin": 3,
+              "centroidTravelMin": 3,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      }
+    },
+    {
+      "groupId": "cleaner-987-cluster-0-pair-0",
+      "origin": "CLEANER_CLUSTER",
+      "seedBandIndex": 0,
+      "cleanerId": 987,
+      "taskIds": [
+        231850,
+        227684
+      ],
+      "logisticCodes": [
+        1516,
+        229
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 660,
+        "hasDriverBringsBag": true,
+        "originPriority": 0,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 987: 3 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 987,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231850,
+              "logisticCode": 1516,
+              "cleanerSequence": 1,
+              "bagPolicy": "CLEANER_HAS_BAG",
+              "lat": 45.4507041,
+              "lng": 9.1959097
+            },
+            {
+              "taskId": 227684,
+              "logisticCode": 229,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4510472,
+              "lng": 9.1910628
+            },
+            {
+              "taskId": 231165,
+              "logisticCode": 273,
+              "cleanerSequence": 3,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4510412,
+              "lng": 9.1910662
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231850,
+              "toTaskId": 227684,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 4,
+              "centroidTravelMin": 4,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            },
+            {
+              "fromTaskId": 227684,
+              "toTaskId": 231165,
+              "fromCleanerSequence": 2,
+              "toCleanerSequence": 3,
+              "stepTravelMin": 3,
+              "centroidTravelMin": 3,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      }
+    },
+    {
+      "groupId": "cleaner-987-cluster-0-pair-1",
+      "origin": "CLEANER_CLUSTER",
+      "seedBandIndex": 0,
+      "cleanerId": 987,
+      "taskIds": [
+        227684,
+        231165
+      ],
+      "logisticCodes": [
+        229,
+        273
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 758,
+        "hasDriverBringsBag": true,
+        "originPriority": 0,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 987: 3 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 987,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231850,
+              "logisticCode": 1516,
+              "cleanerSequence": 1,
+              "bagPolicy": "CLEANER_HAS_BAG",
+              "lat": 45.4507041,
+              "lng": 9.1959097
+            },
+            {
+              "taskId": 227684,
+              "logisticCode": 229,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4510472,
+              "lng": 9.1910628
+            },
+            {
+              "taskId": 231165,
+              "logisticCode": 273,
+              "cleanerSequence": 3,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4510412,
+              "lng": 9.1910662
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231850,
+              "toTaskId": 227684,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 4,
+              "centroidTravelMin": 4,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            },
+            {
+              "fromTaskId": 227684,
+              "toTaskId": 231165,
+              "fromCleanerSequence": 2,
+              "toCleanerSequence": 3,
+              "stepTravelMin": 3,
+              "centroidTravelMin": 3,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      }
+    },
+    {
+      "groupId": "cleaner-445-cluster-0",
+      "origin": "CLEANER_CLUSTER",
+      "seedBandIndex": 0,
+      "cleanerId": 445,
+      "taskIds": [
+        231777,
+        231800
+      ],
+      "logisticCodes": [
+        1050,
+        410
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 660,
+        "hasDriverBringsBag": true,
+        "originPriority": 0,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 445: 2 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 445,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231777,
+              "logisticCode": 1050,
+              "cleanerSequence": 1,
+              "bagPolicy": "CLEANER_HAS_BAG",
+              "lat": 45.4506703,
+              "lng": 9.1779826
+            },
+            {
+              "taskId": 231800,
+              "logisticCode": 410,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4529136,
+              "lng": 9.1823451
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231777,
+              "toTaskId": 231800,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 4,
+              "centroidTravelMin": 4,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      }
+    },
+    {
+      "groupId": "cleaner-1064-cluster-0",
+      "origin": "CLEANER_CLUSTER",
+      "seedBandIndex": 0,
+      "cleanerId": 1064,
+      "taskIds": [
+        231292,
+        231759
+      ],
+      "logisticCodes": [
+        1530,
+        1679
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 675,
+        "hasDriverBringsBag": true,
+        "originPriority": 0,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 1064: 2 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 1064,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231292,
+              "logisticCode": 1530,
+              "cleanerSequence": 1,
+              "bagPolicy": "DRIVER_BRINGS_BAG",
+              "lat": 45.461049,
+              "lng": 9.175446
+            },
+            {
+              "taskId": 231759,
+              "logisticCode": 1679,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4464229,
+              "lng": 9.1816155
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231292,
+              "toTaskId": 231759,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 7,
+              "centroidTravelMin": 7,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      }
+    },
+    {
+      "groupId": "cleaner-24-cluster-0",
+      "origin": "CLEANER_CLUSTER",
+      "seedBandIndex": 0,
+      "cleanerId": 24,
+      "taskIds": [
+        231752,
+        231753
+      ],
+      "logisticCodes": [
+        714,
+        840
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 680,
+        "hasDriverBringsBag": true,
+        "originPriority": 0,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 24: 2 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 24,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231752,
+              "logisticCode": 714,
+              "cleanerSequence": 1,
+              "bagPolicy": "CLEANER_HAS_BAG",
+              "lat": 45.4668897,
+              "lng": 9.1272539
+            },
+            {
+              "taskId": 231753,
+              "logisticCode": 840,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4498056,
+              "lng": 9.1372543
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231752,
+              "toTaskId": 231753,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 7,
+              "centroidTravelMin": 7,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      }
+    },
+    {
+      "groupId": "cleaner-596-cluster-0",
+      "origin": "CLEANER_CLUSTER",
+      "seedBandIndex": 0,
+      "cleanerId": 596,
+      "taskIds": [
+        231748,
+        231776
+      ],
+      "logisticCodes": [
+        623,
+        771
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 682,
+        "hasDriverBringsBag": true,
+        "originPriority": 0,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 596: 2 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 596,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231748,
+              "logisticCode": 623,
+              "cleanerSequence": 1,
+              "bagPolicy": "CLEANER_HAS_BAG",
+              "lat": 45.4518038,
+              "lng": 9.1768031
+            },
+            {
+              "taskId": 231776,
+              "logisticCode": 771,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4549994,
+              "lng": 9.2049206
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231748,
+              "toTaskId": 231776,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 8,
+              "centroidTravelMin": 8,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      }
+    },
+    {
+      "groupId": "cleaner-132-cluster-0",
+      "origin": "CLEANER_CLUSTER",
+      "seedBandIndex": 1,
+      "cleanerId": 132,
+      "taskIds": [
+        231755,
+        231775
+      ],
+      "logisticCodes": [
+        504,
+        782
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 690,
+        "hasDriverBringsBag": true,
+        "originPriority": 0,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 132: 2 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 132,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231755,
+              "logisticCode": 504,
+              "cleanerSequence": 1,
+              "bagPolicy": "CLEANER_HAS_BAG",
+              "lat": 45.5034283,
+              "lng": 9.221111
+            },
+            {
+              "taskId": 231775,
+              "logisticCode": 782,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4814018,
+              "lng": 9.1909154
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231755,
+              "toTaskId": 231775,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 10,
+              "centroidTravelMin": 10,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      }
+    },
+    {
+      "groupId": "cleaner-326-cluster-0",
+      "origin": "CLEANER_CLUSTER",
+      "seedBandIndex": 0,
+      "cleanerId": 326,
+      "taskIds": [
+        231760,
+        231757
+      ],
+      "logisticCodes": [
+        1744,
+        1051
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 770,
+        "hasDriverBringsBag": true,
+        "originPriority": 0,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 326: 2 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 326,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231760,
+              "logisticCode": 1744,
+              "cleanerSequence": 1,
+              "bagPolicy": "CLEANER_HAS_BAG",
+              "lat": 45.466036,
+              "lng": 9.1521474
+            },
+            {
+              "taskId": 231757,
+              "logisticCode": 1051,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4581403,
+              "lng": 9.1462786
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231760,
+              "toTaskId": 231757,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 5,
+              "centroidTravelMin": 5,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      }
+    },
+    {
+      "groupId": "cleaner-1034-cluster-0",
+      "origin": "CLEANER_CLUSTER",
+      "seedBandIndex": 1,
+      "cleanerId": 1034,
+      "taskIds": [
+        231754,
+        231758
+      ],
+      "logisticCodes": [
+        1634,
+        1662
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 772,
+        "hasDriverBringsBag": true,
+        "originPriority": 0,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 1034: 2 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 1034,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231754,
+              "logisticCode": 1634,
+              "cleanerSequence": 1,
+              "bagPolicy": "CLEANER_HAS_BAG",
+              "lat": 45.475911,
+              "lng": 9.1710371
+            },
+            {
+              "taskId": 231758,
+              "logisticCode": 1662,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4889546,
+              "lng": 9.147833
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231754,
+              "toTaskId": 231758,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 8,
+              "centroidTravelMin": 8,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      }
+    },
+    {
+      "groupId": "nearby-223810-223960",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        223810,
+        223960
+      ],
+      "logisticCodes": [
+        1741,
+        1741
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 1439,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (223810, 223960)",
+        "details": {
+          "seedTaskId": 223810,
+          "candidateTaskId": 223960,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-225570-225782",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 1,
+      "cleanerId": null,
+      "taskIds": [
+        225570,
+        225782
+      ],
+      "logisticCodes": [
+        1637,
+        1637
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 1439,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (225570, 225782)",
+        "details": {
+          "seedTaskId": 225570,
+          "candidateTaskId": 225782,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-225570-225996",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 1,
+      "cleanerId": null,
+      "taskIds": [
+        225570,
+        225996
+      ],
+      "logisticCodes": [
+        1637,
+        1637
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 1439,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (225570, 225996)",
+        "details": {
+          "seedTaskId": 225570,
+          "candidateTaskId": 225996,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-225570-231760",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        225570,
+        231760
+      ],
+      "logisticCodes": [
+        1637,
+        1744
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 1439,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (225570, 231760)",
+        "details": {
+          "seedTaskId": 225570,
+          "candidateTaskId": 231760,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-225782-225996",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 1,
+      "cleanerId": null,
+      "taskIds": [
+        225782,
+        225996
+      ],
+      "logisticCodes": [
+        1637,
+        1637
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 1439,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (225782, 225996)",
+        "details": {
+          "seedTaskId": 225782,
+          "candidateTaskId": 225996,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-225782-231760",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        225782,
+        231760
+      ],
+      "logisticCodes": [
+        1637,
+        1744
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 1439,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (225782, 231760)",
+        "details": {
+          "seedTaskId": 225782,
+          "candidateTaskId": 231760,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-225996-231760",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        225996,
+        231760
+      ],
+      "logisticCodes": [
+        1637,
+        1744
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 1439,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (225996, 231760)",
+        "details": {
+          "seedTaskId": 225996,
+          "candidateTaskId": 231760,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-227684-231165",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        227684,
+        231165
+      ],
+      "logisticCodes": [
+        229,
+        273
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 758,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (227684, 231165)",
+        "details": {
+          "seedTaskId": 227684,
+          "candidateTaskId": 231165,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-227684-231850",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        227684,
+        231850
+      ],
+      "logisticCodes": [
+        229,
+        1516
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 660,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (227684, 231850)",
+        "details": {
+          "seedTaskId": 227684,
+          "candidateTaskId": 231850,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231165-231850",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        231165,
+        231850
+      ],
+      "logisticCodes": [
+        273,
+        1516
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 660,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231165, 231850)",
+        "details": {
+          "seedTaskId": 231165,
+          "candidateTaskId": 231850,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231292-231747",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        231292,
+        231747
+      ],
+      "logisticCodes": [
+        1530,
+        1681
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 660,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231292, 231747)",
+        "details": {
+          "seedTaskId": 231292,
+          "candidateTaskId": 231747,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231292-231831",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        231292,
+        231831
+      ],
+      "logisticCodes": [
+        1530,
+        1715
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 600,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231292, 231831)",
+        "details": {
+          "seedTaskId": 231292,
+          "candidateTaskId": 231831,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231292-231800",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        231292,
+        231800
+      ],
+      "logisticCodes": [
+        1530,
+        410
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 675,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231292, 231800)",
+        "details": {
+          "seedTaskId": 231292,
+          "candidateTaskId": 231800,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231747-231831",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        231747,
+        231831
+      ],
+      "logisticCodes": [
+        1681,
+        1715
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 600,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231747, 231831)",
+        "details": {
+          "seedTaskId": 231747,
+          "candidateTaskId": 231831,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231747-231800",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        231747,
+        231800
+      ],
+      "logisticCodes": [
+        1681,
+        410
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 660,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231747, 231800)",
+        "details": {
+          "seedTaskId": 231747,
+          "candidateTaskId": 231800,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231748-231777",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        231748,
+        231777
+      ],
+      "logisticCodes": [
+        623,
+        1050
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 660,
+        "hasDriverBringsBag": false,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231748, 231777)",
+        "details": {
+          "seedTaskId": 231748,
+          "candidateTaskId": 231777,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231748-231800",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        231748,
+        231800
+      ],
+      "logisticCodes": [
+        623,
+        410
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 729,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231748, 231800)",
+        "details": {
+          "seedTaskId": 231748,
+          "candidateTaskId": 231800,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231748-231292",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        231748,
+        231292
+      ],
+      "logisticCodes": [
+        623,
+        1530
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 675,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231748, 231292)",
+        "details": {
+          "seedTaskId": 231748,
+          "candidateTaskId": 231292,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231750-231778",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 1,
+      "cleanerId": null,
+      "taskIds": [
+        231750,
+        231778
+      ],
+      "logisticCodes": [
+        1381,
+        795
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 660,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231750, 231778)",
+        "details": {
+          "seedTaskId": 231750,
+          "candidateTaskId": 231778,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231753-231757",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        231753,
+        231757
+      ],
+      "logisticCodes": [
+        840,
+        1051
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 680,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231753, 231757)",
+        "details": {
+          "seedTaskId": 231753,
+          "candidateTaskId": 231757,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231756-231775",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 1,
+      "cleanerId": null,
+      "taskIds": [
+        231756,
+        231775
+      ],
+      "logisticCodes": [
+        1729,
+        782
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 683,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231756, 231775)",
+        "details": {
+          "seedTaskId": 231756,
+          "candidateTaskId": 231775,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231757-231760",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        231757,
+        231760
+      ],
+      "logisticCodes": [
+        1051,
+        1744
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 770,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231757, 231760)",
+        "details": {
+          "seedTaskId": 231757,
+          "candidateTaskId": 231760,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231759-231777",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        231759,
+        231777
+      ],
+      "logisticCodes": [
+        1679,
+        1050
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 660,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231759, 231777)",
+        "details": {
+          "seedTaskId": 231759,
+          "candidateTaskId": 231777,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231759-231800",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        231759,
+        231800
+      ],
+      "logisticCodes": [
+        1679,
+        410
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 729,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231759, 231800)",
+        "details": {
+          "seedTaskId": 231759,
+          "candidateTaskId": 231800,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231759-227684",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        231759,
+        227684
+      ],
+      "logisticCodes": [
+        1679,
+        229
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 753,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231759, 227684)",
+        "details": {
+          "seedTaskId": 231759,
+          "candidateTaskId": 227684,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231776-231850",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        231776,
+        231850
+      ],
+      "logisticCodes": [
+        771,
+        1516
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 660,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231776, 231850)",
+        "details": {
+          "seedTaskId": 231776,
+          "candidateTaskId": 231850,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "nearby-231777-231800",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        231777,
+        231800
+      ],
+      "logisticCodes": [
+        1050,
+        410
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 660,
+        "hasDriverBringsBag": true,
+        "originPriority": 2,
+        "sizeScore": -2
+      },
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231777, 231800)",
+        "details": {
+          "seedTaskId": 231777,
+          "candidateTaskId": 231800,
+          "travelMaxMin": 5
+        }
+      }
+    },
+    {
+      "groupId": "singleton-223810",
+      "origin": "SINGLETON_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        223810
+      ],
+      "logisticCodes": [
+        1741
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 1439,
+        "hasDriverBringsBag": true,
+        "originPriority": 3,
+        "sizeScore": -1
+      },
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 223810,
+          "logisticCode": 1741,
+          "cleanerId": null,
+          "cleanerSequence": null
+        }
+      }
+    },
+    {
+      "groupId": "singleton-223960",
+      "origin": "SINGLETON_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": null,
+      "taskIds": [
+        223960
+      ],
+      "logisticCodes": [
+        1741
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 1439,
+        "hasDriverBringsBag": true,
+        "originPriority": 3,
+        "sizeScore": -1
+      },
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 223960,
+          "logisticCode": 1741,
+          "cleanerId": null,
+          "cleanerSequence": null
+        }
+      }
+    },
+    {
+      "groupId": "singleton-231750",
+      "origin": "SINGLETON_FALLBACK",
+      "seedBandIndex": 1,
+      "cleanerId": 249,
+      "taskIds": [
+        231750
+      ],
+      "logisticCodes": [
+        1381
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 825,
+        "hasDriverBringsBag": true,
+        "originPriority": 3,
+        "sizeScore": -1
+      },
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 231750,
+          "logisticCode": 1381,
+          "cleanerId": 249,
+          "cleanerSequence": 3
+        }
+      }
+    },
+    {
+      "groupId": "singleton-231752",
+      "origin": "SINGLETON_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": 24,
+      "taskIds": [
+        231752
+      ],
+      "logisticCodes": [
+        714
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 1439,
+        "hasDriverBringsBag": false,
+        "originPriority": 3,
+        "sizeScore": -1
+      },
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 231752,
+          "logisticCode": 714,
+          "cleanerId": 24,
+          "cleanerSequence": 1
+        }
+      }
+    },
+    {
+      "groupId": "singleton-231753",
+      "origin": "SINGLETON_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": 24,
+      "taskIds": [
+        231753
+      ],
+      "logisticCodes": [
+        840
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 680,
+        "hasDriverBringsBag": true,
+        "originPriority": 3,
+        "sizeScore": -1
+      },
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 231753,
+          "logisticCode": 840,
+          "cleanerId": 24,
+          "cleanerSequence": 2
+        }
+      }
+    },
+    {
+      "groupId": "singleton-231754",
+      "origin": "SINGLETON_FALLBACK",
+      "seedBandIndex": 1,
+      "cleanerId": 1034,
+      "taskIds": [
+        231754
+      ],
+      "logisticCodes": [
+        1634
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 900,
+        "hasDriverBringsBag": false,
+        "originPriority": 3,
+        "sizeScore": -1
+      },
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 231754,
+          "logisticCode": 1634,
+          "cleanerId": 1034,
+          "cleanerSequence": 1
+        }
+      }
+    },
+    {
+      "groupId": "singleton-231755",
+      "origin": "SINGLETON_FALLBACK",
+      "seedBandIndex": 1,
+      "cleanerId": 132,
+      "taskIds": [
+        231755
+      ],
+      "logisticCodes": [
+        504
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 1439,
+        "hasDriverBringsBag": false,
+        "originPriority": 3,
+        "sizeScore": -1
+      },
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 231755,
+          "logisticCode": 504,
+          "cleanerId": 132,
+          "cleanerSequence": 1
+        }
+      }
+    },
+    {
+      "groupId": "singleton-231756",
+      "origin": "SINGLETON_FALLBACK",
+      "seedBandIndex": 1,
+      "cleanerId": 469,
+      "taskIds": [
+        231756
+      ],
+      "logisticCodes": [
+        1729
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 683,
+        "hasDriverBringsBag": true,
+        "originPriority": 3,
+        "sizeScore": -1
+      },
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 231756,
+          "logisticCode": 1729,
+          "cleanerId": 469,
+          "cleanerSequence": 2
+        }
+      }
+    },
+    {
+      "groupId": "singleton-231757",
+      "origin": "SINGLETON_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": 326,
+      "taskIds": [
+        231757
+      ],
+      "logisticCodes": [
+        1051
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 770,
+        "hasDriverBringsBag": true,
+        "originPriority": 3,
+        "sizeScore": -1
+      },
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 231757,
+          "logisticCode": 1051,
+          "cleanerId": 326,
+          "cleanerSequence": 2
+        }
+      }
+    },
+    {
+      "groupId": "singleton-231758",
+      "origin": "SINGLETON_FALLBACK",
+      "seedBandIndex": 1,
+      "cleanerId": 1034,
+      "taskIds": [
+        231758
+      ],
+      "logisticCodes": [
+        1662
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 772,
+        "hasDriverBringsBag": true,
+        "originPriority": 3,
+        "sizeScore": -1
+      },
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 231758,
+          "logisticCode": 1662,
+          "cleanerId": 1034,
+          "cleanerSequence": 2
+        }
+      }
+    },
+    {
+      "groupId": "singleton-231759",
+      "origin": "SINGLETON_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": 1064,
+      "taskIds": [
+        231759
+      ],
+      "logisticCodes": [
+        1679
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 753,
+        "hasDriverBringsBag": true,
+        "originPriority": 3,
+        "sizeScore": -1
+      },
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 231759,
+          "logisticCode": 1679,
+          "cleanerId": 1064,
+          "cleanerSequence": 2
+        }
+      }
+    },
+    {
+      "groupId": "singleton-231775",
+      "origin": "SINGLETON_FALLBACK",
+      "seedBandIndex": 1,
+      "cleanerId": 132,
+      "taskIds": [
+        231775
+      ],
+      "logisticCodes": [
+        782
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 690,
+        "hasDriverBringsBag": true,
+        "originPriority": 3,
+        "sizeScore": -1
+      },
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 231775,
+          "logisticCode": 782,
+          "cleanerId": 132,
+          "cleanerSequence": 2
+        }
+      }
+    },
+    {
+      "groupId": "singleton-231776",
+      "origin": "SINGLETON_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": 596,
+      "taskIds": [
+        231776
+      ],
+      "logisticCodes": [
+        771
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 682,
+        "hasDriverBringsBag": true,
+        "originPriority": 3,
+        "sizeScore": -1
+      },
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 231776,
+          "logisticCode": 771,
+          "cleanerId": 596,
+          "cleanerSequence": 2
+        }
+      }
+    },
+    {
+      "groupId": "singleton-231778",
+      "origin": "SINGLETON_FALLBACK",
+      "seedBandIndex": 1,
+      "cleanerId": 249,
+      "taskIds": [
+        231778
+      ],
+      "logisticCodes": [
+        795
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 660,
+        "hasDriverBringsBag": false,
+        "originPriority": 3,
+        "sizeScore": -1
+      },
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 231778,
+          "logisticCode": 795,
+          "cleanerId": 249,
+          "cleanerSequence": 1
+        }
+      }
+    },
+    {
+      "groupId": "singleton-231831",
+      "origin": "SINGLETON_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": 469,
+      "taskIds": [
+        231831
+      ],
+      "logisticCodes": [
+        1715
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 600,
+        "hasDriverBringsBag": false,
+        "originPriority": 3,
+        "sizeScore": -1
+      },
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 231831,
+          "logisticCode": 1715,
+          "cleanerId": 469,
+          "cleanerSequence": 1
+        }
+      }
+    },
+    {
+      "groupId": "singleton-231903",
+      "origin": "SINGLETON_FALLBACK",
+      "seedBandIndex": 0,
+      "cleanerId": 249,
+      "taskIds": [
+        231903
+      ],
+      "logisticCodes": [
+        1032
+      ],
+      "queueSortKey": {
+        "earliestDeadlineMin": 740,
+        "hasDriverBringsBag": true,
+        "originPriority": 3,
+        "sizeScore": -1
+      },
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 231903,
+          "logisticCode": 1032,
+          "cleanerId": 249,
+          "cleanerSequence": 2
+        }
+      }
+    }
+  ]
+}

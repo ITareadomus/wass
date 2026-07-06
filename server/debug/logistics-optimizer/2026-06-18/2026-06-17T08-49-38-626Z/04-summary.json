@@ -1,0 +1,20 @@
+{
+  "workDate": "2026-06-18",
+  "runId": "2026-06-17T08-49-38-626Z",
+  "groupsProcessed": 14,
+  "groupsAssigned": 13,
+  "groupsUnassigned": 0,
+  "tasksAssigned": 26,
+  "tasksUnassigned": 2,
+  "repairInsertedTasks": 0,
+  "scheduleBuildCount": 43164,
+  "scheduleBuildElapsedMs": 327,
+  "reasonCounts": {
+    "CHECKIN_CHECKOUT_CONSTRAINT": 0,
+    "CLEANER_TIME_CONSTRAINT": 0,
+    "NO_DRIVER_FEASIBLE": 0,
+    "NO_TASK_CANDIDATES": 0,
+    "TRULY_IMPOSSIBLE": 1,
+    "ROUTE_CAPACITY_OR_ORDERING_CONFLICT": 1
+  }
+}

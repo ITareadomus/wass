@@ -163,6 +163,7 @@ class Cleaner:
     lastname: str
     role: str
     start_time: datetime
+    end_time: datetime
     available_from: Optional[datetime] = None
     last_eo_address: Optional[str] = None
     last_eo_lat: Optional[float] = None
@@ -338,7 +339,7 @@ def evaluate_route(cleaner: Cleaner, route: List[Task]) -> Tuple[bool, List[Tupl
     else:
         arrival = base
 
-    max_end_time = datetime(arrival.year, arrival.month, arrival.day, 19, 0)
+    max_end_time = cleaner.end_time
 
     if first.straordinaria:
         if first.checkout_dt:
@@ -677,11 +678,17 @@ def load_cleaners(ref_date: str) -> List[Cleaner]:
             continue
 
         st = (c.get("start_time") or "10:00")
+        et = (c.get("end_time") or "20:00")
         try:
             h, m = [int(x) for x in st.split(":")]
         except Exception:
             h, m = 10, 0
+        try:
+            eh, em = [int(x) for x in et.split(":")]
+        except Exception:
+            eh, em = 20, 0
         start_dt = datetime.strptime(f"{ref_date} {h:02d}:{m:02d}", "%Y-%m-%d %H:%M")
+        end_dt = datetime.strptime(f"{ref_date} {eh:02d}:{em:02d}", "%Y-%m-%d %H:%M")
 
         cleaners.append(
             Cleaner(
@@ -690,6 +697,7 @@ def load_cleaners(ref_date: str) -> List[Cleaner]:
                 lastname=c.get("lastname", ""),
                 role=role,
                 start_time=start_dt,
+                end_time=end_dt,
             ))
     return cleaners
 
@@ -1060,7 +1068,7 @@ def build_output(cleaners: List[Cleaner], unassigned: List[Task], original_tasks
                 "6. Premium task solo a premium cleaner",
                 "7. Check-in strict: deve finire prima del check-in time",
                 "8. HP hard earliest: 11:00",
-                "9. Vincolo orario: nessuna task deve finire dopo le 19:00",
+                "9. Vincolo orario: nessuna task deve finire dopo end_time del cleaner",
                 "10. CROSS-CONTAINER: Favorisce vicinanza con task EO già assegnate"
             ]
         }

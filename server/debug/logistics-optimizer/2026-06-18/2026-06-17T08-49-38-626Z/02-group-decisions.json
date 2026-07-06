@@ -1,0 +1,3263 @@
+{
+  "workDate": "2026-06-18",
+  "runId": "2026-06-17T08-49-38-626Z",
+  "decisions": [
+    {
+      "step": 1,
+      "groupId": "cleaner-987-cluster-0",
+      "origin": "CLEANER_CLUSTER",
+      "taskIds": [
+        231850,
+        227684,
+        231165
+      ],
+      "logisticCodes": [
+        1516,
+        229,
+        273
+      ],
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 987: 3 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 987,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231850,
+              "logisticCode": 1516,
+              "cleanerSequence": 1,
+              "bagPolicy": "CLEANER_HAS_BAG",
+              "lat": 45.4507041,
+              "lng": 9.1959097
+            },
+            {
+              "taskId": 227684,
+              "logisticCode": 229,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4510472,
+              "lng": 9.1910628
+            },
+            {
+              "taskId": 231165,
+              "logisticCode": 273,
+              "cleanerSequence": 3,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4510412,
+              "lng": 9.1910662
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231850,
+              "toTaskId": 227684,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 4,
+              "centroidTravelMin": 4,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            },
+            {
+              "fromTaskId": 227684,
+              "toTaskId": 231165,
+              "fromCleanerSequence": 2,
+              "toCleanerSequence": 3,
+              "stepTravelMin": 3,
+              "centroidTravelMin": 3,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      },
+      "outcome": "FULL_ASSIGNED",
+      "why": "best_competitive_candidate",
+      "winner": {
+        "driverId": 737,
+        "score": 288,
+        "travelMinutesDelta": 14,
+        "projectedClockEnd": "11:52",
+        "taskOrder": [
+          227684,
+          231165,
+          231850
+        ],
+        "schedule": [
+          {
+            "taskId": 227684,
+            "logisticCode": 229,
+            "startTime": "11:00",
+            "endTime": "11:15",
+            "travelMinutes": 7,
+            "checkoutWaitMinutes": 0
+          },
+          {
+            "taskId": 231165,
+            "logisticCode": 273,
+            "startTime": "11:18",
+            "endTime": "11:33",
+            "travelMinutes": 3,
+            "checkoutWaitMinutes": 0
+          },
+          {
+            "taskId": 231850,
+            "logisticCode": 1516,
+            "startTime": "11:37",
+            "endTime": "11:52",
+            "travelMinutes": 4,
+            "checkoutWaitMinutes": 0
+          }
+        ]
+      },
+      "driverAttempts": [
+        {
+          "driverId": 737,
+          "feasible": true,
+          "score": 312,
+          "travelMinutesDelta": 14,
+          "projectedClockEnd": "11:52"
+        },
+        {
+          "driverId": 1078,
+          "feasible": true,
+          "score": 309,
+          "travelMinutesDelta": 14,
+          "projectedClockEnd": "11:52"
+        }
+      ],
+      "competitiveContext": {
+        "candidateType": "CLEANER_SEQUENCE",
+        "competitorsConsidered": [
+          {
+            "id": "cand-cleaner-cleaner-249-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": null,
+            "feasible": false
+          },
+          {
+            "id": "cand-cleaner-cleaner-987-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 288,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-1-full",
+            "type": "SAME_LOCATION",
+            "score": 257,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231747-231831",
+            "type": "NEARBY_MICRO",
+            "score": 239,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231292-231831",
+            "type": "NEARBY_MICRO",
+            "score": null,
+            "feasible": false
+          },
+          {
+            "id": "cand-cleaner-cleaner-326-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 197,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231757-231760",
+            "type": "NEARBY_MICRO",
+            "score": 192,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-469-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 198,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-24-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 217,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231750-231778",
+            "type": "NEARBY_MICRO",
+            "score": null,
+            "feasible": false
+          },
+          {
+            "id": "cand-nearby-231748-231800",
+            "type": "NEARBY_MICRO",
+            "score": 206,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231748-231292",
+            "type": "NEARBY_MICRO",
+            "score": null,
+            "feasible": false
+          },
+          {
+            "id": "cand-nearby-231753-231757",
+            "type": "NEARBY_MICRO",
+            "score": 223,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-596-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": null,
+            "feasible": false
+          },
+          {
+            "id": "cand-cleaner-cleaner-249-cluster-0-pair-1",
+            "type": "CLEANER_SEQUENCE",
+            "score": null,
+            "feasible": false
+          },
+          {
+            "id": "cand-cleaner-cleaner-132-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 207.8,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-445-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 195,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-987-cluster-0-pair-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 161,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-227684-231850",
+            "type": "NEARBY_MICRO",
+            "score": 156,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231777-231800",
+            "type": "NEARBY_MICRO",
+            "score": 190,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231165-231850",
+            "type": "NEARBY_MICRO",
+            "score": 156,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231292-231747",
+            "type": "NEARBY_MICRO",
+            "score": 233,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231777",
+            "type": "NEARBY_MICRO",
+            "score": 197,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231756-231775",
+            "type": "NEARBY_MICRO",
+            "score": 187,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-249-cluster-0-pair-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": null,
+            "feasible": false
+          },
+          {
+            "id": "cand-cleaner-cleaner-1064-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 192,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231747-231800",
+            "type": "NEARBY_MICRO",
+            "score": 190,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231776-231850",
+            "type": "NEARBY_MICRO",
+            "score": null,
+            "feasible": false
+          },
+          {
+            "id": "cand-nearby-231292-231800",
+            "type": "NEARBY_MICRO",
+            "score": 194,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-1034-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 185,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231748-231777",
+            "type": "NEARBY_MICRO",
+            "score": null,
+            "feasible": false
+          },
+          {
+            "id": "cand-cleaner-cleaner-987-cluster-0-pair-1",
+            "type": "CLEANER_SEQUENCE",
+            "score": 158,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-227684-231165",
+            "type": "NEARBY_MICRO",
+            "score": 153,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231800",
+            "type": "NEARBY_MICRO",
+            "score": 152,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-227684",
+            "type": "NEARBY_MICRO",
+            "score": 117,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-223810-223960",
+            "type": "NEARBY_MICRO",
+            "score": 163,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225570-225782",
+            "type": "NEARBY_MICRO",
+            "score": -147,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225570-225996",
+            "type": "NEARBY_MICRO",
+            "score": -147,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225782-225996",
+            "type": "NEARBY_MICRO",
+            "score": -147,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-0-full",
+            "type": "SAME_LOCATION",
+            "score": 169,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-1-pair-0",
+            "type": "SAME_LOCATION",
+            "score": -141,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-1-pair-1",
+            "type": "SAME_LOCATION",
+            "score": -141,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225570-231760",
+            "type": "NEARBY_MICRO",
+            "score": -153,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225782-231760",
+            "type": "NEARBY_MICRO",
+            "score": -153,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225996-231760",
+            "type": "NEARBY_MICRO",
+            "score": -153,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231753",
+            "type": "SINGLETON",
+            "score": 79,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231757",
+            "type": "SINGLETON",
+            "score": 79,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231750",
+            "type": "SINGLETON",
+            "score": 75,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231776",
+            "type": "SINGLETON",
+            "score": null,
+            "feasible": false
+          },
+          {
+            "id": "cand-singleton-231775",
+            "type": "SINGLETON",
+            "score": null,
+            "feasible": false
+          },
+          {
+            "id": "cand-singleton-231903",
+            "type": "SINGLETON",
+            "score": null,
+            "feasible": false
+          },
+          {
+            "id": "cand-singleton-231831",
+            "type": "SINGLETON",
+            "score": 77,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231756",
+            "type": "SINGLETON",
+            "score": 52,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231759",
+            "type": "SINGLETON",
+            "score": 62,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231758",
+            "type": "SINGLETON",
+            "score": 51,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231778",
+            "type": "SINGLETON",
+            "score": null,
+            "feasible": false
+          },
+          {
+            "id": "cand-singleton-223810",
+            "type": "SINGLETON",
+            "score": -85,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223960",
+            "type": "SINGLETON",
+            "score": -85,
+            "feasible": true
+          }
+        ],
+        "scoreGapToRunnerUp": 31,
+        "fragmentationPenalty": 0,
+        "fragmentationPenaltyCapped": false,
+        "fragmentationProtectedNearPairCount": 0,
+        "fragmentationEvents": [],
+        "routeLinearityBefore": 0,
+        "routeLinearityAfter": 0,
+        "routeLinearityDelta": 0,
+        "routeLinearityDeltaApplied": 0,
+        "routeLinearityEvents": []
+      }
+    },
+    {
+      "step": 2,
+      "groupId": "cleaner-249-cluster-0",
+      "origin": "CLEANER_CLUSTER",
+      "taskIds": [
+        231778,
+        231903,
+        231750
+      ],
+      "logisticCodes": [
+        795,
+        1032,
+        1381
+      ],
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 249: 3 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 249,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231778,
+              "logisticCode": 795,
+              "cleanerSequence": 1,
+              "bagPolicy": "CLEANER_HAS_BAG",
+              "lat": 45.4829072,
+              "lng": 9.2150899
+            },
+            {
+              "taskId": 231903,
+              "logisticCode": 1032,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4662468,
+              "lng": 9.2045849
+            },
+            {
+              "taskId": 231750,
+              "logisticCode": 1381,
+              "cleanerSequence": 3,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4901211,
+              "lng": 9.2057682
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231778,
+              "toTaskId": 231903,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 7,
+              "centroidTravelMin": 7,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            },
+            {
+              "fromTaskId": 231903,
+              "toTaskId": 231750,
+              "fromCleanerSequence": 2,
+              "toCleanerSequence": 3,
+              "stepTravelMin": 9,
+              "centroidTravelMin": 7,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      },
+      "outcome": "FULL_ASSIGNED",
+      "why": "best_competitive_candidate",
+      "winner": {
+        "driverId": 737,
+        "score": 302,
+        "travelMinutesDelta": 21,
+        "projectedClockEnd": "12:58",
+        "taskOrder": [
+          231903,
+          231750,
+          231778
+        ],
+        "schedule": [
+          {
+            "taskId": 231903,
+            "logisticCode": 1032,
+            "startTime": "11:59",
+            "endTime": "12:14",
+            "travelMinutes": 7,
+            "checkoutWaitMinutes": 0
+          },
+          {
+            "taskId": 231750,
+            "logisticCode": 1381,
+            "startTime": "12:23",
+            "endTime": "12:38",
+            "travelMinutes": 9,
+            "checkoutWaitMinutes": 0
+          },
+          {
+            "taskId": 231778,
+            "logisticCode": 795,
+            "startTime": "12:43",
+            "endTime": "12:58",
+            "travelMinutes": 5,
+            "checkoutWaitMinutes": 0
+          }
+        ]
+      },
+      "driverAttempts": [
+        {
+          "driverId": 737,
+          "feasible": true,
+          "score": 318,
+          "travelMinutesDelta": 21,
+          "projectedClockEnd": "12:58"
+        },
+        {
+          "driverId": 1078,
+          "feasible": false,
+          "failure": {
+            "reasonCode": "CHECKIN_CHECKOUT_CONSTRAINT",
+            "taskId": 231778
+          }
+        }
+      ],
+      "competitiveContext": {
+        "candidateType": "CLEANER_SEQUENCE",
+        "competitorsConsidered": [
+          {
+            "id": "cand-cleaner-cleaner-249-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 302,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-1-full",
+            "type": "SAME_LOCATION",
+            "score": 285,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231747-231831",
+            "type": "NEARBY_MICRO",
+            "score": 264,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231292-231831",
+            "type": "NEARBY_MICRO",
+            "score": 169,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-326-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 222,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231757-231760",
+            "type": "NEARBY_MICRO",
+            "score": 217,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-469-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 223,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-24-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 242,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231750-231778",
+            "type": "NEARBY_MICRO",
+            "score": 165,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231748-231800",
+            "type": "NEARBY_MICRO",
+            "score": 231,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231748-231292",
+            "type": "NEARBY_MICRO",
+            "score": 170,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231753-231757",
+            "type": "NEARBY_MICRO",
+            "score": 248,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-596-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 166,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231748",
+            "type": "NEARBY_MICRO",
+            "score": 230,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-249-cluster-0-pair-1",
+            "type": "CLEANER_SEQUENCE",
+            "score": 173,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-132-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 231.8,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-445-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 216,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231777-231800",
+            "type": "NEARBY_MICRO",
+            "score": 211,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231292-231747",
+            "type": "NEARBY_MICRO",
+            "score": 254,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231777",
+            "type": "NEARBY_MICRO",
+            "score": 218,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231756-231775",
+            "type": "NEARBY_MICRO",
+            "score": 211,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-249-cluster-0-pair-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 215,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-1064-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 213,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231747-231800",
+            "type": "NEARBY_MICRO",
+            "score": 215,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231292-231800",
+            "type": "NEARBY_MICRO",
+            "score": 215,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-1034-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 213,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231748-231777",
+            "type": "NEARBY_MICRO",
+            "score": 181,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231800",
+            "type": "NEARBY_MICRO",
+            "score": 177,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-223810-223960",
+            "type": "NEARBY_MICRO",
+            "score": 188,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225570-225782",
+            "type": "NEARBY_MICRO",
+            "score": -119,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225570-225996",
+            "type": "NEARBY_MICRO",
+            "score": -119,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225782-225996",
+            "type": "NEARBY_MICRO",
+            "score": -119,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-0-full",
+            "type": "SAME_LOCATION",
+            "score": 194,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-1-pair-0",
+            "type": "SAME_LOCATION",
+            "score": -113,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-1-pair-1",
+            "type": "SAME_LOCATION",
+            "score": -113,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225570-231760",
+            "type": "NEARBY_MICRO",
+            "score": -128,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225782-231760",
+            "type": "NEARBY_MICRO",
+            "score": -128,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225996-231760",
+            "type": "NEARBY_MICRO",
+            "score": -128,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231753",
+            "type": "SINGLETON",
+            "score": 108,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231757",
+            "type": "SINGLETON",
+            "score": 108,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231750",
+            "type": "SINGLETON",
+            "score": 103,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231776",
+            "type": "SINGLETON",
+            "score": 84,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231775",
+            "type": "SINGLETON",
+            "score": 78,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231903",
+            "type": "SINGLETON",
+            "score": 87,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231831",
+            "type": "SINGLETON",
+            "score": 106,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231756",
+            "type": "SINGLETON",
+            "score": 80,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231759",
+            "type": "SINGLETON",
+            "score": 87,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231758",
+            "type": "SINGLETON",
+            "score": 79,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231778",
+            "type": "SINGLETON",
+            "score": 77,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223810",
+            "type": "SINGLETON",
+            "score": -60,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223960",
+            "type": "SINGLETON",
+            "score": -60,
+            "feasible": true
+          }
+        ],
+        "scoreGapToRunnerUp": 17,
+        "fragmentationPenalty": 0,
+        "fragmentationPenaltyCapped": false,
+        "fragmentationProtectedNearPairCount": 0,
+        "fragmentationEvents": [],
+        "routeLinearityBefore": 0,
+        "routeLinearityAfter": 0,
+        "routeLinearityDelta": 0,
+        "routeLinearityDeltaApplied": 0,
+        "routeLinearityEvents": []
+      }
+    },
+    {
+      "step": 3,
+      "groupId": "same-location-1",
+      "origin": "STRONG_LOCATION_CLUSTER",
+      "taskIds": [
+        225570,
+        225782,
+        225996
+      ],
+      "logisticCodes": [
+        1637,
+        1637,
+        1637
+      ],
+      "groupingReason": {
+        "strategy": "STRONG_LOCATION_CLUSTER",
+        "summary": "Stesso indirizzo (addressId=1): 3 task pre-aggregati",
+        "details": {
+          "addressId": 1,
+          "chunkIndex": 0,
+          "totalChunks": 1,
+          "reason": "tutti i task condividono logisticCode 1637",
+          "logisticCodes": [
+            1637
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "sameLocationTravelMaxMin": 1
+          },
+          "members": [
+            {
+              "taskId": 225570,
+              "logisticCode": 1637,
+              "lat": 45.4709651,
+              "lng": 9.1566484,
+              "priority": "low_priority",
+              "bagPolicy": "NORMAL_TASK"
+            },
+            {
+              "taskId": 225782,
+              "logisticCode": 1637,
+              "lat": 45.4709651,
+              "lng": 9.1566484,
+              "priority": "low_priority",
+              "bagPolicy": "NORMAL_TASK"
+            },
+            {
+              "taskId": 225996,
+              "logisticCode": 1637,
+              "lat": 45.4709651,
+              "lng": 9.1566484,
+              "priority": "low_priority",
+              "bagPolicy": "NORMAL_TASK"
+            }
+          ]
+        }
+      },
+      "outcome": "FULL_ASSIGNED",
+      "why": "best_competitive_candidate",
+      "winner": {
+        "driverId": 1078,
+        "score": 285,
+        "travelMinutesDelta": 19,
+        "projectedClockEnd": "11:51",
+        "taskOrder": [
+          225570,
+          225782,
+          225996
+        ],
+        "schedule": [
+          {
+            "taskId": 225570,
+            "logisticCode": 1637,
+            "startTime": "11:00",
+            "endTime": "11:15",
+            "travelMinutes": 13,
+            "checkoutWaitMinutes": 0
+          },
+          {
+            "taskId": 225782,
+            "logisticCode": 1637,
+            "startTime": "11:18",
+            "endTime": "11:33",
+            "travelMinutes": 3,
+            "checkoutWaitMinutes": 0
+          },
+          {
+            "taskId": 225996,
+            "logisticCode": 1637,
+            "startTime": "11:36",
+            "endTime": "11:51",
+            "travelMinutes": 3,
+            "checkoutWaitMinutes": 0
+          }
+        ]
+      },
+      "driverAttempts": [
+        {
+          "driverId": 737,
+          "feasible": true,
+          "score": 236,
+          "travelMinutesDelta": 19,
+          "projectedClockEnd": "14:02"
+        },
+        {
+          "driverId": 1078,
+          "feasible": true,
+          "score": 285,
+          "travelMinutesDelta": 19,
+          "projectedClockEnd": "11:51"
+        }
+      ],
+      "competitiveContext": {
+        "candidateType": "SAME_LOCATION",
+        "competitorsConsidered": [
+          {
+            "id": "cand-same-1-full",
+            "type": "SAME_LOCATION",
+            "score": 285,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231747-231831",
+            "type": "NEARBY_MICRO",
+            "score": 264,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231292-231831",
+            "type": "NEARBY_MICRO",
+            "score": 137,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-326-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 222,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231757-231760",
+            "type": "NEARBY_MICRO",
+            "score": 217,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-469-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 223,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-24-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 242,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231748-231800",
+            "type": "NEARBY_MICRO",
+            "score": 231,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231748-231292",
+            "type": "NEARBY_MICRO",
+            "score": 138,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231753-231757",
+            "type": "NEARBY_MICRO",
+            "score": 248,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-596-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 134,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231748",
+            "type": "NEARBY_MICRO",
+            "score": 230,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-132-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 231.8,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-445-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 216,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231777-231800",
+            "type": "NEARBY_MICRO",
+            "score": 211,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231292-231747",
+            "type": "NEARBY_MICRO",
+            "score": 254,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231777",
+            "type": "NEARBY_MICRO",
+            "score": 218,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231756-231775",
+            "type": "NEARBY_MICRO",
+            "score": 211,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-1064-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 213,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231747-231800",
+            "type": "NEARBY_MICRO",
+            "score": 215,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231292-231800",
+            "type": "NEARBY_MICRO",
+            "score": 215,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-1034-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 213,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231748-231777",
+            "type": "NEARBY_MICRO",
+            "score": 149,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231800",
+            "type": "NEARBY_MICRO",
+            "score": 177,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-223810-223960",
+            "type": "NEARBY_MICRO",
+            "score": 188,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225570-225782",
+            "type": "NEARBY_MICRO",
+            "score": -119,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225570-225996",
+            "type": "NEARBY_MICRO",
+            "score": -119,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225782-225996",
+            "type": "NEARBY_MICRO",
+            "score": -119,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-0-full",
+            "type": "SAME_LOCATION",
+            "score": 194,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-1-pair-0",
+            "type": "SAME_LOCATION",
+            "score": -113,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-1-pair-1",
+            "type": "SAME_LOCATION",
+            "score": -113,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225570-231760",
+            "type": "NEARBY_MICRO",
+            "score": -128,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225782-231760",
+            "type": "NEARBY_MICRO",
+            "score": -128,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-225996-231760",
+            "type": "NEARBY_MICRO",
+            "score": -128,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231753",
+            "type": "SINGLETON",
+            "score": 116,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231757",
+            "type": "SINGLETON",
+            "score": 116,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231776",
+            "type": "SINGLETON",
+            "score": 68,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231775",
+            "type": "SINGLETON",
+            "score": 62,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231831",
+            "type": "SINGLETON",
+            "score": 114,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231756",
+            "type": "SINGLETON",
+            "score": 80,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231759",
+            "type": "SINGLETON",
+            "score": 87,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231758",
+            "type": "SINGLETON",
+            "score": 79,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223810",
+            "type": "SINGLETON",
+            "score": -60,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223960",
+            "type": "SINGLETON",
+            "score": -60,
+            "feasible": true
+          }
+        ],
+        "scoreGapToRunnerUp": 21,
+        "fragmentationPenalty": 0,
+        "fragmentationPenaltyCapped": false,
+        "fragmentationProtectedNearPairCount": 0,
+        "fragmentationEvents": [],
+        "routeLinearityBefore": 0,
+        "routeLinearityAfter": 0,
+        "routeLinearityDelta": 0,
+        "routeLinearityDeltaApplied": 0,
+        "routeLinearityEvents": []
+      }
+    },
+    {
+      "step": 4,
+      "groupId": "nearby-231747-231831",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "taskIds": [
+        231747,
+        231831
+      ],
+      "logisticCodes": [
+        1681,
+        1715
+      ],
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231747, 231831)",
+        "details": {
+          "seedTaskId": 231747,
+          "candidateTaskId": 231831,
+          "travelMaxMin": 5
+        }
+      },
+      "outcome": "FULL_ASSIGNED",
+      "why": "best_competitive_candidate",
+      "winner": {
+        "driverId": 1078,
+        "score": 264,
+        "travelMinutesDelta": 9,
+        "projectedClockEnd": "12:14",
+        "taskOrder": [
+          231831,
+          231747
+        ],
+        "schedule": [
+          {
+            "taskId": 231831,
+            "logisticCode": 1715,
+            "startTime": "10:10",
+            "endTime": "10:25",
+            "travelMinutes": 10,
+            "checkoutWaitMinutes": 0
+          },
+          {
+            "taskId": 231747,
+            "logisticCode": 1681,
+            "startTime": "11:00",
+            "endTime": "11:15",
+            "travelMinutes": 4,
+            "checkoutWaitMinutes": 0
+          }
+        ]
+      },
+      "driverAttempts": [
+        {
+          "driverId": 737,
+          "feasible": true,
+          "score": 222,
+          "travelMinutesDelta": 13,
+          "projectedClockEnd": "13:19"
+        },
+        {
+          "driverId": 1078,
+          "feasible": true,
+          "score": 264,
+          "travelMinutesDelta": 9,
+          "projectedClockEnd": "12:14"
+        }
+      ],
+      "competitiveContext": {
+        "candidateType": "NEARBY_MICRO",
+        "competitorsConsidered": [
+          {
+            "id": "cand-nearby-231747-231831",
+            "type": "NEARBY_MICRO",
+            "score": 264,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231292-231831",
+            "type": "NEARBY_MICRO",
+            "score": 149,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-326-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 228,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231757-231760",
+            "type": "NEARBY_MICRO",
+            "score": 223,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-469-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 222,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-24-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 246,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231748-231800",
+            "type": "NEARBY_MICRO",
+            "score": 230,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231748-231292",
+            "type": "NEARBY_MICRO",
+            "score": 150,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231753-231757",
+            "type": "NEARBY_MICRO",
+            "score": 253,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-596-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 146,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231748",
+            "type": "NEARBY_MICRO",
+            "score": 228,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-132-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 230.8,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-445-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 215,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231777-231800",
+            "type": "NEARBY_MICRO",
+            "score": 210,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231292-231747",
+            "type": "NEARBY_MICRO",
+            "score": 255,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231777",
+            "type": "NEARBY_MICRO",
+            "score": 217,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231756-231775",
+            "type": "NEARBY_MICRO",
+            "score": 210,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-1064-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 214,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231747-231800",
+            "type": "NEARBY_MICRO",
+            "score": 215,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231292-231800",
+            "type": "NEARBY_MICRO",
+            "score": 216,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-1034-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 215,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231748-231777",
+            "type": "NEARBY_MICRO",
+            "score": 208,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231800",
+            "type": "NEARBY_MICRO",
+            "score": 176,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-223810-223960",
+            "type": "NEARBY_MICRO",
+            "score": 183,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-0-full",
+            "type": "SAME_LOCATION",
+            "score": 189,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231753",
+            "type": "SINGLETON",
+            "score": 131,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231757",
+            "type": "SINGLETON",
+            "score": 133,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231776",
+            "type": "SINGLETON",
+            "score": 80,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231775",
+            "type": "SINGLETON",
+            "score": 105,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231831",
+            "type": "SINGLETON",
+            "score": 130,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231756",
+            "type": "SINGLETON",
+            "score": 79,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231759",
+            "type": "SINGLETON",
+            "score": 85,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231758",
+            "type": "SINGLETON",
+            "score": 83,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223810",
+            "type": "SINGLETON",
+            "score": -65,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223960",
+            "type": "SINGLETON",
+            "score": -65,
+            "feasible": true
+          }
+        ],
+        "scoreGapToRunnerUp": 9,
+        "fragmentationPenalty": 0,
+        "fragmentationPenaltyCapped": false,
+        "fragmentationProtectedNearPairCount": 0,
+        "fragmentationEvents": [],
+        "routeLinearityBefore": 0,
+        "routeLinearityAfter": 0,
+        "routeLinearityDelta": 0,
+        "routeLinearityDeltaApplied": 0,
+        "routeLinearityEvents": []
+      }
+    },
+    {
+      "step": 5,
+      "groupId": "nearby-231753-231757",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "taskIds": [
+        231753,
+        231757
+      ],
+      "logisticCodes": [
+        840,
+        1051
+      ],
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231753, 231757)",
+        "details": {
+          "seedTaskId": 231753,
+          "candidateTaskId": 231757,
+          "travelMaxMin": 5
+        }
+      },
+      "outcome": "FULL_ASSIGNED",
+      "why": "best_competitive_candidate",
+      "winner": {
+        "driverId": 1078,
+        "score": 235,
+        "travelMinutesDelta": 16,
+        "projectedClockEnd": "12:29",
+        "taskOrder": [
+          231753,
+          231757
+        ],
+        "schedule": [
+          {
+            "taskId": 231753,
+            "logisticCode": 840,
+            "startTime": "10:11",
+            "endTime": "10:26",
+            "travelMinutes": 11,
+            "checkoutWaitMinutes": 0
+          },
+          {
+            "taskId": 231757,
+            "logisticCode": 1051,
+            "startTime": "10:31",
+            "endTime": "10:46",
+            "travelMinutes": 5,
+            "checkoutWaitMinutes": 0
+          }
+        ]
+      },
+      "driverAttempts": [
+        {
+          "driverId": 737,
+          "feasible": true,
+          "score": 205,
+          "travelMinutesDelta": 20,
+          "projectedClockEnd": "12:58"
+        },
+        {
+          "driverId": 1078,
+          "feasible": true,
+          "score": 235,
+          "travelMinutesDelta": 16,
+          "projectedClockEnd": "12:29"
+        }
+      ],
+      "competitiveContext": {
+        "candidateType": "NEARBY_MICRO",
+        "competitorsConsidered": [
+          {
+            "id": "cand-cleaner-cleaner-326-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 207,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231757-231760",
+            "type": "NEARBY_MICRO",
+            "score": 202,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-24-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 226,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231748-231800",
+            "type": "NEARBY_MICRO",
+            "score": 218,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231292-231748",
+            "type": "NEARBY_MICRO",
+            "score": 203,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231753-231757",
+            "type": "NEARBY_MICRO",
+            "score": 235,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-596-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 220.2,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231748",
+            "type": "NEARBY_MICRO",
+            "score": 216,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-132-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 217.8,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-445-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 205,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231777-231800",
+            "type": "NEARBY_MICRO",
+            "score": 200,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231777",
+            "type": "NEARBY_MICRO",
+            "score": 204,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231756-231775",
+            "type": "NEARBY_MICRO",
+            "score": 201,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-1064-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 203,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231292-231800",
+            "type": "NEARBY_MICRO",
+            "score": 205,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-1034-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 203,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231748-231777",
+            "type": "NEARBY_MICRO",
+            "score": 216.2,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231800",
+            "type": "NEARBY_MICRO",
+            "score": 164,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-223810-223960",
+            "type": "NEARBY_MICRO",
+            "score": 171,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-0-full",
+            "type": "SAME_LOCATION",
+            "score": 177,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231753",
+            "type": "SINGLETON",
+            "score": 113,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231757",
+            "type": "SINGLETON",
+            "score": 115,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231292",
+            "type": "SINGLETON",
+            "score": 115,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231776",
+            "type": "SINGLETON",
+            "score": 105,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231775",
+            "type": "SINGLETON",
+            "score": 110,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231756",
+            "type": "SINGLETON",
+            "score": 73,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231759",
+            "type": "SINGLETON",
+            "score": 73,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231758",
+            "type": "SINGLETON",
+            "score": 71,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223810",
+            "type": "SINGLETON",
+            "score": -77,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223960",
+            "type": "SINGLETON",
+            "score": -77,
+            "feasible": true
+          }
+        ],
+        "scoreGapToRunnerUp": 9,
+        "fragmentationPenalty": 0,
+        "fragmentationPenaltyCapped": false,
+        "fragmentationProtectedNearPairCount": 0,
+        "fragmentationEvents": [],
+        "routeLinearityBefore": 0,
+        "routeLinearityAfter": 0,
+        "routeLinearityDelta": 0,
+        "routeLinearityDeltaApplied": 0,
+        "routeLinearityEvents": []
+      }
+    },
+    {
+      "step": 6,
+      "groupId": "nearby-231748-231800",
+      "origin": "GEOGRAPHIC_FALLBACK",
+      "taskIds": [
+        231748,
+        231800
+      ],
+      "logisticCodes": [
+        623,
+        410
+      ],
+      "groupingReason": {
+        "strategy": "NEARBY_MICRO_CLUSTER",
+        "summary": "Nearby micro-cluster (231748, 231800)",
+        "details": {
+          "seedTaskId": 231748,
+          "candidateTaskId": 231800,
+          "travelMaxMin": 5
+        }
+      },
+      "outcome": "FULL_ASSIGNED",
+      "why": "best_competitive_candidate",
+      "winner": {
+        "driverId": 1078,
+        "score": 202,
+        "travelMinutesDelta": 11,
+        "projectedClockEnd": "13:44",
+        "taskOrder": [
+          231748,
+          231800
+        ],
+        "schedule": [
+          {
+            "taskId": 231748,
+            "logisticCode": 623,
+            "startTime": "10:07",
+            "endTime": "10:22",
+            "travelMinutes": 7,
+            "checkoutWaitMinutes": 0
+          },
+          {
+            "taskId": 231800,
+            "logisticCode": 410,
+            "startTime": "11:00",
+            "endTime": "11:15",
+            "travelMinutes": 4,
+            "checkoutWaitMinutes": 0
+          }
+        ]
+      },
+      "driverAttempts": [
+        {
+          "driverId": 737,
+          "feasible": true,
+          "score": 192,
+          "travelMinutesDelta": 9,
+          "projectedClockEnd": "13:18"
+        },
+        {
+          "driverId": 1078,
+          "feasible": true,
+          "score": 202,
+          "travelMinutesDelta": 11,
+          "projectedClockEnd": "13:44"
+        }
+      ],
+      "competitiveContext": {
+        "candidateType": "NEARBY_MICRO",
+        "competitorsConsidered": [
+          {
+            "id": "cand-nearby-231748-231800",
+            "type": "NEARBY_MICRO",
+            "score": 202,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231292-231748",
+            "type": "NEARBY_MICRO",
+            "score": 198.2,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-596-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 197.2,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231748",
+            "type": "NEARBY_MICRO",
+            "score": 202,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-132-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 198.8,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-445-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 193,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231777-231800",
+            "type": "NEARBY_MICRO",
+            "score": 188,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231777",
+            "type": "NEARBY_MICRO",
+            "score": 174,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231756-231775",
+            "type": "NEARBY_MICRO",
+            "score": 192,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-1064-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 191,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231292-231800",
+            "type": "NEARBY_MICRO",
+            "score": 192,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-1034-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 191,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231748-231777",
+            "type": "NEARBY_MICRO",
+            "score": 196.2,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231800",
+            "type": "NEARBY_MICRO",
+            "score": 149,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-223810-223960",
+            "type": "NEARBY_MICRO",
+            "score": 143,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-0-full",
+            "type": "SAME_LOCATION",
+            "score": 149,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231292",
+            "type": "SINGLETON",
+            "score": 103,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231776",
+            "type": "SINGLETON",
+            "score": 93.19999999999999,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231775",
+            "type": "SINGLETON",
+            "score": 98,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231756",
+            "type": "SINGLETON",
+            "score": 61,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231759",
+            "type": "SINGLETON",
+            "score": 59,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231758",
+            "type": "SINGLETON",
+            "score": 59,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223810",
+            "type": "SINGLETON",
+            "score": -89,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223960",
+            "type": "SINGLETON",
+            "score": -89,
+            "feasible": true
+          }
+        ],
+        "scoreGapToRunnerUp": 0,
+        "fragmentationPenalty": 0,
+        "fragmentationPenaltyCapped": false,
+        "fragmentationProtectedNearPairCount": 0,
+        "fragmentationEvents": [],
+        "routeLinearityBefore": 0,
+        "routeLinearityAfter": 0,
+        "routeLinearityDelta": 0,
+        "routeLinearityDeltaApplied": 0,
+        "routeLinearityEvents": []
+      }
+    },
+    {
+      "step": 7,
+      "groupId": "cleaner-132-cluster-0",
+      "origin": "CLEANER_CLUSTER",
+      "taskIds": [
+        231755,
+        231775
+      ],
+      "logisticCodes": [
+        504,
+        782
+      ],
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 132: 2 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 132,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231755,
+              "logisticCode": 504,
+              "cleanerSequence": 1,
+              "bagPolicy": "CLEANER_HAS_BAG",
+              "lat": 45.5034283,
+              "lng": 9.221111
+            },
+            {
+              "taskId": 231775,
+              "logisticCode": 782,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4814018,
+              "lng": 9.1909154
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231755,
+              "toTaskId": 231775,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 10,
+              "centroidTravelMin": 10,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      },
+      "outcome": "FULL_ASSIGNED",
+      "why": "best_competitive_candidate",
+      "winner": {
+        "driverId": 737,
+        "score": 179.8,
+        "travelMinutesDelta": 34,
+        "projectedClockEnd": "13:23",
+        "taskOrder": [
+          231755,
+          231775
+        ],
+        "schedule": [
+          {
+            "taskId": 231755,
+            "logisticCode": 504,
+            "startTime": "10:21",
+            "endTime": "10:36",
+            "travelMinutes": 21,
+            "checkoutWaitMinutes": 0
+          },
+          {
+            "taskId": 231775,
+            "logisticCode": 782,
+            "startTime": "11:00",
+            "endTime": "11:15",
+            "travelMinutes": 10,
+            "checkoutWaitMinutes": 14
+          }
+        ]
+      },
+      "driverAttempts": [
+        {
+          "driverId": 737,
+          "feasible": true,
+          "score": 179.8,
+          "travelMinutesDelta": 34,
+          "projectedClockEnd": "13:23"
+        },
+        {
+          "driverId": 1078,
+          "feasible": true,
+          "score": 170,
+          "travelMinutesDelta": 33,
+          "projectedClockEnd": "14:13"
+        }
+      ],
+      "competitiveContext": {
+        "candidateType": "CLEANER_SEQUENCE",
+        "competitorsConsidered": [
+          {
+            "id": "cand-cleaner-cleaner-132-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 179.8,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231759-231777",
+            "type": "NEARBY_MICRO",
+            "score": 163,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-231756-231775",
+            "type": "NEARBY_MICRO",
+            "score": 143,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-1064-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 159,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-1034-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 178,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-223810-223960",
+            "type": "NEARBY_MICRO",
+            "score": 129,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-0-full",
+            "type": "SAME_LOCATION",
+            "score": 135,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231292",
+            "type": "SINGLETON",
+            "score": 78,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231776",
+            "type": "SINGLETON",
+            "score": 80,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231775",
+            "type": "SINGLETON",
+            "score": 74,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231756",
+            "type": "SINGLETON",
+            "score": 21,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231759",
+            "type": "SINGLETON",
+            "score": 34,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231758",
+            "type": "SINGLETON",
+            "score": 35,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231777",
+            "type": "SINGLETON",
+            "score": 85,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231754",
+            "type": "SINGLETON",
+            "score": 87,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223810",
+            "type": "SINGLETON",
+            "score": -103,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223960",
+            "type": "SINGLETON",
+            "score": -103,
+            "feasible": true
+          }
+        ],
+        "scoreGapToRunnerUp": 1.8000000000000114,
+        "fragmentationPenalty": 0,
+        "fragmentationPenaltyCapped": false,
+        "fragmentationProtectedNearPairCount": 0,
+        "fragmentationEvents": [],
+        "routeLinearityBefore": 0,
+        "routeLinearityAfter": 0,
+        "routeLinearityDelta": 0,
+        "routeLinearityDeltaApplied": 0,
+        "routeLinearityEvents": []
+      }
+    },
+    {
+      "step": 8,
+      "groupId": "cleaner-1034-cluster-0",
+      "origin": "CLEANER_CLUSTER",
+      "taskIds": [
+        231754,
+        231758
+      ],
+      "logisticCodes": [
+        1634,
+        1662
+      ],
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 1034: 2 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 1034,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231754,
+              "logisticCode": 1634,
+              "cleanerSequence": 1,
+              "bagPolicy": "CLEANER_HAS_BAG",
+              "lat": 45.475911,
+              "lng": 9.1710371
+            },
+            {
+              "taskId": 231758,
+              "logisticCode": 1662,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4889546,
+              "lng": 9.147833
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231754,
+              "toTaskId": 231758,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 8,
+              "centroidTravelMin": 8,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      },
+      "outcome": "FULL_ASSIGNED",
+      "why": "best_competitive_candidate",
+      "winner": {
+        "driverId": 1078,
+        "score": 178,
+        "travelMinutesDelta": 15,
+        "projectedClockEnd": "14:29",
+        "taskOrder": [
+          231754,
+          231758
+        ],
+        "schedule": [
+          {
+            "taskId": 231754,
+            "logisticCode": 1634,
+            "startTime": "12:52",
+            "endTime": "13:07",
+            "travelMinutes": 7,
+            "checkoutWaitMinutes": 0
+          },
+          {
+            "taskId": 231758,
+            "logisticCode": 1662,
+            "startTime": "13:15",
+            "endTime": "13:30",
+            "travelMinutes": 8,
+            "checkoutWaitMinutes": 0
+          }
+        ]
+      },
+      "driverAttempts": [
+        {
+          "driverId": 737,
+          "feasible": true,
+          "score": 147.8,
+          "travelMinutesDelta": 19,
+          "projectedClockEnd": "14:12"
+        },
+        {
+          "driverId": 1078,
+          "feasible": true,
+          "score": 178,
+          "travelMinutesDelta": 15,
+          "projectedClockEnd": "14:29"
+        }
+      ],
+      "competitiveContext": {
+        "candidateType": "CLEANER_SEQUENCE",
+        "competitorsConsidered": [
+          {
+            "id": "cand-nearby-231759-231777",
+            "type": "NEARBY_MICRO",
+            "score": 144.4,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-1064-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 147,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-1034-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 178,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-223810-223960",
+            "type": "NEARBY_MICRO",
+            "score": 139,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-0-full",
+            "type": "SAME_LOCATION",
+            "score": 145,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231292",
+            "type": "SINGLETON",
+            "score": 82,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231776",
+            "type": "SINGLETON",
+            "score": 72,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231756",
+            "type": "SINGLETON",
+            "score": 25,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231759",
+            "type": "SINGLETON",
+            "score": 38,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231758",
+            "type": "SINGLETON",
+            "score": 39,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231777",
+            "type": "SINGLETON",
+            "score": 60.599999999999994,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231754",
+            "type": "SINGLETON",
+            "score": 87,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231752",
+            "type": "SINGLETON",
+            "score": 75,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223810",
+            "type": "SINGLETON",
+            "score": -120,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223960",
+            "type": "SINGLETON",
+            "score": -120,
+            "feasible": true
+          }
+        ],
+        "scoreGapToRunnerUp": 31,
+        "fragmentationPenalty": 0,
+        "fragmentationPenaltyCapped": false,
+        "fragmentationProtectedNearPairCount": 0,
+        "fragmentationEvents": [],
+        "routeLinearityBefore": 0,
+        "routeLinearityAfter": 0,
+        "routeLinearityDelta": 0,
+        "routeLinearityDeltaApplied": 0,
+        "routeLinearityEvents": []
+      }
+    },
+    {
+      "step": 9,
+      "groupId": "cleaner-1064-cluster-0",
+      "origin": "CLEANER_CLUSTER",
+      "taskIds": [
+        231292,
+        231759
+      ],
+      "logisticCodes": [
+        1530,
+        1679
+      ],
+      "groupingReason": {
+        "strategy": "CLEANER_CLUSTER",
+        "summary": "Cleaner 1064: 2 task HK consecutivi (sequenza + vicinanza entro soglia)",
+        "details": {
+          "cleanerId": 1064,
+          "segmentIndex": 0,
+          "orderedBy": [
+            "cleaner_sequence",
+            "cleaner_task_start_time",
+            "task_id"
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "stepTravelMaxMin": 10,
+            "centroidRadiusMaxMin": 12
+          },
+          "members": [
+            {
+              "taskId": 231292,
+              "logisticCode": 1530,
+              "cleanerSequence": 1,
+              "bagPolicy": "DRIVER_BRINGS_BAG",
+              "lat": 45.461049,
+              "lng": 9.175446
+            },
+            {
+              "taskId": 231759,
+              "logisticCode": 1679,
+              "cleanerSequence": 2,
+              "bagPolicy": "NORMAL_TASK",
+              "lat": 45.4464229,
+              "lng": 9.1816155
+            }
+          ],
+          "consecutiveLinks": [
+            {
+              "fromTaskId": 231292,
+              "toTaskId": 231759,
+              "fromCleanerSequence": 1,
+              "toCleanerSequence": 2,
+              "stepTravelMin": 7,
+              "centroidTravelMin": 7,
+              "compatible": true,
+              "limits": {
+                "maxTasksPerCluster": 4,
+                "stepTravelMaxMin": 10,
+                "centroidRadiusMaxMin": 12
+              }
+            }
+          ],
+          "splitBefore": null
+        }
+      },
+      "outcome": "FULL_ASSIGNED",
+      "why": "best_competitive_candidate",
+      "winner": {
+        "driverId": 1078,
+        "score": 119,
+        "travelMinutesDelta": 22,
+        "projectedClockEnd": "15:21",
+        "taskOrder": [
+          231292,
+          231759
+        ],
+        "schedule": [
+          {
+            "taskId": 231292,
+            "logisticCode": 1530,
+            "startTime": "11:51",
+            "endTime": "12:06",
+            "travelMinutes": 10,
+            "checkoutWaitMinutes": 0
+          },
+          {
+            "taskId": 231759,
+            "logisticCode": 1679,
+            "startTime": "12:13",
+            "endTime": "12:28",
+            "travelMinutes": 7,
+            "checkoutWaitMinutes": 0
+          }
+        ]
+      },
+      "driverAttempts": [
+        {
+          "driverId": 737,
+          "feasible": false,
+          "failure": {
+            "reasonCode": "CHECKIN_CHECKOUT_CONSTRAINT",
+            "taskId": 231292
+          }
+        },
+        {
+          "driverId": 1078,
+          "feasible": true,
+          "score": 131,
+          "travelMinutesDelta": 22,
+          "projectedClockEnd": "15:21"
+        }
+      ],
+      "competitiveContext": {
+        "candidateType": "CLEANER_SEQUENCE",
+        "competitorsConsidered": [
+          {
+            "id": "cand-nearby-231759-231777",
+            "type": "NEARBY_MICRO",
+            "score": 118.4,
+            "feasible": true
+          },
+          {
+            "id": "cand-cleaner-cleaner-1064-cluster-0",
+            "type": "CLEANER_SEQUENCE",
+            "score": 119,
+            "feasible": true
+          },
+          {
+            "id": "cand-nearby-223810-223960",
+            "type": "NEARBY_MICRO",
+            "score": 103,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-0-full",
+            "type": "SAME_LOCATION",
+            "score": 109,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231292",
+            "type": "SINGLETON",
+            "score": 68,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231776",
+            "type": "SINGLETON",
+            "score": 58,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231756",
+            "type": "SINGLETON",
+            "score": 15,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231759",
+            "type": "SINGLETON",
+            "score": 24,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231777",
+            "type": "SINGLETON",
+            "score": 49.80000000000001,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231752",
+            "type": "SINGLETON",
+            "score": 52,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223810",
+            "type": "SINGLETON",
+            "score": -134,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223960",
+            "type": "SINGLETON",
+            "score": -134,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231760",
+            "type": "SINGLETON",
+            "score": 33,
+            "feasible": true
+          }
+        ],
+        "scoreGapToRunnerUp": 0.5999999999999943,
+        "fragmentationPenalty": 0,
+        "fragmentationPenaltyCapped": false,
+        "fragmentationProtectedNearPairCount": 0,
+        "fragmentationEvents": [],
+        "routeLinearityBefore": 0,
+        "routeLinearityAfter": 0,
+        "routeLinearityDelta": 0,
+        "routeLinearityDeltaApplied": 0,
+        "routeLinearityEvents": []
+      }
+    },
+    {
+      "step": 10,
+      "groupId": "same-location-0",
+      "origin": "STRONG_LOCATION_CLUSTER",
+      "taskIds": [
+        223810,
+        223960
+      ],
+      "logisticCodes": [
+        1741,
+        1741
+      ],
+      "groupingReason": {
+        "strategy": "STRONG_LOCATION_CLUSTER",
+        "summary": "Stesso indirizzo (addressId=0): 2 task pre-aggregati",
+        "details": {
+          "addressId": 0,
+          "chunkIndex": 0,
+          "totalChunks": 1,
+          "reason": "tutti i task condividono logisticCode 1741",
+          "logisticCodes": [
+            1741
+          ],
+          "limits": {
+            "maxTasksPerCluster": 4,
+            "sameLocationTravelMaxMin": 1
+          },
+          "members": [
+            {
+              "taskId": 223810,
+              "logisticCode": 1741,
+              "lat": 45.4342758,
+              "lng": 9.1803654,
+              "priority": "low_priority",
+              "bagPolicy": "NORMAL_TASK"
+            },
+            {
+              "taskId": 223960,
+              "logisticCode": 1741,
+              "lat": 45.4342758,
+              "lng": 9.1803654,
+              "priority": "low_priority",
+              "bagPolicy": "NORMAL_TASK"
+            }
+          ]
+        }
+      },
+      "outcome": "FULL_ASSIGNED",
+      "why": "best_competitive_candidate",
+      "winner": {
+        "driverId": 737,
+        "score": 107.80000000000001,
+        "travelMinutesDelta": 19,
+        "projectedClockEnd": "14:12",
+        "taskOrder": [
+          223810,
+          223960
+        ],
+        "schedule": [
+          {
+            "taskId": 223810,
+            "logisticCode": 1741,
+            "startTime": "13:39",
+            "endTime": "13:54",
+            "travelMinutes": 16,
+            "checkoutWaitMinutes": 0
+          },
+          {
+            "taskId": 223960,
+            "logisticCode": 1741,
+            "startTime": "13:57",
+            "endTime": "14:12",
+            "travelMinutes": 3,
+            "checkoutWaitMinutes": 0
+          }
+        ]
+      },
+      "driverAttempts": [
+        {
+          "driverId": 737,
+          "feasible": true,
+          "score": 119.80000000000001,
+          "travelMinutesDelta": 19,
+          "projectedClockEnd": "14:12"
+        },
+        {
+          "driverId": 1078,
+          "feasible": true,
+          "score": 92,
+          "travelMinutesDelta": 16,
+          "projectedClockEnd": "16:07"
+        }
+      ],
+      "competitiveContext": {
+        "candidateType": "SAME_LOCATION",
+        "competitorsConsidered": [
+          {
+            "id": "cand-nearby-223810-223960",
+            "type": "NEARBY_MICRO",
+            "score": 101.80000000000001,
+            "feasible": true
+          },
+          {
+            "id": "cand-same-0-full",
+            "type": "SAME_LOCATION",
+            "score": 107.80000000000001,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231776",
+            "type": "SINGLETON",
+            "score": 49.80000000000001,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231756",
+            "type": "SINGLETON",
+            "score": 15,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231777",
+            "type": "SINGLETON",
+            "score": 49.80000000000001,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231752",
+            "type": "SINGLETON",
+            "score": 44,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223810",
+            "type": "SINGLETON",
+            "score": -146.2,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-223960",
+            "type": "SINGLETON",
+            "score": -146.2,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231760",
+            "type": "SINGLETON",
+            "score": 2.799999999999997,
+            "feasible": true
+          }
+        ],
+        "scoreGapToRunnerUp": 6,
+        "fragmentationPenalty": 0,
+        "fragmentationPenaltyCapped": false,
+        "fragmentationProtectedNearPairCount": 0,
+        "fragmentationEvents": [],
+        "routeLinearityBefore": 0,
+        "routeLinearityAfter": 0,
+        "routeLinearityDelta": 0,
+        "routeLinearityDeltaApplied": 0,
+        "routeLinearityEvents": []
+      }
+    },
+    {
+      "step": 11,
+      "groupId": "singleton-231776",
+      "origin": "SINGLETON_FALLBACK",
+      "taskIds": [
+        231776
+      ],
+      "logisticCodes": [
+        771
+      ],
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 231776,
+          "logisticCode": 771,
+          "cleanerId": 596,
+          "cleanerSequence": 2
+        }
+      },
+      "outcome": "FULL_ASSIGNED",
+      "why": "best_competitive_candidate",
+      "winner": {
+        "driverId": 737,
+        "score": 43.80000000000001,
+        "travelMinutesDelta": 6,
+        "projectedClockEnd": "14:33",
+        "taskOrder": [
+          231776
+        ],
+        "schedule": [
+          {
+            "taskId": 231776,
+            "logisticCode": 771,
+            "startTime": "11:25",
+            "endTime": "11:40",
+            "travelMinutes": 10,
+            "checkoutWaitMinutes": 0
+          }
+        ]
+      },
+      "driverAttempts": [
+        {
+          "driverId": 737,
+          "feasible": true,
+          "score": 59.80000000000001,
+          "travelMinutesDelta": 6,
+          "projectedClockEnd": "14:33"
+        },
+        {
+          "driverId": 1078,
+          "feasible": false,
+          "failure": {
+            "reasonCode": "CHECKIN_CHECKOUT_CONSTRAINT",
+            "taskId": 231776
+          }
+        }
+      ],
+      "competitiveContext": {
+        "candidateType": "SINGLETON",
+        "competitorsConsidered": [
+          {
+            "id": "cand-singleton-231776",
+            "type": "SINGLETON",
+            "score": 43.80000000000001,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231756",
+            "type": "SINGLETON",
+            "score": 9,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231777",
+            "type": "SINGLETON",
+            "score": 43.80000000000001,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231752",
+            "type": "SINGLETON",
+            "score": 38,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231760",
+            "type": "SINGLETON",
+            "score": 0.7999999999999972,
+            "feasible": true
+          }
+        ],
+        "scoreGapToRunnerUp": 0,
+        "fragmentationPenalty": 0,
+        "fragmentationPenaltyCapped": false,
+        "fragmentationProtectedNearPairCount": 0,
+        "fragmentationEvents": [],
+        "routeLinearityBefore": 0,
+        "routeLinearityAfter": 0,
+        "routeLinearityDelta": 0,
+        "routeLinearityDeltaApplied": 0,
+        "routeLinearityEvents": []
+      }
+    },
+    {
+      "step": 12,
+      "groupId": "singleton-231752",
+      "origin": "SINGLETON_FALLBACK",
+      "taskIds": [
+        231752
+      ],
+      "logisticCodes": [
+        714
+      ],
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 231752,
+          "logisticCode": 714,
+          "cleanerId": 24,
+          "cleanerSequence": 1
+        }
+      },
+      "outcome": "FULL_ASSIGNED",
+      "why": "best_competitive_candidate",
+      "winner": {
+        "driverId": 1078,
+        "score": 6,
+        "travelMinutesDelta": 20,
+        "projectedClockEnd": "15:22",
+        "taskOrder": [
+          231752
+        ],
+        "schedule": [
+          {
+            "taskId": 231752,
+            "logisticCode": 714,
+            "startTime": "10:15",
+            "endTime": "10:30",
+            "travelMinutes": 15,
+            "checkoutWaitMinutes": 0
+          }
+        ]
+      },
+      "driverAttempts": [
+        {
+          "driverId": 737,
+          "feasible": true,
+          "score": 0.7999999999999972,
+          "travelMinutesDelta": 15,
+          "projectedClockEnd": "15:03"
+        },
+        {
+          "driverId": 1078,
+          "feasible": true,
+          "score": 22,
+          "travelMinutesDelta": 20,
+          "projectedClockEnd": "15:22"
+        }
+      ],
+      "competitiveContext": {
+        "candidateType": "SINGLETON",
+        "competitorsConsidered": [
+          {
+            "id": "cand-singleton-231756",
+            "type": "SINGLETON",
+            "score": null,
+            "feasible": false
+          },
+          {
+            "id": "cand-singleton-231777",
+            "type": "SINGLETON",
+            "score": null,
+            "feasible": false
+          },
+          {
+            "id": "cand-singleton-231752",
+            "type": "SINGLETON",
+            "score": 6,
+            "feasible": true
+          },
+          {
+            "id": "cand-singleton-231760",
+            "type": "SINGLETON",
+            "score": -10.200000000000003,
+            "feasible": true
+          }
+        ],
+        "scoreGapToRunnerUp": 16.200000000000003,
+        "fragmentationPenalty": 0,
+        "fragmentationPenaltyCapped": false,
+        "fragmentationProtectedNearPairCount": 0,
+        "fragmentationEvents": [],
+        "routeLinearityBefore": 0,
+        "routeLinearityAfter": 0,
+        "routeLinearityDelta": 0,
+        "routeLinearityDeltaApplied": 0,
+        "routeLinearityEvents": []
+      }
+    },
+    {
+      "step": 13,
+      "groupId": "singleton-231760",
+      "origin": "SINGLETON_FALLBACK",
+      "taskIds": [
+        231760
+      ],
+      "logisticCodes": [
+        1744
+      ],
+      "groupingReason": {
+        "strategy": "RECOVERY_SINGLETON",
+        "summary": "Task non presente in nessun gruppo iniziale: singleton di recupero",
+        "details": {
+          "taskId": 231760,
+          "logisticCode": 1744,
+          "cleanerId": 326,
+          "cleanerSequence": 1
+        }
+      },
+      "outcome": "FULL_ASSIGNED",
+      "why": "best_competitive_candidate",
+      "winner": {
+        "driverId": 737,
+        "score": -10.200000000000003,
+        "travelMinutesDelta": 10,
+        "projectedClockEnd": "14:58",
+        "taskOrder": [
+          231760
+        ],
+        "schedule": [
+          {
+            "taskId": 231760,
+            "logisticCode": 1744,
+            "startTime": "13:58",
+            "endTime": "14:13",
+            "travelMinutes": 14,
+            "checkoutWaitMinutes": 0
+          }
+        ]
+      },
+      "driverAttempts": [
+        {
+          "driverId": 737,
+          "feasible": true,
+          "score": 5.799999999999997,
+          "travelMinutesDelta": 10,
+          "projectedClockEnd": "14:58"
+        },
+        {
+          "driverId": 1078,
+          "feasible": true,
+          "score": -13,
+          "travelMinutesDelta": 4,
+          "projectedClockEnd": "15:41"
+        }
+      ],
+      "competitiveContext": {
+        "candidateType": "SINGLETON",
+        "competitorsConsidered": [
+          {
+            "id": "cand-singleton-231756",
+            "type": "SINGLETON",
+            "score": null,
+            "feasible": false
+          },
+          {
+            "id": "cand-singleton-231777",
+            "type": "SINGLETON",
+            "score": null,
+            "feasible": false
+          },
+          {
+            "id": "cand-singleton-231760",
+            "type": "SINGLETON",
+            "score": -10.200000000000003,
+            "feasible": true
+          }
+        ],
+        "scoreGapToRunnerUp": null,
+        "fragmentationPenalty": 0,
+        "fragmentationPenaltyCapped": false,
+        "fragmentationProtectedNearPairCount": 0,
+        "fragmentationEvents": [],
+        "routeLinearityBefore": 0,
+        "routeLinearityAfter": 0,
+        "routeLinearityDelta": 0,
+        "routeLinearityDeltaApplied": 0,
+        "routeLinearityEvents": []
+      }
+    }
+  ]
+}

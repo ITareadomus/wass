@@ -5,13 +5,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import GenerateAssignments from "@/pages/generate-assignments";
 import GenerateLogisticsAssignments from "@/pages/generate-logistics-assignments";
+import LogisticsDriverSheet from "@/pages/logistics-driver-sheet";
 import Convocazioni from "@/pages/convocazioni";
 import UnconfirmedTasks from "@/pages/unconfirmed-tasks";
 import HomeGate from "@/pages/home-gate";
 import Login from "@/pages/login";
 import Settings from "@/pages/settings";
 import SystemSettings from "@/pages/system-settings";
-import ClientSettings from "@/pages/client-settings";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 import { WassSiteHeader } from "@/components/wass-site-header";
@@ -155,6 +155,9 @@ function Router() {
       <Route path="/generate-assignments">
         {() => <ProtectedRoute component={GenerateAssignments} />}
       </Route>
+      <Route path="/generate-logistics-assignments/driver/:driverId">
+        {() => <ProtectedRoute component={LogisticsDriverSheet} />}
+      </Route>
       <Route path="/generate-logistics-assignments">
         {() => <ProtectedRoute component={GenerateLogisticsAssignments} />}
       </Route>
@@ -166,9 +169,6 @@ function Router() {
       </Route>
       <Route path="/settings">
         {() => <ProtectedRoute component={SystemSettings} />}
-      </Route>
-      <Route path="/client-settings">
-        {() => <ProtectedRoute component={ClientSettings} />}
       </Route>
       <Route component={NotFound} />
     </Switch>

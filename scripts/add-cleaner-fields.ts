@@ -10,7 +10,8 @@ async function addCleanerFields() {
       ADD COLUMN IF NOT EXISTS cleaner_lastname VARCHAR(255),
       ADD COLUMN IF NOT EXISTS cleaner_role VARCHAR(100),
       ADD COLUMN IF NOT EXISTS cleaner_premium BOOLEAN DEFAULT false,
-      ADD COLUMN IF NOT EXISTS cleaner_start_time VARCHAR(10) DEFAULT '10:00';
+      ADD COLUMN IF NOT EXISTS cleaner_start_time VARCHAR(10) DEFAULT '10:00',
+      ADD COLUMN IF NOT EXISTS cleaner_end_time VARCHAR(10) DEFAULT '20:00';
     `);
     
     // Add same fields to daily_assignments_history
@@ -20,7 +21,8 @@ async function addCleanerFields() {
       ADD COLUMN IF NOT EXISTS cleaner_lastname VARCHAR(255),
       ADD COLUMN IF NOT EXISTS cleaner_role VARCHAR(100),
       ADD COLUMN IF NOT EXISTS cleaner_premium BOOLEAN DEFAULT false,
-      ADD COLUMN IF NOT EXISTS cleaner_start_time VARCHAR(10) DEFAULT '10:00';
+      ADD COLUMN IF NOT EXISTS cleaner_start_time VARCHAR(10) DEFAULT '10:00',
+      ADD COLUMN IF NOT EXISTS cleaner_end_time VARCHAR(10) DEFAULT '20:00';
     `);
     
     console.log('✅ Cleaner fields added to both tables');

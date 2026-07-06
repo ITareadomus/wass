@@ -277,44 +277,43 @@ def classify_tasks(tasks, selected_date, use_api=False):
     early_out_config = settings.get("early-out", {})
     high_priority_config = settings.get("high-priority", {})
 
-    # Finestra EO esplicita: eo_start_time / eo_end_time
-    # Se non specificati, usiamo dei default sensati,
-    # ma manteniamo compatibilità col vecchio comportamento (solo eo_end_time).
-    eo_start_time = parse_time(early_out_config.get("eo_start_time"))
-    if eo_start_time is None:
-        # default: 10:00, come usato finora nel resto del codice
-        eo_start_time = datetime.strptime("10:00", "%H:%M").time()
+    hp_start_time = parse_time(high_priority_config.get("hp_start_time"))
+    hp_end_time = parse_time(high_priority_config.get("hp_end_time"))
+    if hp_start_time is None or hp_end_time is None:
+        raise ValueError(
+            "Priority settings invalid: high-priority.hp_start_time and "
+            "high-priority.hp_end_time are required in HH:MM format"
+        )
+    if hp_end_time < hp_start_time:
+        raise ValueError(
+            "Priority settings invalid: high-priority.hp_end_time must be "
+            "greater than or equal to hp_start_time"
+        )
 
-    eo_end_time = parse_time(early_out_config.get("eo_end_time"))
-    if eo_end_time is None:
-        # default storico: 10:59
-        eo_end_time = datetime.strptime("10:59", "%H:%M").time()
+    eo_clients = {str(client_id).strip() for client_id in (early_out_config.get("eo_clients") or [])}
+    hp_clients = {str(client_id).strip() for client_id in (high_priority_config.get("hp_clients") or [])}
 
-    # Nuova logica HP: finestra esplicita hp_start_time / hp_end_time
-    hp_start_time = (
-        parse_time(high_priority_config.get("hp_start_time"))
-        or datetime.strptime("11:00", "%H:%M").time()
-    )
-
-    hp_end_time = (
-        parse_time(high_priority_config.get("hp_end_time"))
-        or parse_time(high_priority_config.get("hp_time"))  # fallback per vecchia chiave
-        or datetime.strptime("15:30", "%H:%M").time()
-    )
-
-    eo_clients = early_out_config.get("eo_clients") or []
-    hp_clients = high_priority_config.get("hp_clients") or []
-
-    dedupe_strategy = (settings.get("dedupe_strategy") or "eo_wins").lower()
+    dedupe_strategy = settings.get("dedupe_strategy")
+    if dedupe_strategy not in ("eo_wins", "hp_wins"):
+        raise ValueError("Priority settings invalid: dedupe_strategy must be eo_wins or hp_wins")
 
     early_out_tasks = []
     high_priority_tasks = []
     low_priority_tasks = []
 
+    def is_truthy(value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return value == 1
+        if isinstance(value, str):
+            return value.strip().lower() in ("true", "1", "yes")
+        return False
+
     for task in tasks:
         task_id = task.get("task_id")
-        client_id = task.get("client_id")
-        is_premium = task.get("premium")
+        client_id = str(task.get("client_id")).strip() if task.get("client_id") is not None else None
+        is_premium = is_truthy(task.get("premium"))
 
         eo_reasons = []
         hp_reasons = []
@@ -322,34 +321,10 @@ def classify_tasks(tasks, selected_date, use_api=False):
         # EARLY OUT
         checkout_time = parse_time(task.get("checkout_time"))
 
-        # Logica EO:
-        # 1) checkout_time tra eo_start_time ed eo_end_time
-        # 2) OPPURE checkout_time < eo_start_time (checkout notturno)
-        # 3) OPPURE client forzato EO
-        #
-        # Gestiamo anche il caso (raro) di finestra che scavalca mezzanotte.
-        if checkout_time:
-            if eo_start_time and eo_end_time:
-                if eo_start_time <= eo_end_time:
-                    # finestra normale: es. 10:00–10:59
-                    if (
-                        eo_start_time <= checkout_time <= eo_end_time
-                        or checkout_time < eo_start_time
-                    ):
-                        eo_reasons.append(
-                            "checkout_time_eo_window_or_before_start"
-                        )
-                else:
-                    # finestra che scavalca mezzanotte, es. 22:00–02:00
-                    if checkout_time >= eo_start_time or checkout_time <= eo_end_time:
-                        eo_reasons.append("checkout_time_eo_wrapped_window")
-            else:
-                # Fallback di compatibilità: se per qualche motivo mancano i tempi,
-                # usiamo il vecchio criterio "checkout_time <= eo_end_time"
-                if checkout_time <= eo_end_time:
-                    eo_reasons.append("checkout_time<=eo_end_time")
+        if checkout_time is not None and checkout_time < hp_start_time:
+            eo_reasons.append("checkout_before_hp_start")
 
-        if client_id in eo_clients:
+        if client_id is not None and client_id in eo_clients:
             eo_reasons.append("client_forced_eo")
 
         # HIGH PRIORITY
@@ -361,52 +336,36 @@ def classify_tasks(tasks, selected_date, use_api=False):
             bool(checkin_date) and bool(checkout_date) and (checkin_date == checkout_date)
         )
 
-        # Finestra HP esplicita: hp_start_time <= checkin_time <= hp_end_time
-        in_time_window = (
-            checkin_time is not None
-            and hp_start_time is not None
-            and hp_end_time is not None
-            and (hp_start_time <= checkin_time <= hp_end_time)
-        )
-
-        if same_day_turnover and in_time_window:
+        if same_day_turnover and checkin_time is not None and (hp_start_time <= checkin_time <= hp_end_time):
             hp_reasons.append("same_day_checkin_between_hp_start_hp_end")
 
         if is_premium:
             hp_reasons.append("premium")
 
-        if client_id in hp_clients:
+        if client_id is not None and client_id in hp_clients:
             hp_reasons.append("client_forced_hp")
 
-        # Classificazione
-        task_with_reasons = {**task, "reasons": []}
+        eo_match = bool(eo_reasons)
+        hp_match = bool(hp_reasons)
+        reasons = eo_reasons + hp_reasons
 
-        if eo_reasons:
-            task_with_reasons["reasons"] = eo_reasons
-            task_with_reasons["priority"] = "early_out"
-            early_out_tasks.append(task_with_reasons)
+        if eo_match and hp_match:
+            priority = "early_out" if dedupe_strategy == "eo_wins" else "high_priority"
+        elif eo_match:
+            priority = "early_out"
+        elif hp_match:
+            priority = "high_priority"
+        else:
+            priority = "low_priority"
+            reasons = ["not_eo", "not_hp"]
 
-        if hp_reasons:
-            hp_task = {**task, "reasons": hp_reasons, "priority": "high_priority"}
-            high_priority_tasks.append(hp_task)
-
-    # Deduplica
-    eo_ids = {t["task_id"] for t in early_out_tasks}
-    hp_ids = {t["task_id"] for t in high_priority_tasks}
-
-    if dedupe_strategy == "eo_wins":
-        high_priority_tasks = [t for t in high_priority_tasks if t["task_id"] not in eo_ids]
-    elif dedupe_strategy == "hp_wins":
-        early_out_tasks = [t for t in early_out_tasks if t["task_id"] not in hp_ids]
-
-    # LOW PRIORITY
-    classified_eo = {t["task_id"] for t in early_out_tasks}
-    classified_hp = {t["task_id"] for t in high_priority_tasks}
-
-    for task in tasks:
-        tid = task.get("task_id")
-        if tid not in classified_eo and tid not in classified_hp:
-            low_priority_tasks.append({**task, "priority": "low_priority", "reasons": ["not_eo", "not_hp"]})
+        task_with_priority = {**task, "priority": priority, "reasons": reasons}
+        if priority == "early_out":
+            early_out_tasks.append(task_with_priority)
+        elif priority == "high_priority":
+            high_priority_tasks.append(task_with_priority)
+        else:
+            low_priority_tasks.append(task_with_priority)
 
     return early_out_tasks, high_priority_tasks, low_priority_tasks
 

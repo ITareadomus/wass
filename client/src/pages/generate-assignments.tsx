@@ -1,5 +1,9 @@
 import { DragDropContext, DropResult } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
+import {
+  isWorkDateHistoricallyLocked,
+  isWorkDateInPast,
+} from "@shared/work-date-access";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
 import MapSection from "@/components/map/map-section";
@@ -8,7 +12,19 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext, us
 const DEBUG = false;
 const dlog = (...args: any[]) => DEBUG && console.log(...args);
 import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
-import { CalendarIcon, Users, RefreshCw, Settings, Search } from "lucide-react";
+import { CalendarIcon, Users, RefreshCw, Settings, Search, Map as MapIcon, BarChart3 } from "lucide-react";
+import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
+import {
+  registerTimelineMapPanelOpener,
+  unregisterTimelineMapPanelOpener,
+} from "@/lib/timeline-map-panel";
+import AssignmentTaskStatisticsPanel, {
+  computeAssignmentTaskStatisticsFromTasks,
+} from "@/components/stats/assignment-task-statistics";
+import {
+  getDefaultTimelineFloatingPanel,
+  useTimelineFloatingPanel,
+} from "@/hooks/use-timeline-floating-panel";
 import { Input } from "@/components/ui/input";
 import { useLocation } from 'wouter';
 import { format } from "date-fns";
@@ -19,9 +35,12 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { useToast } from "@/hooks/use-toast";
-import { isContinuazioneStraordinariaTask, isTaskLocked } from "@/lib/taskValidation";
+import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
 
 const OFFICE_SCOPE_ENABLED = false;
+const getDefaultTimelineMapPanel = () => getDefaultTimelineFloatingPanel("right");
+const getDefaultTimelineStatsPanel = () =>
+  getDefaultTimelineFloatingPanel("right", { width: 320, height: 320 });
 type PreAssignedMode = "normal" | "readonly";
 const PREASSIGNED_REASON_NORMAL = "preassigned_enable_wass";
 const PREASSIGNED_REASON_READONLY = "preassigned_enable_wass_readonly";
@@ -138,15 +157,6 @@ function indexById(list: Task[]): Map<string, Task> {
   }
   return m;
 }
-
-// Helper per verificare se una data è nel passato
-const isDateInPast = (date: Date): boolean => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Normalizza a inizio giornata per confronto
-  const targetDate = new Date(date);
-  targetDate.setHours(0, 0, 0, 0);
-  return targetDate < today;
-};
 
 // Tipo per risposta API timeline (evita inferenza never[] su assignments/cleaners_assignments)
 interface TimelineCleanerEntry {
@@ -376,6 +386,13 @@ export default function GenerateAssignments() {
 
   // Stato per la ricerca di task
   const [searchTask, setSearchTask] = useState("");
+  const timelineMapPanel = useTimelineFloatingPanel("right", getDefaultTimelineMapPanel);
+  const timelineStatsPanel = useTimelineFloatingPanel("right", getDefaultTimelineStatsPanel);
+
+  useEffect(() => {
+    registerTimelineMapPanelOpener(() => timelineMapPanel.setIsOpen(true));
+    return unregisterTimelineMapPanelOpener;
+  }, [timelineMapPanel.setIsOpen]);
 
   // Stato per highlight task da mappa (doppio click su pallino grigio)
   const [containerHighlightTaskId, setContainerHighlightTaskId] = useState<string | null>(null);
@@ -705,7 +722,7 @@ export default function GenerateAssignments() {
       today.setHours(0, 0, 0, 0);
       const targetDate = new Date(date);
       targetDate.setHours(0, 0, 0, 0);
-      const isPastDate = targetDate < today;
+      const isPastDate = isWorkDateInPast(date);
       const isCurrentDate = targetDate.getTime() === today.getTime();
 
       // CRITICAL: Verifica SE esistono assegnazioni salvate per questa data
@@ -785,8 +802,8 @@ export default function GenerateAssignments() {
           });
 
           // Imposta timeline in modalità read-only SOLO per date passate
-          setIsTimelineReadOnly(isPastDate);
-          if (isPastDate) {
+          setIsTimelineReadOnly(isWorkDateHistoricallyLocked(date));
+          if (isWorkDateHistoricallyLocked(date)) {
             console.log("🔒 Timeline impostata in modalità READ-ONLY (data passata)");
           } else {
             console.log("✏️ Timeline impostata in modalità EDITABILE (data corrente/futura con salvataggio)");
@@ -812,7 +829,7 @@ export default function GenerateAssignments() {
           setIsExtracting(false);
         } else {
           // Caricamento fallito = nessun salvataggio disponibile
-          if (isPastDate) {
+          if (isWorkDateHistoricallyLocked(date)) {
             console.log("📭 Data passata senza salvataggi disponibili - mostro container in sola lettura");
             setIsTimelineReadOnly(true);
           } else {
@@ -852,7 +869,7 @@ export default function GenerateAssignments() {
         }
 
         // SOLO date STRETTAMENTE passate sono read-only
-        if (isPastDate) {
+        if (isWorkDateHistoricallyLocked(date)) {
           console.log("🔒 Data passata senza assegnazioni salvate - NESSUNA ESTRAZIONE");
           setIsTimelineReadOnly(true);
 
@@ -881,13 +898,8 @@ export default function GenerateAssignments() {
       console.error("Errore nella verifica assegnazioni salvate:", error);
 
       // Fallback SOLO per date NON passate
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const targetDate = new Date(date);
-      targetDate.setHours(0, 0, 0, 0);
-
-      if (targetDate >= today) {
-        console.log("Fallback: estrazione per data presente/futura");
+      if (!isWorkDateHistoricallyLocked(date)) {
+        console.log("Fallback: estrazione per data presente/futura (o passata in development)");
         await extractData(date);
       } else {
         console.log("Fallback: data passata, nessuna estrazione");
@@ -2117,35 +2129,16 @@ export default function GenerateAssignments() {
   // const allTasks = [...timelineTasksWithoutDuplicates, ...containerTasks];
 
   // Determina se la modalità storica è attiva (data passata)
-  const isHistoricalMode = isDateInPast(selectedDate);
+  const isHistoricalMode = isWorkDateHistoricallyLocked(selectedDate);
 
-  const unlockedTasksForStats = useMemo(
-    () => allTasksWithAssignments.filter((task) => !isTaskLocked(task)),
-    [allTasksWithAssignments]
+  const assignmentStatistics = useMemo(
+    () =>
+      computeAssignmentTaskStatisticsFromTasks(
+        allTasksWithAssignments,
+        isOfficeScope ? "office" : "housekeeping"
+      ),
+    [allTasksWithAssignments, isOfficeScope]
   );
-
-  // Filtra le task non assegnate
-  const unassignedTasks = allTasksWithAssignments.filter(task => !(task as any).assignedCleaner);
-  const straordinarieCount = unlockedTasksForStats.filter((t) => isEquivalentStraordinariaTask(t)).length;
-  const standardCount = unlockedTasksForStats.filter(
-    (t) => !isEquivalentStraordinariaTask(t) && !t.premium
-  ).length;
-  const premiumCount = unlockedTasksForStats.filter(
-    (t) => !isEquivalentStraordinariaTask(t) && t.premium
-  ).length;
-  const puliziaUfficioCount = Math.max(0, unlockedTasksForStats.length - straordinarieCount);
-  const puliziaUfficioInternaCount = unlockedTasksForStats.filter((task) => {
-    const taskAny = task as any;
-    const operationId = Number(taskAny.operation_id ?? taskAny.operationId);
-    const operationName = String(
-      taskAny.operation_name ?? taskAny.operationName ?? taskAny.operation_label ?? ""
-    )
-      .toLowerCase()
-      .trim();
-
-    return operationId === 15 || operationName.includes("uffic");
-  }).length;
-  const hasAssignedTasks = allTasksWithAssignments.some(task => Boolean((task as any).assignedCleaner));
   const timelinePriorityState = useMemo(() => {
     let hasEoOnTimeline = false;
     let hasHpOnTimeline = false;
@@ -2173,8 +2166,8 @@ export default function GenerateAssignments() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <div className="mx-auto flex w-full min-h-0 max-w-[1920px] flex-1 flex-col px-4 pb-6 pt-3">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-background text-foreground">
+      <div className="mx-auto flex w-full min-h-0 max-w-[1920px] flex-1 flex-col overflow-x-hidden px-4 pb-6 pt-3">
         {!(isExtracting || isLoadingTasks || isLoading) && (
           <div className="mx-auto mb-3 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-4">
@@ -2464,9 +2457,9 @@ export default function GenerateAssignments() {
             })()}
 
           <div className="mt-0 grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div className="xl:col-span-2">
+            <div className="xl:col-span-3">
               {/* Timeline View */}
-              <div data-print-timeline>
+              <div data-print-timeline className="relative">
                 <TimelineView
                   personnel={[]}
                   tasks={allTasksWithAssignments}
@@ -2484,119 +2477,55 @@ export default function GenerateAssignments() {
                   searchTask={searchTask}
                   preassignedAnimatedTaskIds={preassignedAnimatedTaskIds}
                 />
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <MapSection tasks={allTasksWithAssignments} />
-
-              {/* Pannello Statistiche Task */}
-              <div className="bg-card rounded-lg border-2 border-border shadow-sm box-border overflow-hidden">
-                <div className="p-4 border-b border-border">
-                  <h3 className="font-semibold text-foreground flex items-center">
-                    <svg
-                      className="w-5 h-5 mr-2 text-custom-blue"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                      />
-                    </svg>
-                    Statistiche Task
-                  </h3>
-                </div>
-                <div className="p-4 grid grid-cols-2 gap-3">
-                  {isOfficeScope ? (
-                    <>
-                      {/* Totale Task */}
-                      <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-3 border-2 border-blue-300 dark:border-blue-700">
-                        <div className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">Totale</div>
-                        <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-                          {unlockedTasksForStats.length}
-                        </div>
-                      </div>
-
-                      {/* Non Assegnate */}
-                      <div className="bg-gray-100 dark:bg-gray-950/50 rounded-lg p-3 border-2 border-gray-300 dark:border-gray-700">
-                        <div className="text-xs text-gray-700 dark:text-gray-300 font-medium mb-1">Non Assegnate</div>
-                        <div className="text-2xl font-bold text-gray-800 dark:text-gray-200">
-                          {unassignedTasks.length}
-                        </div>
-                      </div>
-
-                      {/* Pulizia Ufficio */}
-                      <div className="bg-sky-100 dark:bg-sky-950/50 rounded-lg p-3 border-2 border-sky-300 dark:border-sky-700">
-                        <div className="text-xs text-sky-700 dark:text-sky-300 font-medium mb-1">Pulizia Ufficio</div>
-                        <div className="text-2xl font-bold text-sky-800 dark:text-sky-200">
-                          {puliziaUfficioCount}
-                        </div>
-                      </div>
-
-                      {/* Pulizia Ufficio Straordinaria */}
-                      <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-3 border-2 border-red-300 dark:border-red-700">
-                        <div className="text-xs text-red-700 dark:text-red-300 font-medium mb-1">Pulizia Ufficio Straordinaria</div>
-                        <div className="text-2xl font-bold text-red-800 dark:text-red-200">
-                          {straordinarieCount}
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {/* Totale Task */}
-                      <div className="bg-blue-100 dark:bg-blue-950/50 rounded-lg p-3 border-2 border-blue-300 dark:border-blue-700">
-                        <div className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">Totale</div>
-                        <div className="text-2xl font-bold text-blue-800 dark:text-blue-200">
-                          {unlockedTasksForStats.length}
-                        </div>
-                      </div>
-
-                      {/* Non Assegnate */}
-                      <div className="bg-gray-100 dark:bg-gray-950/50 rounded-lg p-3 border-2 border-gray-300 dark:border-gray-700">
-                        <div className="text-xs text-gray-700 dark:text-gray-300 font-medium mb-1">Non Assegnate</div>
-                        <div className="text-2xl font-bold text-gray-800 dark:text-gray-200">
-                          {unassignedTasks.length}
-                        </div>
-                      </div>
-
-                      {/* Standard */}
-                      <div className="bg-green-100 dark:bg-green-950/50 rounded-lg p-3 border-2 border-green-300 dark:border-green-700">
-                        <div className="text-xs text-green-700 dark:text-green-300 font-medium mb-1">Standard</div>
-                        <div className="text-2xl font-bold text-green-800 dark:text-green-200">
-                          {standardCount}
-                        </div>
-                      </div>
-
-                      {/* Premium */}
-                      <div className="bg-yellow-100 dark:bg-yellow-950/50 rounded-lg p-3 border-2 border-yellow-300 dark:border-yellow-700">
-                        <div className="text-xs text-yellow-700 dark:text-yellow-300 font-medium mb-1">Premium</div>
-                        <div className="text-2xl font-bold text-yellow-800 dark:text-yellow-200">
-                          {premiumCount}
-                        </div>
-                      </div>
-
-                      {/* Straordinarie */}
-                      <div className="bg-red-100 dark:bg-red-950/50 rounded-lg p-3 border-2 border-red-300 dark:border-red-700">
-                        <div className="text-xs text-red-700 dark:text-red-300 font-medium mb-1">Straordinarie</div>
-                        <div className="text-2xl font-bold text-red-800 dark:text-red-200">
-                          {straordinarieCount}
-                        </div>
-                      </div>
-
-                      {/* Pulizia Ufficio Interna */}
-                      <div className="bg-sky-100 dark:bg-sky-950/50 rounded-lg p-3 border-2 border-sky-300 dark:border-sky-700">
-                        <div className="text-xs text-sky-700 dark:text-sky-300 font-medium mb-1">Pulizia Ufficio Interna</div>
-                        <div className="text-2xl font-bold text-sky-800 dark:text-sky-200">
-                          {puliziaUfficioInternaCount}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
+                <TimelineFloatingPanel
+                  side="right"
+                  toggleVerticalOffset={52}
+                  fitContent
+                  isOpen={timelineStatsPanel.isOpen}
+                  onOpenChange={timelineStatsPanel.setIsOpen}
+                  panel={timelineStatsPanel.panel}
+                  onResetPanel={timelineStatsPanel.resetPanel}
+                  toggleAriaLabel="Mostra statistiche"
+                  toggleTitle="Mostra statistiche"
+                  toggleIcon={<BarChart3 className="h-4 w-4" />}
+                  dragTitle="Trascina statistiche"
+                  closeAriaLabel="Nascondi statistiche"
+                  closeTitle="Nascondi statistiche"
+                  onPointerDown={timelineStatsPanel.handlePointerDown}
+                  onPointerMove={timelineStatsPanel.handlePointerMove}
+                  onPointerEnd={timelineStatsPanel.handlePointerEnd}
+                >
+                  <AssignmentTaskStatisticsPanel
+                    variant={isOfficeScope ? "office" : "housekeeping"}
+                    stats={assignmentStatistics}
+                  />
+                </TimelineFloatingPanel>
+                <TimelineFloatingPanel
+                  side="right"
+                  isOpen={timelineMapPanel.isOpen}
+                  onOpenChange={timelineMapPanel.setIsOpen}
+                  panel={timelineMapPanel.panel}
+                  onResetPanel={timelineMapPanel.resetPanel}
+                  toggleAriaLabel="Mostra mappa"
+                  toggleTitle="Mostra mappa"
+                  toggleIcon={<MapIcon className="h-4 w-4" />}
+                  dragTitle="Trascina mappa"
+                  closeAriaLabel="Nascondi mappa"
+                  closeTitle="Nascondi mappa"
+                  onPointerDown={timelineMapPanel.handlePointerDown}
+                  onPointerMove={timelineMapPanel.handlePointerMove}
+                  onPointerEnd={timelineMapPanel.handlePointerEnd}
+                  contentClassName="border-custom-blue"
+                >
+                  <MapSection
+                    tasks={allTasksWithAssignments}
+                    compact
+                    className="h-full"
+                    bodyClassName="flex flex-col"
+                    mapClassName="h-full flex-1"
+                    mapMinHeight={0}
+                  />
+                </TimelineFloatingPanel>
               </div>
             </div>
           </div>

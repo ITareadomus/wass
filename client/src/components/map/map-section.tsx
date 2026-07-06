@@ -4,10 +4,19 @@ import { TaskType as Task } from "@shared/schema";
 import TaskCard from "@/components/drag-drop/task-card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { getCleanerHexColor } from "@/lib/cleaner-colors";
+import {
+  getPersonnelHexColor,
+  type PersonnelColorScope,
+} from "@/lib/cleaner-colors";
 
 interface MapSectionProps {
   tasks: Task[];
+  className?: string;
+  bodyClassName?: string;
+  mapClassName?: string;
+  mapMinHeight?: string | number;
+  compact?: boolean;
+  personnelColorScope?: PersonnelColorScope;
 }
 
 declare global {
@@ -17,7 +26,15 @@ declare global {
   }
 }
 
-export default function MapSection({ tasks }: MapSectionProps) {
+export default function MapSection({
+  tasks,
+  className,
+  bodyClassName,
+  mapClassName,
+  mapMinHeight,
+  compact = false,
+  personnelColorScope = "housekeeping",
+}: MapSectionProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const googleMapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
@@ -42,6 +59,24 @@ export default function MapSection({ tasks }: MapSectionProps) {
       : "housekeeping";
   const withScope = (url: string) =>
     `${url}${url.includes("?") ? "&" : "?"}scope=${scopeValue}`;
+
+  const getTaskMarkerId = (task: any): string => {
+    const baseTaskId = String(task?.task_id ?? task?.taskId ?? task?.id ?? task?.name ?? "");
+    const collaboratorIds = (task as any).collaborator_ids as number[] | null;
+    const assignedCleaner = (task as any).assignedCleaner as number | null;
+    const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
+    return isCollaborativeTask && assignedCleaner != null
+      ? `${baseTaskId}:${assignedCleaner}`
+      : baseTaskId;
+  };
+
+  const getMapMarkerTitle = (task: Task): string => {
+    const adamCode = String(task.name ?? "").trim();
+    const clientAlias = String((task as any).alias ?? "").trim();
+    const address = String(task.address ?? "").trim();
+    const line1 = clientAlias ? `${adamCode} - ${clientAlias}` : adamCode;
+    return address ? `${line1}\n${address}` : line1;
+  };
 
   // Carica i cleaners
   useEffect(() => {
@@ -106,7 +141,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
 
   // Funzione per ottenere il colore del cleaner (sincronizzato con timeline)
   const getCleanerColor = (cleanerId: number) => {
-    return getCleanerHexColor(cleanerId);
+    return getPersonnelHexColor(cleanerId, personnelColorScope);
   };
 
   // Carica Google Maps API
@@ -151,6 +186,22 @@ export default function MapSection({ tasks }: MapSectionProps) {
     googleMapRef.current = map;
   }, [isMapLoaded]);
 
+  // Google Maps calcola i tile in base alle dimensioni del container.
+  // Nel pannello overlay la mappa può essere montata/ridimensionata dopo l'init.
+  useEffect(() => {
+    if (!isMapLoaded || !mapRef.current || !googleMapRef.current || !window.google?.maps) return;
+
+    const resizeMap = () => {
+      window.google.maps.event.trigger(googleMapRef.current, "resize");
+    };
+
+    resizeMap();
+    const observer = new ResizeObserver(resizeMap);
+    observer.observe(mapRef.current);
+
+    return () => observer.disconnect();
+  }, [isMapLoaded]);
+
   // Aggiorna i marker quando cambiano le task, cleaners o filtro
   useEffect(() => {
     if (!googleMapRef.current || !isMapLoaded) return;
@@ -171,7 +222,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
     });
 
     // Determina quali marker evidenziare (non nascondere gli altri)
-    // Usa ID univoco per marker: "taskName:cleanerId" per task collaborativi, "taskName" per altri
+    // Usa ID univoco per marker: "taskId:cleanerId" per task collaborativi, "taskId" per altri
     const highlightedMarkerIds = new Set<string>();
     
     // Se c'è un filtro per task ID (doppio click su task card)
@@ -189,9 +240,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
         
         // Evidenzia solo se il task è assegnato al cleaner filtrato
         if (assignedCleaner === filteredCleanerId) {
-          const markerId = isCollaborativeTask 
-            ? `${task.name}:${assignedCleaner}` 
-            : task.name;
+          const markerId = getTaskMarkerId(task);
           highlightedMarkerIds.add(markerId);
         }
       });
@@ -271,10 +320,8 @@ export default function MapSection({ tasks }: MapSectionProps) {
       const markerColor = assignedCleaner ? getCleanerColor(assignedCleaner) : '#6B7280';
       const sequence = (task as any).sequence;
       
-      // Calcola ID univoco per questo marker: "taskName:cleanerId" per collaborativi, "taskName" per altri
-      const markerId = isCollaborativeTask && assignedCleaner 
-        ? `${task.name}:${assignedCleaner}` 
-        : task.name;
+      // Calcola ID univoco per questo marker: "taskId:cleanerId" per collaborativi, "taskId" per altri
+      const markerId = getTaskMarkerId(task);
       
       // Verifica se questo marker specifico è evidenziato
       const isHighlighted = highlightedMarkerIds.has(markerId);
@@ -287,7 +334,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
       
       // Per task collaborativi, raggruppa per appartamento (task+coordinate) così da avere UNA sola linea.
       const collaborationGroupKey = isCollaborativeTask
-        ? `${task.name}:${coordKey}`
+        ? `${String(task.task_id ?? task.taskId ?? task.id ?? task.name ?? "")}:${coordKey}`
         : null;
       
       if (shouldUseCustomOverlay) {
@@ -326,7 +373,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
             div.style.fontWeight = 'bold';
             div.style.zIndex = isHighlighted ? '1000' : String(index);
             div.textContent = sequence !== undefined && sequence !== null ? String(sequence) : '';
-            div.title = `${task.name} - ${task.type}${sequence !== undefined ? ` (Seq: ${sequence})` : ''}`;
+            div.title = getMapMarkerTitle(task);
             
             // Aggiungi animazione bounce se evidenziato
             if (isHighlighted) {
@@ -480,7 +527,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
         const marker = new window.google.maps.Marker({
           position,
           map: googleMapRef.current,
-          title: `${task.name} - ${task.type}`,
+          title: getMapMarkerTitle(task),
           icon: {
             path: window.google.maps.SymbolPath.CIRCLE,
             fillColor: markerColor,
@@ -529,9 +576,7 @@ export default function MapSection({ tasks }: MapSectionProps) {
           const collaboratorIds = (task as any).collaborator_ids as number[] | null;
           const assignedCleaner = (task as any).assignedCleaner as number | null;
           const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
-          const markerId = isCollaborativeTask && assignedCleaner 
-            ? `${task.name}:${assignedCleaner}` 
-            : task.name;
+          const markerId = getTaskMarkerId(task);
           
           if (highlightedMarkerIds.has(markerId)) {
             const lat = parseFloat(task.lat || '0');
@@ -551,11 +596,11 @@ export default function MapSection({ tasks }: MapSectionProps) {
         }, 100);
       }
     }
-  }, [tasks, isMapLoaded, cleaners, filteredCleanerId, filteredTaskId]);
+  }, [tasks, isMapLoaded, cleaners, filteredCleanerId, filteredTaskId, personnelColorScope]);
 
   return (
-    <div className="bg-card rounded-lg border-2 border-border shadow-sm box-border overflow-hidden">
-      <div className="p-4 border-b border-border">
+    <div className={cn("bg-card rounded-lg border-2 border-border shadow-sm box-border overflow-hidden", compact && "flex flex-col", className)}>
+      <div className={cn("border-b border-border", compact ? "px-3 py-2" : "p-4")}>
         <h3 className="font-semibold text-foreground flex items-center">
           <svg 
             className="w-5 h-5 mr-2 text-custom-blue" 
@@ -579,11 +624,11 @@ export default function MapSection({ tasks }: MapSectionProps) {
           Mappa Appartamenti
         </h3>
       </div>
-      <div className="p-4 relative">
+      <div className={cn("relative", compact ? "min-h-0 flex-1 p-2" : "p-4", bodyClassName)}>
         <div 
           ref={mapRef} 
-          className="relative w-full h-[400px] rounded-lg bg-muted"
-          style={{ minHeight: '400px' }}
+          className={cn("relative w-full rounded-lg bg-muted", mapClassName || "h-[400px]")}
+          style={{ minHeight: mapMinHeight ?? '400px' }}
         >
           {!isMapLoaded && (
             <div className="absolute inset-0 z-[1] flex items-center justify-center rounded-lg bg-muted">

@@ -1,0 +1,190 @@
+{
+  "workDate": "2026-06-18",
+  "runId": "2026-06-18T10-04-20-669Z",
+  "startedAt": "2026-06-18T10:04:20.669Z",
+  "milestone": "routing-dry-run",
+  "solverId": "ortools-v1",
+  "inputValidation": {
+    "valid": true,
+    "errorCount": 0,
+    "warningCount": 0
+  },
+  "solutionValidation": {
+    "valid": true,
+    "errorCount": 0,
+    "warningCount": 0
+  },
+  "counts": {
+    "drivers": 2,
+    "tasks": 28,
+    "routes": 2,
+    "assignedTasks": 28,
+    "droppedTasks": 0,
+    "hardConstraints": 58,
+    "softConstraints": 29,
+    "businessGroups": 20,
+    "businessSoftConstraints": 20,
+    "timelineAssignmentHints": 0,
+    "preAssignedRequiredCount": 0,
+    "autoConvokedDriversCount": 0,
+    "autoConvokeMissingInDbDriversCount": 0,
+    "requiredDriverTaskConstraints": 0,
+    "excludedTasks": 0
+  },
+  "solutionStatus": "FEASIBLE",
+  "businessGroupsByType": {
+    "SAME_COORDINATES_BUILDING": 3,
+    "SAME_CLEANER": 10,
+    "CLEANER_SEQUENCE": 3,
+    "PRIORITY_COMPATIBLE": 1,
+    "NEARBY_CLUSTER": 3
+  },
+  "businessSoftConstraints": [
+    {
+      "type": "KEEP_SAME_COORDINATES_BUILDING_TOGETHER",
+      "groupId": "same-coordinates:223810,223960",
+      "weight": 100,
+      "toleranceMeters": 100
+    },
+    {
+      "type": "KEEP_SAME_COORDINATES_BUILDING_TOGETHER",
+      "groupId": "same-coordinates:225570,225782,225996",
+      "weight": 100,
+      "toleranceMeters": 100
+    },
+    {
+      "type": "KEEP_SAME_COORDINATES_BUILDING_TOGETHER",
+      "groupId": "same-coordinates:227684,231165",
+      "weight": 100,
+      "toleranceMeters": 100
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:24",
+      "weight": 30,
+      "cleanerId": 24
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:132",
+      "weight": 30,
+      "cleanerId": 132
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:249",
+      "weight": 30,
+      "cleanerId": 249
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:326",
+      "weight": 30,
+      "cleanerId": 326
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:445",
+      "weight": 30,
+      "cleanerId": 445
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:469",
+      "weight": 30,
+      "cleanerId": 469
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:596",
+      "weight": 30,
+      "cleanerId": 596
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:987",
+      "weight": 30,
+      "cleanerId": 987
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:1034",
+      "weight": 30,
+      "cleanerId": 1034
+    },
+    {
+      "type": "KEEP_SAME_CLEANER_TASKS_TOGETHER",
+      "groupId": "same-cleaner:1064",
+      "weight": 30,
+      "cleanerId": 1064
+    },
+    {
+      "type": "KEEP_CLEANER_SEQUENCE",
+      "groupId": "cleaner-sequence:249",
+      "weight": 40,
+      "cleanerId": 249,
+      "orderedTaskIds": [
+        231903,
+        231750
+      ]
+    },
+    {
+      "type": "KEEP_CLEANER_SEQUENCE",
+      "groupId": "cleaner-sequence:987",
+      "weight": 40,
+      "cleanerId": 987,
+      "orderedTaskIds": [
+        227684,
+        231165
+      ]
+    },
+    {
+      "type": "KEEP_CLEANER_SEQUENCE",
+      "groupId": "cleaner-sequence:1064",
+      "weight": 40,
+      "cleanerId": 1064,
+      "orderedTaskIds": [
+        231292,
+        231759
+      ]
+    },
+    {
+      "type": "KEEP_PRIORITY_COMPATIBLE_TASKS_TOGETHER",
+      "groupId": "priority-compatible:223810,223960,225570,225782,225996,227684,231165,231747,231748,231750,231752,231753,231754,231755,231756,231757,231758,231759,231760,231775,231776,231777,231778,231800,231831,231850,231903",
+      "weight": 20,
+      "windowOverlap": {
+        "startMin": 660,
+        "endMin": 720
+      }
+    },
+    {
+      "type": "KEEP_NEARBY_CLUSTER_TOGETHER",
+      "groupId": "nearby-cluster:223810",
+      "weight": 15,
+      "maxTravelMin": 10
+    },
+    {
+      "type": "KEEP_NEARBY_CLUSTER_TOGETHER",
+      "groupId": "nearby-cluster:225570",
+      "weight": 15,
+      "maxTravelMin": 10
+    },
+    {
+      "type": "KEEP_NEARBY_CLUSTER_TOGETHER",
+      "groupId": "nearby-cluster:231750",
+      "weight": 15,
+      "maxTravelMin": 10
+    }
+  ],
+  "files": [
+    "01-routing-input.json",
+    "02-routing-solution.json",
+    "03-ortools-payload.json",
+    "04-run-extra.json",
+    "05-final-timeline-validation.json"
+  ],
+  "extra": [
+    "applyGate",
+    "droppedDiagnostics"
+  ]
+}

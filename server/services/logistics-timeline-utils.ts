@@ -1,34 +1,20 @@
 import * as workspaceFiles from "./workspace-files";
-
-const EARTH_RADIUS_M = 6371000;
-const DEFAULT_AVG_SPEED_KMH = 28;
-const BASE_MINUTES = 3;
-const MIN_LEG_MIN = 2;
-const MAX_LEG_MIN = 180;
-
-function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const r1 = (lat1 * Math.PI) / 180;
-  const r2 = (lat2 * Math.PI) / 180;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(r1) * Math.cos(r2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return EARTH_RADIUS_M * c;
-}
-
-function estimateCarTravelMinutes(
-  a: { lat: number; lng: number },
-  b: { lat: number; lng: number },
-  avgSpeedKmh: number = DEFAULT_AVG_SPEED_KMH
-): number {
-  const meters = haversineMeters(a.lat, a.lng, b.lat, b.lng);
-  const km = meters / 1000;
-  const hours = km / avgSpeedKmh;
-  const minutes = BASE_MINUTES + hours * 60;
-  return Math.round(Math.max(MIN_LEG_MIN, Math.min(MAX_LEG_MIN, minutes)));
-}
+import { minutesToHm, parseHmToMinutes } from "../../shared/logistics-scheduling-constraints";
+import { estimateLogisticsReturnToDepotMinutes } from "../../shared/logistics-travel-estimate";
+export {
+  estimateLogisticsCarTravelMinutes as estimateCarTravelMinutes,
+  LOGISTICS_DEPOT_LAT,
+  LOGISTICS_DEPOT_LNG,
+} from "../../shared/logistics-travel-estimate";
+import {
+  buildLogisticsScheduleForDriver,
+  type LogisticsScheduleTaskInput,
+} from "./logistics-optimizer/logistics-driver-schedule";
+import {
+  loadPriorityStartWindows,
+  mapPriorityType,
+  type PriorityWindows,
+} from "./optimizer/priorityWindows";
 
 export async function getDriverStartTime(driverId: number, workDate: string): Promise<string | null> {
   try {
@@ -91,31 +77,119 @@ export async function hydrateTasksFromLogisticsContainers(driverData: any, workD
   return driverData;
 }
 
-function parseTimeToMinutes(value: unknown, fallback: number): number {
-  const raw = String(value ?? "").trim();
-  const match = raw.match(/^(\d{1,2}):(\d{2})/);
-  if (!match) return fallback;
-  const h = Number(match[1]);
-  const m = Number(match[2]);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return fallback;
-  return h * 60 + m;
-}
-
-function minutesToHHMM(totalMinutes: number): string {
-  const bounded = Math.max(0, Math.min(24 * 60 - 1, Math.round(totalMinutes)));
-  const h = Math.floor(bounded / 60);
-  const m = bounded % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
 function toFiniteNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
 
-/** Logistics-only recalc: route travel + fixed 15m service window */
-export async function recalculateLogisticsDriverTimes(entry: any, workDate?: string): Promise<any> {
+function getLogisticsTaskKey(task: any): string | null {
+  const taskId = Number(task?.task_id);
+  if (Number.isFinite(taskId) && taskId > 0) return `task:${taskId}`;
+  const logisticCode = Number(task?.logistic_code);
+  if (Number.isFinite(logisticCode) && logisticCode > 0) return `code:${logisticCode}`;
+  return null;
+}
+
+export function dedupeLogisticsTimelineAssignments(
+  timeline: { drivers_assignments?: any[] } | null | undefined
+): boolean {
+  if (!Array.isArray(timeline?.drivers_assignments)) return false;
+
+  let changed = false;
+  const mergedByDriver = new Map<number, any>();
+  const mergedEntries: any[] = [];
+
+  for (const entry of timeline.drivers_assignments) {
+    const driverId = Number(entry?.driver?.id);
+    if (!Number.isFinite(driverId)) {
+      mergedEntries.push(entry);
+      continue;
+    }
+
+    const existing = mergedByDriver.get(driverId);
+    if (existing) {
+      existing.tasks = [
+        ...(Array.isArray(existing.tasks) ? existing.tasks : []),
+        ...(Array.isArray(entry?.tasks) ? entry.tasks : []),
+      ];
+      changed = true;
+      continue;
+    }
+
+    const normalizedEntry = {
+      ...entry,
+      tasks: Array.isArray(entry?.tasks) ? [...entry.tasks] : [],
+    };
+    mergedByDriver.set(driverId, normalizedEntry);
+    mergedEntries.push(normalizedEntry);
+  }
+
+  const seenTasks = new Set<string>();
+  for (const entry of mergedEntries) {
+    if (!Array.isArray(entry?.tasks)) {
+      entry.tasks = [];
+      continue;
+    }
+
+    const dedupedTasks: any[] = [];
+    for (const task of entry.tasks) {
+      const key = getLogisticsTaskKey(task);
+      if (key && seenTasks.has(key)) {
+        changed = true;
+        continue;
+      }
+      if (key) seenTasks.add(key);
+      dedupedTasks.push(task);
+    }
+
+    entry.tasks = dedupedTasks
+      .sort((left, right) => Number(left?.sequence || 0) - Number(right?.sequence || 0))
+      .map((task, index) => ({
+        ...task,
+        sequence: index + 1,
+        followup: index > 0,
+      }));
+  }
+
+  if (changed) {
+    timeline.drivers_assignments = mergedEntries;
+  }
+  return changed;
+}
+
+export function snapshotLogisticsTimelineSchedule(
+  timeline: { drivers_assignments?: any[] } | null | undefined
+): string {
+  const entries = Array.isArray(timeline?.drivers_assignments) ? timeline.drivers_assignments : [];
+  const snapshot = entries
+    .map((entry) => {
+      const tasks = Array.isArray(entry?.tasks) ? entry.tasks : [];
+      return {
+        driverId: Number(entry?.driver?.id ?? 0),
+        driverStartTime: entry?.driver?.start_time ?? null,
+        tasks: tasks
+          .map((task: any) => ({
+            taskId: Number(task?.task_id ?? 0),
+            sequence: Number(task?.sequence ?? 0),
+            startTime: task?.start_time ?? null,
+            endTime: task?.end_time ?? null,
+            travelTime: Number(task?.travel_time ?? 0),
+            checkoutWaitMinutes: Number(task?.checkout_wait_minutes ?? 0),
+          }))
+          .sort((left, right) => left.sequence - right.sequence || left.taskId - right.taskId),
+      };
+    })
+    .sort((left, right) => left.driverId - right.driverId);
+  return JSON.stringify(snapshot);
+}
+
+/** Logistics-only recalc: route travel + fixed service window (15m). */
+export async function recalculateLogisticsDriverTimes(
+  entry: any,
+  workDate?: string,
+  priorityWindows: PriorityWindows | null = null
+): Promise<any> {
   const dateToUse = workDate || new Date().toISOString().slice(0, 10);
   const driver = entry.driver || {};
   const startTime = await getDriverStartTime(driver.id, dateToUse);
@@ -123,39 +197,111 @@ export async function recalculateLogisticsDriverTimes(entry: any, workDate?: str
     entry.driver.start_time = startTime;
   }
 
-  const tasks: any[] = Array.isArray(entry.tasks) ? entry.tasks : [];
+  // Preserve array order: DnD mutations splice entry.tasks directly; sorting by stale
+  // sequence values would undo manual reorders before times are recalculated.
+  const tasks: any[] = Array.isArray(entry.tasks) ? [...entry.tasks] : [];
   if (tasks.length === 0) {
     entry.tasks = [];
+    entry.return_travel_time = 0;
     return entry;
   }
 
-  const driverStartMin = parseTimeToMinutes(entry.driver?.start_time, 10 * 60);
-  let clockMin = driverStartMin;
-  let prevLat: number | null = null;
-  let prevLng: number | null = null;
+  const driverStartMin = parseHmToMinutes(entry.driver?.start_time, 10 * 60) ?? 10 * 60;
+  const scheduleInputs: LogisticsScheduleTaskInput[] = tasks.map((task) => ({
+    taskId: Number(task.task_id),
+    logisticCode: Number(task.logistic_code),
+    lat: toFiniteNumber(task?.lat),
+    lng: toFiniteNumber(task?.lng),
+    priorityType: mapPriorityType(task?.priority ?? null),
+    checkoutTime: task.checkout_time ?? null,
+    checkoutDate: task.checkout_date ?? null,
+    checkinTime: task.checkin_time ?? null,
+    checkinDate: task.checkin_date ?? null,
+    travelMinutesFromPrevious: toFiniteNumber(task?.travel_time),
+  }));
+
+  const built = buildLogisticsScheduleForDriver({
+    tasks: scheduleInputs,
+    driverStartMin,
+    workDate: dateToUse,
+    priorityWindows,
+  });
+
+  if (built.effectiveDriverStartMin !== driverStartMin) {
+    entry.driver.start_time = minutesToHm(built.effectiveDriverStartMin);
+  }
 
   for (let i = 0; i < tasks.length; i++) {
     const task = tasks[i];
-    const lat = toFiniteNumber(task?.lat);
-    const lng = toFiniteNumber(task?.lng);
-    let travel = 0;
-    if (i > 0 && prevLat !== null && prevLng !== null && lat !== null && lng !== null) {
-      travel = estimateCarTravelMinutes({ lat: prevLat, lng: prevLng }, { lat, lng });
-    }
-    const startMin = clockMin + travel;
-    const endMin = startMin + 15;
-
-    task.travel_time = travel;
-    task.start_time = minutesToHHMM(startMin);
-    task.end_time = minutesToHHMM(endMin);
-    task.sequence = i + 1;
+    const row = built.tasks[i];
+    if (!row) continue;
+    task.travel_time = row.travelMinutes;
+    task.checkout_wait_minutes = row.checkoutWaitMinutes;
+    task.checkout_wait_exceeded = row.checkoutWaitExceeded;
+    task._checkin_violated = row.checkinViolated || row.startAtOrAfterCheckin;
+    task.start_time = row.startTime;
+    task.end_time = row.endTime;
+    task.sequence = row.sequence;
     task.followup = i > 0;
-
-    clockMin = endMin;
-    prevLat = lat;
-    prevLng = lng;
   }
 
   entry.tasks = tasks;
+  const lastTask = tasks[tasks.length - 1];
+  entry.return_travel_time = estimateLogisticsReturnToDepotMinutes(lastTask);
   return entry;
+}
+
+/** Ricalcolo di tutti i driver prima del salvataggio (es. apply ottimizzatore). */
+export async function recalculateLogisticsTimeline(
+  timeline: { drivers_assignments?: any[] },
+  workDate: string
+): Promise<boolean> {
+  const entries = timeline.drivers_assignments;
+  if (!Array.isArray(entries)) return false;
+
+  const before = snapshotLogisticsTimelineSchedule(timeline);
+  dedupeLogisticsTimelineAssignments(timeline);
+
+  let priorityWindows: PriorityWindows | null = null;
+  try {
+    priorityWindows = await loadPriorityStartWindows();
+  } catch (error) {
+    console.warn("⚠️ recalculateLogisticsTimeline: priority windows unavailable, proceeding without them", error);
+  }
+
+  for (let i = 0; i < timeline.drivers_assignments.length; i++) {
+    const entry = timeline.drivers_assignments[i];
+    if (!entry?.tasks?.length) continue;
+    await hydrateTasksFromLogisticsContainers(entry, workDate);
+    timeline.drivers_assignments[i] = await recalculateLogisticsDriverTimes(entry, workDate, priorityWindows);
+  }
+
+  return snapshotLogisticsTimelineSchedule(timeline) !== before;
+}
+
+/** Ricalcolo completo di un driver dopo DnD / mutazioni manuali (hydrate + priority windows). */
+export async function recalculateLogisticsDriverEntry(
+  entry: any,
+  workDate: string
+): Promise<any> {
+  await hydrateTasksFromLogisticsContainers(entry, workDate);
+
+  let priorityWindows: PriorityWindows | null = null;
+  try {
+    priorityWindows = await loadPriorityStartWindows();
+  } catch (error) {
+    console.warn(
+      "⚠️ recalculateLogisticsDriverEntry: priority windows unavailable, proceeding without them",
+      error
+    );
+  }
+
+  return recalculateLogisticsDriverTimes(entry, workDate, priorityWindows);
+}
+
+export function pruneEmptyLogisticsDriverAssignments(timeline: { drivers_assignments?: any[] }): void {
+  if (!Array.isArray(timeline?.drivers_assignments)) return;
+  timeline.drivers_assignments = timeline.drivers_assignments.filter(
+    (entry) => Array.isArray(entry?.tasks) && entry.tasks.length > 0
+  );
 }

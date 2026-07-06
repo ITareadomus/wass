@@ -33,7 +33,8 @@ import {
 } from "@/lib/taskValidation";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { getCleanerHexColor } from "@/lib/cleaner-colors";
+import { openTimelineMapPanel } from "@/lib/timeline-map-panel";
+import { getPersonnelHexColor } from "@/lib/cleaner-colors";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -77,9 +78,63 @@ interface Cleaner {
   preferred_customers: number[];
   telegram_id: number | null;
   start_time: string | null;
+  end_time?: string | null;
   show_plus_one?: boolean;
 }
 
+const DEFAULT_TIMELINE_START_MINUTES = 10 * 60;
+const DEFAULT_TIMELINE_END_MINUTES = 19 * 60;
+const MIN_TIMELINE_TASK_WIDTH_PX = 150;
+const FALLBACK_SHORTEST_TASK_MINUTES = 30;
+const TIMELINE_END_BUFFER_MINUTES = 60;
+
+const parseTimelineClockToMinutes = (value?: string | null) => {
+  if (!value) return null;
+  const parts = String(value).split(":");
+  if (parts.length < 2) return null;
+
+  const hours = Number(parts[0]);
+  const minutes = Number(parts[1]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+
+  return hours * 60 + minutes;
+};
+
+const parseTimelineDurationToMinutes = (duration?: string | number | null) => {
+  if (duration === undefined || duration === null) return 0;
+
+  if (typeof duration === "number") {
+    return Number.isFinite(duration) ? duration : 0;
+  }
+
+  const [hoursPart = "0", minutesPart = "0"] = String(duration).split(".");
+  const hours = Number.parseInt(hoursPart, 10);
+  const minutes = Number.parseInt(minutesPart, 10);
+
+  return (Number.isFinite(hours) ? hours : 0) * 60 + (Number.isFinite(minutes) ? minutes : 0);
+};
+
+const getTimelineTaskDurationMinutes = (task: any) => {
+  const directDuration = Number(task?.cleaning_time ?? task?.cleaningTime);
+  if (Number.isFinite(directDuration) && directDuration > 0) {
+    return directDuration;
+  }
+
+  return parseTimelineDurationToMinutes(task?.duration);
+};
+
+const getTimelineTravelMinutes = (task: any) => {
+  const travel = Number(task?.travel_time ?? task?.travelTime);
+  return Number.isFinite(travel) && travel > 0 ? travel : 0;
+};
+
+const roundDownToHour = (minutes: number) => Math.floor(minutes / 60) * 60;
+const roundUpToHour = (minutes: number) => Math.ceil(minutes / 60) * 60;
+
+const formatTimelineSlot = (minutes: number) => {
+  const hours = Math.floor(minutes / 60);
+  return `${String(hours).padStart(2, "0")}:00`;
+};
 type CleanerDirectoryEntry = {
   id: number;
   name?: string;
@@ -244,6 +299,9 @@ export default function TimelineView({
   const [editingStartTime, setEditingStartTime] = useState<string>("10:00");
   const [startTimeEditDialog, setStartTimeEditDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
   const [isSavingStartTime, setIsSavingStartTime] = useState(false);
+  const [editingEndTime, setEditingEndTime] = useState<string>("20:00");
+  const [endTimeEditDialog, setEndTimeEditDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
+  const [isSavingEndTime, setIsSavingEndTime] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isTransferringToAdam, setIsTransferringToAdam] = useState(false);
   const [showOptimizerDialog, setShowOptimizerDialog] = useState(false);
@@ -276,11 +334,10 @@ export default function TimelineView({
     });
   }, []);
 
-  // EO, HP, LP brackets for priority windows
+  // EO/HP/LP brackets derived from the hp-centric priority settings.
   type PriorityWindows = {
-    EO: { start: string; end: string };
-    HP: { start: string; end: string };
-    LP: { start: string; end?: string | null };
+    hpStart: string;
+    hpEnd: string;
   };
   
   const [priorityWindows, setPriorityWindows] = useState<PriorityWindows | null>(null);
@@ -296,29 +353,11 @@ export default function TimelineView({
   
         const s = await res.json();
   
-        // Struttura presa da app_settings.json nel DB:
-        // s["early-out"].eo_start_time / eo_end_time
-        // s["high-priority"].hp_start_time / hp_end_time
-        // low-priority potrebbe esserci o no (nel tuo repo lato server esiste come chiave)
-        const eoStart = s?.["early-out"]?.eo_start_time;
-        const eoEnd = s?.["early-out"]?.eo_end_time;
-  
         const hpStart = s?.["high-priority"]?.hp_start_time;
         const hpEnd = s?.["high-priority"]?.hp_end_time;
-  
-        const lpStart =
-          s?.["low-priority"]?.lp_start_time
-          // fallback sensato se non c’è low-priority nel JSON:
-          ?? hpEnd
-          ?? hpStart;
-  
-        if (eoStart && eoEnd && hpStart && hpEnd && lpStart) {
-          setPriorityWindows({
-            EO: { start: eoStart, end: eoEnd },
-            HP: { start: hpStart, end: hpEnd },
-            // LP tipicamente “da lpStart in poi”
-            LP: { start: lpStart, end: null },
-          });
+
+        if (hpStart && hpEnd) {
+          setPriorityWindows({ hpStart, hpEnd });
         }
       } catch (e) {
         console.warn("Failed to load /api/settings for priority windows", e);
@@ -371,12 +410,85 @@ export default function TimelineView({
 
   // Larghezza della timeline in pixel per calcolo larghezze task
   const [timelineWidthPx, setTimelineWidthPx] = useState<number>(0);
-  const timelineRowRef = useRef<HTMLDivElement>(null);
+  const [timelineScrollLeft, setTimelineScrollLeft] = useState(0);
+  const timelineRowRef = useRef<HTMLDivElement | null>(null);
+  const timelineScrollRefs = useRef<HTMLDivElement[]>([]);
+  const isSyncingTimelineScrollRef = useRef(false);
+  const timelineScrollDragRef = useRef<{
+    scrollContainer: HTMLDivElement;
+    pointerId: number;
+    startX: number;
+    startScrollLeft: number;
+  } | null>(null);
 
   // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
   // DEVE essere definito PRIMA di allCleanersToShow che lo usa
   const [timelineCleaners, setTimelineCleaners] = useState<any[]>([]);
 
+  const registerTimelineScrollRef = React.useCallback((node: HTMLDivElement | null) => {
+    if (node && !timelineScrollRefs.current.includes(node)) {
+      timelineScrollRefs.current.push(node);
+    }
+  }, []);
+
+  const handleTimelineScroll = React.useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    if (isSyncingTimelineScrollRef.current) return;
+
+    const source = event.currentTarget;
+    setTimelineScrollLeft(source.scrollLeft);
+    isSyncingTimelineScrollRef.current = true;
+    timelineScrollRefs.current = timelineScrollRefs.current.filter((node) => node.isConnected);
+    timelineScrollRefs.current.forEach((node) => {
+      if (node !== source) {
+        node.scrollLeft = source.scrollLeft;
+      }
+    });
+    requestAnimationFrame(() => {
+      isSyncingTimelineScrollRef.current = false;
+    });
+  }, []);
+
+  const canStartTimelinePan = React.useCallback((target: EventTarget | null) => {
+    const element = target instanceof HTMLElement ? target : null;
+    if (!element) return false;
+
+    return !element.closest(
+      '[data-rbd-draggable-id], [data-rbd-drag-handle-draggable-id], button, input, textarea, select, a, [role="button"]'
+    );
+  }, []);
+
+  const handleTimelinePointerDown = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const scrollContainer = event.currentTarget;
+    if (event.button !== 0 || !canStartTimelinePan(event.target)) return;
+    if (scrollContainer.scrollWidth <= scrollContainer.clientWidth) return;
+
+    timelineScrollDragRef.current = {
+      scrollContainer,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startScrollLeft: scrollContainer.scrollLeft,
+    };
+    scrollContainer.setPointerCapture(event.pointerId);
+    scrollContainer.classList.add("is-panning");
+    event.preventDefault();
+  }, [canStartTimelinePan]);
+
+  const handleTimelinePointerMove = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const dragState = timelineScrollDragRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+    dragState.scrollContainer.scrollLeft = dragState.startScrollLeft - (event.clientX - dragState.startX);
+    event.preventDefault();
+  }, []);
+
+  const stopTimelinePan = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const dragState = timelineScrollDragRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+    dragState.scrollContainer.releasePointerCapture(event.pointerId);
+    dragState.scrollContainer.classList.remove("is-panning");
+    timelineScrollDragRef.current = null;
+  }, []);
   const normalizeCleanerRole = (rawRole: string | undefined | null) => {
     const role = String(rawRole ?? "").trim();
     if (!role) return "";
@@ -447,6 +559,15 @@ export default function TimelineView({
     return combined;
   }, [cleaners, timelineCleaners]);
 
+  const visibleCleanerIds = React.useMemo(
+    () => new Set(allCleanersToShow.map(cleaner => Number(cleaner.id))),
+    [allCleanersToShow]
+  );
+
+  const timelineAssignedTasks = React.useMemo(
+    () => tasks.filter(task => visibleCleanerIds.has(Number((task as any).assignedCleaner))),
+    [tasks, visibleCleanerIds]
+  );
   const cleanerDirectoryIds = React.useMemo(() => {
     const ids = new Set<number>();
     for (const cleaner of cleaners) {
@@ -780,57 +901,137 @@ export default function TimelineView({
     });
   };
 
-  // Trova lo start time minimo tra tutti i cleaner
+  // Trova lo start time minimo tra tutti i cleaner e arrotonda la griglia all'ora intera.
   const getGlobalStartTime = () => {
-    if (allCleanersToShow.length === 0) return "10:00";
+    if (allCleanersToShow.length === 0) return formatTimelineSlot(DEFAULT_TIMELINE_START_MINUTES);
 
-    const startTimes = allCleanersToShow.map(c => c.start_time || "10:00");
-    const minTime = startTimes.reduce((min, current) => {
-      const [minH, minM] = min.split(':').map(Number);
-      const [curH, curM] = current.split(':').map(Number);
-      const minMinutes = minH * 60 + minM;
-      const curMinutes = curH * 60 + curM;
-      return curMinutes < minMinutes ? current : min;
-    });
+    const cleanerStartMinutes = allCleanersToShow
+      .map(c => parseTimelineClockToMinutes(c.start_time) ?? DEFAULT_TIMELINE_START_MINUTES);
+    const startMinutes = cleanerStartMinutes.length > 0
+      ? Math.min(...cleanerStartMinutes)
+      : DEFAULT_TIMELINE_START_MINUTES;
 
-    return minTime;
+    return formatTimelineSlot(roundDownToHour(startMinutes));
   };
 
-  // Genera time slots globali basati sullo start time minimo (solo orari interi)
+  const globalStartTime = getGlobalStartTime();
+  const timelineStartMinutes = parseTimelineClockToMinutes(globalStartTime) ?? DEFAULT_TIMELINE_START_MINUTES;
+
+  const shortestTaskMinutes = React.useMemo(() => {
+    const validDurations = timelineAssignedTasks
+      .map(task => getTimelineTaskDurationMinutes(task as any))
+      .filter(duration => Number.isFinite(duration) && duration > 0);
+
+    return validDurations.length > 0
+      ? Math.min(...validDurations)
+      : FALLBACK_SHORTEST_TASK_MINUTES;
+  }, [timelineAssignedTasks]);
+
+  const minimumTimelinePxPerMinute = MIN_TIMELINE_TASK_WIDTH_PX / shortestTaskMinutes;
+
+  const timelineEndMinutes = React.useMemo(() => {
+    const cleanerStartById = new Map<number, number>();
+    for (const cleaner of allCleanersToShow) {
+      cleanerStartById.set(
+        Number(cleaner.id),
+        parseTimelineClockToMinutes(cleaner.start_time) ?? timelineStartMinutes
+      );
+    }
+
+    const endCandidates: number[] = [];
+
+    for (const task of timelineAssignedTasks) {
+      const taskObj = task as any;
+      const duration = getTimelineTaskDurationMinutes(taskObj);
+      if (!Number.isFinite(duration) || duration <= 0) continue;
+
+      const startMinutes = parseTimelineClockToMinutes(
+        taskObj.start_time || taskObj.fw_start_time || taskObj.startTime
+      );
+      const endMinutes = parseTimelineClockToMinutes(taskObj.end_time || taskObj.endTime);
+
+      if (endMinutes !== null) {
+        endCandidates.push(endMinutes);
+      } else if (startMinutes !== null) {
+        endCandidates.push(startMinutes + duration);
+      }
+    }
+
+    const tasksByCleaner = new Map<number, any[]>();
+    for (const task of timelineAssignedTasks) {
+      const cleanerId = Number((task as any).assignedCleaner);
+      if (!Number.isFinite(cleanerId)) continue;
+      const cleanerTasks = tasksByCleaner.get(cleanerId) ?? [];
+      cleanerTasks.push(task as any);
+      tasksByCleaner.set(cleanerId, cleanerTasks);
+    }
+
+    for (const [cleanerId, cleanerTasks] of tasksByCleaner) {
+      let cursor = cleanerStartById.get(cleanerId) ?? timelineStartMinutes;
+
+      const sortedTasks = [...cleanerTasks].sort((a, b) => {
+        const seqA = Number(a.sequence);
+        const seqB = Number(b.sequence);
+        if (Number.isFinite(seqA) && Number.isFinite(seqB)) return seqA - seqB;
+
+        const timeA = parseTimelineClockToMinutes(a.start_time || a.fw_start_time || a.startTime) ?? cursor;
+        const timeB = parseTimelineClockToMinutes(b.start_time || b.fw_start_time || b.startTime) ?? cursor;
+        return timeA - timeB;
+      });
+
+      sortedTasks.forEach((taskObj, index) => {
+        const duration = getTimelineTaskDurationMinutes(taskObj);
+        if (!Number.isFinite(duration) || duration <= 0) return;
+
+        const explicitStart = parseTimelineClockToMinutes(
+          taskObj.start_time || taskObj.fw_start_time || taskObj.startTime
+        );
+
+        if (explicitStart !== null) {
+          cursor = Math.max(cursor, explicitStart);
+        } else if (index > 0) {
+          cursor += getTimelineTravelMinutes(taskObj);
+        }
+
+        cursor += duration;
+        endCandidates.push(cursor);
+      });
+    }
+
+    if (endCandidates.length === 0) return DEFAULT_TIMELINE_END_MINUTES;
+
+    const latestEnd = Math.max(...endCandidates);
+    return Math.max(
+      timelineStartMinutes + 60,
+      roundUpToHour(latestEnd + TIMELINE_END_BUFFER_MINUTES)
+    );
+  }, [allCleanersToShow, timelineAssignedTasks, timelineStartMinutes]);
+
+  // Genera time slots globali basati sul range visibile dinamico.
   const generateGlobalTimeSlots = () => {
-    const globalStartTime = getGlobalStartTime();
-    const [startHour, startMin] = globalStartTime.split(':').map(Number);
-
-    // Arrotonda all'ora intera precedente per iniziare sempre da un'ora intera
-    const startHourRounded = startMin > 0 ? startHour : startHour;
-    const endHour = 19; // Fine fissa alle 19:00
-
     const slots: string[] = [];
+    const slotsCount = Math.max(1, Math.ceil((timelineEndMinutes - timelineStartMinutes) / 60));
 
-    // Genera slot ogni ora fino alle 19:00 (solo orari interi)
-    for (let hour = startHourRounded; hour <= endHour; hour++) {
-      slots.push(`${String(hour).padStart(2, '0')}:00`);
+    for (let idx = 0; idx < slotsCount; idx++) {
+      slots.push(formatTimelineSlot(timelineStartMinutes + idx * 60));
     }
 
     return slots;
   };
 
-  // Calcola i minuti totali della timeline globale (in base all'ora ARROTONDATA per match con la griglia)
-  const getGlobalTimelineMinutes = () => {
-    const globalStartTime = getGlobalStartTime();
-    const [startHour, startMin] = globalStartTime.split(':').map(Number);
-
-    // CRITICAL: Usa l'ora arrotondata (come la griglia visiva) per calcolare i minuti
-    const startHourRounded = startMin > 0 ? startHour : startHour;
-    const startMinutes = startHourRounded * 60; // Parte dall'ora intera
-    const endMinutes = 19 * 60; // 19:00
-    return endMinutes - startMinutes;
-  };
+  const getGlobalTimelineMinutes = () => Math.max(60, timelineEndMinutes - timelineStartMinutes);
 
   // Genera gli slot una volta sola
   const globalTimeSlots = generateGlobalTimeSlots();
   const globalTimelineMinutes = getGlobalTimelineMinutes();
-  const globalStartTime = getGlobalStartTime();
+  const minimumTimelineContentWidthPx = globalTimelineMinutes * minimumTimelinePxPerMinute;
+  const timelineContentWidthPx = Math.max(
+    timelineWidthPx,
+    minimumTimelineContentWidthPx
+  );
+  const timelinePxPerMinute = timelineContentWidthPx / globalTimelineMinutes;
+  const timelineScaledWidth = timelineContentWidthPx > 0 ? `${timelineContentWidthPx}px` : "100%";
+  const timelineTaskWidthPx = timelineContentWidthPx;
 
 
 // Helpers to render EO/HP/LP brackets above the time header
@@ -847,14 +1048,11 @@ const getTimelineStartMinutes = () => {
   return timeToMinutes(first);
 };
 
-const getTimelineEndMinutes = () => 19 * 60; // 19:00 fixed end
+const getTimelineEndMinutes = () => timelineEndMinutes;
 
 const minutesToPct = (absoluteMinutes: number) => {
-  if (!globalTimeSlots?.length) return 0;
-
-  const timelineStart = timeToMinutes(globalTimeSlots[0]);
-  const timelineEnd = timelineStart + globalTimeSlots.length * 60;
-
+  const timelineStart = getTimelineStartMinutes();
+  const timelineEnd = getTimelineEndMinutes();
   const total = timelineEnd - timelineStart;
   if (total <= 0) return 0;
 
@@ -881,28 +1079,43 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
   React.useEffect(() => {
     (window as any).globalTimelineMinutes = globalTimelineMinutes;
     (window as any).globalTimeSlotsCount = globalTimeSlots.length;
-  }, [globalTimelineMinutes, globalTimeSlots.length]);
+    (window as any).timelinePxPerMinute = timelinePxPerMinute;
+    (window as any).minTimelineTaskWidthPx = MIN_TIMELINE_TASK_WIDTH_PX;
+  }, [globalTimelineMinutes, globalTimeSlots.length, timelinePxPerMinute]);
 
   // Misura la larghezza della timeline row per TaskCard (state React → rerender)
   React.useEffect(() => {
+    let resizeObserver: ResizeObserver | null = null;
+    let attachTimer: ReturnType<typeof setTimeout> | null = null;
+
     const measureWidth = () => {
       if (timelineRowRef.current) {
-        const width = timelineRowRef.current.offsetWidth;
-        setTimelineWidthPx(width);
+        setTimelineWidthPx(timelineRowRef.current.offsetWidth);
       }
     };
 
-    measureWidth();
-    window.addEventListener('resize', measureWidth);
+    const attach = () => {
+      const node = timelineRowRef.current;
+      if (!node) return false;
 
-    // Rimisura dopo un breve delay per catturare layout post-render
-    const timer = setTimeout(measureWidth, 100);
+      measureWidth();
+      resizeObserver = new ResizeObserver(measureWidth);
+      resizeObserver.observe(node);
+      return true;
+    };
+
+    if (!attach()) {
+      attachTimer = setTimeout(attach, 100);
+    }
+
+    window.addEventListener("resize", measureWidth);
 
     return () => {
-      window.removeEventListener('resize', measureWidth);
-      clearTimeout(timer);
+      resizeObserver?.disconnect();
+      if (attachTimer) clearTimeout(attachTimer);
+      window.removeEventListener("resize", measureWidth);
     };
-  }, [cleaners, isFullscreen]);
+  }, [cleaners, isFullscreen, globalTimeSlots.length]);
 
   // Esponi gli start_time dei cleaner alla pagina per optimistic UI nel DnD
   // Quando droppi su un cleaner "vuoto", l'optimistic UI deve sapere da che ora parte
@@ -1144,6 +1357,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           title: "Filtro attivato",
           description: `Visualizzi solo gli appartamenti di ${cleaner.name} ${cleaner.lastname}`,
         });
+        openTimelineMapPanel();
       }
     } else {
       // Primo click: avvia timer
@@ -1503,6 +1717,16 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     });
   };
 
+  const handleOpenEndTimeDialog = (cleaner: Cleaner) => {
+    const currentEndTime = cleaner.end_time || "20:00";
+    setEditingEndTime(currentEndTime);
+    setEndTimeEditDialog({
+      open: true,
+      cleanerId: cleaner.id,
+      cleanerName: `${cleaner.name} ${cleaner.lastname}`
+    });
+  };
+
   // Salva l'alias modificato
   const handleSaveAlias = async () => {
     if (!aliasDialog.cleanerId) return;
@@ -1615,6 +1839,70 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     }
   };
 
+  const handleSaveEndTime = async () => {
+    if (!endTimeEditDialog.cleanerId) return;
+
+    if (!/^\d{2}:\d{2}$/.test(editingEndTime)) {
+      toast({
+        variant: "destructive",
+        title: "⚠️ Formato orario non valido",
+        description: "Inserisci un orario nel formato HH:mm (es. 20:00)"
+      });
+      return;
+    }
+
+    setIsSavingEndTime(true);
+    try {
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const response = await fetch('/api/update-cleaner-end-time', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cleanerId: endTimeEditDialog.cleanerId,
+          endTime: editingEndTime,
+          date: workDate,
+          scope: scopeValue,
+          modified_by: currentUser.username || 'unknown'
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.message || 'Errore nel salvataggio dell\'end time');
+      }
+
+      setCleaners(prev => prev.map(c =>
+        c.id === endTimeEditDialog.cleanerId ? { ...c, end_time: editingEndTime } : c
+      ));
+
+      if (selectedCleaner && selectedCleaner.id === endTimeEditDialog.cleanerId) {
+        setSelectedCleaner({ ...selectedCleaner, end_time: editingEndTime });
+      }
+
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
+
+      toast({
+        title: "End Time salvato",
+        description: `Orario di fine aggiornato a ${editingEndTime}`,
+        variant: "success",
+      });
+
+      setEndTimeEditDialog({ open: false, cleanerId: null, cleanerName: '' });
+
+    } catch (error: any) {
+      console.error("Errore nel salvataggio dell'end time:", error);
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile salvare l'end time",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingEndTime(false);
+    }
+  };
+
   // Calcola la larghezza dinamica della colonna cleaners in base all'alias più lungo
   const calculateCleanerColumnWidth = () => {
     // Mantieni una colonna stabile anche quando non ci sono cleaner selezionati,
@@ -1627,10 +1915,10 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     }, 0);
 
     // Formula: larghezza base + (caratteri * pixel per carattere)
-    // Aggiungi spazio extra per il badge
-    const baseWidth = 60; // padding e margini
-    const charWidth = 7.5; // circa 7.5px per carattere con font bold 13px
-    const badgeSpace = 30; // spazio per il badge P/F
+    // Mantiene la colonna dinamica sul nome più lungo, evitando spazio vuoto eccessivo.
+    const baseWidth = 44; // padding e margini
+    const charWidth = 7; // circa 7px per carattere con font bold 13px
+    const badgeSpace = 20; // spazio per il badge P/F
 
     return Math.max(128, baseWidth + (maxLength * charWidth) + badgeSpace);
   };
@@ -1801,59 +2089,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       straordinaria: isStraordinaria,
       confirmed_operation: isConfirmedOperation,
     };
-  };
-
-  // Funzione per verificare se un task viola la sua finestra temporale di priorità
-  // EO: 10:00-10:59, HP: 11:00-15:30, LP: >= 11:00
-  const isPriorityWindowViolation = (task: any): boolean => {
-    const priority = task.priority;
-    const startTimeStr = task.start_time;
-    
-    if (!priority || !startTimeStr) return false;
-    
-    // Normalizza priority per gestire TUTTI i formati possibili:
-    // DB: early_out, high_priority, low_priority, high, low
-    // Container: early-out, high, low
-    // Possibili varianti: EO, HP, LP (abbreviazioni)
-    const p = String(priority).toLowerCase().trim();
-    
-    // Determina il tipo di priorità
-    let priorityType: 'eo' | 'hp' | 'lp' | null = null;
-    
-    if (p === 'early_out' || p === 'early-out' || p === 'eo' || p.includes('early')) {
-      priorityType = 'eo';
-    } else if (p === 'high_priority' || p === 'high-priority' || p === 'high' || p === 'hp') {
-      priorityType = 'hp';
-    } else if (p === 'low_priority' || p === 'low-priority' || p === 'low' || p === 'lp') {
-      priorityType = 'lp';
-    }
-    
-    if (!priorityType) return false;
-    
-    // Parse start_time (formato HH:MM:SS o HH:MM)
-    const timeParts = startTimeStr.split(':');
-    if (timeParts.length < 2) return false;
-    const hours = parseInt(timeParts[0], 10);
-    const minutes = parseInt(timeParts[1], 10);
-    if (isNaN(hours) || isNaN(minutes)) return false;
-    const startMinutes = hours * 60 + minutes;
-    
-    // Finestre temporali (in minuti dalla mezzanotte)
-    const EO_START = 10 * 60;      // 10:00 = 600
-    const EO_END = 10 * 60 + 59;   // 10:59 = 659
-    const HP_START = 11 * 60;      // 11:00 = 660
-    const HP_END = 15 * 60 + 30;   // 15:30 = 930
-    const LP_START = 11 * 60;      // 11:00 = 660
-    
-    if (priorityType === 'eo') {
-      return startMinutes < EO_START || startMinutes > EO_END;
-    } else if (priorityType === 'hp') {
-      return startMinutes < HP_START || startMinutes > HP_END;
-    } else if (priorityType === 'lp') {
-      return startMinutes < LP_START;
-    }
-    
-    return false;
   };
 
   // Gestione toast per incompatibilità task-cleaner (con sistema per coppie)
@@ -2098,7 +2333,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     <>
       <div
         ref={timelineRef}
-        className={`bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm relative ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
+        className={`bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm relative overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
       >
         {/* Loading overlay durante drag&drop e rimozione cleaner */}
         {(isLoadingDragDrop || removeCleanerMutation.isPending || clearAllSelectedCleanersMutation.isPending) && (
@@ -2156,34 +2391,42 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             </div>
           </div>
         </div>
-        <div className="px-4 pt-4 pb-4 overflow-x-auto">
+        <div className="flex min-h-0 flex-col overflow-hidden px-1 pt-4 pb-4">
 
 {/* Graffe fasce orarie (EO / HP / LP) sopra gli orari */}
-<div className="flex items-stretch mb-0 px-4 h-[26px]">
+<div className="flex items-stretch mb-0 px-1 h-[40px]">
   {/* colonna pulsante / nome cleaner (vuota per allineamento) */}
   <div
     className="flex-shrink-0 h-full print:hidden"
     style={{ width: `${cleanerColumnWidth}px` }}
   />
   {/* area timeline (stessa larghezza della griglia orari) */}
-  <div className="flex-1 h-full relative">
+  <div
+    ref={registerTimelineScrollRef}
+    onScroll={handleTimelineScroll}
+    onPointerDown={handleTimelinePointerDown}
+    onPointerMove={handleTimelinePointerMove}
+    onPointerUp={stopTimelinePan}
+    onPointerCancel={stopTimelinePan}
+    className="timeline-center-scroll min-w-0 flex-1 h-full"
+  >
     {priorityWindows && (
-    <div className="absolute inset-0">
+    <div className="relative h-full" style={{ width: timelineScaledWidth, minWidth: "100%" }}>
       {(() => {
-        const eo1 = clamp(minutesToPct(timeToMinutes(priorityWindows.EO.start)), 0, 100);
-        const eo2 = clamp(minutesToPct(timeToMinutes(priorityWindows.EO.end)), 0, 100);
+        const hpStartMin = timeToMinutes(priorityWindows.hpStart);
+        const hpEndMin = timeToMinutes(priorityWindows.hpEnd);
 
-        const hp1 = clamp(minutesToPct(timeToMinutes(priorityWindows.HP.start)), 0, 100);
-        const hp2 = clamp(minutesToPct(timeToMinutes(priorityWindows.HP.end)), 0, 100);
+        const hp1 = clamp(minutesToPct(hpStartMin), 0, 100);
+        const hp2 = clamp(minutesToPct(hpEndMin), 0, 100);
 
-        const lp1 = clamp(minutesToPct(timeToMinutes(priorityWindows.LP.start)), 0, 100);
+        const lp1 = clamp(minutesToPct(hpEndMin), 0, 100);
         const lp2 = 100;
 
         // Due piani:
         // - LP più su (top più piccolo)
         // - EO + HP più giù (top più grande)
-        const TOP_LP = -2;   // LP abbassato leggermente per pareggiare il gap superiore/inferiore
-        const TOP_MAIN = 16; // EO/HP abbassati leggermente per allineamento visivo con gli orari
+        const TOP_LP = 2;    // LP resta nel contenitore scrollabile senza essere tagliato
+        const TOP_MAIN = 18; // EO/HP restano allineati ma completamente visibili
 
         // EO deve seguire sempre l'inizio visibile della timeline:
         // se la timeline si estende verso sinistra, anche il bracket EO si estende.
@@ -2191,7 +2434,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
         const windows = [
           { key: "LP", left: lp1, right: lp2, top: TOP_LP, opacity: 0.65 },
-          { key: "EO", left: eoLeft, right: eo2, top: TOP_MAIN, opacity: 0.85 },
+          { key: "EO", left: eoLeft, right: hp1, top: TOP_MAIN, opacity: 0.85 },
           { key: "HP", left: hp1, right: hp2, top: TOP_MAIN, opacity: 0.75 },
         ];
 
@@ -2250,9 +2493,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 </div>
 
           {/* Header con orari - unico per tutti i cleaner */}
-          <div className="flex items-stretch my-0.5 px-4 h-[40px]">
+          <div className="relative z-20 flex items-stretch my-0.5 px-1 h-[40px]">
             <div
-              className="relative flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden translate-y-2"
+              className="relative z-10 flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden translate-y-2"
               style={{ width: `${cleanerColumnWidth}px` }}
             >
               <div
@@ -2294,31 +2537,55 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 <UserMinus className="w-4 h-4" />
               </Button>
             </div>
-            <div
-              ref={timelineRowRef}
-              className="flex-1 h-full relative overflow-visible translate-y-1"
-              style={{ display: 'grid', gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
-            >
-              {globalTimeSlots.map((slot, idx) => (
-                <div
-                  key={idx}
-                  className="relative h-full"
+            <div className="relative min-w-0 flex-1 h-full overflow-visible">
+              {globalTimeSlots[0] && (
+                <span
+                  className={cn(
+                    "pointer-events-none absolute left-0 top-[14px] z-30 inline-flex -translate-x-1/2 flex-col items-center gap-0.5 rounded bg-custom-blue-light px-1 text-[13px] font-medium tabular-nums leading-none text-foreground whitespace-nowrap",
+                    timelineScrollLeft > 0 && "invisible"
+                  )}
                 >
-                  <span
-                    className="absolute top-[14px] inline-flex flex-col items-center gap-0.5 text-[13px] font-medium tabular-nums leading-none text-foreground whitespace-nowrap"
-                    style={{
-                      left: "0px",
-                      transform: "translateX(-50%)",
-                    }}
-                  >
-                    <span>{slot}</span>
-                  </span>
+                  <span>{globalTimeSlots[0]}</span>
+                </span>
+              )}
+              <div
+                ref={(node) => {
+                  timelineRowRef.current = node;
+                  registerTimelineScrollRef(node);
+                }}
+                onScroll={handleTimelineScroll}
+                onPointerDown={handleTimelinePointerDown}
+                onPointerMove={handleTimelinePointerMove}
+                onPointerUp={stopTimelinePan}
+                onPointerCancel={stopTimelinePan}
+                className="timeline-center-scroll h-full w-full"
+              >
+                <div
+                  className="relative h-full grid"
+                  style={{ width: timelineScaledWidth, gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
+                >
+                {globalTimeSlots.map((slot, idx) => (
                   <div
-                    className="absolute top-[30px] h-[8px] border-l border-slate-500/60 dark:border-white/60 z-10"
-                    style={{ left: "0px" }}
-                  />
+                    key={idx}
+                    className="relative h-full"
+                  >
+                    <span
+                      className={cn(
+                        "absolute top-[14px] z-30 inline-flex flex-col items-center gap-0.5 rounded bg-custom-blue-light px-1 text-[13px] font-medium tabular-nums leading-none text-foreground whitespace-nowrap",
+                        idx === 0 ? "invisible -translate-x-1/2" : "-translate-x-1/2"
+                      )}
+                      style={{ left: "0px" }}
+                    >
+                      <span>{slot}</span>
+                    </span>
+                    <div
+                      className="absolute top-[30px] h-[8px] border-l border-slate-500/60 dark:border-white/60 z-10"
+                      style={{ left: "0px" }}
+                    />
+                  </div>
+                ))}
                 </div>
-              ))}
+              </div>
             </div>
             <div className="flex-shrink-0 w-20 h-full text-center text-[13px] font-medium text-foreground border-l border-border/70 px-1 flex items-center justify-center">
               Ore lavorate
@@ -2326,30 +2593,36 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           </div>
 
           {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
-          <div className="flex-1 overflow-auto px-4 pb-4 pt-2">
+          <div className="timeline-rows-scroll relative z-0 flex-1 overflow-x-hidden overflow-y-auto px-1 pb-2 pt-2">
             {allCleanersToShow.length === 0 && !isReadOnly ? (
-              <div className="flex items-center justify-center h-64 bg-yellow-100 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
-                <div className="text-center p-6">
-                  <Users className="mx-auto h-12 w-12 text-yellow-600 dark:text-yellow-400 mb-3" />
-                  <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
-                    Nessun cleaner convocato
-                  </h3>
-                  <p className="text-yellow-700 dark:text-yellow-300">
-                    Vai alla pagina Convocazioni per selezionare i cleaner da convocare
-                  </p>
+              <div className="mb-0.5 flex min-w-0">
+                <div className="flex min-w-0 flex-1 items-center justify-center rounded-lg border-2 border-yellow-300 bg-yellow-100 dark:border-yellow-700 dark:bg-yellow-950/50 h-64">
+                  <div className="text-center p-6">
+                    <Users className="mx-auto h-12 w-12 text-yellow-600 dark:text-yellow-400 mb-3" />
+                    <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
+                      Nessun cleaner convocato
+                    </h3>
+                    <p className="text-yellow-700 dark:text-yellow-300">
+                      Vai alla pagina Convocazioni per selezionare i cleaner da convocare
+                    </p>
+                  </div>
                 </div>
+                <div className="w-20 flex-shrink-0" aria-hidden />
               </div>
             ) : allCleanersToShow.length === 0 && isReadOnly ? (
-              <div className="flex items-center justify-center h-64 bg-red-50 dark:bg-red-950/20 border-2 border-red-300 dark:border-blue-800 rounded-lg">
-                <div className="text-center p-6">
-                  <CalendarIcon className="mx-auto h-12 w-12 text-red-600 dark:text-red-400 mb-3" />
-                  <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
-                    Nessuna assegnazione presente per questa data
-                  </h3>
-                  <p className="text-red-700 dark:text-red-300">
-                    Non sono disponibili dati salvati per questa data passata
-                  </p>
+              <div className="mb-0.5 flex min-w-0">
+                <div className="flex min-w-0 flex-1 items-center justify-center rounded-lg border-2 border-red-300 bg-red-50 dark:border-blue-800 dark:bg-red-950/20 h-64">
+                  <div className="text-center p-6">
+                    <CalendarIcon className="mx-auto h-12 w-12 text-red-600 dark:text-red-400 mb-3" />
+                    <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
+                      Nessuna assegnazione presente per questa data
+                    </h3>
+                    <p className="text-red-700 dark:text-red-300">
+                      Non sono disponibili dati salvati per questa data passata
+                    </p>
+                  </div>
                 </div>
+                <div className="w-20 flex-shrink-0" aria-hidden />
               </div>
             ) : (
               allCleanersToShow.map((cleaner, index) => {
@@ -2384,22 +2657,21 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 const cleanerStartTime = cleaner.start_time || "10:00";
 
                 return (
-                  <div key={cleaner.id} className="flex mb-0.5 h-[50px]">
+                  <div key={cleaner.id} className="mb-0.5 flex h-[50px] min-w-0 overflow-hidden">
                     {/* Info cleaner */}
                     <div
-                      className="flex-shrink-0 flex items-center h-[50px] overflow-hidden rounded-md border border-border/60 bg-background/95 cursor-pointer hover:bg-muted/35 transition-colors"
+                      className={cn(
+                        "flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-custom-blue-light cursor-pointer hover:bg-muted/35 transition-colors",
+                        filteredCleanerId === cleaner.id &&
+                          "ring-2 ring-inset ring-blue-500 border-blue-500",
+                        hasIncompatibleTasks &&
+                          !isRemoved &&
+                          "ring-2 ring-inset ring-yellow-500 border-yellow-500 animate-pulse"
+                      )}
                       style={{
                         width: `${cleanerColumnWidth}px`,
-                        boxShadow: hasIncompatibleTasks && !isRemoved
-                          ? 'inset 0 0 0 2px #EAB308, 0 0 10px 2px rgba(234, 179, 8, 0.35)'
-                          : filteredCleanerId === cleaner.id ? 'inset 0 0 0 2px #3B82F6, 0 0 20px 5px rgba(59, 130, 246, 0.5)' : 'none',
-                        transform: filteredCleanerId === cleaner.id ? 'scale(1.03)' : hasIncompatibleTasks && !isRemoved ? 'scale(1.01)' : 'none',
-                        zIndex: filteredCleanerId === cleaner.id ? 20 : hasIncompatibleTasks && !isRemoved ? 16 : 'auto',
-                        position: 'relative',
-                        userSelect: 'none',
+                        userSelect: "none",
                         opacity: isRemoved ? 0.7 : 1,
-                        borderColor: hasIncompatibleTasks && !isRemoved ? '#EAB308' : filteredCleanerId === cleaner.id ? '#3B82F6' : undefined,
-                        animation: hasIncompatibleTasks && !isRemoved ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none'
                       }}
                       onClick={(e) => {
                         e.preventDefault();
@@ -2421,7 +2693,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                             "flex-shrink-0 self-center my-[2px] ml-[2px] h-[calc(100%-4px)] rounded-sm",
                             CLEANER_BOX_VARIANT === "left-bar" ? "w-1.5" : "w-7"
                           )}
-                          style={{ backgroundColor: getCleanerHexColor(cleaner.id) }}
+                          style={{ backgroundColor: getPersonnelHexColor(cleaner.id, "housekeeping") }}
                         />
                       )}
                       <div className="min-w-0 w-full flex items-center gap-2 px-2">
@@ -2474,21 +2746,29 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     >
                       {(provided, snapshot) => (
                         <div
-                          ref={provided.innerRef}
                           {...provided.droppableProps}
                           data-testid={`timeline-cleaner-${cleaner.id}`}
                           data-cleaner-id={cleaner.id}
-                          className={`relative h-[50px] min-h-[50px] flex-1 border-l border-border transition-colors duration-200 ${
+                          ref={(node) => {
+                            provided.innerRef(node);
+                            registerTimelineScrollRef(node);
+                          }}
+                          onScroll={handleTimelineScroll}
+                          onPointerDown={handleTimelinePointerDown}
+                          onPointerMove={handleTimelinePointerMove}
+                          onPointerUp={stopTimelinePan}
+                          onPointerCancel={stopTimelinePan}
+                          className={`timeline-center-scroll relative min-w-0 min-h-[45px] flex-1 border-l border-border transition-colors duration-200 ${
                             snapshot.isDraggingOver
                               ? 'bg-blue-200/40 dark:bg-blue-900/40 border-l-2 border-blue-400 dark:border-blue-600'
                               : 'bg-background'
                           }`}
-                          style={{
-                            zIndex: filteredCleanerId === cleaner.id || hasIncompatibleTasks ? 15 : 'auto'
-                          }}
                         >
                           {/* Griglia oraria di sfondo (solo visiva) con alternanza colori */}
-                          <div className="absolute inset-0 pointer-events-none" style={{ display: 'grid', gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}>
+                          <div
+                            className="absolute inset-y-0 left-0 pointer-events-none"
+                            style={{ width: timelineScaledWidth, display: 'grid', gridTemplateColumns: `repeat(${globalTimeSlots.length}, 1fr)` }}
+                          >
                             {globalTimeSlots.map((slot, idx) => {
                               const isEvenHour = idx % 2 === 0;
                               return (
@@ -2506,7 +2786,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           </div>
 
                           {/* Task posizionate in sequenza con indicatori di travel time */}
-                          <div className="relative z-10 flex items-center h-full" style={{ minHeight: '50px' }}>
+                          <div className="relative z-10 flex items-center h-full" style={{ minHeight: '45px', width: timelineScaledWidth, minWidth: "100%" }}>
                             {(() => {
                               // Calcola l'array delle task per questo cleaner una sola volta
                               const cleanerTasks = tasks
@@ -2584,16 +2864,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                       }
                                     }
 
-                                    // Calcola larghezza EFFETTIVA in base ai minuti reali di travel_time
-                                    // Usa la stessa base di calcolo dei task (slot * 60 minuti virtuali)
+                                    // Calcola le larghezze con la stessa scala temporale usata da task e griglia.
                                     const effectiveTravelMinutes = seq >= 2 && travelTime > 0 && !snapshot.isDraggingOver ? travelTime : 0;
-                                    const virtualMinutes = globalTimeSlots.length * 60;
-                                    const timelineWidth = timelineWidthPx || 0;
-                                    const travelWidthPx = effectiveTravelMinutes > 0 && virtualMinutes > 0 && timelineWidth > 0
-                                      ? (effectiveTravelMinutes / virtualMinutes) * timelineWidth
+                                    const travelWidthPx = effectiveTravelMinutes > 0 && timelinePxPerMinute > 0
+                                      ? effectiveTravelMinutes * timelinePxPerMinute
                                       : 0;
-                                    const initialOffsetWidthPx = seq === 1 && timeOffset > 0 && virtualMinutes > 0 && timelineWidth > 0
-                                      ? (timeOffset / virtualMinutes) * timelineWidth
+                                    const initialOffsetWidthPx = seq === 1 && timeOffset > 0 && timelinePxPerMinute > 0
+                                      ? timeOffset * timelinePxPerMinute
                                       : 0;
                                     const shouldShowInitialOffset =
                                       !snapshot.isDraggingOver && !Boolean(snapshot.draggingFromThisWith);
@@ -2628,8 +2905,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                         }
                                       }
                                     }
-                                    const waitingGapWidthPx = waitingGap > 0 && virtualMinutes > 0 && timelineWidth > 0
-                                      ? (waitingGap / virtualMinutes) * timelineWidth
+                                    const waitingGapWidthPx = waitingGap > 0 && timelinePxPerMinute > 0
+                                      ? waitingGap * timelinePxPerMinute
                                       : 0;
 
                                     // Chiave univoca per task collaborative: include cleaner.id
@@ -2659,20 +2936,14 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                         {/* Travel time marker - FUORI dal Draggable (solo per sequence >= 2) */}
                                         {seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
                                           <div
-                                            className="flex items-center justify-center flex-shrink-0 py-3"
+                                            className="flex flex-shrink-0 cursor-pointer items-center"
                                             style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
                                             title={`${travelTime} min`}
                                           >
-                                            <svg
-                                              width="20"
-                                              height="20"
-                                              viewBox="0 0 24 24"
-                                              fill="currentColor"
-                                              className="flex-shrink-0"
-                                              style={{ color: getCleanerHexColor(cleaner.id) }}
-                                            >
-                                              <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/>
-                                            </svg>
+                                            <div
+                                              aria-hidden
+                                              className="h-0.5 w-full bg-slate-500/55 dark:bg-slate-400/40"
+                                            />
                                           </div>
                                         )}
 
@@ -2707,10 +2978,11 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           allTasks={cleanerTasks}
                                           isDragDisabled={isTimelineInteractionDisabled}
                                           isReadOnly={isReadOnly}
-                                          timelineWidthPx={timelineWidthPx}
-                                          isHighlighted={effectiveHighlightedTaskIds.has(String(task.id))}
+                                          timelineWidthPx={timelineTaskWidthPx}
+                                          timelinePxPerMinute={timelinePxPerMinute}
+                                          minTimelineTaskWidthPx={MIN_TIMELINE_TASK_WIDTH_PX}
+                                          isHighlighted={highlightedTaskIds.has(String(task.id))}
                                           cleanerId={cleaner.id}
-                                          isPriorityWindowViolation={isPriorityWindowViolation(task)}
                                         />
                                       </React.Fragment>
                                     );
@@ -2747,13 +3019,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 );
               })
             )}
+          </div>
 
-            {/* Riga finale con pulsanti */}
-            <div className="pt-0"></div>
-              <div className="relative flex items-stretch mb-0 h-[40px]">
-                {/* Pulsante + sotto il nome dell'ultimo cleaner */}
+          {/* Riga finale con pulsanti — fuori dallo scroll delle righe cleaner */}
+          <div className="relative z-20 flex shrink-0 items-stretch px-1 pb-1 pt-0 h-[40px]">
+                {/* Pulsante + sotto il nome dell'ultimo cleaner (speculare all'header UserMinus) */}
                 <div
-                  className="relative flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible"
+                  className="relative z-10 flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden -translate-y-2"
                   style={{ width: `${cleanerColumnWidth}px` }}
                 >
                   <div
@@ -2825,7 +3097,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     })()}` : "Nessun salvataggio su ADAM"}
                   </span>
                 </div>
-              </div>
           </div>
         </div>
       </div>
@@ -3026,33 +3297,61 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
       {/* Start Time Edit Dialog */}
       <Dialog open={startTimeEditDialog.open} onOpenChange={(open) => !open && setStartTimeEditDialog({ open: false, cleanerId: null, cleanerName: '' })}>
-        <DialogContent className="sm:max-md" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <DialogContent
+          className="sm:max-w-md"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Pencil className="w-5 h-5 text-custom-blue" />
-              Modifica Start Time
-            </DialogTitle>
+            <DialogTitle>Modifica start time</DialogTitle>
             <DialogDescription>
-              Stai modificando l'orario di inizio di <strong>{startTimeEditDialog.cleanerName}</strong>
+              Orario di inizio per <strong>{startTimeEditDialog.cleanerName}</strong>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <div>
-              <label className="text-sm font-semibold text-muted-foreground mb-2 block">
-                Nuovo Start Time
-              </label>
-              <Input
-                type="time"
-                value={editingStartTime}
-                onChange={(e) => setEditingStartTime(e.target.value)}
-                placeholder="Inserisci orario (HH:mm)"
-                className="w-full"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSaveStartTime();
-                  }
-                }}
-              />
+              <span className="text-sm font-semibold text-muted-foreground mb-2 block">Start time</span>
+              <div className="flex items-center justify-center gap-1 bg-background border-2 border-custom-blue rounded-lg px-3 py-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const [hours, minutes] = editingStartTime.split(":").map(Number);
+                    let totalMinutes = hours * 60 + minutes - 30;
+                    if (totalMinutes < 0) totalMinutes += 24 * 60;
+                    const newHours = Math.floor(totalMinutes / 60);
+                    const newMinutes = totalMinutes % 60;
+                    setEditingStartTime(
+                      `${String(newHours).padStart(2, "0")}:${String(newMinutes).padStart(2, "0")}`
+                    );
+                  }}
+                >
+                  <span className="text-lg font-bold">−</span>
+                </Button>
+                <span className="text-lg font-mono font-bold min-w-[60px] text-center">{editingStartTime}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-900"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const [hours, minutes] = editingStartTime.split(":").map(Number);
+                    let totalMinutes = hours * 60 + minutes + 30;
+                    if (totalMinutes >= 24 * 60) totalMinutes -= 24 * 60;
+                    const newHours = Math.floor(totalMinutes / 60);
+                    const newMinutes = totalMinutes % 60;
+                    setEditingStartTime(
+                      `${String(newHours).padStart(2, "0")}:${String(newMinutes).padStart(2, "0")}`
+                    );
+                  }}
+                >
+                  <span className="text-lg font-bold">+</span>
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 text-center">Intervalli di 30 minuti (+ / −)</p>
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-6">
@@ -3060,28 +3359,114 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               variant="outline"
               size="sm"
               onClick={() => setStartTimeEditDialog({ open: false, cleanerId: null, cleanerName: '' })}
-              disabled={isSavingStartTime}
               className="border-2 border-custom-blue"
+              disabled={isSavingStartTime}
             >
               Annulla
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={handleSaveStartTime}
+              onClick={() => void handleSaveStartTime()}
               disabled={isSavingStartTime}
               className="border-2 border-custom-blue"
             >
               {isSavingStartTime ? (
                 <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Salvataggio...
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Salvataggio…
                 </>
               ) : (
+                "Salva"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* End Time Edit Dialog */}
+      <Dialog open={endTimeEditDialog.open} onOpenChange={(open) => !open && setEndTimeEditDialog({ open: false, cleanerId: null, cleanerName: '' })}>
+        <DialogContent
+          className="sm:max-w-md"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>Modifica end time</DialogTitle>
+            <DialogDescription>
+              Orario di fine per <strong>{endTimeEditDialog.cleanerName}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <span className="text-sm font-semibold text-muted-foreground mb-2 block">End time</span>
+              <div className="flex items-center justify-center gap-1 bg-background border-2 border-custom-blue rounded-lg px-3 py-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const [hours, minutes] = editingEndTime.split(":").map(Number);
+                    let totalMinutes = hours * 60 + minutes - 30;
+                    if (totalMinutes < 0) totalMinutes += 24 * 60;
+                    const newHours = Math.floor(totalMinutes / 60);
+                    const newMinutes = totalMinutes % 60;
+                    setEditingEndTime(
+                      `${String(newHours).padStart(2, "0")}:${String(newMinutes).padStart(2, "0")}`
+                    );
+                  }}
+                >
+                  <span className="text-lg font-bold">−</span>
+                </Button>
+                <span className="text-lg font-mono font-bold min-w-[60px] text-center">{editingEndTime}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-900"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const [hours, minutes] = editingEndTime.split(":").map(Number);
+                    let totalMinutes = hours * 60 + minutes + 30;
+                    if (totalMinutes >= 24 * 60) totalMinutes -= 24 * 60;
+                    const newHours = Math.floor(totalMinutes / 60);
+                    const newMinutes = totalMinutes % 60;
+                    setEditingEndTime(
+                      `${String(newHours).padStart(2, "0")}:${String(newMinutes).padStart(2, "0")}`
+                    );
+                  }}
+                >
+                  <span className="text-lg font-bold">+</span>
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 text-center">Intervalli di 30 minuti (+ / −)</p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEndTimeEditDialog({ open: false, cleanerId: null, cleanerName: '' })}
+              className="border-2 border-custom-blue"
+              disabled={isSavingEndTime}
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleSaveEndTime()}
+              disabled={isSavingEndTime}
+              className="border-2 border-custom-blue"
+            >
+              {isSavingEndTime ? (
                 <>
-                  <Save className="w-4 h-4 mr-2" />
-                  Salva
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Salvataggio…
                 </>
+              ) : (
+                "Salva"
               )}
             </Button>
           </div>
@@ -3543,8 +3928,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   />
                 </div>
 
-                {/* Start Time (2/4) */}
-                <div className="col-span-2">
+                {/* Start Time (1/4) + End Time (1/4) — metà sinistra */}
+                <div className="col-span-1">
                   <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1 flex items-center gap-1">
                     Start Time
                     {!isReadOnly && <Pencil className="w-3 h-3 text-gray-700 dark:text-muted-foreground/60" />}
@@ -3562,7 +3947,25 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   </p>
                 </div>
 
-                {/* Tipo contratto (2/4) */}
+                <div className="col-span-1">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1 flex items-center gap-1">
+                    End Time
+                    {!isReadOnly && <Pencil className="w-3 h-3 text-gray-700 dark:text-muted-foreground/60" />}
+                  </p>
+                  <p
+                    className={`text-sm p-2 rounded border ${
+                      !isReadOnly ? "cursor-pointer hover:bg-muted/50 border-border hover:border-custom-blue" : "border-border"
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isReadOnly) handleOpenEndTimeDialog(selectedCleaner);
+                    }}
+                  >
+                    {selectedCleaner.end_time || "20:00"}
+                  </p>
+                </div>
+
+                {/* Tipo contratto (2/4) — metà destra */}
                 <div className="col-span-2">
                   <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">Tipo contratto</p>
                   <Input
