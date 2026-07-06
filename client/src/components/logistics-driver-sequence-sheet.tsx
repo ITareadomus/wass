@@ -179,12 +179,12 @@ export default function LogisticsDriverSequenceSheet({
                   <div className="flex flex-col gap-0.5 text-[11px] text-muted-foreground print:hidden">
                     {group.warehouseDepartureTime && (
                       <span className="whitespace-nowrap">
-                        Partenza magazzino stimata: {group.warehouseDepartureTime}
+                        Partenza dal magazzino: {group.warehouseDepartureTime}
                       </span>
                     )}
                     {group.warehouseReturnTime && (
                       <span className="whitespace-nowrap">
-                        Ritorno magazzino stimato: {group.warehouseReturnTime}
+                        Ritorno al magazzino: {group.warehouseReturnTime}
                       </span>
                     )}
                   </div>
