@@ -139,7 +139,7 @@ export default function LogisticsDriverSequenceSheet({
       className={cn(
         "logistics-driver-sheet-page flex w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-background",
         PAGE_BELOW_HEADER_MIN_H,
-        "print:max-w-none print:overflow-visible"
+        "print:min-h-0 print:max-w-none print:overflow-visible"
       )}
     >
       <header className="relative shrink-0 print:bg-white">
@@ -147,7 +147,7 @@ export default function LogisticsDriverSequenceSheet({
           aria-hidden
           className="pointer-events-none absolute left-1/2 top-0 h-full w-screen -translate-x-1/2 border-b border-custom-blue/30 bg-custom-blue-light print:hidden"
         />
-        <div className="relative mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3 px-4 py-3 print:max-w-none print:px-2 print:py-2">
+        <div className="relative mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3 px-4 py-3 print:max-w-none print:px-1 print:py-1">
           <div className="flex min-w-0 items-center gap-3">
             <Link href={backHref}>
               <Button
@@ -161,25 +161,57 @@ export default function LogisticsDriverSequenceSheet({
               </Button>
             </Link>
             <div className="min-w-0 print:w-full">
-              <h1 className="text-sm font-semibold text-foreground print:text-base print:text-black">
-                <span className="inline-flex flex-nowrap items-center gap-x-1.5 whitespace-nowrap">
-                  <span>{group.label}</span>
-                  {group.vehiclePlate && (
-                    <span className="shrink-0 rounded border border-custom-blue/40 bg-background/80 px-1.5 text-[10px] font-semibold leading-4 text-custom-blue print:border-black print:bg-white print:text-[11px] print:text-black">
-                      {group.vehiclePlate}
-                    </span>
-                  )}
-                </span>
-                <span className="ml-1.5 font-normal text-foreground print:text-black">
-                  - {group.tasks.length} task
-                </span>
-              </h1>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+                <h1 className="text-sm font-semibold text-foreground print:text-base print:text-black">
+                  <span className="inline-flex flex-nowrap items-center gap-x-1.5 whitespace-nowrap">
+                    <span>{group.label}</span>
+                    {group.vehiclePlate && (
+                      <span className="shrink-0 rounded border border-custom-blue/40 bg-background/80 px-1.5 text-[10px] font-semibold leading-4 text-custom-blue print:border-black print:bg-white print:text-[11px] print:text-black">
+                        {group.vehiclePlate}
+                      </span>
+                    )}
+                  </span>
+                  <span className="ml-1.5 font-normal text-foreground print:text-black">
+                    - {group.tasks.length} task
+                  </span>
+                </h1>
+                {(group.warehouseDepartureTime || group.warehouseReturnTime) && (
+                  <div className="flex flex-col gap-0.5 text-[11px] text-muted-foreground print:hidden">
+                    {group.warehouseDepartureTime && (
+                      <span className="whitespace-nowrap">
+                        Partenza magazzino stimata: {group.warehouseDepartureTime}
+                      </span>
+                    )}
+                    {group.warehouseReturnTime && (
+                      <span className="whitespace-nowrap">
+                        Ritorno magazzino stimato: {group.warehouseReturnTime}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
               <p className="mt-0.5 hidden text-[11px] text-muted-foreground print:block print:text-black/70">
                 {workDate} · {isLoadOrder ? "Ordine di carico" : "Ordine di sequenza"}
               </p>
             </div>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-1.5">
+            {(group.warehouseDepartureTime || group.warehouseReturnTime) && (
+              <div className="hidden flex-col items-end gap-0.5 text-right print:flex">
+                {group.warehouseDepartureTime && (
+                  <p className="whitespace-nowrap text-[11px] text-black">
+                    <span className="font-semibold">Partenza magazzino stimata:</span>{" "}
+                    {group.warehouseDepartureTime}
+                  </p>
+                )}
+                {group.warehouseReturnTime && (
+                  <p className="whitespace-nowrap text-[11px] text-black">
+                    <span className="font-semibold">Ritorno magazzino stimato:</span>{" "}
+                    {group.warehouseReturnTime}
+                  </p>
+                )}
+              </div>
+            )}
             <Button
               type="button"
               variant="outline"
@@ -212,43 +244,43 @@ export default function LogisticsDriverSequenceSheet({
           </div>
         )}
 
-        <div className="mx-auto w-full min-w-0 max-w-[1600px] px-4 py-4 print:max-w-none print:px-2 print:py-2">
+        <div className="mx-auto w-full min-w-0 max-w-[1600px] px-4 py-4 print:max-w-none print:px-1 print:py-0">
           <div className="driver-sheet-print-table min-w-0 overflow-x-auto overflow-y-visible rounded-lg border border-custom-blue/40 bg-background shadow-sm print:overflow-visible print:rounded-none print:border-0 print:p-0 print:shadow-none">
           <table className="w-full border-collapse text-xs print:table-fixed print:text-[8px]">
             <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur-sm print:static print:bg-[#eee]">
               <tr className="border-b border-custom-blue/30 print:border-black/40">
-                <th className="h-9 w-[52px] min-w-[52px] max-w-[52px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:normal-case print:text-black">
+                <th className="h-9 w-[52px] min-w-[52px] max-w-[52px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   Seq.
                 </th>
-                <th className="h-9 min-w-[88px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:normal-case print:text-black">
+                <th className="h-9 min-w-[88px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   <span className="print:hidden">Codice adam</span>
                   <span className="hidden print:inline">Codice</span>
                 </th>
-                <th className="h-9 min-w-[100px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:normal-case print:text-black">
-                  Alias
+                <th className="h-9 min-w-[100px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                  Cliente
                 </th>
-                <th className="h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:normal-case print:text-black">
+                <th className="h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   Indirizzo
                 </th>
-                <th className="h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:normal-case print:text-black">
+                <th className="h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   <span className="print:hidden">Finestra di lavoro driver</span>
                   <span className="hidden print:inline">Fin. driver</span>
                 </th>
-                <th className="h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:normal-case print:text-black">
+                <th className="h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   <span className="print:hidden">Finestra di lavoro cleaner</span>
                   <span className="hidden print:inline">Fin. cleaner</span>
                 </th>
-                <th className="h-9 min-w-[120px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:normal-case print:text-black">
+                <th className="h-9 min-w-[120px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   <span className="print:hidden">Check-out / Check-in</span>
                   <span className="hidden print:inline">Out/In</span>
                 </th>
-                <th className="h-9 min-w-[120px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:normal-case print:text-black">
+                <th className="h-9 min-w-[120px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   Cleaner
                 </th>
-                <th className="h-9 min-w-[100px] border-r border-border/60 px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:normal-case print:text-black">
+                <th className="h-9 min-w-[100px] border-r border-border/60 px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   Divani
                 </th>
-                <th className="h-9 min-w-[160px] px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:normal-case print:text-black">
+                <th className="h-9 min-w-[160px] px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   Note
                 </th>
               </tr>

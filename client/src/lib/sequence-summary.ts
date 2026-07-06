@@ -1,8 +1,12 @@
 import { formatHmTime, formatWorkWindowLabel } from "@shared/logistics-task-windows";
 import {
+  computeLogisticsCheckoutWaitGap,
   getLogisticsTimelineViolationMessages,
+  minutesToHm,
+  parseHmToMinutes,
   pickLogisticsViolationFields,
 } from "@shared/logistics-scheduling-constraints";
+import { estimateLogisticsReturnToDepotMinutes } from "@shared/logistics-travel-estimate";
 import {
   resolveLogisticsTaskKind,
   type LogisticsTaskKind,
@@ -32,6 +36,8 @@ export type SequenceSummaryGroup = {
   id: number;
   label: string;
   vehiclePlate?: string;
+  warehouseDepartureTime?: string | null;
+  warehouseReturnTime?: string | null;
   tasks: SequenceSummaryEntry[];
 };
 
@@ -273,6 +279,62 @@ function resolveDriverVehiclePlate(driver: {
   return plate || undefined;
 }
 
+function resolveWarehouseScheduleTimes(
+  driver: { start_time?: string | null; startTime?: string | null },
+  tasks: any[],
+  returnTravelTime?: number | null,
+  workDate?: string
+): { warehouseDepartureTime: string | null; warehouseReturnTime: string | null } {
+  if (tasks.length === 0) {
+    return { warehouseDepartureTime: null, warehouseReturnTime: null };
+  }
+
+  const sortedTasks = sortTasksBySequence(tasks);
+  const firstTask = sortedTasks[0];
+  const lastTask = sortedTasks[sortedTasks.length - 1];
+
+  const travelTime = Number(firstTask?.travel_time ?? firstTask?.travelTime ?? 0);
+  const checkoutWait =
+    workDate != null && workDate !== ""
+      ? computeLogisticsCheckoutWaitGap({
+          workDate,
+          sequence: 1,
+          startTime: firstTask?.start_time ?? firstTask?.startTime,
+          checkoutTime: firstTask?.checkout_time ?? firstTask?.checkoutTime,
+          checkoutDate: firstTask?.checkout_date ?? firstTask?.checkoutDate,
+          checkoutWaitMinutes:
+            firstTask?.checkout_wait_minutes ?? firstTask?.checkoutWaitMinutes,
+          travelMinutes: Number.isFinite(travelTime) ? travelTime : 0,
+          prevEndTime: null,
+          prevCheckinDate: null,
+        })
+      : 0;
+
+  const startMin = parseHmToMinutes(firstTask?.start_time ?? firstTask?.startTime, null);
+  let departureMin: number | null = null;
+  if (startMin != null) {
+    departureMin = startMin - checkoutWait - (Number.isFinite(travelTime) ? travelTime : 0);
+  } else {
+    departureMin = parseHmToMinutes(driver?.start_time ?? driver?.startTime, null);
+  }
+
+  const endMin = parseHmToMinutes(lastTask?.end_time ?? lastTask?.endTime, null);
+  const returnTravel =
+    returnTravelTime != null && Number.isFinite(Number(returnTravelTime))
+      ? Number(returnTravelTime)
+      : estimateLogisticsReturnToDepotMinutes(lastTask);
+
+  let returnMin: number | null = null;
+  if (endMin != null && returnTravel > 0) {
+    returnMin = endMin + returnTravel;
+  }
+
+  return {
+    warehouseDepartureTime: departureMin != null ? minutesToHm(departureMin) : null,
+    warehouseReturnTime: returnMin != null ? minutesToHm(returnMin) : null,
+  };
+}
+
 export function buildSequenceSummaryGroupsFromTasks(tasks: any[]): SequenceSummaryGroup[] {
   const byCleaner = new Map<number, any[]>();
 
@@ -308,8 +370,11 @@ export function buildSequenceSummaryGroupsFromDriverAssignments(
       alias?: string;
       assigned_vehicle_pms_code?: string | null;
       vehicle_pms_code?: string | null;
+      start_time?: string | null;
+      startTime?: string | null;
     };
     tasks?: any[];
+    return_travel_time?: number | null;
   }>,
   workDate?: string
 ): SequenceSummaryGroup[] {
@@ -320,10 +385,18 @@ export function buildSequenceSummaryGroupsFromDriverAssignments(
     if (driverTasks.length === 0) continue;
 
     const sortedTasks = sortTasksBySequence(driverTasks);
+    const warehouseTimes = resolveWarehouseScheduleTimes(
+      row.driver,
+      sortedTasks,
+      row.return_travel_time,
+      workDate
+    );
     groups.push({
       id: row.driver.id,
       label: resolveDriverLabel(row.driver),
       vehiclePlate: resolveDriverVehiclePlate(row.driver),
+      warehouseDepartureTime: warehouseTimes.warehouseDepartureTime,
+      warehouseReturnTime: warehouseTimes.warehouseReturnTime,
       tasks: sortedTasks.map((task, index) => mapTaskToSummaryEntry(task, index + 1, workDate)),
     });
   }

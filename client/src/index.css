@@ -628,6 +628,11 @@
 
 /* Print styles */
 @media print {
+  @page driver-sheet {
+    size: landscape;
+    margin: 0.3cm 0.55cm;
+  }
+
   @page {
     size: landscape;
     margin: 0.45cm 0.75cm;
@@ -792,12 +797,19 @@
     overflow: visible !important;
     width: auto !important;
     height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body:has([data-print-driver-sheet]) header:not([data-print-driver-sheet] header) {
+    display: none !important;
   }
 
   [data-print-driver-sheet] {
-    position: static !important;
-    left: auto !important;
-    top: auto !important;
+    page: driver-sheet;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
     min-height: 0 !important;
@@ -808,7 +820,7 @@
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
     box-sizing: border-box !important;
-    padding-right: 2mm !important;
+    padding: 0 !important;
   }
 
   [data-print-driver-sheet] *,
@@ -839,11 +851,33 @@
     margin-bottom: 0.25rem !important;
   }
 
+  [data-print-driver-sheet] header > div.relative {
+    padding-bottom: 0.25rem !important;
+  }
+
+  [data-print-driver-sheet] header h1 {
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+    margin: 0 !important;
+  }
+
+  [data-print-driver-sheet] header p {
+    margin-top: 0.2rem !important;
+    margin-bottom: 0 !important;
+    line-height: 1.2 !important;
+    font-size: 9px !important;
+  }
+
   [data-print-driver-sheet] .driver-sheet-print-table {
     width: 100% !important;
     max-width: 100% !important;
     overflow: visible !important;
     padding: 0 !important;
+    border-top: 1px solid #666 !important;
+  }
+
+  [data-print-driver-sheet] thead th {
+    border-top: 1px solid #666 !important;
   }
 
   [data-print-driver-sheet] tr.driver-sheet-row--violated {
@@ -924,6 +958,9 @@
     background: #eee !important;
     font-weight: 700 !important;
     letter-spacing: 0 !important;
+    text-transform: uppercase !important;
+    padding-top: 0.1rem !important;
+    padding-bottom: 0.1rem !important;
   }
 
   [data-print-driver-sheet] td:last-child,
