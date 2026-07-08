@@ -2,12 +2,17 @@ import { Personnel, TaskType as Task } from "@shared/schema";
 import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, UserMinus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap, Lock, Unlock } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
-import { Droppable, Draggable } from "react-beautiful-dnd";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { fetchWithOperation } from "@/lib/operationManager";
 import { useToast } from "@/hooks/use-toast";
-import TaskCard from "@/components/drag-drop/task-card";
+import SortableTaskCard from "@/components/drag-drop/sortable-task-card";
+import {
+  DndDroppableSortableContainer,
+  getTaskDndKey,
+  taskDndId,
+  type AppDndItem,
+} from "@/lib/dnd";
 import {
   Dialog,
   DialogContent,
@@ -58,6 +63,7 @@ interface TimelineViewProps {
   isLoadingDragDrop?: boolean; // Mostra loading overlay durante drag&drop
   lastValidDragIndex?: number | null; // Indice valido durante il drag (da container verso timeline)
   draggingOverCleanerId?: number | null; // ID del cleaner su cui si sta trascinando
+  activeDragCleanerId?: number | null; // ID del cleaner sorgente durante il drag
   searchTask?: string; // Ricerca task per ID, logistic code, address o customer reference
   preassignedAnimatedTaskIds?: Set<string>;
 }
@@ -156,6 +162,7 @@ export default function TimelineView({
   isLoadingDragDrop = false,
   lastValidDragIndex = null,
   draggingOverCleanerId = null,
+  activeDragCleanerId = null,
   searchTask = "",
   preassignedAnimatedTaskIds = new Set<string>(),
 }: TimelineViewProps) {
@@ -2739,30 +2746,56 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                       </div>
                     </div>
                     {/* Timeline per questo cleaner - area unica droppable */}
-                    <Droppable
-                      droppableId={`timeline-${cleaner.id}`}
-                      direction="horizontal"
-                      isDropDisabled={isTimelineInteractionDisabled}
-                    >
-                      {(provided, snapshot) => (
-                        <div
-                          {...provided.droppableProps}
+                    {(() => {
+                      const cleanerTasks = tasks
+                        .filter((task) =>
+                          (task as any).assignedCleaner === cleaner.id
+                        )
+                        .map(normalizeTask)
+                        .sort((a, b) => {
+                          const taskA = a as any;
+                          const taskB = b as any;
+
+                          if (taskA.sequence !== undefined && taskB.sequence !== undefined) {
+                            return taskA.sequence - taskB.sequence;
+                          }
+
+                          const timeA = taskA.start_time || taskA.fw_start_time || taskA.startTime || "00:00";
+                          const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
+                          return timeA.localeCompare(timeB);
+                        });
+                      const itemIds = cleanerTasks.map((task) =>
+                        taskDndId("housekeeping", getTaskDndKey(task), cleaner.id)
+                      );
+
+                      return (
+                        <DndDroppableSortableContainer
+                          scope="housekeeping"
+                          type="timeline"
+                          staffId={cleaner.id}
+                          itemIds={itemIds}
+                          insertIndex={cleanerTasks.length}
+                          disabled={isTimelineInteractionDisabled}
+                          orientation="horizontal"
                           data-testid={`timeline-cleaner-${cleaner.id}`}
                           data-cleaner-id={cleaner.id}
-                          ref={(node) => {
-                            provided.innerRef(node);
-                            registerTimelineScrollRef(node);
-                          }}
+                          innerRef={registerTimelineScrollRef}
                           onScroll={handleTimelineScroll}
                           onPointerDown={handleTimelinePointerDown}
                           onPointerMove={handleTimelinePointerMove}
                           onPointerUp={stopTimelinePan}
                           onPointerCancel={stopTimelinePan}
-                          className={`timeline-center-scroll relative min-w-0 min-h-[45px] flex-1 border-l border-border transition-colors duration-200 ${
-                            snapshot.isDraggingOver
-                              ? 'bg-blue-200/40 dark:bg-blue-900/40 border-l-2 border-blue-400 dark:border-blue-600'
-                              : 'bg-background'
-                          }`}
+                          className="timeline-center-scroll relative min-w-0 min-h-[45px] flex-1 border-l border-border bg-background"
+                        >
+                          {({ isOver }) => {
+                            const shouldHideDndGaps =
+                              isOver ||
+                              draggingOverCleanerId === cleaner.id ||
+                              activeDragCleanerId === cleaner.id;
+
+                            return (
+                        <div
+                          className="contents"
                         >
                           {/* Griglia oraria di sfondo (solo visiva) con alternanza colori */}
                           <div
@@ -2788,25 +2821,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           {/* Task posizionate in sequenza con indicatori di travel time */}
                           <div className="relative z-10 flex items-center h-full" style={{ minHeight: '45px', width: timelineScaledWidth, minWidth: "100%" }}>
                             {(() => {
-                              // Calcola l'array delle task per questo cleaner una sola volta
-                              const cleanerTasks = tasks
-                                .filter((task) =>
-                                  (task as any).assignedCleaner === cleaner.id
-                                )
-                                .map(normalizeTask)
-                                .sort((a, b) => {
-                                  const taskA = a as any;
-                                  const taskB = b as any;
-
-                                  if (taskA.sequence !== undefined && taskB.sequence !== undefined) {
-                                    return taskA.sequence - taskB.sequence;
-                                  }
-
-                                  const timeA = taskA.start_time || taskA.fw_start_time || taskA.startTime || "00:00";
-                                  const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
-                                  return timeA.localeCompare(timeB);
-                                });
-
                               return (
                                 <>
                                   {cleanerTasks.map((task, idx) => {
@@ -2865,7 +2879,10 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     }
 
                                     // Calcola le larghezze con la stessa scala temporale usata da task e griglia.
-                                    const effectiveTravelMinutes = seq >= 2 && travelTime > 0 && !snapshot.isDraggingOver ? travelTime : 0;
+                                    const effectiveTravelMinutes =
+                                      seq >= 2 && travelTime > 0 && !shouldHideDndGaps
+                                        ? travelTime
+                                        : 0;
                                     const travelWidthPx = effectiveTravelMinutes > 0 && timelinePxPerMinute > 0
                                       ? effectiveTravelMinutes * timelinePxPerMinute
                                       : 0;
@@ -2873,13 +2890,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                       ? timeOffset * timelinePxPerMinute
                                       : 0;
                                     const shouldShowInitialOffset =
-                                      !snapshot.isDraggingOver && !Boolean(snapshot.draggingFromThisWith);
+                                      !shouldHideDndGaps;
 
                                     // CRITICAL FIX: Calcola il "waitingGap" per task con sequence >= 2
                                     // Il waitingGap rappresenta l'attesa del cleaner quando arriva prima che l'appartamento si liberi
                                     // IMPORTANTE: Mostra il waitingGap SOLO se la task corrente ha un checkout_time reale
                                     let waitingGap = 0;
-                                    if (seq >= 2 && taskObj.start_time && taskObj.checkout_time && !snapshot.isDraggingOver) {
+                                    if (seq >= 2 && taskObj.start_time && taskObj.checkout_time && !shouldHideDndGaps) {
                                       // CRITICAL: L'array è ordinato per sequence, quindi idx-1 è la vera task precedente
                                       const prevTask = idx > 0 ? cleanerTasks[idx - 1] as any : null;
 
@@ -2912,6 +2929,19 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     // Chiave univoca per task collaborative: include cleaner.id
                                     const taskId = taskObj.task_id || taskObj.id;
                                     const uniqueKey = `${taskId}-cleaner-${cleaner.id}`;
+                                    const taskKey = getTaskDndKey(task);
+                                    const dndId = taskDndId("housekeeping", taskKey, cleaner.id);
+                                    const dndData: AppDndItem = {
+                                      kind: "task",
+                                      scope: "housekeeping",
+                                      taskId: taskKey,
+                                      index: idx,
+                                      initialIndex: idx,
+                                      from: {
+                                        type: "timeline",
+                                        staffId: cleaner.id,
+                                      },
+                                    };
 
                                     // Verifica compatibilità task-cleaner
                                     const isIncompatible = validationRules && cleanerRole && !isOfficeCleanerRole(cleanerRole)
@@ -2970,8 +3000,12 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                         )}
 
                                         {/* TaskCard: non deve mai sparire */}
-                                        <TaskCard
+                                        <SortableTaskCard
                                           key={uniqueKey}
+                                          dndId={dndId}
+                                          dndData={dndData}
+                                          draggingOpacity={0}
+                                          hideWhileDragging
                                           task={task}
                                           index={idx}
                                           isInTimeline={true}
@@ -2987,15 +3021,16 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                       </React.Fragment>
                                     );
                                   })}
-                                  {/* Placeholder esattamente come nei container */}
-                                  {provided.placeholder}
                                 </>
                               );
                             })()}
                           </div>
                         </div>
-                      )}
-                    </Droppable>
+                            );
+                          }}
+                        </DndDroppableSortableContainer>
+                      );
+                    })()}
                     {/* Colonna ore totali lavorate */}
                     <div className="flex-shrink-0 w-20 h-[50px] flex items-center justify-center border-l border-border bg-sky-100/30 dark:bg-sky-900/10 text-center">
                       {(() => {

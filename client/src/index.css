@@ -589,8 +589,8 @@
 
   /* Drop zone effects */
   .drop-zone-active {
-    border-color: hsl(221.2 83.2% 53.3%);
-    background-color: hsl(221.2 83.2% 53.3% / 0.05);
+    border-color: inherit;
+    background-color: transparent;
   }
 
   /* Timeline styling */

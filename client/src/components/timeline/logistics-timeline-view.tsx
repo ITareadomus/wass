@@ -23,11 +23,10 @@ import {
   type UIEvent,
 } from "react";
 import { useLocation } from "wouter";
-import { Droppable } from "react-beautiful-dnd";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import TaskCard from "@/components/drag-drop/task-card";
+import SortableTaskCard from "@/components/drag-drop/sortable-task-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -69,6 +68,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DndDroppableSortableContainer,
+  getTaskDndKey,
+  taskDndId,
+  type AppDndItem,
+} from "@/lib/dnd";
 
 type PriorityWindows = {
   hpStart: string;
@@ -119,6 +124,8 @@ interface LogisticsTimelineViewProps {
   isReadOnly?: boolean;
   isLoadingOverlay?: boolean;
   suppressTaskDrag?: boolean;
+  draggingOverDriverId?: number | null;
+  activeDragDriverId?: number | null;
   onRefresh: () => Promise<void>;
 }
 
@@ -280,6 +287,8 @@ export default function LogisticsTimelineView({
   isReadOnly = false,
   isLoadingOverlay = false,
   suppressTaskDrag = false,
+  draggingOverDriverId = null,
+  activeDragDriverId = null,
   onRefresh,
 }: LogisticsTimelineViewProps) {
   const [, setLocation] = useLocation();
@@ -1794,30 +1803,32 @@ export default function LogisticsTimelineView({
                         )}
                       </div>
                     </div>
-                    <Droppable
-                      droppableId={`timeline-${driver.id}`}
-                      direction="horizontal"
-                      isDropDisabled={isReadOnly || suppressTaskDrag}
+                    <DndDroppableSortableContainer
+                      scope="logistics"
+                      type="timeline"
+                      staffId={driver.id}
+                      itemIds={tasks.map((task) =>
+                        taskDndId("logistics", getTaskDndKey(task), driver.id)
+                      )}
+                      insertIndex={tasks.length}
+                      disabled={isReadOnly || suppressTaskDrag}
+                      orientation="horizontal"
+                      innerRef={registerTimelineScrollRef}
+                      onScroll={handleTimelineScroll}
+                      onPointerDown={handleTimelinePointerDown}
+                      onPointerMove={handleTimelinePointerMove}
+                      onPointerUp={stopTimelinePan}
+                      onPointerCancel={stopTimelinePan}
+                      className="timeline-center-scroll relative min-w-0 min-h-[45px] flex-1 border-l border-border bg-background"
                     >
-                      {(provided, snapshot) => (
-                        <div
-                          {...provided.droppableProps}
-                          ref={(node) => {
-                            provided.innerRef(node);
-                            registerTimelineScrollRef(node);
-                          }}
-                          onScroll={handleTimelineScroll}
-                          onPointerDown={handleTimelinePointerDown}
-                          onPointerMove={handleTimelinePointerMove}
-                          onPointerUp={stopTimelinePan}
-                          onPointerCancel={stopTimelinePan}
-                          className={cn(
-                            "timeline-center-scroll relative min-w-0 min-h-[45px] flex-1 border-l border-border transition-colors",
-                            snapshot.isDraggingOver
-                              ? "bg-blue-200/40 dark:bg-blue-900/40 border-l-2 border-blue-400"
-                              : "bg-background"
-                          )}
-                        >
+                      {({ isOver }) => {
+                        const shouldHideDndGaps =
+                          isOver ||
+                          draggingOverDriverId === driver.id ||
+                          activeDragDriverId === driver.id;
+
+                        return (
+                        <>
                           <div
                             className="absolute inset-y-0 left-0 pointer-events-none grid"
                             style={{
@@ -1870,18 +1881,22 @@ export default function LogisticsTimelineView({
                               const prevRaw = index > 0 ? rawTasks[index - 1] : null;
                               const seq = Number(raw?.sequence ?? index + 1);
                               const travelTime =
-                                raw?.travel_time != null ? Number(raw.travel_time) : 0;
-                              const checkoutWait = computeLogisticsCheckoutWaitGap({
-                                workDate,
-                                sequence: seq,
-                                startTime: raw?.start_time,
-                                checkoutTime: raw?.checkout_time,
-                                checkoutDate: raw?.checkout_date,
-                                checkoutWaitMinutes: raw?.checkout_wait_minutes,
-                                travelMinutes: travelTime,
-                                prevEndTime: prevRaw?.end_time,
-                                prevCheckinDate: prevRaw?.checkin_date,
-                              });
+                                !shouldHideDndGaps && raw?.travel_time != null
+                                  ? Number(raw.travel_time)
+                                  : 0;
+                              const checkoutWait = shouldHideDndGaps
+                                ? 0
+                                : computeLogisticsCheckoutWaitGap({
+                                    workDate,
+                                    sequence: seq,
+                                    startTime: raw?.start_time,
+                                    checkoutTime: raw?.checkout_time,
+                                    checkoutDate: raw?.checkout_date,
+                                    checkoutWaitMinutes: raw?.checkout_wait_minutes,
+                                    travelMinutes: travelTime,
+                                    prevEndTime: prevRaw?.end_time,
+                                    prevCheckinDate: prevRaw?.checkin_date,
+                                  });
                               const travelWidthPx = minutesToTimelineWidthPx(
                                 travelTime,
                                 virtualMinutes,
@@ -1893,7 +1908,12 @@ export default function LogisticsTimelineView({
                                 timelineWidth
                               );
                               let initialIdleOffsetPx = 0;
-                              if (seq === 1 && virtualMinutes > 0 && timelineWidth > 0) {
+                              if (
+                                seq === 1 &&
+                                virtualMinutes > 0 &&
+                                timelineWidth > 0 &&
+                                !shouldHideDndGaps
+                              ) {
                                 const gridStartMinutes = timelineStartMinutes;
                                 const taskStartMinutes = parseHmToMinutes(raw?.start_time, null);
                                 const driverStartMinutes =
@@ -1949,8 +1969,27 @@ export default function LogisticsTimelineView({
                                       </svg>
                                     </div>
                                   )}
-                                  <TaskCard
+                                  {(() => {
+                                    const taskKey = getTaskDndKey(task);
+                                    const dndData: AppDndItem = {
+                                      kind: "task",
+                                      scope: "logistics",
+                                      taskId: taskKey,
+                                      index,
+                                      initialIndex: index,
+                                      from: {
+                                        type: "timeline",
+                                        staffId: driver.id,
+                                      },
+                                    };
+
+                                    return (
+                                  <SortableTaskCard
                                     key={`${task.id}-${driver.id}`}
+                                    dndId={taskDndId("logistics", taskKey, driver.id)}
+                                    dndData={dndData}
+                                    draggingOpacity={0}
+                                    hideWhileDragging
                                     task={task}
                                     index={index}
                                     isInTimeline
@@ -1968,11 +2007,13 @@ export default function LogisticsTimelineView({
                                     timelineRowStaffDisplayLabel={driverRowDisplayLabel}
                                     onLogisticsTimelineMutated={onRefresh}
                                   />
+                                    );
+                                  })()}
                                 </Fragment>
                               );
                             })}
                             <LogisticsRouteLineSegment
-                              widthPx={returnTravelWidthPx}
+                              widthPx={shouldHideDndGaps ? 0 : returnTravelWidthPx}
                               title={
                                 returnTravelMinutes > 0
                                   ? `Rientro in magazzino: ${returnTravelMinutes} min`
@@ -1983,11 +2024,11 @@ export default function LogisticsTimelineView({
                                 </>
                               );
                             })()}
-                            {provided.placeholder}
                           </div>
-                        </div>
-                      )}
-                    </Droppable>
+                        </>
+                        );
+                      }}
+                    </DndDroppableSortableContainer>
                     <div className="flex-shrink-0 w-20 h-[50px] flex items-center justify-center border-l border-border bg-sky-100/30 dark:bg-sky-900/10 text-center">
                       <span className="text-[13px] font-medium tabular-nums text-foreground">
                         {formatLogisticsWorkedHours(sumLogisticsTaskWorkedMinutes(rawTasks))}

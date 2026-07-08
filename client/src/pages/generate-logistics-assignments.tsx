@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { DragDropContext, type DropResult } from "react-beautiful-dnd";
+import { DndContext, MeasuringStrategy } from "@dnd-kit/core";
 import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
 import { useToast } from "@/hooks/use-toast";
 import PriorityColumn from "@/components/drag-drop/priority-column";
+import TaskCardDragOverlay from "@/components/drag-drop/task-card-drag-overlay";
 import AssignedTasksSequenceSummary from "@/components/assigned-tasks-sequence-summary";
 import LogisticsTimelineView from "@/components/timeline/logistics-timeline-view";
 import MapSection from "@/components/map/map-section";
@@ -46,6 +47,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DndRemoveZone,
+  useLogisticsDnd,
+  type AppDndContainer,
+  type AppDndSource,
+  type DndDropOperation,
+  type DndInsertTarget,
+  type DndPriorityKey,
+} from "@/lib/dnd";
 
 function getCurrentUsername(): string {
   try {
@@ -114,6 +124,8 @@ const EMPTY_LOGISTICS_TASK_LISTS: LogisticsTaskLists = {
   high_priority: [],
   low_priority: [],
 };
+
+const LOGISTICS_REMOVE_ZONE_DROPPABLE_ID = "logistics-remove-zone";
 
 function parseLogisticsTaskLists(data: any): LogisticsTaskLists {
   return {
@@ -433,6 +445,9 @@ export default function GenerateLogisticsAssignments() {
     Array<{ driver: { id: number; name?: string; lastname?: string; role?: string; premium?: boolean; start_time?: string | null }; tasks: any[] }>
   >([]);
   const [isLoadingDragDrop, setIsLoadingDragDrop] = useState(false);
+  const [isDraggingTimelineTask, setIsDraggingTimelineTask] = useState(false);
+  const [draggingOverDriverId, setDraggingOverDriverId] = useState<number | null>(null);
+  const [activeDragDriverId, setActiveDragDriverId] = useState<number | null>(null);
   /** Estrazione / refresh da ADAM al cambio data (come checkAndAutoLoadSavedAssignments + extractData su HK) */
   const [isExtractingLogistics, setIsExtractingLogistics] = useState(false);
   const [extractionStep, setExtractionStep] = useState("Inizializzazione...");
@@ -981,6 +996,83 @@ export default function GenerateLogisticsAssignments() {
     return null;
   };
 
+  const priorityKeyToDroppableId = (key: DndPriorityKey) => {
+    if (key === "early_out") return "early-out";
+    if (key === "high_priority") return "high";
+    return "low";
+  };
+
+  const dndSourceToDroppableId = (source: AppDndSource) => {
+    if (source.type === "priority") return priorityKeyToDroppableId(source.key);
+    if (source.type === "summary") return `summary-${source.staffId}`;
+    return `timeline-${source.staffId}`;
+  };
+
+  const dndContainerToDroppableId = (container: AppDndContainer) => {
+    if (container.type === "priority") return priorityKeyToDroppableId(container.key);
+    if (container.type === "summary") return `summary-${container.staffId}`;
+    if (container.type === "remove-zone") return LOGISTICS_REMOVE_ZONE_DROPPABLE_ID;
+    return `timeline-${container.staffId}`;
+  };
+
+  const dndOperationToLegacyDrop = (operation: DndDropOperation) => {
+    if (operation.type === "noop") return null;
+
+    if (operation.type === "assign") {
+      return {
+        draggableId: operation.taskIds[0],
+        source: {
+          droppableId: dndSourceToDroppableId(operation.from),
+          index: 0,
+        },
+        destination: {
+          droppableId: dndContainerToDroppableId(operation.to),
+          index: operation.index,
+        },
+      };
+    }
+
+    if (operation.type === "reorder") {
+      return {
+        draggableId: operation.taskIds[0],
+        source: {
+          droppableId: dndSourceToDroppableId(operation.in),
+          index: operation.fromIndex,
+        },
+        destination: {
+          droppableId: dndSourceToDroppableId(operation.in),
+          index: operation.toIndex,
+        },
+      };
+    }
+
+    if (operation.type === "reassign") {
+      return {
+        draggableId: operation.taskIds[0],
+        source: {
+          droppableId: dndSourceToDroppableId(operation.from),
+          index: 0,
+        },
+        destination: {
+          droppableId: dndContainerToDroppableId(operation.to),
+          index: operation.index,
+        },
+      };
+    }
+
+    return {
+      draggableId: operation.taskIds[0],
+      source: {
+        droppableId: dndSourceToDroppableId(operation.from),
+        index: 0,
+      },
+      destination: {
+        droppableId: dndContainerToDroppableId(operation.to),
+        index: 0,
+      },
+    };
+  };
+
   const saveLogisticsAssignment = async (
     taskId: string,
     driverId: number,
@@ -1042,65 +1134,8 @@ export default function GenerateLogisticsAssignments() {
     if (!res.ok) throw new Error("Riordino fallito");
   };
 
-  const saveLogisticsContainerMove = async (
-    fromContainer: LogisticsContainerKey,
-    toContainer: LogisticsContainerKey,
-    fromIndex: number,
-    toIndex: number
-  ) => {
-    const nextLists: LogisticsTaskLists = {
-      early_out: [...logisticsTaskLists.early_out],
-      high_priority: [...logisticsTaskLists.high_priority],
-      low_priority: [...logisticsTaskLists.low_priority],
-    };
-
-    const sourceTasks = nextLists[fromContainer];
-    const [movedTask] = sourceTasks.splice(fromIndex, 1);
-    if (!movedTask) {
-      throw new Error("Task container non trovata");
-    }
-
-    const destinationTasks = nextLists[toContainer];
-    const insertAt = Math.max(0, Math.min(toIndex, destinationTasks.length));
-    destinationTasks.splice(insertAt, 0, {
-      ...movedTask,
-      priority: toContainer,
-    });
-
-    const dateStr = format(selectedDate, "yyyy-MM-dd");
-    const res = await fetch("/api/logistics-containers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        date: dateStr,
-        modified_by: getCurrentUsername(),
-        containers: {
-          metadata: { date: dateStr },
-          containers: {
-            early_out: { tasks: nextLists.early_out },
-            high_priority: { tasks: nextLists.high_priority },
-            low_priority: { tasks: nextLists.low_priority },
-          },
-        },
-      }),
-    });
-    if (!res.ok) throw new Error("Spostamento container fallito");
-  };
-
-  const onDragUpdate = (update: { destination?: { droppableId: string; index: number } | null }) => {
-    const { destination } = update;
-    if (!destination) {
-      lastValidDragIndexRef.current = null;
-      return;
-    }
-    if (parseDriverId(destination.droppableId) !== null) {
-      lastValidDragIndexRef.current = destination.index;
-    } else {
-      lastValidDragIndexRef.current = null;
-    }
-  };
-
-  const onDragEnd = async (result: DropResult) => {
+  const onDragEnd = async (result: any) => {
+    setIsDraggingTimelineTask(false);
     const dropIndexSnapshot = lastValidDragIndexRef.current;
     lastValidDragIndexRef.current = null;
     const { destination, source, draggableId } = result;
@@ -1113,10 +1148,15 @@ export default function GenerateLogisticsAssignments() {
     const toDriverId = parseDriverId(destination.droppableId);
     const fromContainer = parseContainerKey(source.droppableId);
     const fromDriverId = parseDriverId(source.droppableId);
+    const isRemoveZoneDrop = destination.droppableId === LOGISTICS_REMOVE_ZONE_DROPPABLE_ID;
 
     const taskId = parseLogisticsDraggableTaskId(draggableId);
     const task = allTasksWithAssignments.find((t) => String(t.id) === String(taskId));
     const logisticCode = task?.name;
+
+    if (fromContainer !== null && toContainer !== null && fromDriverId === null && toDriverId === null) {
+      return;
+    }
 
     if (isTimelineReadOnly) {
       toast({ title: "Sola lettura", description: "Data nel passato", variant: "destructive" });
@@ -1138,15 +1178,10 @@ export default function GenerateLogisticsAssignments() {
     }, 10000);
 
     try {
-      if (fromContainer !== null && toContainer !== null && fromDriverId === null && toDriverId === null) {
-        await saveLogisticsContainerMove(
-          fromContainer as LogisticsContainerKey,
-          toContainer as LogisticsContainerKey,
-          source.index,
-          destination.index
-        );
+      if (fromDriverId !== null && isRemoveZoneDrop) {
+        await removeLogisticsTimelineAssignment(taskId, logisticCode);
         await reloadLogisticsPage();
-        toast({ title: "Container aggiornato", variant: "success" });
+        toast({ title: "Task rimossa dalla timeline", variant: "success" });
         return;
       }
 
@@ -1203,6 +1238,53 @@ export default function GenerateLogisticsAssignments() {
       setIsLoadingDragDrop(false);
     }
   };
+
+  const resetDndUiState = useCallback(() => {
+    setIsDraggingTimelineTask(false);
+    setDraggingOverDriverId(null);
+    setActiveDragDriverId(null);
+    lastValidDragIndexRef.current = null;
+  }, []);
+
+  const handleDndOperation = useCallback(
+    async (operation: DndDropOperation) => {
+      try {
+        const legacyDrop = dndOperationToLegacyDrop(operation);
+        if (!legacyDrop) return;
+        await onDragEnd(legacyDrop);
+      } finally {
+        resetDndUiState();
+      }
+    },
+    [onDragEnd, resetDndUiState]
+  );
+
+  const logisticsDnd = useLogisticsDnd({
+    onOperation: handleDndOperation,
+    onDragStart: (item) => {
+      setIsDraggingTimelineTask(
+        item.from.type === "timeline" || item.from.type === "summary"
+      );
+      setActiveDragDriverId(
+        item.from.type === "timeline" || item.from.type === "summary"
+          ? item.from.staffId
+          : null
+      );
+    },
+    onDragOver: (target: DndInsertTarget | null) => {
+      if (
+        target?.container.type === "timeline" ||
+        target?.container.type === "summary"
+      ) {
+        lastValidDragIndexRef.current = target.index;
+        setDraggingOverDriverId(target.container.staffId);
+        return;
+      }
+      lastValidDragIndexRef.current = null;
+      setDraggingOverDriverId(null);
+    },
+    onDragCancel: resetDndUiState,
+  });
 
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-background text-foreground">
@@ -1343,49 +1425,54 @@ export default function GenerateLogisticsAssignments() {
           </div>
         </div>
 
-        <DragDropContext onDragEnd={onDragEnd} onDragUpdate={onDragUpdate}>
+        <DndContext
+          sensors={logisticsDnd.sensors}
+          collisionDetection={logisticsDnd.collisionDetection}
+          measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+          {...logisticsDnd.handlers}
+        >
           {showContainers && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 w-full">
-            <PriorityColumn
-              title="EARLY OUT"
-              priority="early-out"
-              tasks={earlyOutTasks}
-              droppableId="early-out"
-              icon="clock"
-              isDragDisabled={isTimelineReadOnly}
-              disableToolbar
-              flushDropZone
-              operationsScope="logistics"
-              highlightedTaskIds={highlightedEarlyOut}
-              onLogisticsTimelineMutated={reloadLogisticsPage}
-            />
-            <PriorityColumn
-              title="HIGH PRIORITY"
-              priority="high"
-              tasks={highPriorityTasks}
-              droppableId="high"
-              icon="alert-circle"
-              isDragDisabled={isTimelineReadOnly}
-              disableToolbar
-              flushDropZone
-              operationsScope="logistics"
-              highlightedTaskIds={highlightedHighPriority}
-              onLogisticsTimelineMutated={reloadLogisticsPage}
-            />
-            <PriorityColumn
-              title="LOW PRIORITY"
-              priority="low"
-              tasks={lowPriorityTasks}
-              droppableId="low"
-              icon="arrow-down"
-              isDragDisabled={isTimelineReadOnly}
-              disableToolbar
-              flushDropZone
-              operationsScope="logistics"
-              highlightedTaskIds={highlightedLowPriority}
-              onLogisticsTimelineMutated={reloadLogisticsPage}
-            />
-          </div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 w-full">
+                <PriorityColumn
+                  title="EARLY OUT"
+                  priority="early-out"
+                  tasks={earlyOutTasks}
+                  droppableId="early-out"
+                  icon="clock"
+                  isDragDisabled={isTimelineReadOnly}
+                  disableToolbar
+                  flushDropZone
+                  operationsScope="logistics"
+                  highlightedTaskIds={highlightedEarlyOut}
+                  onLogisticsTimelineMutated={reloadLogisticsPage}
+                />
+                <PriorityColumn
+                  title="HIGH PRIORITY"
+                  priority="high"
+                  tasks={highPriorityTasks}
+                  droppableId="high"
+                  icon="alert-circle"
+                  isDragDisabled={isTimelineReadOnly}
+                  disableToolbar
+                  flushDropZone
+                  operationsScope="logistics"
+                  highlightedTaskIds={highlightedHighPriority}
+                  onLogisticsTimelineMutated={reloadLogisticsPage}
+                />
+                <PriorityColumn
+                  title="LOW PRIORITY"
+                  priority="low"
+                  tasks={lowPriorityTasks}
+                  droppableId="low"
+                  icon="arrow-down"
+                  isDragDisabled={isTimelineReadOnly}
+                  disableToolbar
+                  flushDropZone
+                  operationsScope="logistics"
+                  highlightedTaskIds={highlightedLowPriority}
+                  onLogisticsTimelineMutated={reloadLogisticsPage}
+                />
+              </div>
           )}
 
           <div className="mt-0 grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -1398,6 +1485,8 @@ export default function GenerateLogisticsAssignments() {
                   searchTask={searchTask}
                   isReadOnly={isTimelineReadOnly}
                   isLoadingOverlay={isLoadingDragDrop}
+                  draggingOverDriverId={draggingOverDriverId}
+                  activeDragDriverId={activeDragDriverId}
                   onRefresh={reloadLogisticsPage}
                 />
                 <TimelineFloatingPanel
@@ -1466,7 +1555,21 @@ export default function GenerateLogisticsAssignments() {
               workDate={format(selectedDate, "yyyy-MM-dd")}
             />
           )}
-        </DragDropContext>
+          <DndRemoveZone
+            scope="logistics"
+            visible={isDraggingTimelineTask && !isTimelineReadOnly}
+            disabled={isTimelineReadOnly}
+          />
+          <TaskCardDragOverlay
+            activeItem={logisticsDnd.activeItem}
+            activeDragTask={logisticsDnd.activeDragTask}
+            activeRect={logisticsDnd.activeRect}
+            tasks={allTasksWithAssignments}
+            scope="logistics"
+            modifiers={logisticsDnd.overlayModifiers}
+            onLogisticsTimelineMutated={reloadLogisticsPage}
+          />
+        </DndContext>
 
         <Dialog
           open={showMissingLogisticsKindWarningDialog}

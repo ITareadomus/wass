@@ -1,4 +1,4 @@
-import { DragDropContext, DropResult } from "react-beautiful-dnd";
+import { DndContext, MeasuringStrategy } from "@dnd-kit/core";
 import { TaskType as Task } from "@shared/schema";
 import {
   isWorkDateHistoricallyLocked,
@@ -13,6 +13,7 @@ const DEBUG = false;
 const dlog = (...args: any[]) => DEBUG && console.log(...args);
 import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
 import { CalendarIcon, Users, RefreshCw, Settings, Search, Map as MapIcon, BarChart3 } from "lucide-react";
+import TaskCardDragOverlay from "@/components/drag-drop/task-card-drag-overlay";
 import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
 import {
   registerTimelineMapPanelOpener,
@@ -36,8 +37,18 @@ import { cn } from "@/lib/utils";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { useToast } from "@/hooks/use-toast";
 import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
+import {
+  DndRemoveZone,
+  useAssignmentDnd,
+  type AppDndContainer,
+  type AppDndSource,
+  type DndDropOperation,
+  type DndInsertTarget,
+  type DndPriorityKey,
+} from "@/lib/dnd";
 
 const OFFICE_SCOPE_ENABLED = false;
+const HOUSEKEEPING_REMOVE_ZONE_DROPPABLE_ID = "housekeeping-remove-zone";
 const getDefaultTimelineMapPanel = () => getDefaultTimelineFloatingPanel("right");
 const getDefaultTimelineStatsPanel = () =>
   getDefaultTimelineFloatingPanel("right", { width: 320, height: 320 });
@@ -271,6 +282,7 @@ export default function GenerateAssignments() {
   
   // Traccia il cleaner su cui si sta trascinando per posizionare il placeholder
   const [draggingOverCleanerId, setDraggingOverCleanerId] = useState<number | null>(null);
+  const [activeDragCleanerId, setActiveDragCleanerId] = useState<number | null>(null);
 
   // Stati per selezione multipla INDIPENDENTE per container (ma selezione CROSS-CONTAINER)
   const [multiSelectModes, setMultiSelectModes] = useState<{
@@ -416,6 +428,7 @@ export default function GenerateAssignments() {
 
   // Stato per tracciare se un drag&drop è in corso
   const [isLoadingDragDrop, setIsLoadingDragDrop] = useState(false);
+  const [isDraggingTimelineTask, setIsDraggingTimelineTask] = useState(false);
 
   // Stati di caricamento
   const [isExtracting, setIsExtracting] = useState(true);
@@ -1662,39 +1675,85 @@ export default function GenerateAssignments() {
     return null;
   };
 
-  const onDragUpdate = (update: any) => {
-    const { destination } = update;
+  const priorityKeyToDroppableId = (key: DndPriorityKey) => {
+    if (key === "early_out") return "early-out";
+    if (key === "high_priority") return "high";
+    return "low";
+  };
 
-    if (!destination) {
-      setDragSequencePreview(null);
-      setLastValidDragIndex(null);
-      lastValidDragIndexRef.current = null;
-      setDraggingOverCleanerId(null);
-      return;
+  const dndSourceToDroppableId = (source: AppDndSource) => {
+    if (source.type === "priority") return priorityKeyToDroppableId(source.key);
+    if (source.type === "summary") return `summary-${source.staffId}`;
+    return `timeline-${source.staffId}`;
+  };
+
+  const dndContainerToDroppableId = (container: AppDndContainer) => {
+    if (container.type === "priority") return priorityKeyToDroppableId(container.key);
+    if (container.type === "summary") return `summary-${container.staffId}`;
+    if (container.type === "remove-zone") return HOUSEKEEPING_REMOVE_ZONE_DROPPABLE_ID;
+    return `timeline-${container.staffId}`;
+  };
+
+  const dndOperationToLegacyDrop = (operation: DndDropOperation) => {
+    if (operation.type === "noop") return null;
+
+    if (operation.type === "assign") {
+      return {
+        draggableId: operation.taskIds[0],
+        source: {
+          droppableId: dndSourceToDroppableId(operation.from),
+          index: 0,
+        },
+        destination: {
+          droppableId: dndContainerToDroppableId(operation.to),
+          index: operation.index,
+        },
+      };
     }
 
-    const toCleanerId = parseCleanerId(destination.droppableId);
-
-    // Mostriamo il numero di sequenza solo quando siamo sulla timeline di un cleaner
-    if (toCleanerId === null) {
-      setDragSequencePreview(null);
-      setLastValidDragIndex(null);
-      lastValidDragIndexRef.current = null;
-      setDraggingOverCleanerId(null);
-      return;
+    if (operation.type === "reorder") {
+      return {
+        draggableId: operation.taskIds[0],
+        source: {
+          droppableId: dndSourceToDroppableId(operation.in),
+          index: operation.fromIndex,
+        },
+        destination: {
+          droppableId: dndSourceToDroppableId(operation.in),
+          index: operation.toIndex,
+        },
+      };
     }
 
-    // CRITICAL: Salva l'indice valido durante il drag per evitare bug con destination.index inaffidabile
-    setLastValidDragIndex(destination.index);
-    lastValidDragIndexRef.current = destination.index;
-    setDraggingOverCleanerId(toCleanerId);
-    setDragSequencePreview({
-      // index è 0-based, mostrato come 1-based
-      sequenceIndex: destination.index + 1,
-    });
+    if (operation.type === "reassign") {
+      return {
+        draggableId: operation.taskIds[0],
+        source: {
+          droppableId: dndSourceToDroppableId(operation.from),
+          index: 0,
+        },
+        destination: {
+          droppableId: dndContainerToDroppableId(operation.to),
+          index: operation.index,
+        },
+      };
+    }
+
+    return {
+      draggableId: operation.taskIds[0],
+      source: {
+        droppableId: dndSourceToDroppableId(operation.from),
+        index: 0,
+      },
+      destination: {
+        droppableId: dndContainerToDroppableId(operation.to),
+        index: 0,
+      },
+    };
   };
 
   const onDragEnd = async (result: any) => {
+    setIsDraggingTimelineTask(false);
     setDragSequencePreview(null);
     setLastValidDragIndex(null);
     setDraggingOverCleanerId(null);
@@ -1707,6 +1766,7 @@ export default function GenerateAssignments() {
     const toCleanerId = parseCleanerId(destination?.droppableId);
     const fromContainer = parseContainerKey(source?.droppableId);
     const fromCleanerId = parseCleanerId(source?.droppableId);
+    const isRemoveZoneDrop = destination?.droppableId === HOUSEKEEPING_REMOVE_ZONE_DROPPABLE_ID;
 
     try {
       // niente destinazione => niente da fare (e NON mostrare overlay)
@@ -1794,6 +1854,33 @@ export default function GenerateAssignments() {
         isDraggingRef.current = false;
         setIsLoadingDragDrop(false);
       }, 10000);
+
+      if (fromCleanerId !== null && isRemoveZoneDrop) {
+        dlog(`🔄 Rimozione task ${taskId} dalla timeline tramite remove-zone`);
+
+        try {
+          await removeTimelineAssignment(taskId, logisticCode);
+
+          setHasUnsavedChanges(true);
+          if (handleTaskMoved) {
+            handleTaskMoved();
+          }
+
+          await refreshAssignments("manual");
+        } catch (err) {
+          console.error("Errore nella rimozione tramite remove-zone:", err);
+          toast({
+            title: "Errore",
+            description: "Impossibile rimuovere la task dalla timeline.",
+            variant: "destructive",
+          });
+        } finally {
+          isDraggingRef.current = false;
+          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+          setIsLoadingDragDrop(false);
+        }
+        return;
+      }
       // 🔹 Ramo TIMELINE (drag tra cleaners o riordino nello stesso cleaner)
 
       // Caso: Riordino nella stessa timeline
@@ -2103,6 +2190,61 @@ export default function GenerateAssignments() {
     }
   };
 
+  const resetDndUiState = useCallback(() => {
+    setIsDraggingTimelineTask(false);
+    setDragSequencePreview(null);
+    setLastValidDragIndex(null);
+    lastValidDragIndexRef.current = null;
+    setDraggingOverCleanerId(null);
+    setActiveDragCleanerId(null);
+  }, []);
+
+  const handleDndOperation = useCallback(
+    async (operation: DndDropOperation) => {
+      try {
+        const legacyDrop = dndOperationToLegacyDrop(operation);
+        if (!legacyDrop) return;
+        await onDragEnd(legacyDrop);
+      } finally {
+        resetDndUiState();
+      }
+    },
+    [onDragEnd, resetDndUiState]
+  );
+
+  const assignmentDnd = useAssignmentDnd({
+    scope: "housekeeping",
+    onOperation: handleDndOperation,
+    onDragStart: (item) => {
+      setIsDraggingTimelineTask(
+        item.from.type === "timeline" || item.from.type === "summary"
+      );
+      setActiveDragCleanerId(
+        item.from.type === "timeline" || item.from.type === "summary"
+          ? item.from.staffId
+          : null
+      );
+    },
+    onDragOver: (target: DndInsertTarget | null) => {
+      if (target?.container.type !== "timeline") {
+        setDragSequencePreview(null);
+        setLastValidDragIndex(null);
+        lastValidDragIndexRef.current = null;
+        setDraggingOverCleanerId(null);
+        return;
+      }
+
+      const cleanerId = target.container.staffId;
+      setLastValidDragIndex(target.index);
+      lastValidDragIndexRef.current = target.index;
+      setDraggingOverCleanerId(cleanerId);
+      setDragSequencePreview({
+        sequenceIndex: target.index + 1,
+      });
+    },
+    onDragCancel: resetDndUiState,
+  });
+
   const updateTaskJson = async (taskId: string, logisticCode: string | undefined, fromContainer: string | null, toContainer: string | null) => {
     if (!logisticCode || !fromContainer || !toContainer) {
       console.warn('Missing required parameters for updateTaskJson');
@@ -2241,9 +2383,11 @@ export default function GenerateAssignments() {
           </PageViewportCentered>
         ) : (
         <MultiSelectContext.Provider value={multiSelectContextValue}>
-          <DragDropContext
-            onDragEnd={onDragEnd}
-            onDragUpdate={onDragUpdate}
+          <DndContext
+            sensors={assignmentDnd.sensors}
+            collisionDetection={assignmentDnd.collisionDetection}
+            measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+            {...assignmentDnd.handlers}
           >
             <div className="mb-4 flex items-center gap-3">
               <div className="relative flex-1">
@@ -2475,6 +2619,7 @@ export default function GenerateAssignments() {
                   isLoadingDragDrop={isLoadingDragDrop}
                   lastValidDragIndex={lastValidDragIndex}
                   draggingOverCleanerId={draggingOverCleanerId}
+                  activeDragCleanerId={activeDragCleanerId}
                   searchTask={searchTask}
                   preassignedAnimatedTaskIds={preassignedAnimatedTaskIds}
                 />
@@ -2538,7 +2683,20 @@ export default function GenerateAssignments() {
               </span>
             </div>
           )}
-        </DragDropContext>
+          <DndRemoveZone
+            scope="housekeeping"
+            visible={isDraggingTimelineTask && !isTimelineReadOnly}
+            disabled={isTimelineReadOnly}
+          />
+          <TaskCardDragOverlay
+            activeItem={assignmentDnd.activeItem}
+            activeDragTask={assignmentDnd.activeDragTask}
+            activeRect={assignmentDnd.activeRect}
+            tasks={allTasksWithAssignments}
+            scope="housekeeping"
+            modifiers={assignmentDnd.overlayModifiers}
+          />
+        </DndContext>
         </MultiSelectContext.Provider>
         )}
       </div>

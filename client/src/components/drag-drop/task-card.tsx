@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
-import { Draggable } from "react-beautiful-dnd";
 import { useQuery } from "@tanstack/react-query";
 import { TaskType as Task } from "@shared/schema";
 import {
@@ -76,12 +75,6 @@ import {
 
 // Normalizza la chiave di una task indipendentemente dal campo usato
 const getTaskKey = (t: any) => String(t?.id ?? t?.task_id ?? t?.logistic_code ?? "");
-
-// Genera chiave univoca per DnD includendo cleanerId (per task collaborative)
-const getUniqueDraggableId = (t: any, cleanerId?: number | null) => {
-  const taskKey = getTaskKey(t);
-  return cleanerId != null ? `${taskKey}-cleaner-${cleanerId}` : taskKey;
-};
 
 // Chiave di navigazione per il dialog (evita collisioni su task_id duplicati).
 const getTaskNavigationKey = (t: any, listIndex?: number) =>
@@ -203,7 +196,7 @@ interface MultiSelectContextType {
   getTaskOrder: (taskId: string) => number | undefined;
 }
 
-interface TaskCardProps {
+export interface TaskCardProps {
   task: Task;
   index: number;
   isInTimeline?: boolean;
@@ -217,6 +210,7 @@ interface TaskCardProps {
   timelineWidthPx?: number;
   timelinePxPerMinute?: number;
   minTimelineTaskWidthPx?: number;
+  dragOverlayWidthPx?: number;
   travelTime?: number;
   travelWidthPx?: number;
   waitingGap?: number;
@@ -224,6 +218,10 @@ interface TaskCardProps {
   isHighlighted?: boolean;
   cleanerId?: number | null;
   draggableId?: string;
+  dragWrapper?: "none";
+  externalIsDragging?: boolean;
+  externalDragHandleProps?: React.HTMLAttributes<HTMLDivElement> &
+    React.RefAttributes<HTMLDivElement>;
   /** housekeeping → /api/operations (enable_wass); logistics → enable_wass_route */
   operationsScope?: "housekeeping" | "office" | "logistics";
   /** Solo timeline logistica: nome driver (colonna sinistra). Non usare per HK — lì sarebbe il cleaner. */
@@ -355,13 +353,15 @@ export default function TaskCard({
   timelineWidthPx = 0,
   timelinePxPerMinute = 0,
   minTimelineTaskWidthPx = 0,
+  dragOverlayWidthPx,
   travelTime = 0,
   travelWidthPx = 0,
   waitingGap = 0,
   waitingGapWidthPx = 0,
   isHighlighted = false,
   cleanerId = null,
-  draggableId,
+  externalIsDragging = false,
+  externalDragHandleProps,
   operationsScope = "housekeeping",
   timelineRowStaffDisplayLabel = null,
   onLogisticsTimelineMutated,
@@ -2308,12 +2308,6 @@ const displayClickableInputClass =
       ? "top-1/2 -translate-y-1/2"
       : "top-[5px]";
 
-  // Il drag viene bloccato solo da stato pagina/task, non dai campi orari ADAM.
-  const shouldDisableDrag =
-    isDragDisabled ||
-    isLocked ||
-    isPreAssignedReadonly;
-
   const currentDetailsTaskKey = getTaskKey(displayTask) || getTaskKey(task);
   const taskAny = task as any;
   const logisticsAdamCode = String(
@@ -2973,28 +2967,39 @@ const displayClickableInputClass =
     </>
   );
 
-  return (
-    <>
-      <Draggable
-        draggableId={draggableId ?? getUniqueDraggableId(task, cleanerId)}
-        index={index}
-        isDragDisabled={shouldDisableDrag}
-      >
-        {(provided, snapshot) => {
-          const cardWidth = calculateWidth(effectiveDurationForUi, isInTimeline);
+  const renderTaskCardContent = ({
+    isDragging,
+    dragHandleProps,
+    draggableProps,
+    draggableStyle,
+    innerRef,
+  }: {
+    isDragging: boolean;
+    dragHandleProps?:
+      | (React.HTMLAttributes<HTMLDivElement> &
+          React.RefAttributes<HTMLDivElement>)
+      | null;
+    draggableProps?: React.HTMLAttributes<HTMLDivElement>;
+    draggableStyle?: React.CSSProperties;
+    innerRef?: React.Ref<HTMLDivElement>;
+  }) => {
+    const cardWidth =
+      typeof dragOverlayWidthPx === "number" && dragOverlayWidthPx > 0
+        ? `${dragOverlayWidthPx}px`
+        : calculateWidth(effectiveDurationForUi, isInTimeline);
 
-          return (
+    return (
             <div
-              ref={provided.innerRef}
-              {...provided.draggableProps}
+              ref={innerRef}
+              {...draggableProps}
               style={{
-                ...provided.draggableProps.style,
-                zIndex: snapshot.isDragging ? 9999 : 'auto',
+                ...draggableStyle,
+                zIndex: isDragging ? 9999 : 'auto',
               }}
               className={isInTimeline ? "flex items-center" : ""}
             >
           {/* Task card con drag handle */}
-          <div {...provided.dragHandleProps} className="focus-visible:outline-none">
+          <div {...(dragHandleProps ?? undefined)} className="focus-visible:outline-none">
             {/* Task card effettiva */}
             <TooltipProvider delayDuration={300}>
               <Tooltip>
@@ -3004,11 +3009,10 @@ const displayClickableInputClass =
                       cardSurfaceClass,
                       "rounded-md border transition-colors duration-200",
                       isLogisticsTimelineDetails ? "px-1 py-0" : "flex items-center px-2 py-1",
-                      snapshot.isDragging && "shadow-lg",
                       isSelected && isMultiSelectMode && !isInTimeline && "z-[1] ring-2 ring-sky-500 ring-inset",
                       isOverdue && isInTimeline && "animate-blink",
-                      !snapshot.isDragging && isMapFiltered && "task-border-map-filtered",
-                      !snapshot.isDragging && !isMapFiltered && isHighlighted && "task-border-search-highlighted",
+                      !isDragging && isMapFiltered && "task-border-map-filtered",
+                      !isDragging && !isMapFiltered && isHighlighted && "task-border-search-highlighted",
                       "cursor-pointer flex-shrink-0 relative group"
                     )}
                     style={{
@@ -3020,7 +3024,7 @@ const displayClickableInputClass =
                       maxHeight: isInTimeline ? "40px" : undefined,
                       overflow: isInTimeline ? "visible" : undefined,
                       zIndex:
-                        snapshot.isDragging
+                        isDragging
                           ? 9999
                           : operationsScope === "logistics" && isInTimeline
                             ? 20
@@ -3028,9 +3032,10 @@ const displayClickableInputClass =
                               ? 10
                               : 'auto',
                     }}
+                    data-dnd-task-card-surface="true"
                     data-testid={`task-card-${getTaskKey(task)}`}
                     onClick={(e) => {
-                      if (!snapshot.isDragging) {
+                      if (!isDragging) {
                         handleCardClick(e);
                       }
                     }}
@@ -3239,8 +3244,14 @@ const displayClickableInputClass =
               </div>
             </div>
           );
-        }}
-      </Draggable>
+  };
+
+  return (
+    <>
+      {renderTaskCardContent({
+        isDragging: externalIsDragging,
+        dragHandleProps: externalDragHandleProps,
+      })}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent
           className={cn(

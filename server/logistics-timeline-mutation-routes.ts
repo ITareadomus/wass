@@ -12,6 +12,14 @@ type Deps = {
   getRomeTimestamp: () => string;
 };
 
+function normalizeLogisticsPriorityContainer(priority: unknown): "early_out" | "high_priority" | "low_priority" {
+  const value = String(priority ?? "").trim().toLowerCase();
+  if (value === "early_out" || value === "early-out") return "early_out";
+  if (value === "high_priority" || value === "high" || value === "high-priority") return "high_priority";
+  if (value === "low_priority" || value === "low" || value === "low-priority") return "low_priority";
+  return "low_priority";
+}
+
 export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps) {
   const { getCurrentUsername, getRomeTimestamp } = deps;
 
@@ -329,9 +337,8 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
               },
               summary: {},
             };
-          const pr = removedTask.priority || "low_priority";
-          const containerType =
-            pr === "early_out" ? "early_out" : pr === "high_priority" ? "high_priority" : "low_priority";
+          const containerType = normalizeLogisticsPriorityContainer(removedTask.priority);
+          removedTask.priority = containerType;
           delete removedTask.start_time;
           delete removedTask.end_time;
           delete removedTask.travel_time;

@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { Draggable, Droppable } from "react-beautiful-dnd";
+import type { ReactNode } from "react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { ListOrdered, Loader2, Maximize2, MessageCircle } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
@@ -21,6 +23,13 @@ import {
 } from "@/components/ui/tooltip";
 import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
 import { SequenceSummaryGroupHeading } from "@/components/sequence-summary-group-heading";
+import {
+  appDndDraggableAttributes,
+  appDndHandleAttributes,
+  DndDroppableSortableContainer,
+  taskDndId,
+  type AppDndItem,
+} from "@/lib/dnd";
 
 interface AssignedTasksSequenceSummaryProps {
   groups: SequenceSummaryGroup[];
@@ -29,6 +38,59 @@ interface AssignedTasksSequenceSummaryProps {
   isDragDisabled?: boolean;
   loadingDriverIds?: number[];
   workDate?: string;
+}
+
+function DndSummaryTaskItem({
+  id,
+  data,
+  disabled,
+  className,
+  onClick,
+  onKeyDown,
+  role,
+  tabIndex,
+  ariaLabel,
+  children,
+}: {
+  id: string;
+  data: AppDndItem;
+  disabled: boolean;
+  className: string;
+  onClick: () => void;
+  onKeyDown: (event: React.KeyboardEvent<HTMLLIElement>) => void;
+  role?: string;
+  tabIndex?: number;
+  ariaLabel?: string;
+  children: (state: { isDragging: boolean }) => ReactNode;
+}) {
+  const sortable = useSortable({
+    id,
+    data,
+    disabled,
+  });
+
+  return (
+    <li
+      ref={sortable.setNodeRef}
+      {...sortable.attributes}
+      {...sortable.listeners}
+      {...appDndDraggableAttributes}
+      {...appDndHandleAttributes}
+      style={{
+        transform: CSS.Transform.toString(sortable.transform),
+        transition: sortable.transition,
+        opacity: sortable.isDragging ? 0 : undefined,
+      }}
+      className={className}
+      role={role}
+      tabIndex={tabIndex}
+      aria-label={ariaLabel}
+      onClick={onClick}
+      onKeyDown={onKeyDown}
+    >
+      {children({ isDragging: sortable.isDragging })}
+    </li>
+  );
 }
 
 function matchesSearch(entry: SequenceSummaryGroup["tasks"][number], query: string): boolean {
@@ -188,6 +250,9 @@ export default function AssignedTasksSequenceSummary({
             const isLoadOrder = loadOrderDriverIds.has(group.id);
             const displayedTasks = isLoadOrder ? [...group.tasks].reverse() : group.tasks;
             const isGroupDragDisabled = isDragDisabled || isLoadOrder;
+            const itemIds = displayedTasks.map((entry) =>
+              taskDndId("logistics", entry.taskId, group.id)
+            );
 
             return (
             <div
@@ -237,24 +302,26 @@ export default function AssignedTasksSequenceSummary({
                 </div>
               </div>
 
-              <Droppable
-                droppableId={`summary-${group.id}`}
-                direction="vertical"
-                isDropDisabled={isGroupDragDisabled}
+              <DndDroppableSortableContainer
+                scope="logistics"
+                type="summary"
+                staffId={group.id}
+                itemIds={itemIds}
+                insertIndex={displayedTasks.length}
+                disabled={isGroupDragDisabled}
+                orientation="vertical"
+                className={({ isOver }) =>
+                  cn(
+                    "sequence-summary-driver-scroll flex min-h-0 min-w-0 flex-1 flex-col rounded-md bg-background/70 pb-0.5",
+                    isOver && "ring-1 ring-custom-blue/30"
+                  )
+                }
               >
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className={cn(
-                      "sequence-summary-driver-scroll flex min-h-0 min-w-0 flex-1 flex-col rounded-md bg-background/70 pb-0.5",
-                      snapshot.isDraggingOver && "ring-1 ring-custom-blue/30"
-                    )}
-                  >
+                {({ isOver }) => (
                     <ol
                       className={cn(
                         "sequence-summary-task-list flex min-w-max flex-col gap-1.5",
-                        snapshot.isDraggingOver && "rounded-md bg-custom-blue/5"
+                        isOver && "rounded-md bg-custom-blue/5"
                       )}
                     >
                       {displayedTasks.map((entry, index) => {
@@ -265,57 +332,61 @@ export default function AssignedTasksSequenceSummary({
                         const violationMessages = entry.violationMessages ?? [];
 
                         return (
-                          <Draggable
+                          <DndSummaryTaskItem
                             key={`${group.id}-${entry.taskId}`}
-                            draggableId={`${entry.taskId}-summary-${group.id}`}
-                            index={index}
-                            isDragDisabled={isGroupDragDisabled}
+                            id={taskDndId("logistics", entry.taskId, group.id)}
+                            data={{
+                              kind: "task",
+                              scope: "logistics",
+                              taskId: String(entry.taskId),
+                              index,
+                              initialIndex: index,
+                              from: {
+                                type: "summary",
+                                staffId: group.id,
+                              },
+                            }}
+                            disabled={isGroupDragDisabled}
+                            className={cn(
+                              "sequence-summary-task relative rounded-md border px-2 py-1.5 text-xs",
+                              isTimelineViolated
+                                ? "sequence-summary-task--violated animate-blink-inset border-red-500 bg-red-50 dark:bg-red-950/30"
+                                : isHighlighted
+                                ? "border-amber-400 bg-amber-50 dark:bg-amber-950/30"
+                                : "border-border/70 bg-background",
+                              !isGroupDragDisabled &&
+                                !isTimelineViolated &&
+                                "cursor-grab active:cursor-grabbing"
+                            )}
+                            role={isTimelineViolated ? "button" : undefined}
+                            tabIndex={isTimelineViolated ? 0 : undefined}
+                            ariaLabel={
+                              isTimelineViolated
+                                ? `Mostra violazione timeline per task ${entry.logisticCode || "N/D"}`
+                                : undefined
+                            }
+                            onClick={() => {
+                              if (!isTimelineViolated) return;
+                              setViolationDialog({
+                                open: true,
+                                messages: violationMessages,
+                                logisticCode: entry.logisticCode || "N/D",
+                              });
+                            }}
+                            onKeyDown={(event) => {
+                              if (!isTimelineViolated) return;
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                setViolationDialog({
+                                  open: true,
+                                  messages: violationMessages,
+                                  logisticCode: entry.logisticCode || "N/D",
+                                });
+                              }
+                            }}
                           >
-                            {(dragProvided, dragSnapshot) => (
-                              <li
-                                ref={dragProvided.innerRef}
-                                {...dragProvided.draggableProps}
-                                {...dragProvided.dragHandleProps}
-                                style={dragProvided.draggableProps.style}
-                                className={cn(
-                                  "sequence-summary-task relative rounded-md border px-2 py-1.5 text-xs",
-                                  isTimelineViolated
-                                    ? "sequence-summary-task--violated animate-blink-inset border-red-500 bg-red-50 dark:bg-red-950/30"
-                                    : isHighlighted
-                                    ? "border-amber-400 bg-amber-50 dark:bg-amber-950/30"
-                                    : "border-border/70 bg-background",
-                                  dragSnapshot.isDragging && "shadow-lg ring-2 ring-custom-blue/40",
-                                  !isGroupDragDisabled &&
-                                    !isTimelineViolated &&
-                                    "cursor-grab active:cursor-grabbing"
-                                )}
-                                role={isTimelineViolated ? "button" : undefined}
-                                tabIndex={isTimelineViolated ? 0 : undefined}
-                                aria-label={
-                                  isTimelineViolated
-                                    ? `Mostra violazione timeline per task ${entry.logisticCode || "N/D"}`
-                                    : undefined
-                                }
-                                onClick={() => {
-                                  if (!isTimelineViolated || dragSnapshot.isDragging) return;
-                                  setViolationDialog({
-                                    open: true,
-                                    messages: violationMessages,
-                                    logisticCode: entry.logisticCode || "N/D",
-                                  });
-                                }}
-                                onKeyDown={(event) => {
-                                  if (!isTimelineViolated) return;
-                                  if (event.key === "Enter" || event.key === " ") {
-                                    event.preventDefault();
-                                    setViolationDialog({
-                                      open: true,
-                                      messages: violationMessages,
-                                      logisticCode: entry.logisticCode || "N/D",
-                                    });
-                                  }
-                                }}
-                              >
+                            {() => (
+                              <>
                                 {isTimelineViolated && (
                                   <SequenceSummaryViolationIndicator />
                                 )}
@@ -391,16 +462,14 @@ export default function AssignedTasksSequenceSummary({
                                       )}
                                     </div>
                                 </div>
-                              </li>
+                              </>
                             )}
-                          </Draggable>
+                          </DndSummaryTaskItem>
                         );
                       })}
-                      {provided.placeholder}
                     </ol>
-                  </div>
                 )}
-              </Droppable>
+              </DndDroppableSortableContainer>
             </div>
           );
           })}
