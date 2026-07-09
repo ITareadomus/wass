@@ -1,7 +1,6 @@
 import {
   closestCenter,
   pointerWithin,
-  rectIntersection,
   type Collision,
   type CollisionDetection,
   type UniqueIdentifier,
@@ -239,6 +238,36 @@ const itemBelongsToSortContainer = (
   return from.staffId === container.staffId;
 };
 
+const findPriorityColumnUnderPointer = (args: CollisionArgs) => {
+  const point = args.pointerCoordinates;
+  if (!point) return false;
+
+  const columns = document.querySelectorAll<HTMLElement>(
+    '[data-testid^="priority-column-"], [data-testid^="dnd-priority-column-"]',
+  );
+
+  for (const column of columns) {
+    const rect = column.getBoundingClientRect();
+    if (rectContainsPoint(rect, point)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const findItemPointerCollision = (
+  args: CollisionArgs,
+  collisions: Collision[],
+) => {
+  return collisions.find((collision) => {
+    const droppableContainer = args.droppableContainers.find(
+      (container) => container.id === collision.id,
+    );
+    return isAppDndItem(droppableContainer?.data.current);
+  });
+};
+
 export const timelineFirstCollisionDetection: CollisionDetection = (args) => {
   const removeZoneUnderPointer = findContainerUnderPointer(
     args,
@@ -260,8 +289,7 @@ export const timelineFirstCollisionDetection: CollisionDetection = (args) => {
     return [removeZoneCollision];
   }
 
-  // Riordino (same-cleaner) e inserimento cross-cleaner usano entrambi
-  // closestCenter: l'inserimento segue il centro dell'elemento trascinato.
+  // Timeline/summary: solo quando il cursore è fisicamente dentro la riga/colonna.
   const sortContainer = findSortContainerUnderPointer(args);
   if (sortContainer) {
     const itemContainers = args.droppableContainers.filter((container) =>
@@ -290,35 +318,20 @@ export const timelineFirstCollisionDetection: CollisionDetection = (args) => {
     ];
   }
 
-  const itemCollision = pointerCollisions.find((collision) => {
-    const droppableContainer = args.droppableContainers.find(
-      (container) => container.id === collision.id,
-    );
-    return isAppDndItem(droppableContainer?.data.current);
-  });
+  // Sopra i container priority il rect trascinato può ancora intersecare la
+  // prima riga timeline: non usare collisioni basate sul rect dell'elemento.
+  if (
+    findContainerUnderPointer(args, "priority") ||
+    findPriorityColumnUnderPointer(args)
+  ) {
+    const itemCollision = findItemPointerCollision(args, pointerCollisions);
+    return itemCollision ? [itemCollision] : [];
+  }
 
+  const itemCollision = findItemPointerCollision(args, pointerCollisions);
   if (itemCollision) {
     return [itemCollision];
   }
 
-  const timelineCollision = findContainerCollision(
-    args,
-    pointerCollisions,
-    "timeline",
-  );
-
-  if (timelineCollision) {
-    return [timelineCollision];
-  }
-
-  if (pointerCollisions.length > 0) {
-    return pointerCollisions;
-  }
-
-  const intersectingCollisions = rectIntersection(args);
-  if (intersectingCollisions.length > 0) {
-    return intersectingCollisions;
-  }
-
-  return closestCenter(args);
+  return pointerCollisions;
 };

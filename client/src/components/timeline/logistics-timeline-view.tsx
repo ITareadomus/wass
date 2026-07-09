@@ -1723,19 +1723,15 @@ export default function LogisticsTimelineView({
               </div>
             ) : (
               drivers.map((driver) => {
-                const rawTasks = assignmentByDriver.get(driver.id) || [];
+                const rawTasks = [...(assignmentByDriver.get(driver.id) || [])].sort(
+                  (a, b) => Number(a?.sequence ?? 0) - Number(b?.sequence ?? 0)
+                );
                 const rawByTaskId = new Map<number, any>();
                 for (const rt of rawTasks) {
                   const tid = Number((rt as any)?.task_id);
                   if (Number.isFinite(tid)) rawByTaskId.set(tid, rt);
                 }
-                const tasks = rawTasks
-                  .map((t) => timelineTaskToTask(t, driver.id))
-                  .sort((a, b) => {
-                    const sa = (a as any).sequence ?? 0;
-                    const sb = (b as any).sequence ?? 0;
-                    return sa - sb;
-                  });
+                const tasks = rawTasks.map((t) => timelineTaskToTask(t, driver.id));
                 const hi = highlightedIdsForDriverTasks(tasks, searchTask);
                 const driverRowDisplayLabel = getDriverRowDisplayLabel(driver);
                 const driverPlate = getDriverPlate(driver);
@@ -1808,7 +1804,7 @@ export default function LogisticsTimelineView({
                       type="timeline"
                       staffId={driver.id}
                       itemIds={tasks.map((task) =>
-                        taskDndId("logistics", getTaskDndKey(task), driver.id)
+                        taskDndId("logistics", getTaskDndKey(task), driver.id, "timeline")
                       )}
                       insertIndex={tasks.length}
                       disabled={isReadOnly || suppressTaskDrag}
@@ -1828,7 +1824,7 @@ export default function LogisticsTimelineView({
                           activeDragDriverId === driver.id;
 
                         return (
-                        <>
+                        <div className="contents">
                           <div
                             className="absolute inset-y-0 left-0 pointer-events-none grid"
                             style={{
@@ -1850,7 +1846,7 @@ export default function LogisticsTimelineView({
                             ))}
                           </div>
                           <div
-                            className="relative z-10 flex items-center h-full min-h-[45px] px-0 gap-0 flex-wrap"
+                            className="relative z-10 flex items-center h-full min-h-[45px] px-0 gap-0"
                             style={{ width: timelineScaledWidth, minWidth: "100%" }}
                           >
                             {(() => {
@@ -1986,7 +1982,7 @@ export default function LogisticsTimelineView({
                                     return (
                                   <SortableTaskCard
                                     key={`${task.id}-${driver.id}`}
-                                    dndId={taskDndId("logistics", taskKey, driver.id)}
+                                    dndId={taskDndId("logistics", taskKey, driver.id, "timeline")}
                                     dndData={dndData}
                                     draggingOpacity={0}
                                     hideWhileDragging
@@ -2002,6 +1998,7 @@ export default function LogisticsTimelineView({
                                     }
                                     timelineWidthPx={timelineWidthPx}
                                     timelinePxPerMinute={timelinePxPerMinute}
+                                    minTimelineTaskWidthPx={56}
                                     operationsScope="logistics"
                                     isHighlighted={hi.has(String(task.id))}
                                     timelineRowStaffDisplayLabel={driverRowDisplayLabel}
@@ -2025,7 +2022,7 @@ export default function LogisticsTimelineView({
                               );
                             })()}
                           </div>
-                        </>
+                        </div>
                         );
                       }}
                     </DndDroppableSortableContainer>

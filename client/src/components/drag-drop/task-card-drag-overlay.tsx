@@ -27,11 +27,19 @@ export function TaskCardDragOverlay({
   modifiers,
   onLogisticsTimelineMutated,
 }: TaskCardDragOverlayProps) {
+  const isTimelineDrag =
+    activeItem?.from.type === "timeline" || activeItem?.from.type === "summary";
+
   const activeTask = activeItem
     ? (activeDragTask as Task | null | undefined) ??
       tasks.find((task) => getTaskDndKey(task) === activeItem.taskId) ??
       null
     : null;
+
+  const overlayWidth =
+    activeRect?.width && activeRect.width > 0 ? activeRect.width : undefined;
+  const overlayHeight =
+    activeRect?.height && activeRect.height > 0 ? activeRect.height : undefined;
 
   return (
     <DragOverlay adjustScale={false} dropAnimation={null} modifiers={modifiers}>
@@ -39,15 +47,17 @@ export function TaskCardDragOverlay({
         <div
           className="pointer-events-none origin-top-left"
           style={{
-            width: activeRect?.width,
-            height: activeRect?.height,
+            width: overlayWidth,
+            height: overlayHeight,
+            minWidth: isTimelineDrag && scope === "logistics" ? 56 : undefined,
+            minHeight: isTimelineDrag ? 40 : undefined,
           }}
         >
           <TaskCard
             task={activeTask}
             index={activeItem.index}
             allTasks={tasks as Task[]}
-            isInTimeline={activeItem.from.type !== "priority"}
+            isInTimeline={isTimelineDrag}
             currentContainer={
               activeItem.from.type === "priority" ? activeItem.from.key : ""
             }
@@ -61,7 +71,7 @@ export function TaskCardDragOverlay({
             dragWrapper="none"
             externalIsDragging
             operationsScope={scope}
-            dragOverlayWidthPx={activeRect?.width}
+            dragOverlayWidthPx={overlayWidth}
             timelinePxPerMinute={scope === "logistics" ? 4 : 2.5}
             minTimelineTaskWidthPx={scope === "logistics" ? 56 : 72}
             onLogisticsTimelineMutated={onLogisticsTimelineMutated}

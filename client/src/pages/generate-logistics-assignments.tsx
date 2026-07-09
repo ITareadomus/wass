@@ -1272,10 +1272,12 @@ export default function GenerateLogisticsAssignments() {
       );
     },
     onDragOver: (target: DndInsertTarget | null) => {
-      if (
-        target?.container.type === "timeline" ||
-        target?.container.type === "summary"
-      ) {
+      if (target?.container.type === "timeline") {
+        lastValidDragIndexRef.current = target.index;
+        setDraggingOverDriverId(target.container.staffId);
+        return;
+      }
+      if (target?.container.type === "summary") {
         lastValidDragIndexRef.current = target.index;
         setDraggingOverDriverId(target.container.staffId);
         return;
@@ -1557,7 +1559,7 @@ export default function GenerateLogisticsAssignments() {
           )}
           <DndRemoveZone
             scope="logistics"
-            visible={isDraggingTimelineTask && !isTimelineReadOnly}
+            visible={isDraggingTimelineTask && !isTimelineReadOnly && !isLoadingDragDrop}
             disabled={isTimelineReadOnly}
           />
           <TaskCardDragOverlay

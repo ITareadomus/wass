@@ -251,7 +251,7 @@ export default function AssignedTasksSequenceSummary({
             const displayedTasks = isLoadOrder ? [...group.tasks].reverse() : group.tasks;
             const isGroupDragDisabled = isDragDisabled || isLoadOrder;
             const itemIds = displayedTasks.map((entry) =>
-              taskDndId("logistics", entry.taskId, group.id)
+              taskDndId("logistics", entry.taskId, group.id, "summary")
             );
 
             return (
@@ -334,7 +334,7 @@ export default function AssignedTasksSequenceSummary({
                         return (
                           <DndSummaryTaskItem
                             key={`${group.id}-${entry.taskId}`}
-                            id={taskDndId("logistics", entry.taskId, group.id)}
+                            id={taskDndId("logistics", entry.taskId, group.id, "summary")}
                             data={{
                               kind: "task",
                               scope: "logistics",

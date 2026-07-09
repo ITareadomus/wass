@@ -92,7 +92,7 @@ export function DndPriorityColumn({
       >
         {tasks.map((task, index) => {
           const taskKey = getTaskDndKey(task);
-          const dndId = taskDndId(scope, taskKey);
+          const dndId = taskDndId(scope, taskKey, undefined, "priority");
           const isDraggedTaskSelected = selectedTaskIdSet.has(taskKey);
           const dndData: AppDndItem = {
             kind: "task",

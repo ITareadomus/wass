@@ -403,6 +403,9 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       if (!driverEntry) {
         return res.status(404).json({ success: false, message: "Driver non trovato" });
       }
+      driverEntry.tasks = [...driverEntry.tasks].sort(
+        (left: any, right: any) => Number(left?.sequence ?? 0) - Number(right?.sequence ?? 0)
+      );
       const actualFrom = driverEntry.tasks.findIndex(
         (t: any) => String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
       );

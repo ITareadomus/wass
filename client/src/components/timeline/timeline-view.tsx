@@ -2765,7 +2765,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           return timeA.localeCompare(timeB);
                         });
                       const itemIds = cleanerTasks.map((task) =>
-                        taskDndId("housekeeping", getTaskDndKey(task), cleaner.id)
+                        taskDndId("housekeeping", getTaskDndKey(task), cleaner.id, "timeline")
                       );
 
                       return (
@@ -2930,7 +2930,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     const taskId = taskObj.task_id || taskObj.id;
                                     const uniqueKey = `${taskId}-cleaner-${cleaner.id}`;
                                     const taskKey = getTaskDndKey(task);
-                                    const dndId = taskDndId("housekeeping", taskKey, cleaner.id);
+                                    const dndId = taskDndId("housekeeping", taskKey, cleaner.id, "timeline");
                                     const dndData: AppDndItem = {
                                       kind: "task",
                                       scope: "housekeeping",

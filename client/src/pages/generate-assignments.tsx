@@ -2202,14 +2202,145 @@ export default function GenerateAssignments() {
   const handleDndOperation = useCallback(
     async (operation: DndDropOperation) => {
       try {
+        if (operation.type === "noop") return;
+
+        if (operation.type === "reorder" && operation.in.type === "timeline") {
+          if (isTimelineReadOnly) {
+            toast({
+              title: "Operazione non permessa",
+              description: "La timeline è in sola visualizzazione per questa data.",
+              variant: "warning",
+            });
+            return;
+          }
+
+          const taskId = operation.taskIds[0];
+          const cleanerId = operation.in.staffId;
+          const task = allTasksWithAssignments.find(
+            (t) => String(t.id) === String(taskId)
+          );
+          const logisticCode = task?.name;
+
+          setIsLoadingDragDrop(true);
+          await reorderTimelineAssignment(
+            taskId,
+            logisticCode,
+            cleanerId,
+            operation.fromIndex,
+            operation.toIndex
+          );
+
+          setHasUnsavedChanges(true);
+          handleTaskMoved?.();
+          await refreshAssignments("manual");
+          return;
+        }
+
+        if (
+          operation.type === "reassign" &&
+          operation.from.type === "timeline" &&
+          operation.to.type === "timeline"
+        ) {
+          if (isTimelineReadOnly) {
+            toast({
+              title: "Operazione non permessa",
+              description: "La timeline è in sola visualizzazione per questa data.",
+              variant: "warning",
+            });
+            return;
+          }
+
+          const taskId = operation.taskIds[0];
+          const sourceCleanerId = operation.from.staffId;
+          const destCleanerId = operation.to.staffId;
+          const destIndex = operation.index;
+
+          const task = allTasksWithAssignments.find(
+            (t) => String(t.id) === String(taskId)
+          );
+          const logisticCode = task?.name;
+          const taskPreAssignedMode = resolvePreAssignedModeFromTask(task);
+          if (taskPreAssignedMode === "readonly") {
+            toast({
+              title: "Task pre-assegnata readonly",
+              description: "Puoi solo riordinarla nella stessa riga cleaner.",
+              variant: "warning",
+            });
+            return;
+          }
+
+          setIsLoadingDragDrop(true);
+          const response = await fetch("/api/move-task-between-cleaners", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              taskId,
+              logisticCode,
+              sourceCleanerId,
+              destCleanerId,
+              destIndex,
+              date: format(selectedDate, "yyyy-MM-dd"),
+              scope: scopeValue,
+              mode: "move_assignment",
+              modified_by:
+                JSON.parse(localStorage.getItem("user") || "{}").username ||
+                "unknown",
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            if (response.status === 423) {
+              if (errorData.error === "PREASSIGNED_READONLY") {
+                throw new Error("Task pre-assegnata readonly: non puoi cambiare cleaner");
+              }
+              if (errorData.error === "CLEANER_LOCKED") {
+                throw new Error("Cleaner bloccato: impossibile assegnare");
+              }
+              throw new Error(errorData.locked_reason || "Task bloccata: impossibile assegnare");
+            }
+            throw new Error(
+              errorData.message ||
+                errorData.locked_reason ||
+                "Errore nello spostamento tra cleaners"
+            );
+          }
+
+          setHasUnsavedChanges(true);
+          handleTaskMoved?.();
+          await refreshAssignments("manual");
+          return;
+        }
+
         const legacyDrop = dndOperationToLegacyDrop(operation);
         if (!legacyDrop) return;
         await onDragEnd(legacyDrop);
+      } catch (error) {
+        console.error("Errore nell'operazione drag-and-drop:", error);
+        toast({
+          title: "Errore",
+          description:
+            error instanceof Error
+              ? error.message
+              : "Errore nello spostamento della task",
+          variant: "destructive",
+        });
       } finally {
+        setIsLoadingDragDrop(false);
         resetDndUiState();
       }
     },
-    [onDragEnd, resetDndUiState]
+    [
+      allTasksWithAssignments,
+      selectedDate,
+      scopeValue,
+      isTimelineReadOnly,
+      reorderTimelineAssignment,
+      refreshAssignments,
+      handleTaskMoved,
+      onDragEnd,
+      resetDndUiState,
+    ]
   );
 
   const assignmentDnd = useAssignmentDnd({
@@ -2685,7 +2816,7 @@ export default function GenerateAssignments() {
           )}
           <DndRemoveZone
             scope="housekeeping"
-            visible={isDraggingTimelineTask && !isTimelineReadOnly}
+            visible={isDraggingTimelineTask && !isTimelineReadOnly && !isLoadingDragDrop}
             disabled={isTimelineReadOnly}
           />
           <TaskCardDragOverlay

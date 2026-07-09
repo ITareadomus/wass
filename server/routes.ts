@@ -1196,7 +1196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per spostare una task tra cleaners diversi nella timeline
   app.post("/api/move-task-between-cleaners", async (req, res) => {
     try {
-      const { taskId, logisticCode, sourceCleanerId, destCleanerId, destIndex, date } = req.body;
+      const { taskId, logisticCode, sourceCleanerId, destCleanerId, destIndex, date, mode } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const resolvedScope = resolveScopeFromReq(req);
 
@@ -1275,7 +1275,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const collab = await taskCollaborationService.getCollaboration(workDate, numTaskId);
         
-        if (collab.count > 1 && collab.cleanerIds.includes(numSourceCleanerId)) {
+        if (
+          mode !== "move_assignment" &&
+          collab.count > 1 &&
+          collab.cleanerIds.includes(numSourceCleanerId)
+        ) {
           // ENFORCEMENT: blocca replace collaborator verso cleaner locked
           const locked = await isCleanerLocked(workDate, numDestCleanerId);
           if (locked) {
@@ -1345,7 +1349,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // NB: identità per task_id (univoco). Il logistic_code (codice ADAM) NON è
       // univoco: se il cleaner ha più task con lo stesso codice ADAM, il match per
       // logistic_code prenderebbe la prima e sposterebbe quella sbagliata.
-      const sourceEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === sourceCleanerId);
+      const sourceEntry = timelineData.cleaners_assignments.find(
+        (c: any) => Number(c.cleaner?.id) === Number(sourceCleanerId)
+      );
       if (sourceEntry) {
         const hasTaskIdMove = String(taskId ?? "").trim().length > 0;
         const hasLogisticCodeMove = String(logisticCode ?? "").trim().length > 0;
@@ -1373,13 +1379,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 2. Aggiungi la task al cleaner di destinazione
-      let destEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === destCleanerId);
+      let destEntry = timelineData.cleaners_assignments.find(
+        (c: any) => Number(c.cleaner?.id) === Number(destCleanerId)
+      );
 
       // Se il cleaner di destinazione non esiste ancora, crealo
       if (!destEntry) {
         // Carica i dati del cleaner da PostgreSQL
         const cleanersData = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
-        const cleanerInfo = cleanersData?.cleaners?.find((c: any) => c.id === destCleanerId);
+        const cleanerInfo = cleanersData?.cleaners?.find(
+          (c: any) => Number(c.id) === Number(destCleanerId)
+        );
 
         if (!cleanerInfo) {
           return res.status(404).json({ success: false, message: "Cleaner di destinazione non trovato" });
@@ -9777,7 +9787,9 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       }
 
       // Trova il cleaner
-      const cleanerEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === cleanerId);
+      const cleanerEntry = timelineData.cleaners_assignments.find(
+        (c: any) => Number(c.cleaner?.id) === Number(cleanerId)
+      );
 
       if (!cleanerEntry) {
         return res.status(404).json({ success: false, message: "Cleaner non trovato" });

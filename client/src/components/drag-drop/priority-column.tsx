@@ -253,7 +253,7 @@ export default function PriorityColumn({
     };
 
     return {
-      dndId: taskDndId(dndScope, taskKey),
+      dndId: taskDndId(dndScope, taskKey, undefined, "priority"),
       dndData,
     };
   };

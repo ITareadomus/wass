@@ -12,10 +12,13 @@ const encodeSegment = (value: string | number) =>
 
 const decodeSegment = (value: string) => decodeURIComponent(value);
 
+export type DndTaskSurface = "priority" | "timeline" | "summary";
+
 export type ParsedTaskDndId = {
   kind: "task";
   scope: DndScope;
   taskId: DndTaskId;
+  surface?: DndTaskSurface;
   staffId?: DndStaffId;
 };
 
@@ -44,11 +47,17 @@ export const taskDndId = (
   scope: DndScope,
   taskId: DndTaskId | number,
   staffId?: DndStaffId,
+  surface?: DndTaskSurface,
 ) => {
-  const segments = ["task", scope, encodeSegment(taskId)];
+  const resolvedSurface =
+    surface ?? (staffId !== undefined ? "timeline" : "priority");
+
+  const segments = ["task", scope, resolvedSurface, encodeSegment(taskId)];
+
   if (staffId !== undefined) {
     segments.push("staff", encodeSegment(staffId));
   }
+
   return segments.join(SEPARATOR);
 };
 
@@ -92,21 +101,47 @@ const parseStaffId = (value: string | undefined): DndStaffId | null => {
   return Number.isFinite(staffId) ? staffId : null;
 };
 
+const parseTaskSurface = (
+  value: string | undefined,
+): DndTaskSurface | null => {
+  if (value === "priority" || value === "timeline" || value === "summary") {
+    return value;
+  }
+  return null;
+};
+
 export const parseDndId = (id: string): ParsedDndId | null => {
-  const [kind, rawScope, type, value, staffMarker, rawStaffId] =
+  const [kind, rawScope, segment3, segment4, staffMarker, rawStaffId] =
     id.split(SEPARATOR);
   const scope = parseScope(rawScope);
   if (!scope) return null;
 
   if (kind === "task") {
-    if (!type) return null;
+    const surface = parseTaskSurface(segment3);
+    if (surface) {
+      if (!segment4) return null;
+      const parsed: ParsedTaskDndId = {
+        kind: "task",
+        scope,
+        surface,
+        taskId: decodeSegment(segment4),
+      };
+      if (staffMarker === "staff") {
+        const staffId = parseStaffId(rawStaffId);
+        if (staffId === null) return null;
+        parsed.staffId = staffId;
+      }
+      return parsed;
+    }
+
+    if (!segment3) return null;
     const parsed: ParsedTaskDndId = {
       kind: "task",
       scope,
-      taskId: decodeSegment(type),
+      taskId: decodeSegment(segment3),
     };
-    if (staffMarker === "staff") {
-      const staffId = parseStaffId(rawStaffId);
+    if (segment4 === "staff") {
+      const staffId = parseStaffId(staffMarker);
       if (staffId === null) return null;
       parsed.staffId = staffId;
     }
@@ -115,20 +150,20 @@ export const parseDndId = (id: string): ParsedDndId | null => {
 
   if (kind !== "container") return null;
 
-  if (type === "priority") {
-    const key = parsePriorityKey(value);
+  if (segment3 === "priority") {
+    const key = parsePriorityKey(segment4);
     if (!key) return null;
-    return { kind: "container", scope, type, key };
+    return { kind: "container", scope, type: segment3, key };
   }
 
-  if (type === "timeline" || type === "summary") {
-    const staffId = parseStaffId(value);
+  if (segment3 === "timeline" || segment3 === "summary") {
+    const staffId = parseStaffId(segment4);
     if (staffId === null) return null;
-    return { kind: "container", scope, type, staffId };
+    return { kind: "container", scope, type: segment3, staffId };
   }
 
-  if (type === "remove-zone") {
-    return { kind: "container", scope, type };
+  if (segment3 === "remove-zone") {
+    return { kind: "container", scope, type: segment3 };
   }
 
   return null;
