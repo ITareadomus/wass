@@ -2,7 +2,6 @@ import type { UniqueIdentifier } from "@dnd-kit/core";
 import type {
   AppDndContainer,
   AppDndItem,
-  AppDndSource,
   DndDropOperation,
   DndTaskId,
 } from "./types";
@@ -12,28 +11,6 @@ export const getDraggedTaskIds = (item: AppDndItem): DndTaskId[] => {
     return item.selectedTaskIds;
   }
   return [item.taskId];
-};
-
-export const isSameTimelineSource = (
-  from: AppDndSource,
-  to: AppDndContainer,
-) => {
-  return (
-    from.type === "timeline" &&
-    to.type === "timeline" &&
-    from.staffId === to.staffId
-  );
-};
-
-export const isSameSummarySource = (
-  from: AppDndSource,
-  to: AppDndContainer,
-) => {
-  return (
-    from.type === "summary" &&
-    to.type === "summary" &&
-    from.staffId === to.staffId
-  );
 };
 
 export const buildDndDropOperation = (
@@ -65,34 +42,30 @@ export const buildDndDropOperation = (
     return { type: "noop" };
   }
 
-  if (
-    item.from.type === "timeline" &&
-    container.type === "timeline" &&
-    item.from.staffId === container.staffId
-  ) {
-    if (sourceIndex === index) return { type: "noop" };
-    return {
-      type: "reorder",
-      taskIds,
-      in: item.from,
-      fromIndex: sourceIndex,
-      toIndex: index,
-    };
-  }
+  if (item.from.type === "timeline" || item.from.type === "summary") {
+    if (container.type === "timeline" || container.type === "summary") {
+      if (item.from.staffId === container.staffId) {
+        if (sourceIndex === index) {
+          return { type: "noop" };
+        }
 
-  if (
-    item.from.type === "summary" &&
-    container.type === "summary" &&
-    item.from.staffId === container.staffId
-  ) {
-    if (sourceIndex === index) return { type: "noop" };
-    return {
-      type: "reorder",
-      taskIds,
-      in: item.from,
-      fromIndex: sourceIndex,
-      toIndex: index,
-    };
+        return {
+          type: "reorder",
+          taskIds,
+          in: item.from,
+          fromIndex: sourceIndex,
+          toIndex: index,
+        };
+      }
+
+      return {
+        type: "reassign",
+        taskIds,
+        from: item.from,
+        to: container,
+        index,
+      };
+    }
   }
 
   if (
@@ -116,19 +89,6 @@ export const buildDndDropOperation = (
       taskIds,
       from: item.from,
       to: container,
-    };
-  }
-
-  if (
-    (item.from.type === "timeline" || item.from.type === "summary") &&
-    (container.type === "timeline" || container.type === "summary")
-  ) {
-    return {
-      type: "reassign",
-      taskIds,
-      from: item.from,
-      to: container,
-      index,
     };
   }
 

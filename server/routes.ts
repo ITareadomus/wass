@@ -922,6 +922,13 @@ function buildKey(isoDate: string) {
   return { key: `${folder}/${filename}`, d };
 }
 
+const normalizeTaskSequence = (tasks: any[]) => {
+  tasks.forEach((task, index) => {
+    task.sequence = index + 1;
+    task.followup = index > 0;
+  });
+};
+
 /**
  * Helper function to recalculate travel_time, start_time, end_time for a cleaner's tasks
  * CRITICAL: Ensures cleaner's start_time is loaded from PostgreSQL before recalculation
@@ -1366,11 +1373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         if (taskIndex !== -1) {
           taskToMove = sourceEntry.tasks.splice(taskIndex, 1)[0];
-          // Ricalcola sequence per il cleaner di origine
-          sourceEntry.tasks.forEach((t: any, i: number) => {
-            t.sequence = i + 1;
-            t.followup = i > 0;
-          });
+          normalizeTaskSequence(sourceEntry.tasks);
         }
       }
 
@@ -1403,8 +1406,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 3. Inserisci la task nella posizione specificata e aggiorna reason
-      const targetIndex = destIndex !== undefined
-        ? Math.max(0, Math.min(destIndex, destEntry.tasks.length))
+      const requestedIndex = Number(destIndex);
+      const targetIndex = Number.isFinite(requestedIndex)
+        ? Math.max(
+            0,
+            Math.min(
+              Math.trunc(requestedIndex),
+              destEntry.tasks.length,
+            ),
+          )
         : destEntry.tasks.length;
 
       // Aggiorna la reason per indicare lo spostamento manuale
@@ -1419,6 +1429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       taskToMove.manually_moved = true;
 
       destEntry.tasks.splice(targetIndex, 0, taskToMove);
+      normalizeTaskSequence(destEntry.tasks);
 
       // 4. Ricalcola tempi per il cleaner di origine e destinazione
       try {
@@ -1427,6 +1438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await hydrateTasksFromContainers(sourceEntry, workDate);
           const updatedSourceData = await recalculateCleanerTimes(sourceEntry, workDate);
           sourceEntry.tasks = updatedSourceData.tasks;
+          normalizeTaskSequence(sourceEntry.tasks);
           console.log(`✅ Tempi ricalcolati per cleaner sorgente ${sourceCleanerId}`);
         }
 
@@ -1434,6 +1446,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await hydrateTasksFromContainers(destEntry, workDate);
         const updatedDestData = await recalculateCleanerTimes(destEntry, workDate);
         destEntry.tasks = updatedDestData.tasks;
+        normalizeTaskSequence(destEntry.tasks);
         console.log(`✅ Tempi ricalcolati per cleaner destinazione ${destCleanerId}`);
       } catch (pythonError: any) {
         console.error(`⚠️ Errore nel ricalcolo dei tempi, continuo senza ricalcolare:`, pythonError.message);
@@ -9829,13 +9842,14 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
       // Inserisci nella nuova posizione toIndex
       cleanerEntry.tasks.splice(toIndex, 0, task);
+      normalizeTaskSequence(cleanerEntry.tasks);
 
       // Ricalcola travel_time, start_time, end_time usando lo script Python
       try {
         await hydrateTasksFromContainers(cleanerEntry, workDate);
         const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate);
-        // Sostituisci le task con quelle ricalcolate
         cleanerEntry.tasks = updatedCleanerData.tasks;
+        normalizeTaskSequence(cleanerEntry.tasks);
         console.log(`✅ Tempi ricalcolati per cleaner ${cleanerId}`);
       } catch (pythonError: any) {
         console.error(`⚠️ Errore nel ricalcolo dei tempi, continuo senza ricalcolare:`, pythonError.message);

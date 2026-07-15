@@ -4,7 +4,6 @@ import type {
   DragEndEvent,
   DragOverEvent,
   DragStartEvent,
-  Modifier,
 } from "@dnd-kit/core";
 import { buildDndDropOperation } from "./operations";
 import { timelineFirstCollisionDetection } from "./collision";
@@ -15,6 +14,7 @@ import {
   useAppDndSensors,
 } from "./sensors";
 import {
+  parseDndId,
   summaryContainerDndId,
   timelineContainerDndId,
 } from "./ids";
@@ -98,60 +98,6 @@ const getContainerFromEvent = (event: DragOverEvent | DragEndEvent) => {
   return null;
 };
 
-const rectsIntersect = (
-  a: { left: number; right: number; top: number; bottom: number },
-  b: { left: number; right: number; top: number; bottom: number },
-) => {
-  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-};
-
-const getActiveTranslatedRect = (event: DragEndEvent) => {
-  const translated = event.active.rect.current.translated;
-  if (translated) return translated;
-
-  const initial = event.active.rect.current.initial;
-  if (!initial) return null;
-
-  return {
-    ...initial,
-    left: initial.left + event.delta.x,
-    right: initial.right + event.delta.x,
-    top: initial.top + event.delta.y,
-    bottom: initial.bottom + event.delta.y,
-  };
-};
-
-const getRemoveZoneTargetFromEvent = (
-  event: DragEndEvent,
-  item: AppDndItem,
-  scope: DndScope,
-): DndInsertTarget | null => {
-  if (item.from.type !== "timeline" && item.from.type !== "summary") return null;
-
-  const removeZone = document.querySelector<HTMLElement>(
-    `[data-dnd-remove-zone-scope="${scope}"]`,
-  );
-  if (!removeZone) return null;
-
-  const activeRect = getActiveTranslatedRect(event);
-  if (!activeRect) return null;
-
-  const removeZoneRect = removeZone.getBoundingClientRect();
-  if (!rectsIntersect(activeRect, removeZoneRect)) return null;
-
-  return {
-    containerId: `container:${scope}:remove-zone`,
-    container: {
-      kind: "container",
-      scope,
-      type: "remove-zone",
-      accepts: ["timeline", "summary"],
-    },
-    index: 0,
-    isValid: true,
-  };
-};
-
 const escapeCssAttributeValue = (value: string) => {
   if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
     return CSS.escape(value);
@@ -176,10 +122,6 @@ const getActiveLayoutRect = (event: DndLayoutEvent) => {
   };
 };
 
-// Posizione corrente del puntatore (cursore) = punto di presa iniziale
-// (activatorEvent) + spostamento del drag (delta). La usiamo per l'indice di
-// inserimento perché coincide con l'overlay (ancorato al cursore) e non risente
-// del collasso dei gap, che invece falsa il rect tradotto dell'elemento.
 const getPointerClientCoordinate = (
   event: DndLayoutEvent,
   axis: "x" | "y",
@@ -205,9 +147,6 @@ const getPointerClientCoordinate = (
   return base + (axis === "x" ? event.delta.x : event.delta.y);
 };
 
-// Coordinata usata per calcolare l'indice di inserimento. Preferisce la
-// posizione del cursore (coerente con l'overlay); come fallback usa il centro
-// del rettangolo trascinato.
 const getActiveInsertCoordinate = (
   event: DndLayoutEvent,
   axis: "x" | "y",
@@ -223,10 +162,43 @@ const getActiveInsertCoordinate = (
     : activeRect.top + activeRect.height / 2;
 };
 
+const isAssignedSource = (
+  source: AppDndSource,
+): source is Extract<AppDndSource, { type: "timeline" | "summary" }> =>
+  source.type === "timeline" || source.type === "summary";
+
+const isAssignedContainer = (
+  container: AppDndContainer,
+): container is Extract<
+  AppDndContainer,
+  { type: "timeline" | "summary" }
+> => container.type === "timeline" || container.type === "summary";
+
+const isExcludedSortableElement = (
+  element: HTMLElement,
+  event: DndLayoutEvent,
+  activeItem: unknown,
+) => {
+  const sortableId = element.getAttribute(DND_SORTABLE_ID_ATTRIBUTE);
+  if (!sortableId) return false;
+  if (sortableId === String(event.active.id)) return true;
+
+  const parsed = parseDndId(sortableId);
+  if (
+    isAppDndItem(activeItem) &&
+    parsed?.kind === "task" &&
+    parsed.taskId === activeItem.taskId
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
 const getLayoutInsertIndex = (
   event: DndLayoutEvent,
   target: DndInsertTarget,
-) => {
+): number | null => {
   if (
     target.container.type !== "timeline" &&
     target.container.type !== "summary"
@@ -245,13 +217,15 @@ const getLayoutInsertIndex = (
   );
   if (!container) return target.index;
 
-  const sortableRects = Array.from(
+  const activeItem = event.active.data.current;
+  const allElements = Array.from(
     container.querySelectorAll<HTMLElement>(DND_DRAGGABLE_SELECTOR),
-  )
-    .filter(
-      (element) =>
-        element.getAttribute(DND_SORTABLE_ID_ATTRIBUTE) !== String(event.active.id),
-    )
+  );
+  const visibleElements = allElements.filter(
+    (element) => !isExcludedSortableElement(element, event, activeItem),
+  );
+
+  const sortableRects = visibleElements
     .map((element) => element.getBoundingClientRect())
     .filter((rect) => rect.width > 0 && rect.height > 0)
     .sort((a, b) =>
@@ -259,6 +233,10 @@ const getLayoutInsertIndex = (
         ? a.top - b.top || a.left - b.left
         : a.left - b.left || a.top - b.top,
     );
+
+  if (visibleElements.length > 0 && sortableRects.length === 0) {
+    return null;
+  }
 
   for (let index = 0; index < sortableRects.length; index += 1) {
     const rect = sortableRects[index];
@@ -273,44 +251,150 @@ const getLayoutInsertIndex = (
   return sortableRects.length;
 };
 
+const getInsertIndexFromOverItem = (
+  event: DndLayoutEvent,
+  activeItem: AppDndItem,
+  overItem: AppDndItem,
+  container: Extract<
+    AppDndContainer,
+    { type: "timeline" | "summary" }
+  >,
+) => {
+  const axis = container.type === "summary" ? "y" : "x";
+  const coordinate = getActiveInsertCoordinate(event, axis);
+  const rect = event.over?.rect;
+
+  if (coordinate === null || !rect) {
+    return overItem.index;
+  }
+
+  const midpoint =
+    axis === "x"
+      ? rect.left + rect.width / 2
+      : rect.top + rect.height / 2;
+
+  let insertionSlot =
+    overItem.index + (coordinate >= midpoint ? 1 : 0);
+
+  const sameAssignedSequence =
+    isAssignedSource(activeItem.from) &&
+    activeItem.from.staffId === container.staffId;
+
+  if (sameAssignedSequence) {
+    const sourceIndex =
+      activeItem.initialIndex ?? activeItem.index;
+
+    if (sourceIndex < insertionSlot) {
+      insertionSlot -= 1;
+    }
+  }
+
+  return Math.max(0, insertionSlot);
+};
+
+const buildTargetFromLayout = (
+  event: DragOverEvent | DragEndEvent,
+): DndInsertTarget | null => {
+  const activeItem = event.active.data.current;
+  if (!isAppDndItem(activeItem)) return null;
+  if (activeItem.from.type === "priority") return null;
+
+  const container = sourceToContainer(activeItem.from, activeItem.scope);
+  const containerId =
+    container.type === "timeline"
+      ? timelineContainerDndId(container.scope, container.staffId)
+      : container.type === "summary"
+        ? summaryContainerDndId(container.scope, container.staffId)
+        : String(event.active.id);
+
+  const target: DndInsertTarget = {
+    containerId,
+    container,
+    index: activeItem.index,
+    isValid: true,
+  };
+
+  const layoutIndex = getLayoutInsertIndex(event, target);
+  if (layoutIndex === null) {
+    return { ...target, isValid: false };
+  }
+
+  return {
+    ...target,
+    index: layoutIndex,
+  };
+};
+
 const getTargetFromEvent = (
   event: DragOverEvent | DragEndEvent,
 ): DndInsertTarget | null => {
   if (!event.over) return null;
 
+  if (event.over.id === event.active.id) {
+    return buildTargetFromLayout(event);
+  }
+
   const overData = event.over.data.current as DndEventData | undefined;
   if (overData?.target) {
+    const layoutIndex = getLayoutInsertIndex(event, overData.target);
+    if (layoutIndex === null) {
+      return { ...overData.target, isValid: false };
+    }
     return {
       ...overData.target,
-      index: getLayoutInsertIndex(event, overData.target),
+      index: layoutIndex,
     };
   }
 
   const container = getContainerFromEvent(event);
   if (!container) return null;
+
+  const activeItem = event.active.data.current;
   const overItem = event.over.data.current;
   const containerId =
     container.type === "timeline"
       ? timelineContainerDndId(container.scope, container.staffId)
       : container.type === "summary"
-      ? summaryContainerDndId(container.scope, container.staffId)
-      : event.over.id;
+        ? summaryContainerDndId(container.scope, container.staffId)
+        : event.over.id;
 
-  const target = {
-    containerId,
-    container,
-    index:
-      isAppDndItem(overItem)
-        ? overItem.index
-        : typeof overData?.insertIndex === "number"
+  let index =
+    isAppDndItem(overItem)
+      ? overItem.index
+      : typeof overData?.insertIndex === "number"
         ? overData.insertIndex
-        : 0,
-    isValid: true,
-  };
+        : 0;
+
+  if (
+    isAppDndItem(activeItem) &&
+    isAppDndItem(overItem) &&
+    isAssignedContainer(container)
+  ) {
+    index = getInsertIndexFromOverItem(
+      event,
+      activeItem,
+      overItem,
+      container,
+    );
+  } else {
+    const target = {
+      containerId,
+      container,
+      index,
+      isValid: true,
+    };
+    const layoutIndex = getLayoutInsertIndex(event, target);
+    if (layoutIndex === null) {
+      return { ...target, isValid: false };
+    }
+    index = layoutIndex;
+  }
 
   return {
-    ...target,
-    index: getLayoutInsertIndex(event, target),
+    containerId,
+    container,
+    index,
+    isValid: true,
   };
 };
 
@@ -329,29 +413,16 @@ export function useAssignmentDnd({
   const [insertTarget, setInsertTarget] = useState<DndInsertTarget | null>(
     null,
   );
-  // Shift costante (px) per riportare l'overlay al punto di presa: quando i gap
-  // collassano al dragStart, il nodo sorgente scivola a sinistra e con lui
-  // l'overlay. Misuriamo lo scostamento reale del nodo (prima vs dopo il
-  // collasso) via DOM e lo applichiamo come correzione fissa.
-  const layoutShiftRef = useRef({ x: 0, y: 0 });
-  const layoutShiftFrameRef = useRef<number | null>(null);
-
-  const cancelLayoutShiftCapture = useCallback(() => {
-    if (layoutShiftFrameRef.current !== null) {
-      cancelAnimationFrame(layoutShiftFrameRef.current);
-      layoutShiftFrameRef.current = null;
-    }
-  }, []);
+  const lastPreviewTargetRef = useRef<DndInsertTarget | null>(null);
 
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
       const item = event.active.data.current;
-      cancelLayoutShiftCapture();
-      layoutShiftRef.current = { x: 0, y: 0 };
 
       if (!isAppDndItem(item) || item.scope !== scope) {
         setActiveItem(null);
         setActiveDragTask(null);
+        lastPreviewTargetRef.current = null;
         return;
       }
 
@@ -368,63 +439,34 @@ export function useAssignmentDnd({
           : null,
       );
       onDragStart?.(item);
-
-      // Posizione del nodo sorgente PRIMA del collasso dei gap.
-      const domInitialRect = event.active.rect.current.initial ?? null;
-      const sortableId = String(event.active.id);
-
-      if (domInitialRect && typeof document !== "undefined") {
-        // Doppio rAF: attende che React abbia ricalcolato il layout (gap collassati).
-        layoutShiftFrameRef.current = requestAnimationFrame(() => {
-          layoutShiftFrameRef.current = requestAnimationFrame(() => {
-            layoutShiftFrameRef.current = null;
-            const node = document.querySelector<HTMLElement>(
-              `[${DND_SORTABLE_ID_ATTRIBUTE}="${escapeCssAttributeValue(
-                sortableId,
-              )}"]`,
-            );
-            if (!node) return;
-            const collapsedRect = node.getBoundingClientRect();
-            layoutShiftRef.current = {
-              x: domInitialRect.left - collapsedRect.left,
-              y: domInitialRect.top - collapsedRect.top,
-            };
-          });
-        });
-      }
     },
-    [cancelLayoutShiftCapture, onDragStart, scope],
+    [onDragStart, scope],
   );
 
   const handleDragOver = useCallback(
     (event: DragOverEvent) => {
-      const target = getTargetFromEvent(event);
-      setInsertTarget(target);
-      onDragOver?.(target);
+      const currentTarget = getTargetFromEvent(event);
+
+      if (currentTarget) {
+        lastPreviewTargetRef.current = currentTarget;
+      }
+
+      const previewTarget =
+        currentTarget ?? lastPreviewTargetRef.current;
+
+      setInsertTarget(previewTarget);
+      onDragOver?.(previewTarget);
     },
     [onDragOver],
   );
 
   const resetDragState = useCallback(() => {
-    cancelLayoutShiftCapture();
     setActiveItem(null);
     setActiveDragTask(null);
     setActiveRect(null);
     setInsertTarget(null);
-    layoutShiftRef.current = { x: 0, y: 0 };
-  }, [cancelLayoutShiftCapture]);
-
-  // Applica lo shift costante misurato via DOM: sposta l'overlay della stessa
-  // quantità di cui il nodo sorgente è scivolato, riportandolo sotto il cursore.
-  const overlayModifier = useCallback<Modifier>(({ transform }) => {
-    return {
-      ...transform,
-      x: transform.x + layoutShiftRef.current.x,
-      y: transform.y + layoutShiftRef.current.y,
-    };
+    lastPreviewTargetRef.current = null;
   }, []);
-
-  const overlayModifiers = useMemo(() => [overlayModifier], [overlayModifier]);
 
   const handleDragCancel = useCallback(() => {
     resetDragState();
@@ -440,9 +482,7 @@ export function useAssignmentDnd({
         return;
       }
 
-      const target =
-        getRemoveZoneTargetFromEvent(event, item, scope) ??
-        getTargetFromEvent(event);
+      const target = getTargetFromEvent(event);
       resetDragState();
 
       if (!target?.isValid) {
@@ -470,7 +510,6 @@ export function useAssignmentDnd({
       activeDragTask,
       activeRect,
       insertTarget,
-      overlayModifiers,
       handlers: {
         onDragStart: handleDragStart,
         onDragOver: handleDragOver,
@@ -488,7 +527,6 @@ export function useAssignmentDnd({
       handleDragOver,
       handleDragStart,
       insertTarget,
-      overlayModifiers,
       sensors,
     ],
   );

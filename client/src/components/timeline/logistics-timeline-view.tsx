@@ -1807,7 +1807,7 @@ export default function LogisticsTimelineView({
                         taskDndId("logistics", getTaskDndKey(task), driver.id, "timeline")
                       )}
                       insertIndex={tasks.length}
-                      disabled={isReadOnly || suppressTaskDrag}
+                      disabled={isReadOnly || suppressTaskDrag || isLoadingOverlay}
                       orientation="horizontal"
                       innerRef={registerTimelineScrollRef}
                       onScroll={handleTimelineScroll}
@@ -1817,12 +1817,7 @@ export default function LogisticsTimelineView({
                       onPointerCancel={stopTimelinePan}
                       className="timeline-center-scroll relative min-w-0 min-h-[45px] flex-1 border-l border-border bg-background"
                     >
-                      {({ isOver }) => {
-                        const shouldHideDndGaps =
-                          isOver ||
-                          draggingOverDriverId === driver.id ||
-                          activeDragDriverId === driver.id;
-
+                      {(() => {
                         return (
                         <div className="contents">
                           <div
@@ -1877,12 +1872,10 @@ export default function LogisticsTimelineView({
                               const prevRaw = index > 0 ? rawTasks[index - 1] : null;
                               const seq = Number(raw?.sequence ?? index + 1);
                               const travelTime =
-                                !shouldHideDndGaps && raw?.travel_time != null
+                                raw?.travel_time != null
                                   ? Number(raw.travel_time)
                                   : 0;
-                              const checkoutWait = shouldHideDndGaps
-                                ? 0
-                                : computeLogisticsCheckoutWaitGap({
+                              const checkoutWait = computeLogisticsCheckoutWaitGap({
                                     workDate,
                                     sequence: seq,
                                     startTime: raw?.start_time,
@@ -1907,8 +1900,7 @@ export default function LogisticsTimelineView({
                               if (
                                 seq === 1 &&
                                 virtualMinutes > 0 &&
-                                timelineWidth > 0 &&
-                                !shouldHideDndGaps
+                                timelineWidth > 0
                               ) {
                                 const gridStartMinutes = timelineStartMinutes;
                                 const taskStartMinutes = parseHmToMinutes(raw?.start_time, null);
@@ -1984,6 +1976,7 @@ export default function LogisticsTimelineView({
                                     key={`${task.id}-${driver.id}`}
                                     dndId={taskDndId("logistics", taskKey, driver.id, "timeline")}
                                     dndData={dndData}
+                                    disableSortableTransform
                                     draggingOpacity={0}
                                     hideWhileDragging
                                     task={task}
@@ -1994,7 +1987,10 @@ export default function LogisticsTimelineView({
                                     cleanerId={driver.id}
                                     isReadOnly={isReadOnly}
                                     isDragDisabled={
-                                      isReadOnly || suppressTaskDrag || Boolean((task as any).locked)
+                                      isReadOnly ||
+                                      suppressTaskDrag ||
+                                      isLoadingOverlay ||
+                                      Boolean((task as any).locked)
                                     }
                                     timelineWidthPx={timelineWidthPx}
                                     timelinePxPerMinute={timelinePxPerMinute}
@@ -2010,7 +2006,7 @@ export default function LogisticsTimelineView({
                               );
                             })}
                             <LogisticsRouteLineSegment
-                              widthPx={shouldHideDndGaps ? 0 : returnTravelWidthPx}
+                              widthPx={returnTravelWidthPx}
                               title={
                                 returnTravelMinutes > 0
                                   ? `Rientro in magazzino: ${returnTravelMinutes} min`
@@ -2024,7 +2020,7 @@ export default function LogisticsTimelineView({
                           </div>
                         </div>
                         );
-                      }}
+                      })()}
                     </DndDroppableSortableContainer>
                     <div className="flex-shrink-0 w-20 h-[50px] flex items-center justify-center border-l border-border bg-sky-100/30 dark:bg-sky-900/10 text-center">
                       <span className="text-[13px] font-medium tabular-nums text-foreground">

@@ -1,5 +1,7 @@
 import { DragOverlay, type Modifier } from "@dnd-kit/core";
 import type { TaskType as Task } from "@shared/schema";
+import type { SequenceSummaryEntry } from "@/lib/sequence-summary";
+import { SequenceSummaryTaskRow } from "@/components/sequence-summary-task-row";
 import {
   getTaskDndKey,
   type ActiveDndRect,
@@ -7,6 +9,16 @@ import {
   type DndScope,
 } from "@/lib/dnd";
 import TaskCard from "./task-card";
+
+function isSequenceSummaryEntry(value: unknown): value is SequenceSummaryEntry {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "taskId" in value &&
+    "logisticCode" in value &&
+    "sequence" in value
+  );
+}
 
 type TaskCardDragOverlayProps = {
   activeItem: AppDndItem | null;
@@ -27,10 +39,14 @@ export function TaskCardDragOverlay({
   modifiers,
   onLogisticsTimelineMutated,
 }: TaskCardDragOverlayProps) {
-  const isTimelineDrag =
-    activeItem?.from.type === "timeline" || activeItem?.from.type === "summary";
+  const isSummaryDrag = activeItem?.from.type === "summary";
+  const isTimelineDrag = activeItem?.from.type === "timeline";
 
-  const activeTask = activeItem
+  const activeSummaryEntry = isSummaryDrag && isSequenceSummaryEntry(activeDragTask)
+    ? activeDragTask
+    : null;
+
+  const activeTask = activeItem && !isSummaryDrag
     ? (activeDragTask as Task | null | undefined) ??
       tasks.find((task) => getTaskDndKey(task) === activeItem.taskId) ??
       null
@@ -43,7 +59,21 @@ export function TaskCardDragOverlay({
 
   return (
     <DragOverlay adjustScale={false} dropAnimation={null} modifiers={modifiers}>
-      {activeItem && activeTask ? (
+      {activeItem && activeSummaryEntry ? (
+        <div
+          className="pointer-events-none origin-top-left"
+          style={{
+            width: overlayWidth,
+            height: overlayHeight,
+          }}
+        >
+          <SequenceSummaryTaskRow
+            entry={activeSummaryEntry}
+            className="h-full w-full"
+            isDragging
+          />
+        </div>
+      ) : activeItem && activeTask ? (
         <div
           className="pointer-events-none origin-top-left"
           style={{
@@ -62,10 +92,7 @@ export function TaskCardDragOverlay({
               activeItem.from.type === "priority" ? activeItem.from.key : ""
             }
             cleanerId={
-              activeItem.from.type === "timeline" ||
-              activeItem.from.type === "summary"
-                ? activeItem.from.staffId
-                : null
+              activeItem.from.type === "timeline" ? activeItem.from.staffId : null
             }
             isDragDisabled
             dragWrapper="none"

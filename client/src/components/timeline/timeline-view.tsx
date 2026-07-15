@@ -297,7 +297,6 @@ export default function TimelineView({
     false;
   const scopeValue = isOfficeScope ? "office" : "housekeeping";
   const withScope = (url: string) => `${url}${url.includes("?") ? "&" : "?"}scope=${scopeValue}`;
-  const isTimelineInteractionDisabled = isReadOnly;
   const [editingAlias, setEditingAlias] = useState<string>("");
   const [isSavingAlias, setIsSavingAlias] = useState(false);
   const [isSavingCleanerLock, setIsSavingCleanerLock] = useState(false);
@@ -782,6 +781,12 @@ export default function TimelineView({
       });
     },
   });
+
+  const isTimelineInteractionDisabled =
+    isReadOnly ||
+    isLoadingDragDrop ||
+    removeCleanerMutation.isPending ||
+    clearAllSelectedCleanersMutation.isPending;
 
   // Mutation per aggiungere un cleaner alla timeline
   const addCleanerMutation = useMutation({
@@ -2787,12 +2792,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           onPointerCancel={stopTimelinePan}
                           className="timeline-center-scroll relative min-w-0 min-h-[45px] flex-1 border-l border-border bg-background"
                         >
-                          {({ isOver }) => {
-                            const shouldHideDndGaps =
-                              isOver ||
-                              draggingOverCleanerId === cleaner.id ||
-                              activeDragCleanerId === cleaner.id;
-
+                          {(() => {
                             return (
                         <div
                           className="contents"
@@ -2880,7 +2880,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
                                     // Calcola le larghezze con la stessa scala temporale usata da task e griglia.
                                     const effectiveTravelMinutes =
-                                      seq >= 2 && travelTime > 0 && !shouldHideDndGaps
+                                      seq >= 2 && travelTime > 0
                                         ? travelTime
                                         : 0;
                                     const travelWidthPx = effectiveTravelMinutes > 0 && timelinePxPerMinute > 0
@@ -2889,14 +2889,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     const initialOffsetWidthPx = seq === 1 && timeOffset > 0 && timelinePxPerMinute > 0
                                       ? timeOffset * timelinePxPerMinute
                                       : 0;
-                                    const shouldShowInitialOffset =
-                                      !shouldHideDndGaps;
+                                    const shouldShowInitialOffset = true;
 
                                     // CRITICAL FIX: Calcola il "waitingGap" per task con sequence >= 2
                                     // Il waitingGap rappresenta l'attesa del cleaner quando arriva prima che l'appartamento si liberi
                                     // IMPORTANTE: Mostra il waitingGap SOLO se la task corrente ha un checkout_time reale
                                     let waitingGap = 0;
-                                    if (seq >= 2 && taskObj.start_time && taskObj.checkout_time && !shouldHideDndGaps) {
+                                    if (seq >= 2 && taskObj.start_time && taskObj.checkout_time) {
                                       // CRITICAL: L'array è ordinato per sequence, quindi idx-1 è la vera task precedente
                                       const prevTask = idx > 0 ? cleanerTasks[idx - 1] as any : null;
 
@@ -3004,6 +3003,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           key={uniqueKey}
                                           dndId={dndId}
                                           dndData={dndData}
+                                          disableSortableTransform
                                           draggingOpacity={0}
                                           hideWhileDragging
                                           task={task}
@@ -3027,7 +3027,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           </div>
                         </div>
                             );
-                          }}
+                          })()}
                         </DndDroppableSortableContainer>
                       );
                     })()}

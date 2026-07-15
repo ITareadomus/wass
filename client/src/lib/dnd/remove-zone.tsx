@@ -30,7 +30,7 @@ export function DndRemoveZone({
   const { isOver, setNodeRef } = useDroppable({
     id: removeZoneContainerDndId(scope),
     data,
-    disabled,
+    disabled: disabled || !visible,
   });
 
   return (

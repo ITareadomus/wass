@@ -1,6 +1,5 @@
 import {
   closestCenter,
-  pointerWithin,
   type Collision,
   type CollisionDetection,
   type UniqueIdentifier,
@@ -155,28 +154,43 @@ export const buildTimelineInsertTarget = (
   };
 };
 
-const findContainerCollision = (
-  args: CollisionArgs,
-  collisions: Collision[],
-  type: AppDndContainer["type"],
-) => {
-  return collisions.find((collision) => {
-    const data = getContainerData(args, collision.id);
-    return data?.type === type;
-  });
-};
-
 type SortContainerHit = {
   id: UniqueIdentifier;
   container: Extract<AppDndContainer, { type: "timeline" | "summary" }>;
   droppableContainer: CollisionArgs["droppableContainers"][number];
 };
 
+const TIMELINE_ROW_HIT_BLEED_Y = 10;
+
+const getCollisionPointer = (args: CollisionArgs) => {
+  if (args.pointerCoordinates) {
+    return args.pointerCoordinates;
+  }
+
+  const translated = args.active.rect.current.translated;
+  if (translated) {
+    return {
+      x: translated.left + translated.width / 2,
+      y: translated.top + translated.height / 2,
+    };
+  }
+
+  const initial = args.active.rect.current.initial;
+  if (initial) {
+    return {
+      x: initial.left + initial.width / 2,
+      y: initial.top + initial.height / 2,
+    };
+  }
+
+  return null;
+};
+
 const findContainerUnderPointer = (
   args: CollisionArgs,
   type: AppDndContainer["type"],
 ): Collision | null => {
-  const point = args.pointerCoordinates;
+  const point = getCollisionPointer(args);
   if (!point) return null;
 
   for (const container of args.droppableContainers) {
@@ -203,8 +217,11 @@ const findContainerUnderPointer = (
 const findSortContainerUnderPointer = (
   args: CollisionArgs,
 ): SortContainerHit | null => {
-  const point = args.pointerCoordinates;
+  const point = getCollisionPointer(args);
   if (!point) return null;
+
+  let bestTimelineHit: SortContainerHit | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
 
   for (const droppableContainer of args.droppableContainers) {
     const data = droppableContainer.data.current;
@@ -214,16 +231,44 @@ const findSortContainerUnderPointer = (
     const rect = args.droppableRects.get(droppableContainer.id);
     if (!rect) continue;
 
-    if (rectContainsPoint(rect, point)) {
-      return {
-        id: droppableContainer.id,
-        container: data,
-        droppableContainer,
-      };
+    const hit: SortContainerHit = {
+      id: droppableContainer.id,
+      container: data,
+      droppableContainer,
+    };
+
+    if (data.type === "summary") {
+      if (rectContainsPoint(rect, point)) {
+        return hit;
+      }
+      continue;
+    }
+
+    const pointerInsideHorizontalBounds =
+      point.x >= rect.left && point.x <= rect.right;
+
+    if (!pointerInsideHorizontalBounds) continue;
+
+    const distanceY =
+      point.y < rect.top
+        ? rect.top - point.y
+        : point.y > rect.bottom
+          ? point.y - rect.bottom
+          : 0;
+
+    if (distanceY > TIMELINE_ROW_HIT_BLEED_Y) continue;
+
+    const centerDistance = Math.abs(
+      point.y - (rect.top + rect.height / 2),
+    );
+
+    if (centerDistance < bestDistance) {
+      bestDistance = centerDistance;
+      bestTimelineHit = hit;
     }
   }
 
-  return null;
+  return bestTimelineHit;
 };
 
 const itemBelongsToSortContainer = (
@@ -238,100 +283,50 @@ const itemBelongsToSortContainer = (
   return from.staffId === container.staffId;
 };
 
-const findPriorityColumnUnderPointer = (args: CollisionArgs) => {
-  const point = args.pointerCoordinates;
-  if (!point) return false;
-
-  const columns = document.querySelectorAll<HTMLElement>(
-    '[data-testid^="priority-column-"], [data-testid^="dnd-priority-column-"]',
-  );
-
-  for (const column of columns) {
-    const rect = column.getBoundingClientRect();
-    if (rectContainsPoint(rect, point)) {
-      return true;
-    }
-  }
-
-  return false;
-};
-
-const findItemPointerCollision = (
-  args: CollisionArgs,
-  collisions: Collision[],
-) => {
-  return collisions.find((collision) => {
-    const droppableContainer = args.droppableContainers.find(
-      (container) => container.id === collision.id,
-    );
-    return isAppDndItem(droppableContainer?.data.current);
-  });
-};
+const sortContainerCollision = (sortContainer: SortContainerHit): Collision => ({
+  id: sortContainer.id,
+  data: {
+    droppableContainer: sortContainer.droppableContainer,
+    value: 1,
+  },
+});
 
 export const timelineFirstCollisionDetection: CollisionDetection = (args) => {
-  const removeZoneUnderPointer = findContainerUnderPointer(
-    args,
-    "remove-zone",
-  );
-
-  if (removeZoneUnderPointer) {
-    return [removeZoneUnderPointer];
+  const removeZone = findContainerUnderPointer(args, "remove-zone");
+  if (removeZone) {
+    return [removeZone];
   }
 
-  const pointerCollisions = pointerWithin(args);
-  const removeZoneCollision = findContainerCollision(
-    args,
-    pointerCollisions,
-    "remove-zone",
-  );
-
-  if (removeZoneCollision) {
-    return [removeZoneCollision];
+  const priorityContainer = findContainerUnderPointer(args, "priority");
+  if (priorityContainer) {
+    return [priorityContainer];
   }
 
-  // Timeline/summary: solo quando il cursore è fisicamente dentro la riga/colonna.
   const sortContainer = findSortContainerUnderPointer(args);
+
   if (sortContainer) {
-    const itemContainers = args.droppableContainers.filter((container) =>
-      itemBelongsToSortContainer(container.data.current, sortContainer.container),
-    );
+    const itemContainers = args.droppableContainers.filter((container) => {
+      if (container.id === args.active.id) return false;
+
+      return itemBelongsToSortContainer(
+        container.data.current,
+        sortContainer.container,
+      );
+    });
 
     if (itemContainers.length > 0) {
       const itemCollisions = closestCenter({
         ...args,
         droppableContainers: itemContainers,
-      });
+      }).filter((collision) => collision.id !== args.active.id);
 
       if (itemCollisions.length > 0) {
         return itemCollisions;
       }
     }
 
-    return [
-      {
-        id: sortContainer.id,
-        data: {
-          droppableContainer: sortContainer.droppableContainer,
-          value: 1,
-        },
-      },
-    ];
+    return [sortContainerCollision(sortContainer)];
   }
 
-  // Sopra i container priority il rect trascinato può ancora intersecare la
-  // prima riga timeline: non usare collisioni basate sul rect dell'elemento.
-  if (
-    findContainerUnderPointer(args, "priority") ||
-    findPriorityColumnUnderPointer(args)
-  ) {
-    const itemCollision = findItemPointerCollision(args, pointerCollisions);
-    return itemCollision ? [itemCollision] : [];
-  }
-
-  const itemCollision = findItemPointerCollision(args, pointerCollisions);
-  if (itemCollision) {
-    return [itemCollision];
-  }
-
-  return pointerCollisions;
+  return [];
 };

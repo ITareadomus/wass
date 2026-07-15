@@ -7,11 +7,15 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useState, useEffect, useMemo } from "react";
+import { useDroppable } from "@dnd-kit/core";
 import { fetchWithOperation } from "@/lib/operationManager";
+import { cn } from "@/lib/utils";
 import {
   getTaskDndKey,
+  priorityContainerDndId,
   priorityKeyFromLegacyDroppableId,
   taskDndId,
+  type AppDndContainer,
   type AppDndItem,
   type DndScope,
 } from "@/lib/dnd";
@@ -230,6 +234,36 @@ export default function PriorityColumn({
 
   const dndScope: DndScope = operationsScope === "logistics" ? "logistics" : "housekeeping";
   const priorityKey = priorityKeyFromLegacyDroppableId(droppableId);
+
+  const priorityContainerId = priorityKey
+    ? priorityContainerDndId(dndScope, priorityKey)
+    : `invalid-priority-container:${dndScope}:${droppableId}`;
+
+  const priorityContainerData: AppDndContainer | undefined = priorityKey
+    ? {
+        kind: "container",
+        scope: dndScope,
+        type: "priority",
+        key: priorityKey,
+        accepts: ["priority", "timeline", "summary"],
+      }
+    : undefined;
+
+  const { setNodeRef: setPriorityDropRef, isOver: isPriorityOver } =
+    useDroppable({
+      id: priorityContainerId,
+      data: priorityContainerData
+        ? {
+            ...priorityContainerData,
+            insertIndex: orderedTasks.length,
+          }
+        : undefined,
+      disabled:
+        !priorityKey ||
+        isDragDisabled ||
+        isHistoricalDateLocked,
+    });
+
   const selectedTaskIdSet = useMemo(
     () => new Set(selectedTasks.map((task) => String(task.taskId))),
     [selectedTasks]
@@ -438,10 +472,16 @@ export default function PriorityColumn({
         </div>
       </div>
       <div
-        className={`
-              flex flex-wrap gap-2 min-h-[120px] min-w-0 overflow-visible transition-colors duration-200 content-start border-0
-              ${flushDropZone ? "p-0" : "p-2 pt-4 pl-4"}
-            `}
+        ref={setPriorityDropRef}
+        className={cn(
+          `
+            flex flex-wrap gap-2 min-h-[120px] min-w-0
+            overflow-visible transition-colors duration-200
+            content-start border-0
+            ${flushDropZone ? "p-0" : "p-2 pt-4 pl-4"}
+          `,
+          isPriorityOver && "rounded-md ring-2 ring-custom-blue/60",
+        )}
         data-testid={`priority-column-${droppableId}`}
       >
             {(() => {
