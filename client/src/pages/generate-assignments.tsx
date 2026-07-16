@@ -1874,6 +1874,7 @@ export default function GenerateAssignments() {
       });
     },
     onDragCancel: resetDndUiState,
+    onDragEnd: resetDndUiState,
   });
 
   const updateTaskJson = async (taskId: string, logisticCode: string | undefined, fromContainer: string | null, toContainer: string | null) => {

@@ -2648,6 +2648,11 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   (task as any).assignedCleaner === cleaner.id
                 ).map(normalizeTask); // Applica la normalizzazione qui
 
+                // Durante il drag: nascondi travel/checkout così i task possono riordinarsi in modo ottimistico
+                const hideRouteSpacers =
+                  activeDragCleanerId === cleaner.id ||
+                  draggingOverCleanerId === cleaner.id;
+
                 const isRemoved = removedCleanerIds.has(cleaner.id);
 
                 // Verifica se ci sono task incompatibili per questo cleaner
@@ -2963,7 +2968,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                         )}
 
                                         {/* Travel time marker - FUORI dal Draggable (solo per sequence >= 2) */}
-                                        {seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
+                                        {!hideRouteSpacers && seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
                                           <div
                                             className="flex flex-shrink-0 cursor-pointer items-center"
                                             style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
@@ -2977,7 +2982,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                         )}
 
                                         {/* Waiting gap spacer - FUORI dal Draggable (solo per sequence >= 2) */}
-                                        {seq >= 2 && waitingGap > 0 && waitingGapWidthPx > 0 && (
+                                        {!hideRouteSpacers && seq >= 2 && waitingGap > 0 && waitingGapWidthPx > 0 && (
                                           <div
                                             className="flex items-center justify-center flex-shrink-0 py-3 bg-amber-100/50 dark:bg-amber-900/20 border-y border-dashed border-amber-400"
                                             style={{ width: `${waitingGapWidthPx}px`, minHeight: '50px' }}
@@ -3003,7 +3008,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           key={uniqueKey}
                                           dndId={dndId}
                                           dndData={dndData}
-                                          disableSortableTransform
                                           draggingOpacity={0}
                                           hideWhileDragging
                                           task={task}

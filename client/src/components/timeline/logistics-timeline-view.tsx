@@ -1735,6 +1735,10 @@ export default function LogisticsTimelineView({
                 const hi = highlightedIdsForDriverTasks(tasks, searchTask);
                 const driverRowDisplayLabel = getDriverRowDisplayLabel(driver);
                 const driverPlate = getDriverPlate(driver);
+                // Durante il drag: nascondi travel/checkout così i task possono riordinarsi in modo ottimistico
+                const hideRouteSpacers =
+                  activeDragDriverId === driver.id ||
+                  draggingOverDriverId === driver.id;
                 return (
                   <div key={driver.id} className="flex mb-0.5 h-[50px] min-w-0">
                     <div
@@ -1926,18 +1930,23 @@ export default function LogisticsTimelineView({
                                       aria-hidden
                                     />
                                   )}
-                                  <LogisticsRouteLineSegment
-                                    widthPx={travelWidthPx}
-                                    title={
-                                      travelTime > 0
-                                        ? seq === 1
-                                          ? `Partenza da magazzino: ${travelTime} min`
-                                          : `${travelTime} min`
-                                        : undefined
-                                    }
-                                    showStartCap={seq === 1 && travelTime > 0}
-                                  />
-                                  {checkoutWait > 0 && waitingGapWidthPx > 0 && raw?.checkout_time && (
+                                  {!hideRouteSpacers && (
+                                    <LogisticsRouteLineSegment
+                                      widthPx={travelWidthPx}
+                                      title={
+                                        travelTime > 0
+                                          ? seq === 1
+                                            ? `Partenza da magazzino: ${travelTime} min`
+                                            : `${travelTime} min`
+                                          : undefined
+                                      }
+                                      showStartCap={seq === 1 && travelTime > 0}
+                                    />
+                                  )}
+                                  {!hideRouteSpacers &&
+                                    checkoutWait > 0 &&
+                                    waitingGapWidthPx > 0 &&
+                                    raw?.checkout_time && (
                                     <div
                                       className="flex items-center justify-center flex-shrink-0 py-3 bg-amber-100/50 dark:bg-amber-900/20 border-y border-dashed border-amber-400"
                                       style={{ width: `${waitingGapWidthPx}px`, minHeight: "50px" }}
@@ -1976,7 +1985,6 @@ export default function LogisticsTimelineView({
                                     key={`${task.id}-${driver.id}`}
                                     dndId={taskDndId("logistics", taskKey, driver.id, "timeline")}
                                     dndData={dndData}
-                                    disableSortableTransform
                                     draggingOpacity={0}
                                     hideWhileDragging
                                     task={task}
@@ -2005,15 +2013,17 @@ export default function LogisticsTimelineView({
                                 </Fragment>
                               );
                             })}
-                            <LogisticsRouteLineSegment
-                              widthPx={returnTravelWidthPx}
-                              title={
-                                returnTravelMinutes > 0
-                                  ? `Rientro in magazzino: ${returnTravelMinutes} min`
-                                  : undefined
-                              }
-                              showEndCap
-                            />
+                            {!hideRouteSpacers && (
+                              <LogisticsRouteLineSegment
+                                widthPx={returnTravelWidthPx}
+                                title={
+                                  returnTravelMinutes > 0
+                                    ? `Rientro in magazzino: ${returnTravelMinutes} min`
+                                    : undefined
+                                }
+                                showEndCap
+                              />
+                            )}
                                 </>
                               );
                             })()}

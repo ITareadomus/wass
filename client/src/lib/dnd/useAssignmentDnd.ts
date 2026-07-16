@@ -78,6 +78,8 @@ export type AssignmentDndHandlers = {
   onDragStart?: (item: AppDndItem) => void;
   onDragOver?: (target: DndInsertTarget | null) => void;
   onDragCancel?: () => void;
+  /** Fired as soon as the drag gesture ends (drop or invalid release), before onOperation. */
+  onDragEnd?: () => void;
 };
 
 export type UseAssignmentDndOptions = AssignmentDndHandlers & {
@@ -325,10 +327,46 @@ const buildTargetFromLayout = (
   };
 };
 
+const getCollisionInsertTarget = (
+  event: DragOverEvent | DragEndEvent,
+): DndInsertTarget | null => {
+  const collisions = event.collisions;
+  if (!collisions?.length) return null;
+
+  for (const collision of collisions) {
+    const data = collision.data as DndEventData | undefined;
+    if (data?.target?.isValid) {
+      return data.target;
+    }
+    if (
+      typeof data?.insertIndex === "number" &&
+      Number.isFinite(data.insertIndex)
+    ) {
+      const container = getContainerFromEvent(event);
+      if (!container || !isAssignedContainer(container)) continue;
+      return {
+        containerId: collision.id,
+        container,
+        index: data.insertIndex,
+        isValid: true,
+      };
+    }
+  }
+
+  return null;
+};
+
 const getTargetFromEvent = (
   event: DragOverEvent | DragEndEvent,
 ): DndInsertTarget | null => {
   if (!event.over) return null;
+
+  // Prefer midpoint insert index computed during collision detection so the
+  // drop slot matches the sortable transform (left/right of each card center).
+  const collisionTarget = getCollisionInsertTarget(event);
+  if (collisionTarget) {
+    return collisionTarget;
+  }
 
   if (event.over.id === event.active.id) {
     return buildTargetFromLayout(event);
@@ -336,14 +374,7 @@ const getTargetFromEvent = (
 
   const overData = event.over.data.current as DndEventData | undefined;
   if (overData?.target) {
-    const layoutIndex = getLayoutInsertIndex(event, overData.target);
-    if (layoutIndex === null) {
-      return { ...overData.target, isValid: false };
-    }
-    return {
-      ...overData.target,
-      index: layoutIndex,
-    };
+    return overData.target;
   }
 
   const container = getContainerFromEvent(event);
@@ -405,6 +436,7 @@ export function useAssignmentDnd({
   onDragStart,
   onDragOver,
   onDragCancel,
+  onDragEnd,
 }: UseAssignmentDndOptions) {
   const sensors = useAppDndSensors();
   const [activeItem, setActiveItem] = useState<AppDndItem | null>(null);
@@ -479,11 +511,14 @@ export function useAssignmentDnd({
 
       if (!isAppDndItem(item) || item.scope !== scope) {
         resetDragState();
+        onDragEnd?.();
         return;
       }
 
       const target = getTargetFromEvent(event);
       resetDragState();
+      // Clear page UI (remove zone, route spacers) immediately — don't wait for API.
+      onDragEnd?.();
 
       if (!target?.isValid) {
         await onOperation({ type: "noop" });
@@ -499,7 +534,7 @@ export function useAssignmentDnd({
         }),
       );
     },
-    [onOperation, resetDragState, scope],
+    [onDragEnd, onOperation, resetDragState, scope],
   );
 
   return useMemo(

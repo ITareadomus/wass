@@ -1190,6 +1190,7 @@ export default function GenerateLogisticsAssignments() {
       setDraggingOverDriverId(null);
     },
     onDragCancel: resetDndUiState,
+    onDragEnd: resetDndUiState,
   });
 
   return (

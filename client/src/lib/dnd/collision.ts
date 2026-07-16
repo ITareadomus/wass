@@ -1,5 +1,4 @@
 import {
-  closestCenter,
   type Collision,
   type CollisionDetection,
   type UniqueIdentifier,
@@ -291,6 +290,84 @@ const sortContainerCollision = (sortContainer: SortContainerHit): Collision => (
   },
 });
 
+const sortDroppablesByItemIndex = (
+  containers: CollisionArgs["droppableContainers"],
+) =>
+  [...containers].sort((a, b) => {
+    const aIndex = isAppDndItem(a.data.current) ? a.data.current.index : 0;
+    const bIndex = isAppDndItem(b.data.current) ? b.data.current.index : 0;
+    return aIndex - bIndex;
+  });
+
+/**
+ * Pick the sortable `over` item from pointer vs item midpoints.
+ * Crossing an item's center moves the insert slot (and sortable transforms)
+ * left or right — unlike closestCenter, which sticks until the next center.
+ */
+const findMidpointSortableCollision = (
+  args: CollisionArgs,
+  sortContainer: SortContainerHit,
+): Collision | null => {
+  const point = getCollisionPointer(args);
+  if (!point) return null;
+
+  const allItems = sortDroppablesByItemIndex(
+    args.droppableContainers.filter((container) =>
+      itemBelongsToSortContainer(
+        container.data.current,
+        sortContainer.container,
+      ),
+    ),
+  );
+
+  if (allItems.length === 0) return null;
+
+  const otherItems = allItems.filter(
+    (container) => container.id !== args.active.id,
+  );
+  const midpointItems = otherItems.length > 0 ? otherItems : allItems;
+  const itemRects = buildSortableRects(
+    midpointItems.map((container) => container.id),
+    args.droppableRects,
+  );
+
+  if (itemRects.length === 0) return null;
+
+  const insertIndex =
+    sortContainer.container.type === "summary"
+      ? calculateVerticalInsertIndex({
+          pointerY: point.y,
+          itemRects,
+        })
+      : calculateHorizontalInsertIndex({
+          pointerX: point.x,
+          itemRects,
+        });
+
+  // Sortable `over` uses an item id; appending maps to the last item.
+  const overIndex = Math.min(insertIndex, allItems.length - 1);
+  const overContainer = allItems[overIndex];
+  if (!overContainer || overContainer.id === args.active.id) {
+    return null;
+  }
+
+  return {
+    id: overContainer.id,
+    data: {
+      droppableContainer: overContainer,
+      value: 1,
+      // Final slot among the list with the active item removed (0..n).
+      insertIndex,
+      target: {
+        containerId: sortContainer.id,
+        container: sortContainer.container,
+        index: insertIndex,
+        isValid: true,
+      } satisfies DndInsertTarget,
+    },
+  };
+};
+
 export const timelineFirstCollisionDetection: CollisionDetection = (args) => {
   const removeZone = findContainerUnderPointer(args, "remove-zone");
   if (removeZone) {
@@ -305,24 +382,12 @@ export const timelineFirstCollisionDetection: CollisionDetection = (args) => {
   const sortContainer = findSortContainerUnderPointer(args);
 
   if (sortContainer) {
-    const itemContainers = args.droppableContainers.filter((container) => {
-      if (container.id === args.active.id) return false;
-
-      return itemBelongsToSortContainer(
-        container.data.current,
-        sortContainer.container,
-      );
-    });
-
-    if (itemContainers.length > 0) {
-      const itemCollisions = closestCenter({
-        ...args,
-        droppableContainers: itemContainers,
-      }).filter((collision) => collision.id !== args.active.id);
-
-      if (itemCollisions.length > 0) {
-        return itemCollisions;
-      }
+    const midpointCollision = findMidpointSortableCollision(
+      args,
+      sortContainer,
+    );
+    if (midpointCollision) {
+      return [midpointCollision];
     }
 
     return [sortContainerCollision(sortContainer)];
