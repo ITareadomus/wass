@@ -224,6 +224,11 @@ export interface TaskCardProps {
     React.RefAttributes<HTMLDivElement>;
   /** housekeeping → /api/operations (enable_wass); logistics → enable_wass_route */
   operationsScope?: "housekeeping" | "office" | "logistics";
+  /**
+   * Solo housekeeping/office: durante il DnD timeline, card compatte a 15 min
+   * con solo codice ADAM (come la timeline logistica).
+   */
+  compactAdamTimelineUi?: boolean;
   /** Solo timeline logistica: nome driver (colonna sinistra). Non usare per HK — lì sarebbe il cleaner. */
   timelineRowStaffDisplayLabel?: string | null;
   /** Dopo mutazione timeline logistica (es. tipologia manuale). */
@@ -363,6 +368,7 @@ export default function TaskCard({
   externalIsDragging = false,
   externalDragHandleProps,
   operationsScope = "housekeeping",
+  compactAdamTimelineUi = false,
   timelineRowStaffDisplayLabel = null,
   onLogisticsTimelineMutated,
 }: TaskCardProps) {
@@ -617,6 +623,10 @@ const displayClickableInputClass =
   const lastCollaboratorsTaskIdRef = useRef<number | null>(null);
   const initializedEditFieldsTaskKeyRef = useRef<string>("");
   const isLogisticsTimelineDetails = operationsScope === "logistics" && isInTimeline;
+  /** Timeline logistica (sempre) o HK in DnD: card 15' + solo codice ADAM */
+  const showCompactAdamTimelineUi =
+    isInTimeline &&
+    (operationsScope === "logistics" || compactAdamTimelineUi);
   const isHousekeepingDetails = operationsScope === "housekeeping";
   const isHousekeepingTimelineDetails = operationsScope === "housekeeping" && isInTimeline;
   const isLogisticsDetails = operationsScope === "logistics";
@@ -2189,9 +2199,10 @@ const displayClickableInputClass =
     }
   };
 
-  // LOGISTICS: in timeline ogni task vale 15 minuti (solo UI)
-  const effectiveDurationForUi =
-    operationsScope === "logistics" && isInTimeline ? "0.15" : (task.duration || "0.0");
+  // LOGISTICS (sempre) / HK durante DnD: in timeline ogni task vale 15 minuti (solo UI)
+  const effectiveDurationForUi = showCompactAdamTimelineUi
+    ? "0.15"
+    : (task.duration || "0.0");
 
   // Mostra frecce solo per task >= 1 ora
   const [hours, mins] = effectiveDurationForUi.split('.').map(Number);
@@ -3008,7 +3019,7 @@ const displayClickableInputClass =
                     className={cn(
                       cardSurfaceClass,
                       "rounded-md border transition-colors duration-200",
-                      isLogisticsTimelineDetails ? "px-1 py-0" : "flex items-center px-2 py-1",
+                      showCompactAdamTimelineUi ? "px-1 py-0" : "flex items-center px-2 py-1",
                       isSelected && isMultiSelectMode && !isInTimeline && "z-[1] ring-2 ring-sky-500 ring-inset",
                       isOverdue && isInTimeline && "animate-blink",
                       !isDragging && isMapFiltered && "task-border-map-filtered",
@@ -3026,7 +3037,7 @@ const displayClickableInputClass =
                       zIndex:
                         isDragging
                           ? 9999
-                          : operationsScope === "logistics" && isInTimeline
+                          : showCompactAdamTimelineUi
                             ? 20
                             : isMapFiltered
                               ? 10
@@ -3050,7 +3061,7 @@ const displayClickableInputClass =
                         className="absolute -top-1.5 -right-1.5 z-[65]"
                       />
                     )}
-                    {operationsScope === "logistics" && isInTimeline ? (
+                    {showCompactAdamTimelineUi ? (
                       <LogisticsAdamCodeLabel code={logisticsAdamCode} />
                     ) : (
                       <>

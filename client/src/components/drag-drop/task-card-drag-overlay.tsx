@@ -52,10 +52,30 @@ export function TaskCardDragOverlay({
       null
     : null;
 
-  const overlayWidth =
+  const measuredOverlayWidth =
     activeRect?.width && activeRect.width > 0 ? activeRect.width : undefined;
   const overlayHeight =
     activeRect?.height && activeRect.height > 0 ? activeRect.height : undefined;
+
+  const liveTimelinePxPerMinute = (() => {
+    if (typeof window === "undefined") return null;
+    const value = Number((window as any).timelinePxPerMinute);
+    return Number.isFinite(value) && value > 0 ? value : null;
+  })();
+
+  // HK timeline drag: overlay a 15' (come logistica), non alla larghezza reale della card
+  const useCompactHkTimelineOverlay =
+    isTimelineDrag && scope === "housekeeping";
+  const compactTimelinePxPerMinute =
+    liveTimelinePxPerMinute ?? (scope === "logistics" ? 4 : 2.5);
+  const compactOverlayWidthPx = Math.max(
+    15 * compactTimelinePxPerMinute,
+    56,
+  );
+
+  const overlayWidth = useCompactHkTimelineOverlay
+    ? compactOverlayWidthPx
+    : measuredOverlayWidth;
 
   return (
     <DragOverlay adjustScale={false} dropAnimation={null} modifiers={modifiers}>
@@ -63,7 +83,7 @@ export function TaskCardDragOverlay({
         <div
           className="pointer-events-none origin-top-left"
           style={{
-            width: overlayWidth,
+            width: measuredOverlayWidth,
             height: overlayHeight,
           }}
         >
@@ -78,8 +98,11 @@ export function TaskCardDragOverlay({
           className="pointer-events-none origin-top-left"
           style={{
             width: overlayWidth,
-            height: overlayHeight,
-            minWidth: isTimelineDrag && scope === "logistics" ? 56 : undefined,
+            height: useCompactHkTimelineOverlay ? 40 : overlayHeight,
+            minWidth:
+              isTimelineDrag && (scope === "logistics" || useCompactHkTimelineOverlay)
+                ? 56
+                : undefined,
             minHeight: isTimelineDrag ? 40 : undefined,
           }}
         >
@@ -98,9 +121,16 @@ export function TaskCardDragOverlay({
             dragWrapper="none"
             externalIsDragging
             operationsScope={scope}
+            compactAdamTimelineUi={useCompactHkTimelineOverlay}
             dragOverlayWidthPx={overlayWidth}
-            timelinePxPerMinute={scope === "logistics" ? 4 : 2.5}
-            minTimelineTaskWidthPx={scope === "logistics" ? 56 : 72}
+            timelinePxPerMinute={
+              useCompactHkTimelineOverlay || scope === "logistics"
+                ? compactTimelinePxPerMinute
+                : 2.5
+            }
+            minTimelineTaskWidthPx={
+              useCompactHkTimelineOverlay || scope === "logistics" ? 56 : 72
+            }
             onLogisticsTimelineMutated={onLogisticsTimelineMutated}
           />
         </div>

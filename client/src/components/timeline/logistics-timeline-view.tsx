@@ -27,6 +27,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import SortableTaskCard from "@/components/drag-drop/sortable-task-card";
+import { TimelineHorizontalScrollbar } from "@/components/timeline/timeline-horizontal-scrollbar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -1517,7 +1518,13 @@ export default function LogisticsTimelineView({
           </div>
         </div>
 
-        <div className="px-1 pt-4 pb-4 overflow-hidden">
+        <div className="flex min-h-0 flex-col overflow-hidden px-1 pt-4 pb-4">
+          <TimelineHorizontalScrollbar
+            labelColumnWidth={driverColumnWidth}
+            contentWidth={timelineScaledWidth}
+            registerRef={registerTimelineScrollRef}
+            onScroll={handleTimelineScroll}
+          />
           <div className="flex items-stretch mb-0 px-1 h-[40px]">
             <div className="flex-shrink-0 h-full print:hidden" style={{ width: `${driverColumnWidth}px` }} />
             <div
@@ -1696,7 +1703,7 @@ export default function LogisticsTimelineView({
             </div>
           </div>
 
-          <div className="timeline-rows-scroll flex-1 overflow-x-hidden overflow-y-auto px-1 pb-1 pt-0">
+          <div className="timeline-rows-scroll min-h-0 flex-none overflow-x-hidden overflow-y-auto px-1 pb-0 pt-0">
             {drivers.length === 0 && !isReadOnly ? (
               <div className="flex items-center justify-center h-64 bg-yellow-100 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
                 <div className="text-center p-6">
@@ -1740,7 +1747,7 @@ export default function LogisticsTimelineView({
                   activeDragDriverId === driver.id ||
                   draggingOverDriverId === driver.id;
                 return (
-                  <div key={driver.id} className="flex mb-0.5 h-[50px] min-w-0">
+                  <div key={driver.id} className="mb-0.5 flex h-[50px] min-w-0">
                     <div
                       className={cn(
                         "flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-custom-blue-light",
@@ -2042,54 +2049,59 @@ export default function LogisticsTimelineView({
               })
             )}
 
-            {/* Riga finale: +, indicatore salvataggio / storico */}
-            <div className="pt-0" />
-            <div className="relative flex items-stretch mb-0 h-[40px]">
-              <div
-                className="relative flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden"
-                style={{ width: `${driverColumnWidth}px` }}
-              >
+            {/* Scrollbar + pulsante +: stessa riga */}
+            <div className="relative z-20 -mx-1 flex shrink-0 flex-col bg-custom-blue-light">
+              <TimelineHorizontalScrollbar
+                labelColumnWidth={driverColumnWidth}
+                contentWidth={timelineScaledWidth}
+                registerRef={registerTimelineScrollRef}
+                onScroll={handleTimelineScroll}
+                labelContent={
+                  <>
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0 z-0"
+                    >
+                      <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
+                        <path
+                          d="M0,0 C16,0 30,4 44,12 C54,18 60,24 68,28 C72,30 76,31 80,31 C84,31 88,30 92,28 C100,24 106,18 116,12 C130,4 144,0 160,0 Z"
+                          fill="rgba(59,130,246,0.12)"
+                        />
+                      </svg>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={isReadOnly}
+                      className="absolute inset-0 z-10 h-full w-full rounded-none border-0 bg-transparent p-0 text-custom-blue hover:bg-transparent hover:text-custom-blue dark:hover:text-custom-blue"
+                      aria-label="Aggiungi driver"
+                      title="Aggiungi driver"
+                      onClick={() => void handleOpenAddDriverDialog(null)}
+                    >
+                      <UserPlus className="w-4 h-4" />
+                    </Button>
+                  </>
+                }
+              />
+              <div className="relative flex h-[40px] shrink-0 items-center px-1">
                 <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-x-0 top-0 h-[38px] z-0"
+                  className="pointer-events-none absolute inset-y-0 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap text-sm font-medium leading-none text-slate-600 dark:text-slate-300"
+                  data-testid="indicator-logistics-adam-last-save"
                 >
-                  <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
-                    <path
-                        d="M0,0 C16,0 30,4 44,12 C54,18 60,24 68,28 C72,30 76,31 80,31 C84,31 88,30 92,28 C100,24 106,18 116,12 C130,4 144,0 160,0 Z"
-                      fill="rgba(59,130,246,0.12)"
-                    />
-                  </svg>
+                  <CheckCircle className="h-4 w-4 text-custom-blue" />
+                  <span>
+                    {lastAdamTransfer ? `Salvato il ${(() => {
+                      const d = new Date(lastAdamTransfer);
+                      const day = String(d.getDate()).padStart(2, "0");
+                      const month = String(d.getMonth() + 1).padStart(2, "0");
+                      const year = d.getFullYear();
+                      const hours = String(d.getHours()).padStart(2, "0");
+                      const minutes = String(d.getMinutes()).padStart(2, "0");
+                      return `${day}/${month}/${year} alle ${hours}:${minutes}`;
+                    })()}` : "Nessun salvataggio su ADAM"}
+                  </span>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={isReadOnly}
-                  className="absolute inset-x-0 top-0 z-10 h-[38px] w-full rounded-none border-0 bg-transparent p-0 text-custom-blue hover:bg-transparent hover:text-custom-blue dark:hover:text-custom-blue"
-                  aria-label="Aggiungi driver"
-                  title="Aggiungi driver"
-                  onClick={() => void handleOpenAddDriverDialog(null)}
-                >
-                  <UserPlus className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="flex-1 pl-2 pr-0 h-full" />
-              <div
-                className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 text-sm leading-none font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap"
-                data-testid="indicator-logistics-adam-last-save"
-              >
-                <CheckCircle className="h-4 w-4 text-custom-blue" />
-                <span>
-                  {lastAdamTransfer ? `Salvato il ${(() => {
-                    const d = new Date(lastAdamTransfer);
-                    const day = String(d.getDate()).padStart(2, "0");
-                    const month = String(d.getMonth() + 1).padStart(2, "0");
-                    const year = d.getFullYear();
-                    const hours = String(d.getHours()).padStart(2, "0");
-                    const minutes = String(d.getMinutes()).padStart(2, "0");
-                    return `${day}/${month}/${year} alle ${hours}:${minutes}`;
-                  })()}` : "Nessun salvataggio su ADAM"}
-                </span>
               </div>
             </div>
           </div>

@@ -7,6 +7,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { fetchWithOperation } from "@/lib/operationManager";
 import { useToast } from "@/hooks/use-toast";
 import SortableTaskCard from "@/components/drag-drop/sortable-task-card";
+import { TimelineHorizontalScrollbar } from "@/components/timeline/timeline-horizontal-scrollbar";
 import {
   DndDroppableSortableContainer,
   getTaskDndKey,
@@ -91,6 +92,8 @@ interface Cleaner {
 const DEFAULT_TIMELINE_START_MINUTES = 10 * 60;
 const DEFAULT_TIMELINE_END_MINUTES = 19 * 60;
 const MIN_TIMELINE_TASK_WIDTH_PX = 150;
+/** Durante DnD: stessa larghezza minima delle card logistica (slot 15') */
+const COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX = 56;
 const FALLBACK_SHORTEST_TASK_MINUTES = 30;
 const TIMELINE_END_BUFFER_MINUTES = 60;
 
@@ -2405,6 +2408,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
         </div>
         <div className="flex min-h-0 flex-col overflow-hidden px-1 pt-4 pb-4">
 
+          <TimelineHorizontalScrollbar
+            labelColumnWidth={cleanerColumnWidth}
+            contentWidth={timelineScaledWidth}
+            registerRef={registerTimelineScrollRef}
+            onScroll={handleTimelineScroll}
+          />
+
 {/* Graffe fasce orarie (EO / HP / LP) sopra gli orari */}
 <div className="flex items-stretch mb-0 px-1 h-[40px]">
   {/* colonna pulsante / nome cleaner (vuota per allineamento) */}
@@ -2604,8 +2614,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             </div>
           </div>
 
-          {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
-          <div className="timeline-rows-scroll relative z-0 flex-1 overflow-x-hidden overflow-y-auto px-1 pb-2 pt-2">
+          {/* Righe cleaners + scrollbar/footer attaccati in fondo al contenuto */}
+          <div className="timeline-rows-scroll relative z-0 min-h-0 flex-none overflow-x-hidden overflow-y-auto px-1 pb-0 pt-2">
             {allCleanersToShow.length === 0 && !isReadOnly ? (
               <div className="mb-0.5 flex min-w-0">
                 <div className="flex min-w-0 flex-1 items-center justify-center rounded-lg border-2 border-yellow-300 bg-yellow-100 dark:border-yellow-700 dark:bg-yellow-950/50 h-64">
@@ -3018,7 +3028,12 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           isReadOnly={isReadOnly}
                                           timelineWidthPx={timelineTaskWidthPx}
                                           timelinePxPerMinute={timelinePxPerMinute}
-                                          minTimelineTaskWidthPx={MIN_TIMELINE_TASK_WIDTH_PX}
+                                          minTimelineTaskWidthPx={
+                                            hideRouteSpacers
+                                              ? COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX
+                                              : MIN_TIMELINE_TASK_WIDTH_PX
+                                          }
+                                          compactAdamTimelineUi={hideRouteSpacers}
                                           isHighlighted={highlightedTaskIds.has(String(task.id))}
                                           cleanerId={cleaner.id}
                                         />
@@ -3058,46 +3073,56 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 );
               })
             )}
-          </div>
 
-          {/* Riga finale con pulsanti — fuori dallo scroll delle righe cleaner */}
-          <div className="relative z-20 flex shrink-0 items-stretch px-1 pb-1 pt-0 h-[40px]">
-                {/* Pulsante + sotto il nome dell'ultimo cleaner (speculare all'header UserMinus) */}
+            {/* Scrollbar + pulsante +: stessa riga, attaccata all'ultima cleaner */}
+            <div className="relative z-20 -mx-1 flex shrink-0 flex-col bg-custom-blue-light">
+              <TimelineHorizontalScrollbar
+                labelColumnWidth={cleanerColumnWidth}
+                contentWidth={timelineScaledWidth}
+                registerRef={registerTimelineScrollRef}
+                onScroll={handleTimelineScroll}
+                labelContent={
+                  <>
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0 z-0"
+                    >
+                      <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
+                        <path
+                          d="M0,0 C16,0 30,4 44,12 C54,18 60,24 68,28 C72,30 76,31 80,31 C84,31 88,30 92,28 C100,24 106,18 116,12 C130,4 144,0 160,0 Z"
+                          fill="rgba(59,130,246,0.12)"
+                        />
+                      </svg>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        setCleanerToReplace(null);
+                        handleOpenAddCleanerDialog();
+                      }}
+                      variant="ghost"
+                      size="sm"
+                      className="absolute inset-0 z-10 h-full w-full rounded-none border-0 bg-transparent p-0 text-custom-blue hover:bg-transparent hover:text-custom-blue dark:hover:text-custom-blue"
+                      disabled={isReadOnly}
+                      aria-label="Aggiungi cleaner"
+                      title="Aggiungi cleaner"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                    </Button>
+                  </>
+                }
+              />
+              <div className="relative flex h-[40px] shrink-0 items-stretch px-1">
                 <div
-                  className="relative z-10 flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden -translate-y-2"
+                  className="flex-shrink-0 print:hidden"
                   style={{ width: `${cleanerColumnWidth}px` }}
-                >
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-x-0 top-0 h-[38px] z-0"
-                  >
-                    <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
-                      <path
-                        d="M0,0 C16,0 30,4 44,12 C54,18 60,24 68,28 C72,30 76,31 80,31 C84,31 88,30 92,28 C100,24 106,18 116,12 C130,4 144,0 160,0 Z"
-                        fill="rgba(59,130,246,0.12)"
-                      />
-                    </svg>
-                  </div>
-                  <Button
-                    onClick={() => {
-                      setCleanerToReplace(null);
-                      handleOpenAddCleanerDialog();
-                    }}
-                    variant="ghost"
-                    size="sm"
-                    className="absolute inset-x-0 top-0 z-10 h-[38px] w-full rounded-none border-0 bg-transparent p-0 text-custom-blue hover:bg-transparent hover:text-custom-blue dark:hover:text-custom-blue"
-                    disabled={isReadOnly}
-                  >
-                    <UserPlus className="w-4 h-4" />
-                  </Button>
-                </div>
-                {/* Colonna timeline: azione a destra */}
-                <div className="flex-1 pl-2 pr-0 h-full grid grid-cols-[1fr_auto] items-center">
+                  aria-hidden
+                />
+                <div className="grid h-full flex-1 grid-cols-[1fr_auto] items-center pl-2 pr-0">
                   <Button
                     onClick={() => setShowAdamTransferDialog(true)}
                     size="sm"
                     variant="outline"
-                    className="col-start-2 justify-self-end h-[38px] px-3 border-2 border-custom-blue"
+                    className="col-start-2 h-[38px] justify-self-end border-2 border-custom-blue px-3"
                     disabled={isReadOnly || !hasTasksInTimeline || isTransferringToAdam}
                     title={
                       isReadOnly
@@ -3118,9 +3143,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     {isTransferringToAdam ? "Trasferimento..." : "Trasferisci su ADAM"}
                   </Button>
                 </div>
-                {/* Stato centrato rispetto all'intera riga (inclusa colonna blob sinistra) */}
                 <div
-                  className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 text-sm leading-none font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap"
+                  className="pointer-events-none absolute inset-y-0 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap text-sm font-medium leading-none text-slate-600 dark:text-slate-300"
                   data-testid="indicator-adam-last-save"
                 >
                   <CheckCircle className="h-4 w-4 text-custom-blue" />
@@ -3136,6 +3160,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     })()}` : "Nessun salvataggio su ADAM"}
                   </span>
                 </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
