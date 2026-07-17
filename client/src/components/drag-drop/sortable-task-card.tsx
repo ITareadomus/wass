@@ -16,6 +16,7 @@ export type SortableTaskCardProps = Omit<
   disableSortableTransform?: boolean;
   draggingOpacity?: number;
   hideWhileDragging?: boolean;
+  collapsePullPx?: number;
 };
 
 export function SortableTaskCard({
@@ -24,6 +25,7 @@ export function SortableTaskCard({
   disableSortableTransform = false,
   draggingOpacity,
   hideWhileDragging = false,
+  collapsePullPx,
   isDragDisabled = false,
   ...taskCardProps
 }: SortableTaskCardProps) {
@@ -43,6 +45,7 @@ export function SortableTaskCard({
       disableTransform={disableSortableTransform}
       draggingOpacity={draggingOpacity}
       hideWhileDragging={hideWhileDragging}
+      collapsePullPx={collapsePullPx}
     >
       {({ attributes, listeners, isDragging, setActivatorNodeRef, handleAttributes }) => (
         <TaskCard

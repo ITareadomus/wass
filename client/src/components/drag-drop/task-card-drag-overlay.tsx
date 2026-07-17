@@ -63,7 +63,8 @@ export function TaskCardDragOverlay({
     return Number.isFinite(value) && value > 0 ? value : null;
   })();
 
-  // HK timeline drag: overlay a 15' (come logistica), non alla larghezza reale della card
+  // HK timeline: overlay a 15' allineato al rect della card (stesso top-left
+  // della collision detection) — niente snap al cursore.
   const useCompactHkTimelineOverlay =
     isTimelineDrag && scope === "housekeeping";
   const compactTimelinePxPerMinute =
@@ -72,10 +73,14 @@ export function TaskCardDragOverlay({
     15 * compactTimelinePxPerMinute,
     56,
   );
+  const compactOverlayHeightPx = 40;
 
   const overlayWidth = useCompactHkTimelineOverlay
     ? compactOverlayWidthPx
     : measuredOverlayWidth;
+  const renderedOverlayHeight = useCompactHkTimelineOverlay
+    ? compactOverlayHeightPx
+    : overlayHeight;
 
   return (
     <DragOverlay adjustScale={false} dropAnimation={null} modifiers={modifiers}>
@@ -98,7 +103,7 @@ export function TaskCardDragOverlay({
           className="pointer-events-none origin-top-left"
           style={{
             width: overlayWidth,
-            height: useCompactHkTimelineOverlay ? 40 : overlayHeight,
+            height: renderedOverlayHeight,
             minWidth:
               isTimelineDrag && (scope === "logistics" || useCompactHkTimelineOverlay)
                 ? 56

@@ -2836,6 +2836,37 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           {/* Task posizionate in sequenza con indicatori di travel time */}
                           <div className="relative z-10 flex items-center h-full" style={{ minHeight: '45px', width: timelineScaledWidth, minWidth: "100%" }}>
                             {(() => {
+                              // Optimistic cross-cleaner: spacer invisibile sulla riga target
+                              // (il SortableContext non anima item di un altro container).
+                              const isCrossCleanerTargetRow =
+                                hideRouteSpacers &&
+                                draggingOverCleanerId === cleaner.id &&
+                                activeDragCleanerId != null &&
+                                activeDragCleanerId !== cleaner.id &&
+                                lastValidDragIndex != null;
+                              const isCrossCleanerSourceRow =
+                                hideRouteSpacers &&
+                                activeDragCleanerId === cleaner.id &&
+                                draggingOverCleanerId != null &&
+                                draggingOverCleanerId !== cleaner.id;
+                              const crossCleanerInsertWidthPx = Math.max(
+                                15 * timelinePxPerMinute,
+                                COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX,
+                              );
+                              const renderCrossCleanerInsertSlot = (atIndex: number) =>
+                                isCrossCleanerTargetRow &&
+                                lastValidDragIndex === atIndex ? (
+                                  <div
+                                    key={`cross-insert-${cleaner.id}-${atIndex}`}
+                                    className="flex-shrink-0"
+                                    style={{
+                                      width: `${crossCleanerInsertWidthPx}px`,
+                                      minHeight: "50px",
+                                    }}
+                                    aria-hidden
+                                  />
+                                ) : null;
+
                               return (
                                 <>
                                   {cleanerTasks.map((task, idx) => {
@@ -3013,13 +3044,20 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           </div>
                                         )}
 
-                                        {/* TaskCard: non deve mai sparire */}
+                                        {renderCrossCleanerInsertSlot(idx)}
+
+                                        {/* TaskCard: in DnD tutti a 15'; l'overlay resta incollato al cursore */}
                                         <SortableTaskCard
                                           key={uniqueKey}
                                           dndId={dndId}
                                           dndData={dndData}
                                           draggingOpacity={0}
                                           hideWhileDragging
+                                          collapsePullPx={
+                                            isCrossCleanerSourceRow
+                                              ? crossCleanerInsertWidthPx
+                                              : 0
+                                          }
                                           task={task}
                                           index={idx}
                                           isInTimeline={true}
@@ -3040,6 +3078,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                       </React.Fragment>
                                     );
                                   })}
+                                  {renderCrossCleanerInsertSlot(cleanerTasks.length)}
                                 </>
                               );
                             })()}

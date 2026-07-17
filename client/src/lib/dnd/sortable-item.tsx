@@ -35,6 +35,11 @@ export type SortableItemProps = {
   disableTransform?: boolean;
   draggingOpacity?: number;
   hideWhileDragging?: boolean;
+  /**
+   * Tirare i sibling a sinistra senza collassare il node misurato da dnd-kit
+   * (width:0 rompeva active.rect e l'insert index cross-cleaner).
+   */
+  collapsePullPx?: number;
   className?: string;
   style?: CSSProperties;
   children:
@@ -49,6 +54,7 @@ export function SortableItem({
   disableTransform = false,
   draggingOpacity = 0,
   hideWhileDragging = false,
+  collapsePullPx = 0,
   className = "",
   style,
   children,
@@ -74,12 +80,17 @@ export function SortableItem({
     },
   });
 
+  const shouldPullSiblings =
+    collapsePullPx > 0 && sortable.isDragging;
+
   const transformStyle: CSSProperties = {
     transform: disableTransform ? undefined : CSS.Transform.toString(sortable.transform),
     transition: disableTransform ? undefined : sortable.transition,
     opacity: sortable.isDragging && !hideWhileDragging ? draggingOpacity : undefined,
     visibility: sortable.isDragging && hideWhileDragging ? "hidden" : undefined,
     zIndex: sortable.isDragging ? 999 : undefined,
+    // Mantieni la larghezza per active.rect; il margin negativo chiude il buco.
+    ...(shouldPullSiblings ? { marginRight: -collapsePullPx } : null),
     ...style,
   };
 

@@ -5,8 +5,10 @@ import type {
   DragOverEvent,
   DragStartEvent,
 } from "@dnd-kit/core";
+import { getEventCoordinates } from "@dnd-kit/utilities";
 import { buildDndDropOperation } from "./operations";
 import { timelineFirstCollisionDetection } from "./collision";
+import { constrainAssignedTimelineDragModifier } from "./modifiers";
 import {
   DND_CONTAINER_ID_ATTRIBUTE,
   DND_DRAGGABLE_SELECTOR,
@@ -38,6 +40,9 @@ type DndLayoutEvent = DragOverEvent | DragEndEvent;
 export type ActiveDndRect = {
   width: number;
   height: number;
+  /** Offset cursore → top-left del node al momento del grab */
+  grabOffsetX?: number;
+  grabOffsetY?: number;
 };
 
 const sourceToContainer = (
@@ -461,13 +466,23 @@ export function useAssignmentDnd({
       setActiveItem(item);
       setActiveDragTask(item.getTask?.() ?? null);
       const measuredRect = item.getDragOverlayRect?.() ?? null;
-      const initialRect = measuredRect ?? event.active.rect.current.initial;
+      const initialNodeRect = event.active.rect.current.initial;
+      const width = measuredRect?.width ?? initialNodeRect?.width;
+      const height = measuredRect?.height ?? initialNodeRect?.height;
+
+      let grabOffsetX: number | undefined;
+      let grabOffsetY: number | undefined;
+      if (event.activatorEvent && initialNodeRect) {
+        const coords = getEventCoordinates(event.activatorEvent);
+        if (coords) {
+          grabOffsetX = coords.x - initialNodeRect.left;
+          grabOffsetY = coords.y - initialNodeRect.top;
+        }
+      }
+
       setActiveRect(
-        initialRect
-          ? {
-              width: initialRect.width,
-              height: initialRect.height,
-            }
+        width && height
+          ? { width, height, grabOffsetX, grabOffsetY }
           : null,
       );
       onDragStart?.(item);
@@ -478,14 +493,28 @@ export function useAssignmentDnd({
   const handleDragOver = useCallback(
     (event: DragOverEvent) => {
       const currentTarget = getTargetFromEvent(event);
+      const activeData = event.active.data.current;
+      const isAssignedDrag =
+        isAppDndItem(activeData) &&
+        (activeData.from.type === "timeline" ||
+          activeData.from.type === "summary");
 
       if (currentTarget) {
         lastPreviewTargetRef.current = currentTarget;
+        setInsertTarget(currentTarget);
+        onDragOver?.(currentTarget);
+        return;
       }
 
-      const previewTarget =
-        currentTarget ?? lastPreviewTargetRef.current;
+      // DnD controllato: niente sticky su target non più validi (es. cleaner non adiacente)
+      if (isAssignedDrag) {
+        lastPreviewTargetRef.current = null;
+        setInsertTarget(null);
+        onDragOver?.(null);
+        return;
+      }
 
+      const previewTarget = lastPreviewTargetRef.current;
       setInsertTarget(previewTarget);
       onDragOver?.(previewTarget);
     },
@@ -537,10 +566,16 @@ export function useAssignmentDnd({
     [onDragEnd, onOperation, resetDragState, scope],
   );
 
+  const modifiers = useMemo(
+    () => [constrainAssignedTimelineDragModifier],
+    [],
+  );
+
   return useMemo(
     () => ({
       sensors,
       collisionDetection,
+      modifiers,
       activeItem,
       activeDragTask,
       activeRect,
@@ -562,6 +597,7 @@ export function useAssignmentDnd({
       handleDragOver,
       handleDragStart,
       insertTarget,
+      modifiers,
       sensors,
     ],
   );

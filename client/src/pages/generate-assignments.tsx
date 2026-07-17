@@ -1652,7 +1652,13 @@ export default function GenerateAssignments() {
     }
   };
 
+  const pendingRouteSpacerHideRafRef = useRef<number | null>(null);
+
   const resetDndUiState = useCallback(() => {
+    if (pendingRouteSpacerHideRafRef.current != null) {
+      cancelAnimationFrame(pendingRouteSpacerHideRafRef.current);
+      pendingRouteSpacerHideRafRef.current = null;
+    }
     setIsDraggingTimelineTask(false);
     setDragSequencePreview(null);
     setLastValidDragIndex(null);
@@ -1847,14 +1853,26 @@ export default function GenerateAssignments() {
     scope: "housekeeping",
     onOperation: handleDndOperation,
     onDragStart: (item) => {
-      setIsDraggingTimelineTask(
-        item.from.type === "timeline" || item.from.type === "summary"
-      );
-      setActiveDragCleanerId(
-        item.from.type === "timeline" || item.from.type === "summary"
-          ? item.from.staffId
-          : null
-      );
+      const isTimelineOrSummary =
+        item.from.type === "timeline" || item.from.type === "summary";
+      setIsDraggingTimelineTask(isTimelineOrSummary);
+
+      // Ritarda il reflow (hide travel): DragOverlay deve misurare il rect
+      // iniziale PRIMA che i task scalino a sinistra, altrimenti il cursore si stacca.
+      if (pendingRouteSpacerHideRafRef.current != null) {
+        cancelAnimationFrame(pendingRouteSpacerHideRafRef.current);
+      }
+      if (isTimelineOrSummary && item.from.type === "timeline") {
+        const staffId = item.from.staffId;
+        pendingRouteSpacerHideRafRef.current = requestAnimationFrame(() => {
+          pendingRouteSpacerHideRafRef.current = null;
+          setActiveDragCleanerId(staffId);
+        });
+      } else if (isTimelineOrSummary) {
+        setActiveDragCleanerId(item.from.staffId);
+      } else {
+        setActiveDragCleanerId(null);
+      }
     },
     onDragOver: (target: DndInsertTarget | null) => {
       if (target?.container.type !== "timeline" && target?.container.type !== "summary") {
@@ -2018,6 +2036,7 @@ export default function GenerateAssignments() {
           <DndContext
             sensors={assignmentDnd.sensors}
             collisionDetection={assignmentDnd.collisionDetection}
+            modifiers={assignmentDnd.modifiers}
             measuring={{ droppable: { strategy: MeasuringStrategy.WhileDragging } }}
             {...assignmentDnd.handlers}
           >

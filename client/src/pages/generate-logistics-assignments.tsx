@@ -1335,6 +1335,7 @@ export default function GenerateLogisticsAssignments() {
         <DndContext
           sensors={logisticsDnd.sensors}
           collisionDetection={logisticsDnd.collisionDetection}
+          modifiers={logisticsDnd.modifiers}
           measuring={{ droppable: { strategy: MeasuringStrategy.WhileDragging } }}
           {...logisticsDnd.handlers}
         >

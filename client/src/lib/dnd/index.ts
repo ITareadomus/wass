@@ -2,6 +2,7 @@ export * from "./collision";
 export * from "./droppable-sortable-container";
 export * from "./ids";
 export * from "./insertion-indicator";
+export * from "./modifiers";
 export * from "./operations";
 export * from "./priority";
 export * from "./reorder";
