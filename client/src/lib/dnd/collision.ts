@@ -18,6 +18,11 @@ type CollisionArgs = Parameters<CollisionDetection>[0];
 export type TimelineInsertIndexOptions = {
   pointerX: number;
   itemRects: readonly DndSortableRect[];
+  /**
+   * Soglia sul last item (0..1 dalla left). Default 0.5 (midpoint).
+   * Valori più bassi rendono più facile l'append in coda.
+   */
+  lastItemThreshold?: number;
 };
 
 export type VerticalInsertIndexOptions = {
@@ -28,13 +33,17 @@ export type VerticalInsertIndexOptions = {
 export const calculateHorizontalInsertIndex = ({
   pointerX,
   itemRects,
+  lastItemThreshold = 0.5,
 }: TimelineInsertIndexOptions) => {
   const orderedRects = [...itemRects].sort((a, b) => a.index - b.index);
+  const lastThreshold = Math.min(1, Math.max(0, lastItemThreshold));
 
   for (let position = 0; position < orderedRects.length; position += 1) {
     const rect = orderedRects[position];
-    const midpoint = rect.left + rect.width / 2;
-    if (pointerX < midpoint) return position;
+    const isLast = position === orderedRects.length - 1;
+    const ratio = isLast ? lastThreshold : 0.5;
+    const edge = rect.left + rect.width * ratio;
+    if (pointerX < edge) return position;
   }
 
   return orderedRects.length;
@@ -182,43 +191,81 @@ const getActiveCardRect = (args: CollisionArgs): ActiveCardRect | null => {
   };
 };
 
-/**
- * Punto per insert index: in cross-cleaner usa la X del pointer
- * (allineata all'overlay), non active.rect che può essere stale.
- */
-const getInsertPoint = (
-  args: CollisionArgs,
-  sortContainer: SortContainerHit,
-) => {
-  const card = getActiveCardRect(args);
-  const pointer = args.pointerCoordinates;
-  const activeData = args.active.data.current;
-  const snapStaffId = getAssignedTimelineDragSnapStaffId();
-
-  const isCrossCleaner =
-    isAppDndItem(activeData) &&
-    (activeData.from.type === "timeline" ||
-      activeData.from.type === "summary") &&
-    snapStaffId != null &&
-    sortContainer.container.type !== "priority" &&
-    "staffId" in sortContainer.container &&
-    snapStaffId !== activeData.from.staffId;
-
-  if (isCrossCleaner && pointer) {
-    return {
-      x: pointer.x,
-      y: card?.centerY ?? pointer.y,
-    };
-  }
-
-  if (!card) return pointer ?? null;
-  return { x: card.centerX, y: card.centerY };
-};
-
-const getActiveCardCenter = (args: CollisionArgs) => {
+/** Punto per insert index: sempre il centro della card (same- e cross-cleaner). */
+const getInsertPoint = (args: CollisionArgs) => {
   const card = getActiveCardRect(args);
   if (!card) return args.pointerCoordinates ?? null;
   return { x: card.centerX, y: card.centerY };
+};
+
+const getActiveCardCenter = getInsertPoint;
+
+const isCrossCleanerTimelineSort = (
+  args: CollisionArgs,
+  sortContainer: SortContainerHit,
+  containerItemIds: ReadonlySet<UniqueIdentifier>,
+) => {
+  if (sortContainer.container.type !== "timeline") return false;
+  const activeData = args.active.data.current;
+  if (!isAppDndItem(activeData)) return false;
+  if (
+    activeData.from.type !== "timeline" &&
+    activeData.from.type !== "summary"
+  ) {
+    return false;
+  }
+  // Active assente dal SortableContext target = riga diversa.
+  if (containerItemIds.has(args.active.id)) return false;
+  return (
+    Number(activeData.from.staffId) !==
+    Number(sortContainer.container.staffId)
+  );
+};
+
+const isHkTimelineActiveDrag = (args: CollisionArgs) => {
+  const activeData = args.active.data.current;
+  return (
+    isAppDndItem(activeData) &&
+    activeData.scope === "housekeeping" &&
+    (activeData.from.type === "timeline" || activeData.from.type === "summary")
+  );
+};
+
+/**
+ * In DnD HK le card sono UI a 15', ma i droppableRects restano spesso alla
+ * larghezza "piena" della durata → i midpoint sono molto più a destra della
+ * card visibile e la sequenza si aggiorna solo trascinando lontano.
+ * Usiamo sempre la larghezza compatta (come l'overlay). In cross-cleaner
+ * collassiamo anche i gap dello spacer.
+ */
+const toCompactTimelineInsertRects = (
+  itemRects: DndSortableRect[],
+  collapseGaps: boolean,
+): DndSortableRect[] => {
+  const ordered = [...itemRects].sort((a, b) => a.index - b.index);
+  if (ordered.length === 0) return ordered;
+
+  const slotWidth = getCompactTimelineTaskWidthPx();
+
+  if (!collapseGaps) {
+    return ordered.map((rect) => ({
+      ...rect,
+      width: slotWidth,
+      right: rect.left + slotWidth,
+    }));
+  }
+
+  let x = ordered[0].left;
+  return ordered.map((rect) => {
+    const packed = {
+      ...rect,
+      left: x,
+      right: x + slotWidth,
+      width: slotWidth,
+    };
+    x += slotWidth;
+    return packed;
+  });
 };
 
 const verticalOverlapPx = (
@@ -495,7 +542,7 @@ const itemBelongsToSortContainer = (
   const from = itemData.from;
   if (from.type === "priority") return false;
   if (from.type !== container.type) return false;
-  return from.staffId === container.staffId;
+  return Number(from.staffId) === Number(container.staffId);
 };
 
 const sortContainerCollision = (sortContainer: SortContainerHit): Collision => ({
@@ -524,7 +571,7 @@ const findMidpointSortableCollision = (
   args: CollisionArgs,
   sortContainer: SortContainerHit,
 ): Collision | null => {
-  const point = getInsertPoint(args, sortContainer);
+  const point = getInsertPoint(args);
   if (!point) return null;
 
   const allItems = sortDroppablesByItemIndex(
@@ -558,12 +605,12 @@ const findMidpointSortableCollision = (
     (container) => container.id !== args.active.id,
   );
   const midpointItems = otherItems.length > 0 ? otherItems : allItems;
-  const itemRects = buildSortableRects(
+  const measuredRects = buildSortableRects(
     midpointItems.map((container) => container.id),
     args.droppableRects,
   );
 
-  if (itemRects.length === 0) {
+  if (measuredRects.length === 0) {
     return {
       id: sortContainer.id,
       data: {
@@ -580,7 +627,22 @@ const findMidpointSortableCollision = (
     };
   }
 
-  const insertIndex =
+  const isCrossTimeline = isCrossCleanerTimelineSort(
+    args,
+    sortContainer,
+    new Set(allItems.map((item) => item.id)),
+  );
+  const useCompactTimelineInsert =
+    sortContainer.container.type === "timeline" &&
+    isHkTimelineActiveDrag(args);
+
+  // Midpoint allineati alla card compatta (15'), non al hitbox full-duration.
+  // Cross-cleaner: collassa anche il gap dello spacer.
+  const itemRects = useCompactTimelineInsert
+    ? toCompactTimelineInsertRects(measuredRects, isCrossTimeline)
+    : measuredRects;
+
+  let insertIndex =
     sortContainer.container.type === "summary"
       ? calculateVerticalInsertIndex({
           pointerY: point.y,
@@ -589,7 +651,43 @@ const findMidpointSortableCollision = (
       : calculateHorizontalInsertIndex({
           pointerX: point.x,
           itemRects,
+          lastItemThreshold: isCrossTimeline ? 0.3 : 0.5,
         });
+
+  // Card già oltre l'ultimo task (bordo compatto) → append.
+  if (useCompactTimelineInsert && itemRects.length > 0) {
+    const lastCompact = itemRects[itemRects.length - 1];
+    const card = getActiveCardRect(args);
+    if (
+      lastCompact &&
+      card &&
+      (card.left >= lastCompact.right - 1 ||
+        card.centerX >= lastCompact.right)
+    ) {
+      insertIndex = itemRects.length;
+    }
+  }
+
+  const appendAtEnd = insertIndex >= allItems.length;
+
+  // In append non agganciare l'`over` all'ultimo item (glow rosso fuorviante):
+  // usa il container e l'insertIndex in coda.
+  if (appendAtEnd) {
+    return {
+      id: sortContainer.id,
+      data: {
+        droppableContainer: sortContainer.droppableContainer,
+        value: 1,
+        insertIndex: allItems.length,
+        target: {
+          containerId: sortContainer.id,
+          container: sortContainer.container,
+          index: allItems.length,
+          isValid: true,
+        } satisfies DndInsertTarget,
+      },
+    };
+  }
 
   // Sortable `over` uses an item id; appending maps to the last item.
   // Su riga diversa dalla sorgente l'active non è nel SortableContext locale:
