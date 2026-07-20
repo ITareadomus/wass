@@ -450,6 +450,7 @@ export default function GenerateLogisticsAssignments() {
   const [logisticsLoaderKind, setLogisticsLoaderKind] = useState<
     "extract" | "load-tasks" | "general"
   >("general");
+  const [lastValidDragIndex, setLastValidDragIndex] = useState<number | null>(null);
   const lastValidDragIndexRef = useRef<number | null>(null);
   const isDraggingRef = useRef(false);
   const dragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1028,6 +1029,7 @@ export default function GenerateLogisticsAssignments() {
     setIsDraggingTimelineTask(false);
     setDraggingOverDriverId(null);
     setActiveDragDriverId(null);
+    setLastValidDragIndex(null);
     lastValidDragIndexRef.current = null;
   }, []);
 
@@ -1176,16 +1178,13 @@ export default function GenerateLogisticsAssignments() {
       );
     },
     onDragOver: (target: DndInsertTarget | null) => {
-      if (target?.container.type === "timeline") {
+      if (target?.container.type === "timeline" || target?.container.type === "summary") {
+        setLastValidDragIndex(target.index);
         lastValidDragIndexRef.current = target.index;
         setDraggingOverDriverId(target.container.staffId);
         return;
       }
-      if (target?.container.type === "summary") {
-        lastValidDragIndexRef.current = target.index;
-        setDraggingOverDriverId(target.container.staffId);
-        return;
-      }
+      setLastValidDragIndex(null);
       lastValidDragIndexRef.current = null;
       setDraggingOverDriverId(null);
     },
@@ -1395,6 +1394,7 @@ export default function GenerateLogisticsAssignments() {
                   isLoadingOverlay={isLoadingDragDrop}
                   draggingOverDriverId={draggingOverDriverId}
                   activeDragDriverId={activeDragDriverId}
+                  lastValidDragIndex={lastValidDragIndex}
                   onRefresh={reloadLogisticsPage}
                 />
                 <TimelineFloatingPanel
@@ -1461,6 +1461,9 @@ export default function GenerateLogisticsAssignments() {
                 isLoadingDragDrop ? logisticsDrivers.map((driver) => driver.id) : []
               }
               workDate={format(selectedDate, "yyyy-MM-dd")}
+              draggingOverDriverId={draggingOverDriverId}
+              activeDragDriverId={activeDragDriverId}
+              lastValidDragIndex={lastValidDragIndex}
             />
           )}
           <DndRemoveZone

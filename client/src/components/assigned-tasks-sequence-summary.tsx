@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ListOrdered, Loader2, Maximize2 } from "lucide-react";
@@ -29,6 +29,9 @@ import {
   type AppDndItem,
 } from "@/lib/dnd";
 
+/** Altezza spacer di insert cross-driver (riga summary ~ py-1.5 + testo). */
+const SUMMARY_CROSS_INSERT_HEIGHT_PX = 40;
+
 interface AssignedTasksSequenceSummaryProps {
   groups: SequenceSummaryGroup[];
   searchTask?: string;
@@ -36,6 +39,9 @@ interface AssignedTasksSequenceSummaryProps {
   isDragDisabled?: boolean;
   loadingDriverIds?: number[];
   workDate?: string;
+  draggingOverDriverId?: number | null;
+  activeDragDriverId?: number | null;
+  lastValidDragIndex?: number | null;
 }
 
 function DndSummaryTaskItem({
@@ -43,6 +49,7 @@ function DndSummaryTaskItem({
   data,
   disabled,
   className,
+  collapsePullPx = 0,
   onClick,
   onKeyDown,
   role,
@@ -54,6 +61,8 @@ function DndSummaryTaskItem({
   data: AppDndItem;
   disabled: boolean;
   className: string;
+  /** Chiude il buco sulla riga sorgente in drag cross-driver (marginBottom negativo). */
+  collapsePullPx?: number;
   onClick: () => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLLIElement>) => void;
   role?: string;
@@ -76,7 +85,22 @@ function DndSummaryTaskItem({
     id,
     data: dataWithOverlayRect,
     disabled,
+    transition: {
+      duration: 180,
+      easing: "cubic-bezier(0.25, 1, 0.5, 1)",
+    },
   });
+
+  const shouldPullSiblings = collapsePullPx > 0 && sortable.isDragging;
+
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(sortable.transform),
+    transition: sortable.transition,
+    opacity: sortable.isDragging ? 0 : undefined,
+    visibility: sortable.isDragging ? "hidden" : undefined,
+    // Mantieni l'altezza per active.rect; il margin negativo chiude il buco.
+    ...(shouldPullSiblings ? { marginBottom: -collapsePullPx } : null),
+  };
 
   return (
     <li
@@ -89,12 +113,7 @@ function DndSummaryTaskItem({
       {...appDndDraggableAttributes}
       {...appDndHandleAttributes}
       {...{ [DND_SORTABLE_ID_ATTRIBUTE]: String(id) }}
-      style={{
-        transform: CSS.Transform.toString(sortable.transform),
-        transition: sortable.transition,
-        opacity: sortable.isDragging ? 0 : undefined,
-        visibility: sortable.isDragging ? "hidden" : undefined,
-      }}
+      style={style}
       className={className}
       role={role}
       tabIndex={tabIndex}
@@ -124,6 +143,9 @@ export default function AssignedTasksSequenceSummary({
   isDragDisabled = false,
   loadingDriverIds = [],
   workDate = "",
+  draggingOverDriverId = null,
+  activeDragDriverId = null,
+  lastValidDragIndex = null,
 }: AssignedTasksSequenceSummaryProps) {
   const [customerNoteDialog, setCustomerNoteDialog] = useState<{
     open: boolean;
@@ -150,6 +172,8 @@ export default function AssignedTasksSequenceSummary({
   };
 
   const loadingDriverIdSet = useMemo(() => new Set(loadingDriverIds), [loadingDriverIds]);
+  const isSummaryDragging =
+    activeDragDriverId != null || draggingOverDriverId != null;
 
   if (groups.length === 0) {
     return null;
@@ -174,6 +198,28 @@ export default function AssignedTasksSequenceSummary({
             const itemIds = displayedTasks.map((entry) =>
               taskDndId("logistics", entry.taskId, group.id, "summary")
             );
+
+            const isCrossDriverTargetCol =
+              isSummaryDragging &&
+              draggingOverDriverId === group.id &&
+              activeDragDriverId != null &&
+              activeDragDriverId !== group.id &&
+              lastValidDragIndex != null;
+            const isCrossDriverSourceCol =
+              isSummaryDragging &&
+              activeDragDriverId === group.id &&
+              draggingOverDriverId != null &&
+              draggingOverDriverId !== group.id;
+
+            const renderCrossDriverInsertSlot = (atIndex: number) =>
+              isCrossDriverTargetCol && lastValidDragIndex === atIndex ? (
+                <li
+                  key={`cross-insert-${group.id}-${atIndex}`}
+                  className="list-none flex-shrink-0 rounded-md border border-dashed border-custom-blue/40 bg-custom-blue/5"
+                  style={{ height: `${SUMMARY_CROSS_INSERT_HEIGHT_PX}px` }}
+                  aria-hidden
+                />
+              ) : null;
 
             return (
             <div
@@ -234,7 +280,7 @@ export default function AssignedTasksSequenceSummary({
                 className={({ isOver }) =>
                   cn(
                     "sequence-summary-driver-scroll flex min-h-0 min-w-0 flex-1 flex-col rounded-md bg-background/70 pb-0.5",
-                    isOver && "ring-1 ring-custom-blue/30"
+                    isOver && "ring-1 ring-custom-blue/30",
                   )
                 }
               >
@@ -253,69 +299,77 @@ export default function AssignedTasksSequenceSummary({
                         const violationMessages = entry.violationMessages ?? [];
 
                         return (
-                          <DndSummaryTaskItem
-                            key={`${group.id}-${entry.taskId}`}
-                            id={taskDndId("logistics", entry.taskId, group.id, "summary")}
-                            data={{
-                              kind: "task",
-                              scope: "logistics",
-                              taskId: String(entry.taskId),
-                              index,
-                              initialIndex: index,
-                              from: {
-                                type: "summary",
-                                staffId: group.id,
-                              },
-                              getTask: () => entry,
-                            }}
-                            disabled={isGroupDragDisabled}
-                            className={cn(
-                              getSequenceSummaryTaskRowClassName({
-                                isTimelineViolated,
-                                isHighlighted,
-                              }),
-                              !isGroupDragDisabled &&
-                                !isTimelineViolated &&
-                                "cursor-grab active:cursor-grabbing"
-                            )}
-                            role={isTimelineViolated ? "button" : undefined}
-                            tabIndex={isTimelineViolated ? 0 : undefined}
-                            ariaLabel={
-                              isTimelineViolated
-                                ? `Mostra violazione timeline per task ${entry.logisticCode || "N/D"}`
-                                : undefined
-                            }
-                            onClick={() => {
-                              if (!isTimelineViolated) return;
-                              setViolationDialog({
-                                open: true,
-                                messages: violationMessages,
-                                logisticCode: entry.logisticCode || "N/D",
-                              });
-                            }}
-                            onKeyDown={(event) => {
-                              if (!isTimelineViolated) return;
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault();
+                          <Fragment key={`${group.id}-${entry.taskId}`}>
+                            {renderCrossDriverInsertSlot(index)}
+                            <DndSummaryTaskItem
+                              id={taskDndId("logistics", entry.taskId, group.id, "summary")}
+                              data={{
+                                kind: "task",
+                                scope: "logistics",
+                                taskId: String(entry.taskId),
+                                index,
+                                initialIndex: index,
+                                from: {
+                                  type: "summary",
+                                  staffId: group.id,
+                                },
+                                getTask: () => entry,
+                              }}
+                              disabled={isGroupDragDisabled}
+                              collapsePullPx={
+                                isCrossDriverSourceCol
+                                  ? SUMMARY_CROSS_INSERT_HEIGHT_PX
+                                  : 0
+                              }
+                              className={cn(
+                                getSequenceSummaryTaskRowClassName({
+                                  isTimelineViolated,
+                                  isHighlighted,
+                                }),
+                                !isGroupDragDisabled &&
+                                  !isTimelineViolated &&
+                                  "cursor-grab active:cursor-grabbing",
+                              )}
+                              role={isTimelineViolated ? "button" : undefined}
+                              tabIndex={isTimelineViolated ? 0 : undefined}
+                              ariaLabel={
+                                isTimelineViolated
+                                  ? `Mostra violazione timeline per task ${entry.logisticCode || "N/D"}`
+                                  : undefined
+                              }
+                              onClick={() => {
+                                if (!isTimelineViolated) return;
                                 setViolationDialog({
                                   open: true,
                                   messages: violationMessages,
                                   logisticCode: entry.logisticCode || "N/D",
                                 });
-                              }
-                            }}
-                          >
-                            {() => (
-                              <SequenceSummaryTaskContent
-                                entry={entry}
-                                onCustomerNoteOpen={(note, logisticCode) =>
-                                  setCustomerNoteDialog({ open: true, note, logisticCode })
+                              }}
+                              onKeyDown={(event) => {
+                                if (!isTimelineViolated) return;
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
+                                  setViolationDialog({
+                                    open: true,
+                                    messages: violationMessages,
+                                    logisticCode: entry.logisticCode || "N/D",
+                                  });
                                 }
-                              />
-                            )}
-                          </DndSummaryTaskItem>
+                              }}
+                            >
+                              {() => (
+                                <SequenceSummaryTaskContent
+                                  entry={entry}
+                                  onCustomerNoteOpen={(note, logisticCode) =>
+                                    setCustomerNoteDialog({ open: true, note, logisticCode })
+                                  }
+                                />
+                              )}
+                            </DndSummaryTaskItem>
+                          </Fragment>
                         );
                       })}
+                      {renderCrossDriverInsertSlot(displayedTasks.length)}
                     </ol>
                 )}
               </DndDroppableSortableContainer>

@@ -10,7 +10,7 @@ import type {
   DndSortableRect,
 } from "./types";
 import { isAppDndContainer, isAppDndItem } from "./types";
-import { summaryContainerDndId, timelineContainerDndId } from "./ids";
+import { timelineContainerDndId } from "./ids";
 import { getAssignedTimelineDragSnapStaffId } from "./modifiers";
 
 type CollisionArgs = Parameters<CollisionDetection>[0];
@@ -145,15 +145,15 @@ const getActiveCardRect = (args: CollisionArgs): ActiveCardRect | null => {
   if (!base) return null;
 
   const activeData = args.active.data.current;
-  const isHkTimelineDrag =
+  const isCompactTimelineDrag =
     isAppDndItem(activeData) &&
-    activeData.scope === "housekeeping" &&
+    (activeData.scope === "housekeeping" || activeData.scope === "logistics") &&
     activeData.from.type === "timeline";
 
   // Se il node sorgente è stato alterato, preferisci la larghezza iniziale.
   const measuredWidth =
     base.width > 1 ? base.width : (initial?.width ?? base.width);
-  const width = isHkTimelineDrag
+  const width = isCompactTimelineDrag
     ? Math.min(measuredWidth, getCompactTimelineTaskWidthPx())
     : measuredWidth;
   const height =
@@ -162,16 +162,16 @@ const getActiveCardRect = (args: CollisionArgs): ActiveCardRect | null => {
   let top = base.top;
   let centerY = base.top + height / 2;
 
+  // Solo timeline: allinea Y al centro riga dopo un hop (insert è sull'asse X).
+  // Sul summary l'insert è verticale — non sovrascrivere centerY o l'indice resta
+  // bloccato a metà colonna.
   const snapStaffId = getAssignedTimelineDragSnapStaffId();
   if (
     snapStaffId != null &&
     isAppDndItem(activeData) &&
-    (activeData.from.type === "timeline" || activeData.from.type === "summary")
+    activeData.from.type === "timeline"
   ) {
-    const containerId =
-      activeData.from.type === "timeline"
-        ? timelineContainerDndId(activeData.scope, snapStaffId)
-        : summaryContainerDndId(activeData.scope, snapStaffId);
+    const containerId = timelineContainerDndId(activeData.scope, snapStaffId);
     const rowRect = args.droppableRects.get(containerId);
     if (rowRect) {
       centerY = rowRect.top + rowRect.height / 2;
@@ -222,11 +222,11 @@ const isCrossCleanerTimelineSort = (
   );
 };
 
-const isHkTimelineActiveDrag = (args: CollisionArgs) => {
+const isTimelineActiveDrag = (args: CollisionArgs) => {
   const activeData = args.active.data.current;
   return (
     isAppDndItem(activeData) &&
-    activeData.scope === "housekeeping" &&
+    (activeData.scope === "housekeeping" || activeData.scope === "logistics") &&
     (activeData.from.type === "timeline" || activeData.from.type === "summary")
   );
 };
@@ -634,7 +634,7 @@ const findMidpointSortableCollision = (
   );
   const useCompactTimelineInsert =
     sortContainer.container.type === "timeline" &&
-    isHkTimelineActiveDrag(args);
+    isTimelineActiveDrag(args);
 
   // Midpoint allineati alla card compatta (15'), non al hitbox full-duration.
   // Cross-cleaner: collassa anche il gap dello spacer.

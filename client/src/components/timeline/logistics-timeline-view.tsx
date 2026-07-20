@@ -127,8 +127,14 @@ interface LogisticsTimelineViewProps {
   suppressTaskDrag?: boolean;
   draggingOverDriverId?: number | null;
   activeDragDriverId?: number | null;
+  /** Indice di insert durante drag cross-autista (per spacer di preview). */
+  lastValidDragIndex?: number | null;
   onRefresh: () => Promise<void>;
 }
+
+/** Larghezza minima card 15' — anche scala minima della timeline (abilita scroll orizzontale). */
+const MIN_TIMELINE_TASK_WIDTH_PX = 56;
+const COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX = 56;
 
 const DEFAULT_TIMELINE_START_MINUTES = 10 * 60;
 const DEFAULT_TIMELINE_END_MINUTES = 20 * 60;
@@ -290,6 +296,7 @@ export default function LogisticsTimelineView({
   suppressTaskDrag = false,
   draggingOverDriverId = null,
   activeDragDriverId = null,
+  lastValidDragIndex = null,
   onRefresh,
 }: LogisticsTimelineViewProps) {
   const [, setLocation] = useLocation();
@@ -749,7 +756,22 @@ export default function LogisticsTimelineView({
 
   const globalTimeSlots = generateGlobalTimeSlots();
   const globalTimelineMinutes = getGlobalTimelineMinutes();
-  const timelineScaledWidth = timelineWidthPx > 0 ? `${timelineWidthPx}px` : "100%";
+  // Come HK: contenuto almeno largo abbastanza da dare 56px a ogni slot 15',
+  // altrimenti la timeline si comprime nel viewport e le scrollbar non scorrono.
+  const minimumTimelinePxPerMinute =
+    MIN_TIMELINE_TASK_WIDTH_PX / LOGISTICS_SERVICE_DURATION_MIN;
+  const minimumTimelineContentWidthPx =
+    globalTimelineMinutes * minimumTimelinePxPerMinute;
+  const timelineContentWidthPx = Math.max(
+    timelineWidthPx,
+    minimumTimelineContentWidthPx,
+  );
+  const timelinePxPerMinute =
+    globalTimelineMinutes > 0 && timelineContentWidthPx > 0
+      ? timelineContentWidthPx / globalTimelineMinutes
+      : 0;
+  const timelineScaledWidth =
+    timelineContentWidthPx > 0 ? `${timelineContentWidthPx}px` : "100%";
 
   const timeToMinutes = (t: string) => {
     const [h, m] = t.split(":").map(Number);
@@ -767,7 +789,9 @@ export default function LogisticsTimelineView({
   useEffect(() => {
     (window as any).globalTimelineMinutes = globalTimelineMinutes;
     (window as any).globalTimeSlotsCount = globalTimeSlots.length;
-  }, [globalTimelineMinutes, globalTimeSlots.length]);
+    (window as any).timelinePxPerMinute = timelinePxPerMinute;
+    (window as any).minTimelineTaskWidthPx = MIN_TIMELINE_TASK_WIDTH_PX;
+  }, [globalTimelineMinutes, globalTimeSlots.length, timelinePxPerMinute]);
 
   useEffect(() => {
     let resizeObserver: ResizeObserver | null = null;
@@ -1519,12 +1543,6 @@ export default function LogisticsTimelineView({
         </div>
 
         <div className="flex min-h-0 flex-col overflow-hidden px-1 pt-4 pb-4">
-          <TimelineHorizontalScrollbar
-            labelColumnWidth={driverColumnWidth}
-            contentWidth={timelineScaledWidth}
-            registerRef={registerTimelineScrollRef}
-            onScroll={handleTimelineScroll}
-          />
           <div className="flex items-stretch mb-0 px-1 h-[40px]">
             <div className="flex-shrink-0 h-full print:hidden" style={{ width: `${driverColumnWidth}px` }} />
             <div
@@ -1857,11 +1875,7 @@ export default function LogisticsTimelineView({
                           >
                             {(() => {
                               const virtualMinutes = globalTimelineMinutes;
-                              const timelineWidth = timelineWidthPx || 0;
-                              const timelinePxPerMinute =
-                                virtualMinutes > 0 && timelineWidth > 0
-                                  ? timelineWidth / virtualMinutes
-                                  : 0;
+                              const timelineWidth = timelineContentWidthPx || 0;
                               const lastRawTask =
                                 rawTasks.length > 0 ? rawTasks[rawTasks.length - 1] : null;
                               const returnTravelMinutes =
@@ -1874,6 +1888,37 @@ export default function LogisticsTimelineView({
                                 virtualMinutes,
                                 timelineWidth
                               );
+
+                              // Optimistic cross-driver: spacer invisibile sulla riga target
+                              // (il SortableContext non anima item di un altro container).
+                              const isCrossDriverTargetRow =
+                                hideRouteSpacers &&
+                                draggingOverDriverId === driver.id &&
+                                activeDragDriverId != null &&
+                                activeDragDriverId !== driver.id &&
+                                lastValidDragIndex != null;
+                              const isCrossDriverSourceRow =
+                                hideRouteSpacers &&
+                                activeDragDriverId === driver.id &&
+                                draggingOverDriverId != null &&
+                                draggingOverDriverId !== driver.id;
+                              const crossDriverInsertWidthPx = Math.max(
+                                15 * timelinePxPerMinute,
+                                COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX,
+                              );
+                              const renderCrossDriverInsertSlot = (atIndex: number) =>
+                                isCrossDriverTargetRow &&
+                                lastValidDragIndex === atIndex ? (
+                                  <div
+                                    key={`cross-insert-${driver.id}-${atIndex}`}
+                                    className="flex-shrink-0"
+                                    style={{
+                                      width: `${crossDriverInsertWidthPx}px`,
+                                      minHeight: "50px",
+                                    }}
+                                    aria-hidden
+                                  />
+                                ) : null;
 
                               return (
                                 <>
@@ -1973,6 +2018,7 @@ export default function LogisticsTimelineView({
                                       </svg>
                                     </div>
                                   )}
+                                  {renderCrossDriverInsertSlot(index)}
                                   {(() => {
                                     const taskKey = getTaskDndKey(task);
                                     const dndData: AppDndItem = {
@@ -1994,6 +2040,11 @@ export default function LogisticsTimelineView({
                                     dndData={dndData}
                                     draggingOpacity={0}
                                     hideWhileDragging
+                                    collapsePullPx={
+                                      isCrossDriverSourceRow
+                                        ? crossDriverInsertWidthPx
+                                        : 0
+                                    }
                                     task={task}
                                     index={index}
                                     isInTimeline
@@ -2007,9 +2058,13 @@ export default function LogisticsTimelineView({
                                       isLoadingOverlay ||
                                       Boolean((task as any).locked)
                                     }
-                                    timelineWidthPx={timelineWidthPx}
+                                    timelineWidthPx={timelineContentWidthPx}
                                     timelinePxPerMinute={timelinePxPerMinute}
-                                    minTimelineTaskWidthPx={56}
+                                    minTimelineTaskWidthPx={
+                                      hideRouteSpacers
+                                        ? COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX
+                                        : MIN_TIMELINE_TASK_WIDTH_PX
+                                    }
                                     operationsScope="logistics"
                                     isHighlighted={hi.has(String(task.id))}
                                     timelineRowStaffDisplayLabel={driverRowDisplayLabel}
@@ -2020,6 +2075,7 @@ export default function LogisticsTimelineView({
                                 </Fragment>
                               );
                             })}
+                            {renderCrossDriverInsertSlot(tasks.length)}
                             {!hideRouteSpacers && (
                               <LogisticsRouteLineSegment
                                 widthPx={returnTravelWidthPx}
