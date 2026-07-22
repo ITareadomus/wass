@@ -2194,7 +2194,10 @@ const displayClickableInputClass =
       // Se la task è < 60 minuti, usa sempre 60 minuti (larghezza di 1 ora)
       const displayMinutes = effectiveMinutes < 60 ? 60 : effectiveMinutes;
       const halfHours = Math.ceil(displayMinutes / 30);
-      const baseWidth = halfHours * 50;
+      // Larghezza per mezz'ora + base fissa che riserva lo spazio della colonna
+      // orari (check-in/out posizionati in absolute a destra), così il customer
+      // reference non ci finisce sotto.
+      const baseWidth = halfHours * 54 + 56;
       return `${baseWidth}px`;
     }
   };
@@ -2999,6 +3002,15 @@ const displayClickableInputClass =
         ? `${dragOverlayWidthPx}px`
         : calculateWidth(effectiveDurationForUi, isInTimeline);
 
+    // Nei container gli orari check-in/out sono in absolute a destra: riserviamo
+    // spazio sul contenuto così il customer reference non ci si sovrappone.
+    const reserveTimesSpace =
+      !isInTimeline &&
+      shouldShowCheckInOutArrows &&
+      (Boolean((taskWithPendingEdits as any).checkout_time) ||
+        Boolean((taskWithPendingEdits as any).checkin_time) ||
+        isFutureCheckin);
+
     return (
             <div
               ref={innerRef}
@@ -3197,7 +3209,7 @@ const displayClickableInputClass =
                         );
                       })()}
 
-                    <div className="flex flex-col items-start justify-center flex-1 min-w-0 gap-0.5 pl-2 pr-1 overflow-visible">
+                    <div className={cn("flex flex-col items-start justify-center flex-1 min-w-0 gap-0.5 pl-2 overflow-visible", reserveTimesSpace ? "pr-[52px]" : "pr-1")}>
                       <div className="flex items-center gap-1 w-full min-w-0 overflow-visible">
                         <span
                           className="text-foreground font-extrabold text-[13px] leading-none shrink-0"

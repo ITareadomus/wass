@@ -1,6 +1,7 @@
 import pool, { query } from '../../shared/pg-db';
 import { taskCollaborationService } from './pg-task-collaboration-service';
 import { formatInTimeZone } from 'date-fns-tz';
+import { databaseConfig } from '../../config/database';
 
 const ROME_TZ = 'Europe/Rome';
 
@@ -2134,10 +2135,11 @@ export class PgDailyAssignmentsService {
         try {
           const mysql = await import('mysql2/promise');
           const adamConnection = await mysql.createConnection({
-            host: process.env.DB_HOST,
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            database: process.env.DB_NAME
+            host: databaseConfig.mysql.host,
+            port: databaseConfig.mysql.port,
+            user: databaseConfig.mysql.user,
+            password: databaseConfig.mysql.password,
+            database: databaseConfig.mysql.database,
           });
           
           const logisticCodes = tasksNeedingRef.map(t => t.logistic_code);
@@ -2338,10 +2340,11 @@ export class PgDailyAssignmentsService {
         try {
           const mysql = await import('mysql2/promise');
           const adamConnection = await mysql.createConnection({
-            host: process.env.DB_HOST,
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            database: process.env.DB_NAME
+            host: databaseConfig.mysql.host,
+            port: databaseConfig.mysql.port,
+            user: databaseConfig.mysql.user,
+            password: databaseConfig.mysql.password,
+            database: databaseConfig.mysql.database,
           });
           const logisticCodes = tasksNeedingRef.map(t => t.logistic_code);
           const [rows] = await adamConnection.execute(
