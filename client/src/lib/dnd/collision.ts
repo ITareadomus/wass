@@ -145,10 +145,12 @@ const getActiveCardRect = (args: CollisionArgs): ActiveCardRect | null => {
   if (!base) return null;
 
   const activeData = args.active.data.current;
+  // Timeline source o assign da priority: overlay/collision usano la card a 15'.
   const isCompactTimelineDrag =
     isAppDndItem(activeData) &&
     (activeData.scope === "housekeeping" || activeData.scope === "logistics") &&
-    activeData.from.type === "timeline";
+    (activeData.from.type === "timeline" ||
+      activeData.from.type === "priority");
 
   // Se il node sorgente è stato alterato, preferisci la larghezza iniziale.
   const measuredWidth =
@@ -208,6 +210,10 @@ const isCrossCleanerTimelineSort = (
   if (sortContainer.container.type !== "timeline") return false;
   const activeData = args.active.data.current;
   if (!isAppDndItem(activeData)) return false;
+  // Assign da container: item esterno al SortableContext → pack midpoints + spacer.
+  if (activeData.from.type === "priority") {
+    return !containerItemIds.has(args.active.id);
+  }
   if (
     activeData.from.type !== "timeline" &&
     activeData.from.type !== "summary"
@@ -227,7 +233,9 @@ const isTimelineActiveDrag = (args: CollisionArgs) => {
   return (
     isAppDndItem(activeData) &&
     (activeData.scope === "housekeeping" || activeData.scope === "logistics") &&
-    (activeData.from.type === "timeline" || activeData.from.type === "summary")
+    (activeData.from.type === "timeline" ||
+      activeData.from.type === "summary" ||
+      activeData.from.type === "priority")
   );
 };
 

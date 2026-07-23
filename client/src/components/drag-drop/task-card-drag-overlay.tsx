@@ -41,6 +41,7 @@ export function TaskCardDragOverlay({
 }: TaskCardDragOverlayProps) {
   const isSummaryDrag = activeItem?.from.type === "summary";
   const isTimelineDrag = activeItem?.from.type === "timeline";
+  const isPriorityDrag = activeItem?.from.type === "priority";
 
   const activeSummaryEntry = isSummaryDrag && isSequenceSummaryEntry(activeDragTask)
     ? activeDragTask
@@ -63,10 +64,10 @@ export function TaskCardDragOverlay({
     return Number.isFinite(value) && value > 0 ? value : null;
   })();
 
-  // HK timeline: overlay a 15' allineato al rect della card (stesso top-left
-  // della collision detection) — niente snap al cursore.
+  // HK: overlay a 15' per drag da timeline e da container (assign),
+  // allineato al rect della card — niente snap al cursore.
   const useCompactHkTimelineOverlay =
-    isTimelineDrag && scope === "housekeeping";
+    scope === "housekeeping" && (isTimelineDrag || isPriorityDrag);
   const compactTimelinePxPerMinute =
     liveTimelinePxPerMinute ?? (scope === "logistics" ? 4 : 2.5);
   const compactOverlayWidthPx = Math.max(
@@ -81,6 +82,8 @@ export function TaskCardDragOverlay({
   const renderedOverlayHeight = useCompactHkTimelineOverlay
     ? compactOverlayHeightPx
     : overlayHeight;
+
+  const treatAsTimelineCard = isTimelineDrag || useCompactHkTimelineOverlay;
 
   return (
     <DragOverlay adjustScale={false} dropAnimation={null} modifiers={modifiers}>
@@ -105,17 +108,18 @@ export function TaskCardDragOverlay({
             width: overlayWidth,
             height: renderedOverlayHeight,
             minWidth:
-              isTimelineDrag && (scope === "logistics" || useCompactHkTimelineOverlay)
+              treatAsTimelineCard &&
+              (scope === "logistics" || useCompactHkTimelineOverlay)
                 ? 56
                 : undefined,
-            minHeight: isTimelineDrag ? 40 : undefined,
+            minHeight: treatAsTimelineCard ? 40 : undefined,
           }}
         >
           <TaskCard
             task={activeTask}
             index={activeItem.index}
             allTasks={tasks as Task[]}
-            isInTimeline={isTimelineDrag}
+            isInTimeline={treatAsTimelineCard}
             currentContainer={
               activeItem.from.type === "priority" ? activeItem.from.key : ""
             }

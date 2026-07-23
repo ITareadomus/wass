@@ -786,6 +786,7 @@ export default function GenerateLogisticsAssignments() {
         body: JSON.stringify({
           date: dateStr,
           apply: true,
+          allowPartial: true,
           solver: "ortools-v1",
           debug: true,
         }),

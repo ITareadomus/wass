@@ -1178,12 +1178,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`✅ Containers rigenerati da ADAM`);
       }
 
-      const rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
-        workDate,
-        currentUsername,
-        resolveScopeFromReq(req)
-      );
-      const rehydratedPreassigned = rehydrateResult.rehydrated;
+      // In DEVELOPMENT resettiamo TUTTO, comprese le task pre-assegnate:
+      // non le reidratiamo così tornano nei container come le altre.
+      // In PRODUZIONE il comportamento resta invariato (reidratazione attiva).
+      const { isDevelopmentEnvironment } = await import("../shared/work-date-access");
+      const isDev = isDevelopmentEnvironment();
+
+      let rehydratedPreassigned = 0;
+      if (isDev) {
+        console.log(`🧪 [DEV] Reset totale: le task pre-assegnate NON vengono reidratate`);
+      } else {
+        const rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
+          workDate,
+          currentUsername,
+          resolveScopeFromReq(req)
+        );
+        rehydratedPreassigned = rehydrateResult.rehydrated;
+      }
 
       // === RESET: NON modificare selected_cleaners ===
       console.log(`✅ Reset completato - selected_cleaners NON modificato`);
@@ -4563,10 +4574,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timelineData.cleaners_assignments.push(cleanerEntry);
       }
 
-      // Rimuovi il task se già presente (evita duplicazioni)
-      cleanerEntry.tasks = cleanerEntry.tasks.filter((t: any) =>
-        String(t.logistic_code) !== normalizedLogisticCode && String(t.task_id) !== normalizedTaskId
-      );
+      // Rimuovi il task da TUTTI i cleaner prima di riassegnarlo.
+      // Un assegnamento manuale (drag&drop, anche multi-selezione) è un "move":
+      // il task deve risultare su UN SOLO cleaner. Se lo rimuovessimo solo dal
+      // cleaner di destinazione, un task già presente su un altro cleaner
+      // resterebbe duplicato e il reconciler lo promuoverebbe erroneamente a
+      // collaborazione. Le collaborazioni vere passano da endpoint dedicati
+      // (/collaborators/add, /collaborators/assign), non da qui.
+      const matchesTaskToAssign = (t: any): boolean =>
+        String(t.logistic_code) === normalizedLogisticCode || String(t.task_id) === normalizedTaskId;
+      for (const entry of timelineData.cleaners_assignments) {
+        if (!entry || !Array.isArray(entry.tasks)) continue;
+        entry.tasks = entry.tasks.filter((t: any) => !matchesTaskToAssign(t));
+      }
 
       const preAssignedMode =
         resolvePreassignedModeFromTask(fullTaskData) ||

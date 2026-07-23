@@ -1831,6 +1831,11 @@ export default function GenerateAssignments() {
         if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
         setIsLoadingDragDrop(false);
         resetDndUiState();
+        // Il movimento (anche multi-selezione) è concluso: azzera la selezione
+        // così il prossimo drag riparte da zero e non "trascina" i task
+        // selezionati in precedenza. I drop non validi (noop) escono prima del
+        // try, quindi qui la selezione viene azzerata solo dopo un'operazione reale.
+        clearSelection();
       }
     },
     [
@@ -1845,6 +1850,7 @@ export default function GenerateAssignments() {
       resetDndUiState,
       removeTimelineAssignment,
       saveTaskAssignment,
+      clearSelection,
       toast,
     ],
   );

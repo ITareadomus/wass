@@ -136,10 +136,14 @@ def solve_payload(payload):
         time_dimension.CumulVar(index).SetRange(earliest, max_start)
 
         required_vehicle_index = task.get("requiredVehicleIndex")
+        penalty = int(task.get("dropPenalty", 10000))
         if required_vehicle_index is not None:
-            routing.VehicleVar(index).SetValues([int(required_vehicle_index)])
+            # Required tasks must participate in the disjunction framework like optional
+            # nodes: VehicleVar-only (no AddDisjunction / no -1) makes the whole model
+            # infeasible as soon as any other node is optional.
+            routing.VehicleVar(index).SetValues([int(required_vehicle_index), -1])
+            routing.AddDisjunction([index], penalty)
         else:
-            penalty = int(task.get("dropPenalty", 10000))
             routing.AddDisjunction([index], penalty)
 
     for entry in payload.get("softTimeWindows", []):
@@ -154,8 +158,10 @@ def solve_payload(payload):
         time_dimension.SetGlobalSpanCostCoefficient(balance_weight)
 
     search_params = pywrapcp.DefaultRoutingSearchParameters()
+    # PARALLEL_CHEAPEST_INSERTION finds TW-feasible first solutions much more reliably
+    # than PATH_CHEAPEST_ARC on logistics instances with tight windows.
     search_params.first_solution_strategy = (
-        routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
+        routing_enums_pb2.FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION
     )
     search_params.local_search_metaheuristic = (
         routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH

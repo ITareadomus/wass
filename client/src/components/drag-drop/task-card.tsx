@@ -2207,16 +2207,10 @@ const displayClickableInputClass =
     ? "0.15"
     : (task.duration || "0.0");
 
-  // Mostra frecce solo per task >= 1 ora
-  const [hours, mins] = effectiveDurationForUi.split('.').map(Number);
-  const totalMinutes = (hours || 0) * 60 + (mins || 0);
-
-  // CRITICAL: In timeline, mostra frecce SOLO se >= 1h
-  // Nei container, mostra frecce SEMPRE (anche per < 1h)
-  const shouldShowCheckInOutArrows = isInTimeline ? totalMinutes >= 60 : true;
-
-  // Mostra orari nel tooltip solo per task < 1 ora E quando le frecce sono nascoste
-  const shouldShowTooltipTimes = totalMinutes < 60 && !shouldShowCheckInOutArrows;
+  // Mostra sempre le frecce check-in/out (anche in timeline per task < 1h)
+  const shouldShowCheckInOutArrows = true;
+  // Fallback tooltip disabilitato: gli orari restano sempre sulla card
+  const shouldShowTooltipTimes = false;
   const cardTooltipAddressLabel =
     String(displayTask.address ?? "").trim().toUpperCase() || "INDIRIZZO NON DISPONIBILE";
   const cardTooltipClientAlias = String(displayTask.alias ?? "").trim();

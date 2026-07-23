@@ -2836,14 +2836,20 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           {/* Task posizionate in sequenza con indicatori di travel time */}
                           <div className="relative z-10 flex items-center h-full" style={{ minHeight: '45px', width: timelineScaledWidth, minWidth: "100%" }}>
                             {(() => {
-                              // Optimistic cross-cleaner: spacer invisibile sulla riga target
-                              // (il SortableContext non anima item di un altro container).
-                              const isCrossCleanerTargetRow =
+                              // Optimistic insert gap sulla riga target quando l'item
+                              // non è nel SortableContext (cross-cleaner o assign da container).
+                              const isExternalAssignTargetRow =
                                 hideRouteSpacers &&
                                 draggingOverCleanerId === cleaner.id &&
-                                activeDragCleanerId != null &&
-                                activeDragCleanerId !== cleaner.id &&
+                                activeDragCleanerId == null &&
                                 lastValidDragIndex != null;
+                              const isCrossCleanerTargetRow =
+                                (hideRouteSpacers &&
+                                  draggingOverCleanerId === cleaner.id &&
+                                  activeDragCleanerId != null &&
+                                  activeDragCleanerId !== cleaner.id &&
+                                  lastValidDragIndex != null) ||
+                                isExternalAssignTargetRow;
                               const isCrossCleanerSourceRow =
                                 hideRouteSpacers &&
                                 activeDragCleanerId === cleaner.id &&
