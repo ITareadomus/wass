@@ -115,6 +115,73 @@ describe("buildSameBuildingDriverConstraints", () => {
     });
   });
 
+  it("distributes independent same-building groups instead of collapsing onto the lowest driver id", () => {
+    const tasks = [
+      buildTask({ taskId: 1, nodeIndex: 1, location: { lat: 45.45, lng: 9.18 } }),
+      buildTask({ taskId: 2, nodeIndex: 2, location: { lat: 45.45001, lng: 9.18001 } }),
+      buildTask({ taskId: 3, nodeIndex: 3, location: { lat: 45.47, lng: 9.18 } }),
+      buildTask({ taskId: 4, nodeIndex: 4, location: { lat: 45.47001, lng: 9.18001 } }),
+      buildTask({ taskId: 5, nodeIndex: 5, location: { lat: 45.45, lng: 9.22 } }),
+      buildTask({ taskId: 6, nodeIndex: 6, location: { lat: 45.45001, lng: 9.22001 } }),
+    ];
+    const drivers = [buildDriver(10), buildDriver(20), buildDriver(30)];
+    const travelMatrixMin = buildTravelMatrixMin(buildLocationNodes(tasks));
+    const businessGroups = buildBusinessGroups(tasks, travelMatrixMin);
+
+    const result = buildSameBuildingDriverConstraints({
+      businessGroups,
+      tasks,
+      drivers,
+      travelMatrixMin,
+      existingRequiredDriverByTaskId: new Map(),
+    });
+
+    const selectedDriverIds = result.constraints
+      .filter((constraint) => constraint.type === "REQUIRED_DRIVER_TASK")
+      .map((constraint) => constraint.driverId);
+
+    expect(result.lockedGroupCount).toBe(3);
+    expect(result.constraints).toHaveLength(6);
+    expect(new Set(selectedDriverIds)).toEqual(new Set([10, 20, 30]));
+  });
+
+  it("keeps same-building locks aligned with the daily territory preference", () => {
+    const tasks = [
+      buildTask({ taskId: 1, nodeIndex: 1, location: { lat: 45.45, lng: 9.18 } }),
+      buildTask({ taskId: 2, nodeIndex: 2, location: { lat: 45.45001, lng: 9.18001 } }),
+      buildTask({ taskId: 3, nodeIndex: 3, location: { lat: 45.47, lng: 9.22 } }),
+      buildTask({ taskId: 4, nodeIndex: 4, location: { lat: 45.47001, lng: 9.22001 } }),
+    ];
+    const drivers = [buildDriver(10), buildDriver(20), buildDriver(30)];
+    const travelMatrixMin = buildTravelMatrixMin(buildLocationNodes(tasks));
+    const businessGroups = buildBusinessGroups(tasks, travelMatrixMin);
+
+    const result = buildSameBuildingDriverConstraints({
+      businessGroups,
+      tasks,
+      drivers,
+      travelMatrixMin,
+      existingRequiredDriverByTaskId: new Map(),
+      preferredDriverByTaskId: new Map([
+        [1, 30],
+        [2, 30],
+        [3, 20],
+        [4, 20],
+      ]),
+    });
+
+    const driverByTaskId = new Map(
+      result.constraints
+        .filter((constraint) => constraint.type === "REQUIRED_DRIVER_TASK")
+        .map((constraint) => [constraint.taskId, constraint.driverId])
+    );
+
+    expect(driverByTaskId.get(1)).toBe(30);
+    expect(driverByTaskId.get(2)).toBe(30);
+    expect(driverByTaskId.get(3)).toBe(20);
+    expect(driverByTaskId.get(4)).toBe(20);
+  });
+
   it("greedy solver keeps same-building tasks on one driver", () => {
     const tasks = [
       buildTask({
@@ -253,6 +320,35 @@ describe("buildSameBuildingDriverConstraints", () => {
   });
 });
 
+function buildSchedulableTask(args: {
+  taskId: number;
+  lat: number;
+  lng: number;
+  cleanerSequence: number;
+  cleanerTaskStartTime: string;
+}): LogisticsRoutingSourceData["schedulableTasks"][number] {
+  return {
+    taskId: args.taskId,
+    logisticCode: args.taskId,
+    priority: "low_priority",
+    cleaningTime: 60,
+    lat: args.lat,
+    lng: args.lng,
+    checkinDate: null,
+    checkoutDate: null,
+    checkinTime: null,
+    checkoutTime: null,
+    cleanerId: 987,
+    cleanerStartTime: "10:00",
+    cleanerTaskStartTime: args.cleanerTaskStartTime,
+    cleanerSequence: args.cleanerSequence,
+    premium: false,
+    paxIn: 1,
+    logisticsTaskKind: "delivery/pick-up",
+    logisticsTaskKindSource: "auto",
+  };
+}
+
 describe("buildRoutingProblemInputFromSource integration", () => {
   it("adds same-building REQUIRED_DRIVER constraints from source data", () => {
     const sourceData: LogisticsRoutingSourceData = {
@@ -340,6 +436,134 @@ describe("buildRoutingProblemInputFromSource integration", () => {
     );
     expect(driverIds[0]).toBe(driverIds[1]);
     expect(input.metadata.sameBuildingDriverLockCount).toBe(1);
+    expect(
+      input.metadata.validation.warnings.some(
+        (warning) => warning.path === "metadata.preAssignedRequiredCount"
+      )
+    ).toBe(false);
+  });
+
+  it("derives same-building locks from the territory assignment, not the other way around", () => {
+    const sourceData: LogisticsRoutingSourceData = {
+      workDate: "2026-06-18",
+      allTaskData: [],
+      schedulableTasks: [
+        // Two distant clusters, each containing one same-building pair. Locking both
+        // pairs to the same driver would make one territory unreachable by its own
+        // driver, which is the degradation this ordering prevents.
+        buildSchedulableTask({
+          taskId: 1,
+          lat: 45.49,
+          lng: 9.15,
+          cleanerSequence: 1,
+          cleanerTaskStartTime: "11:00",
+        }),
+        buildSchedulableTask({
+          taskId: 2,
+          lat: 45.490005,
+          lng: 9.150005,
+          cleanerSequence: 2,
+          cleanerTaskStartTime: "11:30",
+        }),
+        buildSchedulableTask({
+          taskId: 3,
+          lat: 45.493,
+          lng: 9.15,
+          cleanerSequence: 3,
+          cleanerTaskStartTime: "12:00",
+        }),
+        buildSchedulableTask({
+          taskId: 4,
+          lat: 45.496,
+          lng: 9.15,
+          cleanerSequence: 4,
+          cleanerTaskStartTime: "12:30",
+        }),
+        buildSchedulableTask({
+          taskId: 5,
+          lat: 45.43,
+          lng: 9.26,
+          cleanerSequence: 5,
+          cleanerTaskStartTime: "13:00",
+        }),
+        buildSchedulableTask({
+          taskId: 6,
+          lat: 45.430005,
+          lng: 9.260005,
+          cleanerSequence: 6,
+          cleanerTaskStartTime: "13:30",
+        }),
+        buildSchedulableTask({
+          taskId: 7,
+          lat: 45.433,
+          lng: 9.26,
+          cleanerSequence: 7,
+          cleanerTaskStartTime: "14:00",
+        }),
+        buildSchedulableTask({
+          taskId: 8,
+          lat: 45.436,
+          lng: 9.26,
+          cleanerSequence: 8,
+          cleanerTaskStartTime: "14:30",
+        }),
+      ],
+      selectedDrivers: [
+        {
+          id: 737,
+          startTime: "10:00",
+          endTime: "20:00",
+          startTimeSource: "default",
+          endTimeSource: "default",
+        },
+        {
+          id: 1078,
+          startTime: "10:00",
+          endTime: "20:00",
+          startTimeSource: "default",
+          endTimeSource: "default",
+        },
+      ],
+      windowConfig: {
+        source: "app_settings",
+        workDate: "2026-06-18",
+        priorityWindows,
+        fallbackUsed: false,
+      },
+      lockedTasksExcluded: 0,
+      tasksExcludedNoCoordinatesIds: [],
+      timelineAssignmentHints: [],
+    };
+
+    const input = buildRoutingProblemInputFromSource(sourceData);
+    const territoryAssignment = input.metadata.dailyTerritoryAssignment;
+    expect(territoryAssignment).toBeDefined();
+
+    const preferredDriverByTaskId = new Map(
+      territoryAssignment!.taskPreferredDriverId.map((entry) => [entry.taskId, entry.driverId])
+    );
+    const sameBuildingConstraints = input.hardConstraints.filter(
+      (constraint) =>
+        constraint.type === "REQUIRED_DRIVER_TASK" &&
+        constraint.source === "same_coordinates_building"
+    );
+
+    expect(input.metadata.sameBuildingDriverLockCount).toBe(2);
+    expect(sameBuildingConstraints).toHaveLength(4);
+
+    const mismatches = sameBuildingConstraints.filter(
+      (constraint) =>
+        constraint.type === "REQUIRED_DRIVER_TASK" &&
+        preferredDriverByTaskId.get(constraint.taskId) !== constraint.driverId
+    );
+    expect(mismatches).toEqual([]);
+
+    const lockedDriverIds = new Set(
+      sameBuildingConstraints.map((constraint) =>
+        constraint.type === "REQUIRED_DRIVER_TASK" ? constraint.driverId : null
+      )
+    );
+    expect(lockedDriverIds).toEqual(new Set([737, 1078]));
   });
 });
 

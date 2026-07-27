@@ -622,6 +622,17 @@ export default function GenerateLogisticsAssignments() {
     await loadLogisticsTimelineState(selectedDate);
   }, [selectedDate, loadLogisticsContainers, loadLogisticsTimelineState]);
 
+  // TaskCard chiama window.reloadAllTasks dopo lock/unlock: senza questo hook
+  // i metadati duplicate_* restano stale e la grafica dei doppi non si spegne.
+  useEffect(() => {
+    (window as any).reloadAllTasks = reloadLogisticsPage;
+    return () => {
+      if ((window as any).reloadAllTasks === reloadLogisticsPage) {
+        delete (window as any).reloadAllTasks;
+      }
+    };
+  }, [reloadLogisticsPage]);
+
   /**
    * Allineato a generate-assignments: data passata → solo PG; data oggi/futura → se la timeline ha già task
    * per quella data si ricarica senza script; altrimenti extract driver + create_containers logistics (ADAM).

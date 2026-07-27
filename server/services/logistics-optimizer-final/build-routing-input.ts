@@ -310,22 +310,28 @@ export function buildRoutingProblemInputFromSource(
   const existingRequiredDriverByTaskId = buildRequiredDriverByTaskIdFromConstraints(
     requiredDriverBuild.constraints
   );
+  // Build territories from real timeline assignments only. Synthetic same-building
+  // locks are derived afterwards, otherwise their local tie-break can distort the
+  // territory-to-driver matching for the entire day.
+  const territoryBuild = buildDailyTerritoryAssignment({
+    tasks,
+    drivers,
+    travelMatrixMin,
+    requiredDriverByTaskId: existingRequiredDriverByTaskId,
+  });
+  const preferredDriverByTaskId = new Map(
+    territoryBuild.assignment?.taskPreferredDriverId.map((entry) => [
+      entry.taskId,
+      entry.driverId,
+    ]) ?? []
+  );
   const sameBuildingDriverBuild = buildSameBuildingDriverConstraints({
     businessGroups: baseBusinessGroups,
     tasks,
     drivers,
     travelMatrixMin,
     existingRequiredDriverByTaskId,
-  });
-  const requiredDriverByTaskId = buildRequiredDriverByTaskIdFromConstraints([
-    ...requiredDriverBuild.constraints,
-    ...sameBuildingDriverBuild.constraints,
-  ]);
-  const territoryBuild = buildDailyTerritoryAssignment({
-    tasks,
-    drivers,
-    travelMatrixMin,
-    requiredDriverByTaskId,
+    preferredDriverByTaskId,
   });
   const businessGroups = [...baseBusinessGroups, ...territoryBuild.groups];
   const businessSoftConstraints = buildBusinessGroupSoftConstraints(businessGroups);

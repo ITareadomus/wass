@@ -1189,16 +1189,18 @@ function validateMetadataAndWarnings(
     });
   }
 
-  if (
-    input.metadata.preAssignedRequiredCount !==
-    input.hardConstraints.filter((constraint) => constraint.type === "REQUIRED_DRIVER_TASK").length
-  ) {
+  const timelinePreAssignedConstraintCount = input.hardConstraints.filter(
+    (constraint) =>
+      constraint.type === "REQUIRED_DRIVER_TASK" &&
+      constraint.source === "timeline_pre_assigned"
+  ).length;
+  if (input.metadata.preAssignedRequiredCount !== timelinePreAssignedConstraintCount) {
     pushWarning(warnings, {
       code: "METADATA_CONSISTENCY_MISMATCH",
-      message: "preAssignedRequiredCount does not match REQUIRED_DRIVER_TASK hardConstraints count",
+      message:
+        "preAssignedRequiredCount does not match timeline_pre_assigned REQUIRED_DRIVER_TASK count",
       path: "metadata.preAssignedRequiredCount",
-      expected: input.hardConstraints.filter((constraint) => constraint.type === "REQUIRED_DRIVER_TASK")
-        .length,
+      expected: timelinePreAssignedConstraintCount,
       actual: input.metadata.preAssignedRequiredCount,
     });
   }

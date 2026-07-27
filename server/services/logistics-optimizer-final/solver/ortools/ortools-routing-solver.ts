@@ -9,6 +9,7 @@ import {
   buildOrToolsPayload,
   decodeOrToolsSolution,
   type OrToolsRawSolution,
+  type OrToolsRoutingPayload,
 } from "./ortools-adapter";
 import {
   buildRequiredDriverNotSelectedSolution,
@@ -100,12 +101,40 @@ function defaultScriptPath(): string {
   return join(process.cwd(), "dist", "logistics_routing_ortools.py");
 }
 
+export const DEFAULT_ORTOOLS_TIME_LIMIT_SEC = 30;
+
+export function resolveOrToolsTimeLimitSec(explicit?: number): number {
+  if (explicit !== undefined) return explicit;
+  const raw = Number.parseInt(String(process.env.LOGISTICS_ORTOOLS_TIME_LIMIT_SEC ?? ""), 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_ORTOOLS_TIME_LIMIT_SEC;
+}
+
+/** Runs an already-built payload through the Python solver and returns the raw result. */
+export async function runOrToolsPayload(
+  payload: OrToolsRoutingPayload,
+  options: {
+    timeoutMs?: number;
+    pythonPath?: string;
+    scriptPath?: string;
+  } = {}
+): Promise<OrToolsRawSolution> {
+  const timeoutMs = options.timeoutMs ?? (payload.options.timeLimitSec + 10) * 1000;
+  const pythonPath =
+    options.pythonPath ?? (process.platform === "win32" ? "python" : "python3");
+  const scriptPath = options.scriptPath ?? defaultScriptPath();
+  const stdout = await runPythonScript(scriptPath, JSON.stringify(payload), {
+    timeoutMs,
+    pythonPath,
+  });
+  return parseRawSolution(stdout);
+}
+
 export async function solveOrToolsRouting(
   input: RoutingProblemInput,
   options: RunOrToolsRoutingOptions = {}
 ): Promise<RoutingSolution> {
   const startedAt = Date.now();
-  const timeLimitSec = options.ortools?.timeLimitSec ?? 30;
+  const timeLimitSec = resolveOrToolsTimeLimitSec(options.ortools?.timeLimitSec);
   const timeoutMs = options.ortools?.timeoutMs ?? (timeLimitSec + 10) * 1000;
   const pythonPath =
     options.ortools?.pythonPath ?? (process.platform === "win32" ? "python" : "python3");

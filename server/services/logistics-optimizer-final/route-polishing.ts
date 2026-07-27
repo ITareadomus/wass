@@ -5,6 +5,7 @@ import {
   type RouteSequenceArcPenaltyDetail,
 } from "./groups/route-sequence-penalties";
 import type { HistoricalTerritoryKey } from "./groups/historical-territory-profiles";
+import { findBestFeasibleSequence } from "./route-sequencer";
 
 const DEPOT_NODE_INDEX = 0;
 const EPSILON = 0.001;
@@ -13,7 +14,15 @@ const ROUTE_POLISHING_CONFIG = {
   maxIterationsPerRoute: 200,
   maxTravelOnlyIterationsPerRoute: 100,
   maxMoveBlockLength: 5,
-  sequencePenaltyMultiplier: 3,
+  /**
+   * Prices the shape penalties in travel minutes. Fuel is the objective and the shape
+   * counters are only proxies for wasting it, so they are worth a few minutes of
+   * detour each — enough to settle near-equivalent orders, not enough to reject an
+   * order that genuinely drives less. Larger shape gains are still reachable through
+   * the shape-first pass, which is explicitly capped at
+   * `maxShapeFirstTravelIncreaseMin` extra minutes.
+   */
+  sequencePenaltyMultiplier: 0.1,
   waitPenaltyWeight: 0.1,
   initialDepotWaitPenaltyWeight: 0,
   routePenaltyWeight: 0.4,
@@ -34,6 +43,8 @@ const ROUTE_POLISHING_CONFIG = {
   rejectedSequenceCandidateLimit: 5,
   rejectedShapeCandidateLimit: 5,
   rejectedTravelOnlyCandidateLimit: 5,
+  /** Width of the deadline band inside which the deadline-aware order may pick by distance. */
+  bucketDeadlineBandMin: 45,
 } as const;
 
 type CandidateMoveType =
@@ -44,6 +55,7 @@ type CandidateMoveType =
   | "move-block-5"
   | "move-subzone-block"
   | "canonical-bucket-order"
+  | "global-sequence"
   | "reverse-segment";
 type PolishPass = "sequence-objective" | "travel-only";
 
@@ -81,7 +93,7 @@ interface CandidateOrder {
   length: number;
 }
 
-interface SubZoneAssignment {
+export interface SubZoneAssignment {
   territoryIndex: number;
   territoryKey: HistoricalTerritoryKey;
   bucketIndex: number;
@@ -219,7 +231,7 @@ function routeSequencePenalty(
   return penaltyLookup.get(`${fromNodeIndex}:${toNodeIndex}`) ?? 0;
 }
 
-function buildSubZoneLookup(input: RoutingProblemInput): Map<TaskId, SubZoneAssignment> {
+export function buildSubZoneLookup(input: RoutingProblemInput): Map<TaskId, SubZoneAssignment> {
   const assignment = input.metadata.dailyTerritoryAssignment;
   if (
     !assignment ||
@@ -796,45 +808,185 @@ function nearestNeighborBucketOrder(
   return bestOrder;
 }
 
-function canonicalBucketOrders(
+function earliestDeadlineBucketOrder(
+  _input: RoutingProblemInput,
+  taskById: Map<TaskId, TaskNode>,
+  bucketTaskIds: TaskId[]
+): TaskId[] {
+  if (bucketTaskIds.length < 2) return bucketTaskIds;
+
+  return [...bucketTaskIds].sort((left, right) => {
+    const leftTask = taskById.get(left);
+    const rightTask = taskById.get(right);
+    if (!leftTask || !rightTask) return 0;
+    const byLatestStart =
+      leftTask.hardWindow.latestStartMin - rightTask.hardWindow.latestStartMin;
+    if (byLatestStart !== 0) return byLatestStart;
+    const byLatestEnd = leftTask.hardWindow.latestEndMin - rightTask.hardWindow.latestEndMin;
+    if (byLatestEnd !== 0) return byLatestEnd;
+    return left - right;
+  });
+}
+
+/**
+ * Nearest neighbor restricted to the tasks whose deadline is within a band of the
+ * tightest remaining one, so a geographically convenient stop cannot strand an urgent
+ * task later in the same bucket.
+ */
+function deadlineAwareNearestNeighborOrder(
+  input: RoutingProblemInput,
+  taskById: Map<TaskId, TaskNode>,
+  bucketTaskIds: TaskId[]
+): TaskId[] {
+  if (bucketTaskIds.length < 3) return earliestDeadlineBucketOrder(input, taskById, bucketTaskIds);
+
+  const latestStartOf = (taskId: TaskId): number =>
+    taskById.get(taskId)?.hardWindow.latestStartMin ?? Number.POSITIVE_INFINITY;
+
+  const remaining = new Set(bucketTaskIds);
+  const resultOrder: TaskId[] = [];
+  let previousTaskId: TaskId | null = null;
+
+  while (remaining.size > 0) {
+    let tightestDeadline = Number.POSITIVE_INFINITY;
+    for (const taskId of remaining) {
+      tightestDeadline = Math.min(tightestDeadline, latestStartOf(taskId));
+    }
+    const deadlineLimit = tightestDeadline + ROUTE_POLISHING_CONFIG.bucketDeadlineBandMin;
+
+    let nextTaskId: TaskId | null = null;
+    let nextTravel = Number.POSITIVE_INFINITY;
+    let nextDeadline = Number.POSITIVE_INFINITY;
+
+    for (const taskId of remaining) {
+      if (latestStartOf(taskId) > deadlineLimit) continue;
+      const travel =
+        previousTaskId === null
+          ? travelMin(input, DEPOT_NODE_INDEX, taskById.get(taskId)?.nodeIndex ?? -1)
+          : travelBetweenTasks(input, taskById, previousTaskId, taskId);
+      const effectiveTravel = travel ?? Number.POSITIVE_INFINITY;
+      if (
+        effectiveTravel < nextTravel ||
+        (effectiveTravel === nextTravel && latestStartOf(taskId) < nextDeadline)
+      ) {
+        nextTaskId = taskId;
+        nextTravel = effectiveTravel;
+        nextDeadline = latestStartOf(taskId);
+      }
+    }
+
+    if (nextTaskId === null) {
+      for (const taskId of remaining) {
+        if (latestStartOf(taskId) < nextDeadline) {
+          nextTaskId = taskId;
+          nextDeadline = latestStartOf(taskId);
+        }
+      }
+    }
+    if (nextTaskId === null) break;
+
+    resultOrder.push(nextTaskId);
+    remaining.delete(nextTaskId);
+    previousTaskId = nextTaskId;
+  }
+
+  return resultOrder.length === bucketTaskIds.length ? resultOrder : bucketTaskIds;
+}
+
+type BucketOrderStrategy = (
+  input: RoutingProblemInput,
+  taskById: Map<TaskId, TaskNode>,
+  bucketTaskIds: TaskId[]
+) => TaskId[];
+
+const BUCKET_ORDER_STRATEGIES: BucketOrderStrategy[] = [
+  nearestNeighborBucketOrder,
+  deadlineAwareNearestNeighborOrder,
+  earliestDeadlineBucketOrder,
+];
+
+/**
+ * Builds full-route candidates that visit each territory as one contiguous block and
+ * sweep its sub-zones monotonically. Bucket indexes are only comparable inside a single
+ * territory, so grouping happens per territory before ordering.
+ */
+export function canonicalBucketOrders(
   input: RoutingProblemInput,
   taskById: Map<TaskId, TaskNode>,
   order: TaskId[],
   subZoneByTaskId: Map<TaskId, SubZoneAssignment>
 ): TaskId[][] {
-  const territoryKeys = new Set<HistoricalTerritoryKey>();
-  const bucketTasksByIndex = new Map<number, TaskId[]>();
+  const territoryAppearanceOrder: number[] = [];
+  const bucketsByTerritory = new Map<number, Map<number, TaskId[]>>();
 
   for (const taskId of order) {
     const subZone = subZoneByTaskId.get(taskId);
     if (!subZone) return [];
 
-    territoryKeys.add(subZone.territoryKey);
-    const bucketTasks = bucketTasksByIndex.get(subZone.bucketIndex) ?? [];
+    let buckets = bucketsByTerritory.get(subZone.territoryIndex);
+    if (!buckets) {
+      buckets = new Map<number, TaskId[]>();
+      bucketsByTerritory.set(subZone.territoryIndex, buckets);
+      territoryAppearanceOrder.push(subZone.territoryIndex);
+    }
+
+    const bucketTasks = buckets.get(subZone.bucketIndex) ?? [];
     bucketTasks.push(taskId);
-    bucketTasksByIndex.set(subZone.bucketIndex, bucketTasks);
+    buckets.set(subZone.bucketIndex, bucketTasks);
   }
 
-  if (territoryKeys.size !== 1 || bucketTasksByIndex.size < 2) return [];
+  let totalBucketCount = 0;
+  for (const buckets of bucketsByTerritory.values()) {
+    totalBucketCount += buckets.size;
+  }
+  if (totalBucketCount < 2) return [];
 
-  const bucketIndexes = [...bucketTasksByIndex.keys()].sort((left, right) => left - right);
-  const buildOrder = (orderedBucketIndexes: number[]): TaskId[] =>
-    orderedBucketIndexes.flatMap((bucketIndex) =>
-      nearestNeighborBucketOrder(input, taskById, bucketTasksByIndex.get(bucketIndex) ?? [])
-    );
+  const buildOrder = (
+    territoryOrder: number[],
+    bucketDirection: 1 | -1,
+    strategy: BucketOrderStrategy
+  ): TaskId[] =>
+    territoryOrder.flatMap((territoryIndex) => {
+      const buckets = bucketsByTerritory.get(territoryIndex);
+      if (!buckets) return [];
+      const bucketIndexes = [...buckets.keys()].sort(
+        (left, right) => (left - right) * bucketDirection
+      );
+      return bucketIndexes.flatMap((bucketIndex) =>
+        strategy(input, taskById, buckets.get(bucketIndex) ?? [])
+      );
+    });
 
-  return [buildOrder(bucketIndexes), buildOrder([...bucketIndexes].reverse())].filter(
-    (candidateOrder) =>
-      candidateOrder.length === order.length &&
-      !candidateOrder.every((taskId, index) => taskId === order[index])
-  );
+  const territoryOrders =
+    territoryAppearanceOrder.length > 1
+      ? [territoryAppearanceOrder, [...territoryAppearanceOrder].reverse()]
+      : [territoryAppearanceOrder];
+
+  const candidateOrders: TaskId[][] = [];
+  const seen = new Set<string>([order.join(",")]);
+
+  for (const territoryOrder of territoryOrders) {
+    for (const bucketDirection of [1, -1] as const) {
+      for (const strategy of BUCKET_ORDER_STRATEGIES) {
+        const candidate = buildOrder(territoryOrder, bucketDirection, strategy);
+        if (candidate.length !== order.length) continue;
+        const key = candidate.join(",");
+        if (seen.has(key)) continue;
+        seen.add(key);
+        candidateOrders.push(candidate);
+      }
+    }
+  }
+
+  return candidateOrders;
 }
 
 function candidateOrders(
   input: RoutingProblemInput,
   taskById: Map<TaskId, TaskNode>,
   order: TaskId[],
-  subZoneByTaskId: Map<TaskId, SubZoneAssignment>
+  subZoneByTaskId: Map<TaskId, SubZoneAssignment>,
+  globalSequence?: { driver: DriverNode }
 ): { candidates: CandidateOrder[]; generatedCanonicalBucketCandidates: TaskId[][] } {
   const candidates: CandidateOrder[] = [];
   const generatedCanonicalBucketCandidates: TaskId[][] = [];
@@ -847,6 +999,35 @@ function candidateOrders(
     seen.add(key);
     candidates.push(candidate);
   };
+
+  // Without sub-zone information the search has no shape to optimise and only
+  // duplicates what the local moves already reach.
+  const hasSubZoneInfo = order.some((taskId) => subZoneByTaskId.has(taskId));
+
+  if (globalSequence && hasSubZoneInfo) {
+    // Beam pruning makes neither ranking dominant: a travel-greedy prefix can strand
+    // the search in a worse global order than a shape-guided one. Offering both lets
+    // the polishing objective decide.
+    for (const ranking of ["travel-first", "shape-first"] as const) {
+      const sequenced = findBestFeasibleSequence({
+        input,
+        driver: globalSequence.driver,
+        taskIds: order,
+        taskById,
+        subZoneByTaskId,
+        ranking,
+      });
+      if (!sequenced) continue;
+      generatedCanonicalBucketCandidates.push(sequenced.order);
+      pushCandidate({
+        order: sequenced.order,
+        moveType: "global-sequence",
+        fromIndex: 0,
+        toIndex: 0,
+        length: sequenced.order.length,
+      });
+    }
+  }
 
   for (const canonicalOrder of canonicalBucketOrders(input, taskById, order, subZoneByTaskId)) {
     generatedCanonicalBucketCandidates.push(canonicalOrder);
@@ -1081,6 +1262,7 @@ function shapeCandidateDiagnostic(args: {
 
 function isStructuralShapeCandidate(candidate: CandidateOrder): boolean {
   return (
+    candidate.moveType === "global-sequence" ||
     candidate.moveType === "canonical-bucket-order" ||
     candidate.moveType === "move-subzone-block" ||
     candidate.moveType === "move-block-3" ||
@@ -1232,7 +1414,13 @@ function polishRoute(args: {
   for (let iteration = 0; iteration < ROUTE_POLISHING_CONFIG.maxIterationsPerRoute; iteration += 1) {
     let bestCandidate: { candidate: CandidateOrder; simulated: SimulatedRoute } | null = null;
     let bestShapeCandidate: { candidate: CandidateOrder; simulated: SimulatedRoute } | null = null;
-    const generated = candidateOrders(args.input, args.taskById, bestOrder, args.subZoneByTaskId);
+    const generated = candidateOrders(
+      args.input,
+      args.taskById,
+      bestOrder,
+      args.subZoneByTaskId,
+      iteration === 0 ? { driver: args.driver } : undefined
+    );
     generatedCanonicalBucketCandidates.push(...generated.generatedCanonicalBucketCandidates);
     generatedSequentialShapeCandidates.push(...generated.generatedCanonicalBucketCandidates);
 

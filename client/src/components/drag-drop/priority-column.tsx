@@ -158,9 +158,6 @@ export default function PriorityColumn({
       const duplicateMeta = getTaskDuplicateMeta(task);
       return { task, originalIndex, duplicateMeta };
     });
-    if (operationsScope === "logistics") {
-      return indexed;
-    }
 
     const duplicateItems = indexed.filter((entry) => entry.duplicateMeta.isDuplicateActive);
     const nonDuplicateItems = indexed.filter((entry) => !entry.duplicateMeta.isDuplicateActive);
@@ -183,7 +180,7 @@ export default function PriorityColumn({
     });
 
     return [...duplicateItems, ...nonDuplicateItems];
-  }, [tasks, operationsScope]);
+  }, [tasks]);
 
   const orderedTasks = useMemo(
     () => orderedEntries.map((entry) => entry.task),
@@ -191,10 +188,6 @@ export default function PriorityColumn({
   );
 
   const groupedDuplicateEntries = useMemo(() => {
-    if (operationsScope === "logistics") {
-      return { duplicateBlocks: [], nonDuplicateEntries: orderedEntries };
-    }
-
     const duplicatesByGroup = new Map<string, typeof orderedEntries>();
     for (const entry of orderedEntries) {
       if (!entry.duplicateMeta.isDuplicateActive) continue;
@@ -230,7 +223,7 @@ export default function PriorityColumn({
 
     const nonDuplicateEntries = orderedEntries.filter((entry) => !entry.duplicateMeta.isDuplicateActive);
     return { duplicateBlocks, nonDuplicateEntries };
-  }, [orderedEntries, operationsScope]);
+  }, [orderedEntries]);
 
   const dndScope: DndScope = operationsScope === "logistics" ? "logistics" : "housekeeping";
   const priorityKey = priorityKeyFromLegacyDroppableId(droppableId);
