@@ -48,6 +48,8 @@ function buildTask(spec: TaskSpec): TaskNode {
     nodeIndex: spec.taskId,
     location: { lat: NORTH_CENTROID.lat, lng: spec.lng },
     priority: "HP",
+    premium: false,
+    straordinaria: false,
     logisticsTaskKind: "pick-up",
     serviceDurationMin: LOGISTICS_SERVICE_DURATION_MIN,
     rawTimes: {

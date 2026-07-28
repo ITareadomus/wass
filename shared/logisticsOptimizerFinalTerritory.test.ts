@@ -45,6 +45,8 @@ function buildTask(taskId: number, lat: number, lng: number): TaskNode {
     nodeIndex: taskId,
     location: { lat, lng },
     priority: "EO",
+    premium: false,
+    straordinaria: false,
     logisticsTaskKind: null,
     serviceDurationMin: LOGISTICS_SERVICE_DURATION_MIN,
     rawTimes: {

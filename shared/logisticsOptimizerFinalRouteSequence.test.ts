@@ -29,6 +29,8 @@ function buildTask(taskId: number, lat: number, lng: number, latestStartMin: num
     nodeIndex: taskId,
     location: { lat, lng },
     priority: "EO",
+    premium: false,
+    straordinaria: false,
     logisticsTaskKind: "pick-up",
     serviceDurationMin: LOGISTICS_SERVICE_DURATION_MIN,
     rawTimes: {

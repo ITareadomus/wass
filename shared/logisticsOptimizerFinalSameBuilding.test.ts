@@ -25,6 +25,8 @@ function buildTask(overrides: Partial<TaskNode> & Pick<TaskNode, "taskId">): Tas
     nodeIndex: overrides.nodeIndex ?? overrides.taskId,
     location: overrides.location ?? { lat: 45.45, lng: 9.18 },
     priority: overrides.priority ?? "LP",
+    premium: overrides.premium ?? false,
+    straordinaria: overrides.straordinaria ?? false,
     logisticsTaskKind: overrides.logisticsTaskKind ?? "delivery/pick-up",
     serviceDurationMin: overrides.serviceDurationMin ?? LOGISTICS_SERVICE_DURATION_MIN,
     rawTimes: overrides.rawTimes ?? {

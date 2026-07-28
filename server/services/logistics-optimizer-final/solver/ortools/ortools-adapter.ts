@@ -1,6 +1,8 @@
 import type { DriverNode, RoutingProblemInput, TaskNode } from "../../input-contract";
 import { BUSINESS_GROUP_THRESHOLDS } from "../../groups/group-weights";
 import { buildVehicleTaskPenalties } from "../../groups/territory-penalties";
+import { hasTightCheckinDeadline } from "../../priority-route-compatibility";
+import { requiresDriverBeforeCleaner } from "../../../../../shared/logistics-task-kind";
 import {
   ORTOOLS_SOLVER_ID,
   ROUTING_SOLUTION_SCHEMA_VERSION,
@@ -11,8 +13,20 @@ import {
 
 const DEPOT_NODE_INDEX = 0;
 
+/**
+ * Drop penalty per priorita' (piu' alto = piu' costoso lasciare fuori il task).
+ *
+ * Regola di business: un task e' davvero "urgente" solo se ha una finestra
+ * check-in/checkout stretta, o e' driver-before-cleaner, o l'alloggio e' premium,
+ * o la pulizia e' straordinaria.
+ * HP ha per definizione queste caratteristiche -> penalty alta.
+ * Un EO con le stesse caratteristiche (EO_URGENT) e' altrettanto importante di un HP.
+ * Un EO "ordinario" (senza nessuna di queste caratteristiche) NON deve pesare piu'
+ * di un HP: viene trattato come LP.
+ */
 export const DROP_PENALTY_BY_PRIORITY = {
-  EO: 100_000,
+  EO_URGENT: 50_000,
+  EO_ORDINARY: 25_000,
   HP: 50_000,
   LP: 25_000,
   default: 10_000,
@@ -107,10 +121,33 @@ function sortDrivers(drivers: DriverNode[]): DriverNode[] {
   return [...drivers].sort((left, right) => left.id - right.id);
 }
 
-function getDropPenalty(priority: TaskNode["priority"]): number {
-  if (priority === "EO") return DROP_PENALTY_BY_PRIORITY.EO;
-  if (priority === "HP") return DROP_PENALTY_BY_PRIORITY.HP;
-  if (priority === "LP") return DROP_PENALTY_BY_PRIORITY.LP;
+/**
+ * An EO task is "urgent" (as important as HP) when it has a tight check-in/checkout
+ * deadline, requires the driver before the cleaner, or the accommodation is premium
+ * or the cleaning is "straordinaria" (extra). Without any of these, it is an
+ * "ordinary" EO and must not outweigh HP.
+ */
+function isUrgentEoTask(task: TaskNode): boolean {
+  if (task.premium || task.straordinaria) return true;
+
+  const tightCheckin = hasTightCheckinDeadline({
+    customerCheckinMin: task.debug?.sourceTimes?.customerCheckinMin ?? null,
+    latestStartMin: task.hardWindow.latestStartMin,
+  });
+  if (tightCheckin) return true;
+
+  const cleanerTaskStartMin = task.debug?.sourceTimes?.cleanerTaskStartMin ?? null;
+  return requiresDriverBeforeCleaner(task.logisticsTaskKind) && cleanerTaskStartMin !== null;
+}
+
+function getDropPenalty(task: TaskNode): number {
+  if (task.priority === "EO") {
+    return isUrgentEoTask(task)
+      ? DROP_PENALTY_BY_PRIORITY.EO_URGENT
+      : DROP_PENALTY_BY_PRIORITY.EO_ORDINARY;
+  }
+  if (task.priority === "HP") return DROP_PENALTY_BY_PRIORITY.HP;
+  if (task.priority === "LP") return DROP_PENALTY_BY_PRIORITY.LP;
   return DROP_PENALTY_BY_PRIORITY.default;
 }
 
@@ -390,7 +427,7 @@ export function buildOrToolsPayload(
       ...(requiredDriverId !== undefined && requiredVehicleIndex !== undefined
         ? { requiredDriverId, requiredVehicleIndex }
         : {}),
-      dropPenalty: getDropPenalty(task.priority),
+      dropPenalty: getDropPenalty(task),
     };
   });
 

@@ -43,6 +43,7 @@ function buildBaseSourceData(overrides: Partial<LogisticsRoutingSourceData> = {}
     cleanerTaskStartTime: "10:00",
     cleanerSequence: 1,
     premium: false,
+    straordinaria: false,
     paxIn: 2,
     locked: false,
     lockedReason: null,
@@ -148,53 +149,91 @@ describe("buildOrToolsPayload", () => {
     ]);
   });
 
-  it("assigns drop penalties EO > HP > LP", () => {
-    const makeTask = (taskId: number, priority: string) => ({
+  it("assigns drop penalties: ordinary EO <= HP, urgent EO == HP, HP > LP > default", () => {
+    const makeTask = (
+      taskId: number,
+      priority: string,
+      overrides: Partial<{
+        premium: boolean;
+        straordinaria: boolean;
+        checkinDate: string | null;
+        checkinTime: string | null;
+        cleanerId: number | null;
+        cleanerSequence: number | null;
+        cleanerStartTime: string | null;
+        cleanerTaskStartTime: string | null;
+      }> = {}
+    ) => ({
       taskId,
       logisticCode: 5000 + taskId,
       priority,
       cleaningTime: 60,
       lat: 45.45 + taskId * 0.001,
       lng: 9.18,
-      checkinDate: null,
+      checkinDate: overrides.checkinDate ?? null,
       checkoutDate: null,
-      checkinTime: null,
+      checkinTime: overrides.checkinTime ?? null,
       checkoutTime: null,
-      cleanerId: 10,
-      cleanerStartTime: "10:00",
-      cleanerTaskStartTime: "10:00",
-      cleanerSequence: 1,
-      premium: false,
+      cleanerId: overrides.cleanerId ?? null,
+      cleanerStartTime: overrides.cleanerStartTime ?? null,
+      cleanerTaskStartTime: overrides.cleanerTaskStartTime ?? null,
+      cleanerSequence: overrides.cleanerSequence ?? null,
+      premium: overrides.premium ?? false,
+      straordinaria: overrides.straordinaria ?? false,
       paxIn: 2,
       locked: false,
       lockedReason: null,
     });
 
+    // 101: EO ordinario - nessuna finestra stretta, non premium, non straordinario, nessun cleaner context.
+    const ordinaryEo = makeTask(101, "early_out");
+    // 102: HP di riferimento.
+    const hp = makeTask(102, "high_priority");
+    // 103: LP di riferimento.
+    const lp = makeTask(103, "low_priority");
+    // 104: priorita' sconosciuta -> penalty di default.
+    const unknown = makeTask(104, "unknown");
+    // 105: EO ma premium -> deve valere quanto HP.
+    const premiumEo = makeTask(105, "early_out", { premium: true });
+    // 106: EO con check-in stretto (workDate) -> deve valere quanto HP.
+    const tightCheckinEo = makeTask(106, "early_out", {
+      checkinDate: "2026-06-04",
+      checkinTime: "12:00",
+    });
+    // 107: EO ma straordinario -> deve valere quanto HP, come premium.
+    const straordinariaEo = makeTask(107, "early_out", { straordinaria: true });
+
+    const allTasks = [ordinaryEo, hp, lp, unknown, premiumEo, tightCheckinEo, straordinariaEo];
+
     const input = buildRoutingProblemInputFromSource(
       buildBaseSourceData({
-        schedulableTasks: [
-          makeTask(101, "early_out"),
-          makeTask(102, "high_priority"),
-          makeTask(103, "low_priority"),
-          makeTask(104, "unknown"),
-        ],
-        allTaskData: [
-          makeTask(101, "early_out"),
-          makeTask(102, "high_priority"),
-          makeTask(103, "low_priority"),
-          makeTask(104, "unknown"),
-        ],
+        schedulableTasks: allTasks,
+        allTaskData: allTasks,
       })
     );
 
     const { payload } = buildOrToolsPayload(input);
     const byId = new Map(payload.tasks.map((task) => [task.taskId, task.dropPenalty]));
 
-    expect(byId.get(101)).toBe(DROP_PENALTY_BY_PRIORITY.EO);
+    // EO ordinario: non deve pesare piu' di un HP; e' equivalente a LP.
+    expect(byId.get(101)).toBe(DROP_PENALTY_BY_PRIORITY.EO_ORDINARY);
+    expect(byId.get(101)).toBe(DROP_PENALTY_BY_PRIORITY.LP);
+    expect(byId.get(101)! <= byId.get(102)!).toBe(true);
+
     expect(byId.get(102)).toBe(DROP_PENALTY_BY_PRIORITY.HP);
     expect(byId.get(103)).toBe(DROP_PENALTY_BY_PRIORITY.LP);
     expect(byId.get(104)).toBe(DROP_PENALTY_BY_PRIORITY.default);
-    expect(byId.get(101)! > byId.get(102)!).toBe(true);
+
+    // EO premium e EO con check-in stretto: pari importanza a HP.
+    expect(byId.get(105)).toBe(DROP_PENALTY_BY_PRIORITY.EO_URGENT);
+    expect(byId.get(105)).toBe(byId.get(102));
+    expect(byId.get(106)).toBe(DROP_PENALTY_BY_PRIORITY.EO_URGENT);
+    expect(byId.get(106)).toBe(byId.get(102));
+
+    // EO straordinario: stessa importanza di premium/check-in stretto -> pari a HP.
+    expect(byId.get(107)).toBe(DROP_PENALTY_BY_PRIORITY.EO_URGENT);
+    expect(byId.get(107)).toBe(byId.get(102));
+
     expect(byId.get(102)! > byId.get(103)!).toBe(true);
   });
 

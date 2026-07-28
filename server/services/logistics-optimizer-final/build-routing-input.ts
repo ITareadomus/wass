@@ -18,7 +18,7 @@ import {
   type LogisticsRoutingSourceData,
   type SchedulableLogisticsTaskInput,
 } from "./loaders";
-import { normalizePriority } from "./normalizers";
+import { DEFAULT_DRIVER_END_MIN, normalizePriority } from "./normalizers";
 import { buildTaskWindow } from "./windows";
 import {
   buildBusinessGroupSoftConstraints,
@@ -93,13 +93,26 @@ function buildDriverNodes(sourceData: LogisticsRoutingSourceData): DriverNode[] 
   });
 }
 
+/**
+ * There is no fixed "end of day" anymore: the latest a task can run, absent a
+ * real business deadline (check-in, cleaner tolerance), is bounded by the
+ * latest work-window end among the drivers actually available that day. This
+ * keeps a driver's configurable end time meaningful instead of being silently
+ * capped by a hardcoded clock value.
+ */
+function resolveDayEndMin(drivers: DriverNode[]): number {
+  if (drivers.length === 0) return DEFAULT_DRIVER_END_MIN;
+  return Math.max(...drivers.map((driver) => driver.workWindow.endMin));
+}
+
 function buildTaskNode(args: {
   taskData: SchedulableLogisticsTaskInput;
   nodeIndex: number;
   workDate: string;
   sourceData: LogisticsRoutingSourceData;
+  dayEndMin: number;
 }): { task: TaskNode; hardConstraints: HardConstraintSpec[]; softWindows: SoftConstraintSpec[] } {
-  const { taskData, nodeIndex, workDate, sourceData } = args;
+  const { taskData, nodeIndex, workDate, sourceData, dayEndMin } = args;
   const priority = normalizePriority(taskData.priority);
   const logisticsTaskKind = resolveTaskLogisticsKindWithTrace(taskData);
   const builtWindow = buildTaskWindow({
@@ -115,6 +128,7 @@ function buildTaskNode(args: {
     cleanerStartTime: taskData.cleanerStartTime,
     cleanerTaskStartTime: taskData.cleanerTaskStartTime,
     priorityWindows: sourceData.windowConfig.priorityWindows,
+    dayEndMin,
   });
 
   const softWindows: SoftConstraintSpec[] = builtWindow.softWindows
@@ -138,6 +152,8 @@ function buildTaskNode(args: {
         addressGroupId: null,
       },
       priority,
+      premium: taskData.premium === true,
+      straordinaria: taskData.straordinaria === true,
       logisticsTaskKind: logisticsTaskKind.value,
       serviceDurationMin: LOGISTICS_SERVICE_DURATION_MIN,
       rawTimes: {
@@ -170,7 +186,11 @@ function buildTaskNode(args: {
   };
 }
 
-function buildTaskNodes(sourceData: LogisticsRoutingSourceData, workDate: string): {
+function buildTaskNodes(
+  sourceData: LogisticsRoutingSourceData,
+  workDate: string,
+  dayEndMin: number
+): {
   tasks: TaskNode[];
   hardConstraints: HardConstraintSpec[];
   softConstraints: SoftConstraintSpec[];
@@ -188,6 +208,7 @@ function buildTaskNodes(sourceData: LogisticsRoutingSourceData, workDate: string
       nodeIndex: index + 1,
       workDate,
       sourceData,
+      dayEndMin,
     });
     tasks.push(builtTask.task);
     hardConstraints.push(...builtTask.hardConstraints);
@@ -295,9 +316,11 @@ export function buildRoutingProblemInputFromSource(
 ): RoutingProblemInput {
   const workDate = sourceData.workDate;
   const drivers = buildDriverNodes(sourceData);
+  const dayEndMin = resolveDayEndMin(drivers);
   const { tasks, hardConstraints, softConstraints: taskSoftConstraints } = buildTaskNodes(
     sourceData,
-    workDate
+    workDate,
+    dayEndMin
   );
   const requiredDriverBuild = buildRequiredDriverConstraints({
     hints: sourceData.timelineAssignmentHints,
