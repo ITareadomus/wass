@@ -169,6 +169,73 @@ function minutesToTimelineWidthPx(
   return (minutes / virtualMinutes) * timelineWidth;
 }
 
+const ROME_TZ = "Europe/Rome";
+
+type RomeClockNow = {
+  dateStr: string;
+  minutes: number;
+  label: string;
+};
+
+function getRomeClockNow(date = new Date()): RomeClockNow {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: ROME_TZ,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  ) as Record<string, string>;
+
+  const hours = Number(parts.hour);
+  const mins = Number(parts.minute);
+  return {
+    dateStr: `${parts.year}-${parts.month}-${parts.day}`,
+    minutes: hours * 60 + mins,
+    label: `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`,
+  };
+}
+
+function LogisticsClockNowLine({
+  leftPx,
+  label,
+  showLabel = false,
+}: {
+  leftPx: number;
+  label?: string;
+  showLabel?: boolean;
+}) {
+  return (
+    <div
+      aria-hidden
+      data-testid="logistics-timeline-now-line"
+      className={cn(
+        "pointer-events-none absolute z-40 flex -translate-x-1/2 flex-col items-center print:hidden",
+        showLabel ? "top-0 bottom-0" : "inset-y-0"
+      )}
+      style={{ left: `${leftPx}px` }}
+    >
+      {showLabel && label ? (
+        <span
+          className={cn(
+            "shrink-0 rounded bg-yellow-400/55 px-1 py-0.5 text-[11px] font-semibold tabular-nums leading-none text-yellow-950/80",
+            "dark:bg-yellow-300/45 dark:text-yellow-100/80"
+          )}
+        >
+          {label}
+        </span>
+      ) : null}
+      <div className="w-px min-h-0 flex-1 bg-yellow-400/55 dark:bg-yellow-300/45" />
+    </div>
+  );
+}
+
 function LogisticsRouteLineSegment({
   widthPx,
   title,
@@ -254,6 +321,7 @@ function timelineTaskToTask(t: any, driverId: number): Task {
       t.checkout_wait_minutes != null ? Number(t.checkout_wait_minutes) : undefined,
     locked: Boolean(t.locked),
     locked_reason: t.locked_reason != null ? String(t.locked_reason) : undefined,
+    is_finished: Boolean(t.is_finished ?? t.isFinished),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...(t.logistics_task_kind != null ? { logistics_task_kind: String(t.logistics_task_kind) } : {}),
@@ -332,6 +400,7 @@ export default function LogisticsTimelineView({
   const [priorityWindows, setPriorityWindows] = useState<PriorityWindows | null>(null);
   const [timelineWidthPx, setTimelineWidthPx] = useState(0);
   const [timelineScrollLeft, setTimelineScrollLeft] = useState(0);
+  const [romeClockNow, setRomeClockNow] = useState<RomeClockNow>(() => getRomeClockNow());
   const timelineRowRef = useRef<HTMLDivElement | null>(null);
   const timelineScrollRefs = useRef<HTMLDivElement[]>([]);
   const isSyncingTimelineScrollRef = useRef(false);
@@ -785,6 +854,41 @@ export default function LogisticsTimelineView({
     if (total <= 0) return 0;
     return ((absoluteMinutes - timelineStartMinutes) / total) * 100;
   };
+
+  useEffect(() => {
+    const tick = () => setRomeClockNow(getRomeClockNow());
+    tick();
+    const id = window.setInterval(tick, 30_000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  const clockNowLineLeftPx = useMemo(() => {
+    // In sviluppo: mostra la linea su qualsiasi data (utile per test).
+    // In produzione: solo se la data selezionata è oggi (Europe/Rome).
+    if (!import.meta.env.DEV && romeClockNow.dateStr !== workDate) return null;
+    if (timelinePxPerMinute <= 0) return null;
+    if (
+      romeClockNow.minutes < timelineStartMinutes ||
+      romeClockNow.minutes > timelineEndMinutes
+    ) {
+      return null;
+    }
+    return (romeClockNow.minutes - timelineStartMinutes) * timelinePxPerMinute;
+  }, [
+    romeClockNow.dateStr,
+    romeClockNow.minutes,
+    timelineEndMinutes,
+    timelinePxPerMinute,
+    timelineStartMinutes,
+    workDate,
+  ]);
 
   useEffect(() => {
     (window as any).globalTimelineMinutes = globalTimelineMinutes;
@@ -1713,6 +1817,13 @@ export default function LogisticsTimelineView({
                     />
                   </div>
                 ))}
+                {clockNowLineLeftPx != null && (
+                  <LogisticsClockNowLine
+                    leftPx={clockNowLineLeftPx}
+                    label={romeClockNow.label}
+                    showLabel
+                  />
+                )}
                 </div>
               </div>
             </div>
@@ -1868,6 +1979,9 @@ export default function LogisticsTimelineView({
                                 )}
                               />
                             ))}
+                            {clockNowLineLeftPx != null && (
+                              <LogisticsClockNowLine leftPx={clockNowLineLeftPx} />
+                            )}
                           </div>
                           <div
                             className="relative z-10 flex items-center h-full min-h-[45px] px-0 gap-0"
@@ -2056,7 +2170,8 @@ export default function LogisticsTimelineView({
                                       isReadOnly ||
                                       suppressTaskDrag ||
                                       isLoadingOverlay ||
-                                      Boolean((task as any).locked)
+                                      Boolean((task as any).locked) ||
+                                      Boolean((task as any).is_finished)
                                     }
                                     timelineWidthPx={timelineContentWidthPx}
                                     timelinePxPerMinute={timelinePxPerMinute}

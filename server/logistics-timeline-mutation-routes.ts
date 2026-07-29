@@ -273,6 +273,20 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       }
 
       let removedTask: any = null;
+      for (const driverEntry of assignmentsData.drivers_assignments || []) {
+        const found = (driverEntry.tasks || []).find(
+          (t: any) =>
+            String(t.logistic_code) === String(logisticCode) ||
+            String(t.task_id) === String(taskId)
+        );
+        if (found && Boolean(found.is_finished)) {
+          return res.status(423).json({
+            success: false,
+            error: "TASK_FINISHED",
+            message: "Task già completata: impossibile rimuovere",
+          });
+        }
+      }
       assignmentsData.drivers_assignments = assignmentsData.drivers_assignments
         .map((driverEntry: any) => {
           const initial = driverEntry.tasks?.length || 0;
@@ -412,6 +426,13 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       if (actualFrom === -1) {
         return res.status(404).json({ success: false, message: "Task non trovata" });
       }
+      if (Boolean(driverEntry.tasks[actualFrom]?.is_finished)) {
+        return res.status(423).json({
+          success: false,
+          error: "TASK_FINISHED",
+          message: "Task già completata: impossibile spostare",
+        });
+      }
       if (toIndex < 0 || toIndex > driverEntry.tasks.length) {
         return res.status(400).json({ success: false, message: "toIndex non valido" });
       }
@@ -498,6 +519,13 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       }
       if (!taskToMove) {
         return res.status(404).json({ success: false, message: "Task non trovata" });
+      }
+      if (Boolean(taskToMove.is_finished)) {
+        return res.status(423).json({
+          success: false,
+          error: "TASK_FINISHED",
+          message: "Task già completata: impossibile spostare",
+        });
       }
 
       let destEntry = timelineData.drivers_assignments.find(

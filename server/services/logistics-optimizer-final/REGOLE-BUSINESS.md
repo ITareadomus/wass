@@ -32,9 +32,6 @@ Se un task è già sulla timeline di un autista:
 ### Task liberi
 I task in pool (nei container, non bloccati) possono andare a **qualsiasi** autista disponibile, se c’è spazio e le regole di orario lo consentono.
 
-### “Spostato a mano”
-Il fatto che un task sia stato mosso manualmente in passato **non** lo rende intoccabile: è solo un’informazione, non un blocco.
-
 ### Senza coordinate
 Senza latitudine/longitudine valide, il task **non entra** nel piano.  
 Non si inventa un indirizzo e non si geocodifica al volo.

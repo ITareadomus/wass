@@ -53,6 +53,43 @@ export async function refreshLogisticsContainersFromAdam(
       };
     }
 
+    // Come housekeeping: togli dai containers i task già presenti in timeline.
+    const timelineData = await workspaceFiles.loadLogisticsTimeline(workDate);
+    const assignedTaskIds = new Set<number>();
+    if (timelineData?.drivers_assignments) {
+      for (const driverEntry of timelineData.drivers_assignments) {
+        for (const task of driverEntry.tasks || []) {
+          const tid = Number(task?.task_id);
+          if (Number.isFinite(tid)) assignedTaskIds.add(tid);
+        }
+      }
+    }
+
+    console.log(`🔍 Logistics: task assegnate in timeline: ${assignedTaskIds.size}`);
+
+    let removedCount = 0;
+    for (const containerType of ['early_out', 'high_priority', 'low_priority'] as const) {
+      const container = containersData.containers?.[containerType];
+      if (!container?.tasks) continue;
+      const originalCount = container.tasks.length;
+      container.tasks = container.tasks.filter((t: any) => {
+        const tid = Number(t?.task_id);
+        return !Number.isFinite(tid) || !assignedTaskIds.has(tid);
+      });
+      container.count = container.tasks.length;
+      removedCount += originalCount - container.tasks.length;
+    }
+
+    if (containersData.summary) {
+      containersData.summary.early_out = containersData.containers.early_out?.count || 0;
+      containersData.summary.high_priority = containersData.containers.high_priority?.count || 0;
+      containersData.summary.low_priority = containersData.containers.low_priority?.count || 0;
+      containersData.summary.total_tasks =
+        containersData.summary.early_out +
+        containersData.summary.high_priority +
+        containersData.summary.low_priority;
+    }
+
     await workspaceFiles.saveLogisticsContainers(workDate, containersData);
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
     await pgDailyAssignmentsService.saveLogisticsContainersToHistory(
@@ -60,12 +97,14 @@ export async function refreshLogisticsContainersFromAdam(
       modifiedBy,
       'logistics_synced_from_adam'
     );
-    console.log(`✅ Logistics containers sincronizzati per ${workDate}`);
+    console.log(
+      `✅ Logistics containers sincronizzati per ${workDate}: rimosse ${removedCount} task già in timeline`
+    );
 
     return {
       success: true,
       containersData,
-      removedCount: 0,
+      removedCount,
     };
   } catch (error: any) {
     console.error('❌ refreshLogisticsContainersFromAdam:', error);

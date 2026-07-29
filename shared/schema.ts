@@ -198,6 +198,7 @@ export const taskSchema = z.object({
   locked: z.boolean().optional(),
   locked_reason: z.string().optional(),
   locked_by: z.string().optional(),
+  is_finished: z.boolean().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

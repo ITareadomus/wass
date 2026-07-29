@@ -515,10 +515,11 @@ const displayClickableInputClass =
   // Estrai locked e locked_reason dal task per dependency stabili
   const taskLocked = (task as any).locked ?? false;
   const taskLockedReason = (task as any).locked_reason ?? '';
+  const isFinished = Boolean((task as any).is_finished ?? (task as any).isFinished);
   const preAssignedMode = resolvePreAssignedModeFromTask(task);
   const isPreAssigned = preAssignedMode === "readonly" || preAssignedMode === "normal";
   const isPreAssignedReadonly = preAssignedMode === "readonly";
-  const isTaskReadOnly = isReadOnly || isPreAssignedReadonly;
+  const isTaskReadOnly = isReadOnly || isPreAssignedReadonly || isFinished;
   
   // Stato per blocco task
   const [isLocked, setIsLocked] = useState(taskLocked);
@@ -1210,8 +1211,9 @@ const displayClickableInputClass =
         })
       : null;
 
-  const categoryStripeClass =
-    operationsScope === "logistics"
+  const categoryStripeClass = isFinished
+    ? "bg-gray-400"
+    : operationsScope === "logistics"
       ? logisticsKindStripeClass(cardLogisticsTaskKind)
       : HOUSEKEEPING_STRIPE_CLASS[cardHousekeepingTier];
 
@@ -1234,8 +1236,10 @@ const displayClickableInputClass =
     cardLogisticsSequence != null ? String(cardLogisticsSequence) : null;
 
   // Nei container: sfondo pagina per contrasto con la colonna; in timeline resta custom-blue-light.
-  const cardSurfaceClass =
-    isLocked && !isInTimeline
+  // Task finished: grigio in timeline e container.
+  const cardSurfaceClass = isFinished
+    ? "bg-gray-200 dark:bg-gray-800 border-gray-400 dark:border-gray-600 opacity-70"
+    : isLocked && !isInTimeline
       ? "bg-muted/80 border-border/60 opacity-70"
       : !isInTimeline
         ? "bg-background border-border shadow-sm"

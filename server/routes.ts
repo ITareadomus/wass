@@ -2509,6 +2509,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
           metadata: { date: workDate },
         });
       }
+
+      // Evita duplicati UI: togli dai containers i task già in timeline (e persisti se serve).
+      const timeline = await workspaceFiles.loadLogisticsTimeline(workDate);
+      const assignedTaskIds = new Set<number>();
+      for (const entry of timeline?.drivers_assignments || []) {
+        for (const task of entry?.tasks || []) {
+          const tid = Number(task?.task_id);
+          if (Number.isFinite(tid)) assignedTaskIds.add(tid);
+        }
+      }
+
+      let removedCount = 0;
+      if (assignedTaskIds.size > 0 && containers.containers) {
+        for (const containerType of ["early_out", "high_priority", "low_priority"] as const) {
+          const container = containers.containers?.[containerType];
+          if (!container?.tasks) continue;
+          const before = container.tasks.length;
+          container.tasks = container.tasks.filter((t: any) => {
+            const tid = Number(t?.task_id);
+            return !Number.isFinite(tid) || !assignedTaskIds.has(tid);
+          });
+          container.count = container.tasks.length;
+          removedCount += before - container.tasks.length;
+        }
+        if (removedCount > 0) {
+          containers.summary = {
+            early_out: containers.containers.early_out?.count || 0,
+            high_priority: containers.containers.high_priority?.count || 0,
+            low_priority: containers.containers.low_priority?.count || 0,
+            total_tasks:
+              (containers.containers.early_out?.count || 0) +
+              (containers.containers.high_priority?.count || 0) +
+              (containers.containers.low_priority?.count || 0),
+          };
+          try {
+            await workspaceFiles.saveLogisticsContainers(workDate, containers);
+            console.log(
+              `✅ GET logistics-containers: rimosse ${removedCount} task già in timeline per ${workDate}`
+            );
+          } catch (saveErr) {
+            console.warn("⚠️ GET logistics-containers: sync save fallita:", saveErr);
+          }
+        }
+      }
+
       res.json({
         ...containers,
         metadata: { ...(containers as any).metadata, date: workDate },

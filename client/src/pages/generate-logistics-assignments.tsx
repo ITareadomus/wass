@@ -258,6 +258,7 @@ function convertLogisticsTimelineTaskToMapTask(task: any, driverId: number): Tas
     type_apt: task?.type_apt != null ? String(task.type_apt) : undefined,
     locked: Boolean(task?.locked),
     locked_reason: task?.locked_reason != null ? String(task.locked_reason) : undefined,
+    is_finished: Boolean(task?.is_finished ?? task?.isFinished),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...(task?.logistics_task_kind != null
@@ -381,6 +382,7 @@ function timelineRowToTaskType(t: any, fallbackPriority: TaskType["priority"]): 
     straordinaria: isEquivalentStraordinariaTask(t),
     locked: Boolean(t.locked),
     locked_reason: t.locked_reason != null ? String(t.locked_reason) : undefined,
+    is_finished: Boolean(t.is_finished ?? t.isFinished),
     customer_name: t.customer_name != null ? String(t.customer_name) : undefined,
     customer_reference: t.customer_reference != null ? String(t.customer_reference) : undefined,
     alias: t.alias != null ? String(t.alias) : undefined,
@@ -883,37 +885,47 @@ export default function GenerateLogisticsAssignments() {
     }
   }, [selectedDate, executeLogisticsOptimizer, toast]);
 
-  const earlyOutTasks = useMemo(
-    () => logisticsTaskLists.early_out.map((t) => convertLogisticsRawToTask(t, "early_out")),
-    [logisticsTaskLists.early_out]
-  );
-  const highPriorityTasks = useMemo(
-    () => logisticsTaskLists.high_priority.map((t) => convertLogisticsRawToTask(t, "high_priority")),
-    [logisticsTaskLists.high_priority]
-  );
-  const lowPriorityTasks = useMemo(
-    () => logisticsTaskLists.low_priority.map((t) => convertLogisticsRawToTask(t, "low_priority")),
-    [logisticsTaskLists.low_priority]
-  );
+  const assignedLogisticsTaskIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const row of logisticsDriversAssignments) {
+      for (const task of row?.tasks || []) {
+        const tid = task?.task_id ?? task?.id;
+        if (tid != null && tid !== "") ids.add(String(tid));
+      }
+    }
+    return ids;
+  }, [logisticsDriversAssignments]);
+
+  const earlyOutTasks = useMemo(() => {
+    const assigned = assignedLogisticsTaskIds;
+    return logisticsTaskLists.early_out
+      .map((t) => convertLogisticsRawToTask(t, "early_out"))
+      .filter((t) => !assigned.has(String(t.id)));
+  }, [logisticsTaskLists.early_out, assignedLogisticsTaskIds]);
+  const highPriorityTasks = useMemo(() => {
+    const assigned = assignedLogisticsTaskIds;
+    return logisticsTaskLists.high_priority
+      .map((t) => convertLogisticsRawToTask(t, "high_priority"))
+      .filter((t) => !assigned.has(String(t.id)));
+  }, [logisticsTaskLists.high_priority, assignedLogisticsTaskIds]);
+  const lowPriorityTasks = useMemo(() => {
+    const assigned = assignedLogisticsTaskIds;
+    return logisticsTaskLists.low_priority
+      .map((t) => convertLogisticsRawToTask(t, "low_priority"))
+      .filter((t) => !assigned.has(String(t.id)));
+  }, [logisticsTaskLists.low_priority, assignedLogisticsTaskIds]);
   const mapTasks = useMemo(() => {
     const assigned: TaskType[] = [];
-    const assignedTaskIds = new Set<string>();
 
     for (const row of logisticsDriversAssignments) {
       const driverId = Number(row?.driver?.id);
       if (!Number.isFinite(driverId)) continue;
       for (const task of row?.tasks || []) {
-        const mapTask = convertLogisticsTimelineTaskToMapTask(task, driverId);
-        assigned.push(mapTask);
-        assignedTaskIds.add(String(mapTask.id));
+        assigned.push(convertLogisticsTimelineTaskToMapTask(task, driverId));
       }
     }
 
-    const unassigned = [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks].filter(
-      (task) => !assignedTaskIds.has(String(task.id))
-    );
-
-    return [...unassigned, ...assigned];
+    return [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks, ...assigned];
   }, [earlyOutTasks, highPriorityTasks, lowPriorityTasks, logisticsDriversAssignments]);
   const assignmentStatistics = useMemo(
     () => computeAssignmentTaskStatisticsFromTasks(mapTasks, "logistics"),
@@ -1079,6 +1091,9 @@ export default function GenerateLogisticsAssignments() {
               if (task && (task as TaskType & { locked?: boolean }).locked) {
                 throw new Error("Task bloccata");
               }
+              if (task && (task as any).is_finished) {
+                throw new Error("Task già completata");
+              }
               await saveLogisticsAssignment(
                 taskId,
                 driverId,
@@ -1099,6 +1114,9 @@ export default function GenerateLogisticsAssignments() {
               const task = allTasksWithAssignments.find(
                 (t) => String(t.id) === String(taskId),
               );
+              if (task && (task as any).is_finished) {
+                throw new Error("Task già completata");
+              }
               await reorderLogisticsTimeline(
                 taskId,
                 task?.name,
@@ -1120,6 +1138,9 @@ export default function GenerateLogisticsAssignments() {
               const task = allTasksWithAssignments.find(
                 (t) => String(t.id) === String(taskId),
               );
+              if (task && (task as any).is_finished) {
+                throw new Error("Task già completata");
+              }
               const res = await fetch("/api/move-task-between-drivers", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -1146,6 +1167,9 @@ export default function GenerateLogisticsAssignments() {
               const task = allTasksWithAssignments.find(
                 (t) => String(t.id) === String(taskId),
               );
+              if (task && (task as any).is_finished) {
+                throw new Error("Task già completata");
+              }
               await removeLogisticsTimelineAssignment(taskId, task?.name);
             }
             await reloadLogisticsPage();
