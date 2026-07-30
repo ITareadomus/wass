@@ -62,6 +62,28 @@ export function requiresDriverBeforeCleaner(kind: LogisticsTaskKind | null): boo
   return kind === "delivery/pick-up";
 }
 
+/** Codice per ADAM `app_housekeeping.lg_operation` (VARCHAR(10)): D&P abbreviato in `d&p`. */
+export function toAdamLogisticsOperation(
+  kind: LogisticsTaskKind | string | null | undefined
+): string | null {
+  switch (normalizeLogisticsTaskKind(kind, "manual")) {
+    case "delivery/pick-up":
+      return "d&p";
+    case "delivery":
+      return "delivery";
+    case "pick-up":
+      return "pick-up";
+    default:
+      return null;
+  }
+}
+
+export function fromAdamLogisticsOperation(value: unknown): LogisticsTaskKind | null {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (raw === "d&p") return "delivery/pick-up";
+  return normalizeLogisticsTaskKind(raw, "manual");
+}
+
 export function resolveLogisticsTaskKind(
   input: ResolveLogisticsTaskKindInput
 ): LogisticsTaskKind | null {

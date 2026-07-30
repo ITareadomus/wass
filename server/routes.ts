@@ -4153,9 +4153,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   /**
-   * Registra una revisione `transfer_to_adam` della timeline logistica su PG (senza sync ADAM).
+   * Registra una revisione `transfer_to_adam` della timeline logistica su PG e scrive i dati
+   * logistica su ADAM `app_housekeeping` (`driven_by_us`, `lg_sequence`, `lg_*`), senza toccare le colonne
+   * housekeeping dei cleaner.
    */
   app.post("/api/transfer-logistics-to-adam", async (req, res) => {
+    let connection: any = null;
     try {
       const { date, username: reqUsername } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
@@ -4187,13 +4190,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         []
       );
 
+      const { pgUsersService } = await import("./services/pg-users-service");
+      const userRecord = await pgUsersService.getUserByUsername(username);
+      const adamUpdatedBy = userRecord?.adam_id ? `E${userRecord.adam_id}` : username;
+
+      const { syncLogisticsTimelineToAdam } = await import(
+        "./services/adam-logistics-transfer-service"
+      );
+
+      connection = await mysql.createConnection({
+        host: databaseConfig.mysql.host,
+        port: databaseConfig.mysql.port,
+        user: databaseConfig.mysql.user,
+        password: databaseConfig.mysql.password,
+        database: databaseConfig.mysql.database,
+      });
+
+      const syncResult = await syncLogisticsTimelineToAdam(connection, {
+        workDate,
+        timeline: timelineData,
+        adamUpdatedBy,
+        nowRome: format(new Date(), "yyyy-MM-dd HH:mm:ss"),
+      });
+
+      const messageParts = [`${syncResult.updated} task logistica scritte su ADAM`];
+      if (syncResult.cleared > 0) messageParts.push(`${syncResult.cleared} liberate`);
+      if (syncResult.errors.length > 0) messageParts.push(`${syncResult.errors.length} errori`);
+
       res.json({
-        success: true,
-        message: "Trasferimento logistica registrato (revisione e snapshot su PostgreSQL).",
+        success: syncResult.errors.length === 0,
+        message: `Trasferimento logistica: ${messageParts.join(", ")}.`,
+        workDate,
+        totalUpdated: syncResult.updated,
+        totalCleared: syncResult.cleared,
+        taskErrors: syncResult.errors.length,
+        clearErrors: syncResult.clearErrors.length,
+        errors: syncResult.errors,
+        clearErrorDetails: syncResult.clearErrors,
       });
     } catch (error: any) {
       console.error("POST /api/transfer-logistics-to-adam:", error);
       res.status(500).json({ success: false, message: error.message });
+    } finally {
+      if (connection) {
+        try {
+          await connection.end();
+        } catch {
+          /* ignore */
+        }
+      }
     }
   });
 
