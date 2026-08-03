@@ -2490,10 +2490,15 @@ const displayClickableInputClass =
       {dialogHousekeepingTypeLabel}
     </Badge>
   );
+  const canEditLogisticsKind = isLogisticsDetails && !isTaskReadOnly;
   const dialogLogisticsKindBadgeCorner =
     effectiveLogisticsTaskKind != null ? (
-      <LogisticsKindBadge kind={effectiveLogisticsTaskKind} />
-    ) : isLogisticsDetails && !isTaskReadOnly ? (
+      <LogisticsKindBadge
+        kind={effectiveLogisticsTaskKind}
+        onClick={canEditLogisticsKind ? () => setLogisticsKindPickerOpen(true) : undefined}
+        disabled={isSavingLogisticsKind}
+      />
+    ) : canEditLogisticsKind ? (
       <LogisticsKindAddBadge
         onClick={() => setLogisticsKindPickerOpen(true)}
         disabled={isSavingLogisticsKind}
@@ -3978,13 +3983,14 @@ const displayClickableInputClass =
         </DialogContent>
       </Dialog>
 
-      {/* Dialog scelta tipologia logistica (task non determinati) */}
+      {/* Dialog scelta / modifica tipologia logistica */}
       <LogisticsKindPickerDialog
         open={logisticsKindPickerOpen}
         onOpenChange={setLogisticsKindPickerOpen}
         taskLabel={`#${getTaskKey(displayTask)}`}
         onSelect={handleSelectLogisticsKind}
         isSaving={isSavingLogisticsKind}
+        currentKind={effectiveLogisticsTaskKind}
       />
 
       {/* Dialog Modifica Tipologia intervento - stesso stile di Pax-In / Check-out / Check-in */}
