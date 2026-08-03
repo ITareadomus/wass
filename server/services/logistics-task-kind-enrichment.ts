@@ -7,7 +7,9 @@ import pool from "../../shared/pg-db";
 import { formatHmTime } from "../../shared/logistics-task-windows";
 import { attachLogisticsTaskWindowFields } from "./logistics-task-window-fields";
 import { enrichLogisticsTimelineStructureSofabeds } from "./adam-structure-sofabeds";
+import { enrichLogisticsTimelineStructureKeys } from "./adam-structure-keys";
 import { enrichLogisticsTimelineCustomerNotes } from "./logistics-customer-notes-enrichment";
+import { enrichLogisticsTimelineExecutionStatus } from "./adam-logistics-execution-status-enrichment";
 
 export interface CleanerContextForTask {
   cleanerId: number | null;
@@ -327,7 +329,9 @@ export async function enrichLogisticsTimelineData(
   }
 
   await enrichLogisticsTimelineStructureSofabeds(timeline);
+  await enrichLogisticsTimelineStructureKeys(timeline);
   await enrichLogisticsTimelineCustomerNotes(workDate, timeline);
+  await enrichLogisticsTimelineExecutionStatus(timeline);
 }
 
 async function buildAutoKindPatchesFromTaskRows(

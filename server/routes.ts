@@ -2651,11 +2651,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { enrichLogisticsTimelineStructureSofabeds } = await import(
           "./services/adam-structure-sofabeds"
         );
+        const { enrichLogisticsTimelineStructureKeys } = await import(
+          "./services/adam-structure-keys"
+        );
         const { enrichLogisticsTimelineCustomerNotes } = await import(
           "./services/logistics-customer-notes-enrichment"
         );
+        const { enrichLogisticsTimelineExecutionStatus } = await import(
+          "./services/adam-logistics-execution-status-enrichment"
+        );
         await enrichLogisticsTimelineStructureSofabeds(timeline);
+        await enrichLogisticsTimelineStructureKeys(timeline);
         await enrichLogisticsTimelineCustomerNotes(workDate, timeline);
+        await enrichLogisticsTimelineExecutionStatus(timeline);
         if (scheduleChanged) {
           await workspaceFiles.saveLogisticsTimeline(
             workDate,

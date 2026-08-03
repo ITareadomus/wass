@@ -325,6 +325,7 @@ export default function AssignedTasksSequenceSummary({
                                 getSequenceSummaryTaskRowClassName({
                                   isTimelineViolated,
                                   isHighlighted,
+                                  executionStatus: entry.executionStatus,
                                 }),
                                 !isGroupDragDisabled &&
                                   !isTimelineViolated &&
