@@ -10,6 +10,10 @@ import {
   type LogisticsTaskKind,
 } from "@shared/logistics-task-kind";
 import {
+  resolveLogisticsTaskExecutionStatus,
+  type LogisticsTaskExecutionStatus,
+} from "@shared/logistics-task-execution-status";
+import {
   DIALOG_SECTION_CORNER_BADGE_WRAP_CLASS,
   LOGISTICS_KIND_BADGE_LABEL,
   LogisticsKindAddBadge,
@@ -18,6 +22,11 @@ import {
   LogisticsSequenceBadge,
   logisticsKindStripeClass,
 } from "@/lib/logistics-task-kind-ui";
+import {
+  hasLogisticsExecutionStatusColor,
+  LogisticsExecutionPausedIcon,
+  logisticsExecutionStatusSurfaceClass,
+} from "@/lib/logistics-task-execution-status-ui";
 import { format, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
 import { fetchWithOperation } from '@/lib/operationManager';
@@ -1235,15 +1244,34 @@ const displayClickableInputClass =
   const cardLogisticsSequenceLabel =
     cardLogisticsSequence != null ? String(cardLogisticsSequence) : null;
 
+  const logisticsExecutionStatus: LogisticsTaskExecutionStatus | null =
+    operationsScope === "logistics"
+      ? ((cardTaskAny.logistics_execution_status as
+          | LogisticsTaskExecutionStatus
+          | undefined) ??
+        resolveLogisticsTaskExecutionStatus({
+          lg_real_start: cardTaskAny.lg_real_start ?? cardTaskAny.lgRealStart,
+          lg_real_end: cardTaskAny.lg_real_end ?? cardTaskAny.lgRealEnd,
+          lg_paused: cardTaskAny.lg_paused ?? cardTaskAny.lgPaused,
+        }))
+      : null;
+  const logisticsExecutionSurfaceClass =
+    operationsScope === "logistics" && isInTimeline
+      ? logisticsExecutionStatusSurfaceClass(logisticsExecutionStatus, "strong")
+      : undefined;
+
   // Nei container: sfondo pagina per contrasto con la colonna; in timeline resta custom-blue-light.
-  // Task finished: grigio in timeline e container.
-  const cardSurfaceClass = isFinished
-    ? "bg-gray-200 dark:bg-gray-800 border-gray-400 dark:border-gray-600 opacity-70"
-    : isLocked && !isInTimeline
-      ? "bg-muted/80 border-border/60 opacity-70"
-      : !isInTimeline
-        ? "bg-background border-border shadow-sm"
-        : "bg-custom-blue-light border-border/60";
+  // Logistica in timeline: colori da stato Adam (lg_real_*), senza opacity che riduce leggibilità.
+  // Task finished: grigio in timeline e container (salvo status esecuzione logistica già colorato).
+  const cardSurfaceClass = logisticsExecutionSurfaceClass
+    ? logisticsExecutionSurfaceClass
+    : isFinished
+      ? "bg-gray-200 dark:bg-gray-800 border-gray-400 dark:border-gray-600 opacity-70"
+      : isLocked && !isInTimeline
+        ? "bg-muted/80 border-border/60 opacity-70"
+        : !isInTimeline
+          ? "bg-background border-border shadow-sm"
+          : "bg-custom-blue-light border-border/60";
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -3036,7 +3064,13 @@ const displayClickableInputClass =
                       "rounded-md border transition-colors duration-200",
                       showCompactAdamTimelineUi ? "px-1 py-0" : "flex items-center px-2 py-1",
                       isSelected && isMultiSelectMode && !isInTimeline && "z-[1] ring-2 ring-sky-500 ring-inset",
-                      isOverdue && isInTimeline && "animate-blink",
+                      isOverdue &&
+                        isInTimeline &&
+                        !(
+                          operationsScope === "logistics" &&
+                          hasLogisticsExecutionStatusColor(logisticsExecutionStatus)
+                        ) &&
+                        "animate-blink",
                       !isDragging && isMapFiltered && "task-border-map-filtered",
                       !isDragging && !isMapFiltered && isHighlighted && "task-border-search-highlighted",
                       "cursor-pointer flex-shrink-0 relative group"
@@ -3076,6 +3110,14 @@ const displayClickableInputClass =
                         className="absolute -top-1.5 -right-1.5 z-[65]"
                       />
                     )}
+                    {operationsScope === "logistics" &&
+                      isInTimeline &&
+                      logisticsExecutionStatus === "paused" && (
+                        <LogisticsExecutionPausedIcon
+                          size="timeline"
+                          className="absolute bottom-0.5 right-0.5 z-[40]"
+                        />
+                      )}
                     {showCompactAdamTimelineUi ? (
                       <LogisticsAdamCodeLabel code={logisticsAdamCode} />
                     ) : (

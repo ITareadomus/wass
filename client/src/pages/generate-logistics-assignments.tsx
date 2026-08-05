@@ -8,6 +8,7 @@ import AssignedTasksSequenceSummary from "@/components/assigned-tasks-sequence-s
 import LogisticsTimelineView from "@/components/timeline/logistics-timeline-view";
 import MapSection from "@/components/map/map-section";
 import type { TaskType } from "@shared/schema";
+import { pickLogisticsExecutionStatusFields } from "@shared/logistics-task-execution-status";
 import { isWorkDateHistoricallyLocked } from "@shared/work-date-access";
 import {
   CalendarIcon,
@@ -15,6 +16,8 @@ import {
   Search,
   Map as MapIcon,
   BarChart3,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
 import {
@@ -273,6 +276,7 @@ function convertLogisticsTimelineTaskToMapTask(task: any, driverId: number): Tas
     ...(task?.cleaner_sequence != null && Number.isFinite(Number(task.cleaner_sequence))
       ? { cleaner_sequence: Number(task.cleaner_sequence) }
       : {}),
+    ...pickLogisticsExecutionStatusFields(task),
     ...( { assignedCleaner: driverId, sequence: task?.sequence } as any ),
   } as TaskType;
 }
@@ -391,6 +395,7 @@ function timelineRowToTaskType(t: any, fallbackPriority: TaskType["priority"]): 
     travel_time: t.travel_time != null ? Number(t.travel_time) : undefined,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    ...pickLogisticsExecutionStatusFields(t),
   };
 }
 
@@ -444,6 +449,8 @@ export default function GenerateLogisticsAssignments() {
   const [isLoadingDragDrop, setIsLoadingDragDrop] = useState(false);
   const [isDraggingTimelineTask, setIsDraggingTimelineTask] = useState(false);
   const [draggingOverDriverId, setDraggingOverDriverId] = useState<number | null>(null);
+  /** Nasconde i containers e mostra il sommario anche se restano task non locked. */
+  const [containersManuallyCollapsed, setContainersManuallyCollapsed] = useState(false);
   const [activeDragDriverId, setActiveDragDriverId] = useState<number | null>(null);
   /** Estrazione / refresh da ADAM al cambio data (come checkAndAutoLoadSavedAssignments + extractData su HK) */
   const [isExtractingLogistics, setIsExtractingLogistics] = useState(false);
@@ -945,13 +952,26 @@ export default function GenerateLogisticsAssignments() {
     [lowPriorityTasks, searchTask, containerHighlightTaskId]
   );
 
-  const showContainers = useMemo(
+  const hasUnlockedContainerTasks = useMemo(
     () =>
       earlyOutTasks.some((task) => !isTaskLocked(task)) ||
       highPriorityTasks.some((task) => !isTaskLocked(task)) ||
       lowPriorityTasks.some((task) => !isTaskLocked(task)),
     [earlyOutTasks, highPriorityTasks, lowPriorityTasks]
   );
+
+  useEffect(() => {
+    setContainersManuallyCollapsed(false);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (!hasUnlockedContainerTasks) {
+      setContainersManuallyCollapsed(false);
+    }
+  }, [hasUnlockedContainerTasks]);
+
+  const showContainers = hasUnlockedContainerTasks && !containersManuallyCollapsed;
+  const showSequenceSummary = !hasUnlockedContainerTasks || containersManuallyCollapsed;
 
   const sequenceSummaryGroups = useMemo(() => {
     const groups = buildSequenceSummaryGroupsFromDriverAssignments(
@@ -1232,7 +1252,7 @@ export default function GenerateLogisticsAssignments() {
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-background text-foreground">
       <div className="mx-auto flex w-full min-h-0 max-w-[1920px] flex-1 flex-col overflow-x-hidden px-4 pb-6 pt-3">
         {!isExtractingLogistics && (
-          <div className="mb-6 flex w-full flex-wrap items-center justify-between gap-4">
+          <div className="mb-[17px] flex w-full flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-4">
               <h1 className="flex items-center gap-2 text-[25px] font-bold text-foreground">
                 Assegnazioni Logistica del
@@ -1304,7 +1324,12 @@ export default function GenerateLogisticsAssignments() {
           </PageViewportCentered>
         ) : (
         <>
-        <div className="mx-auto mb-4 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-3">
+        <div
+          className={cn(
+            "mx-auto flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-3",
+            hasUnlockedContainerTasks ? "mb-0" : "mb-[17px]"
+          )}
+        >
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="relative min-w-[200px] flex-1">
               <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-custom-blue" />
@@ -1374,52 +1399,79 @@ export default function GenerateLogisticsAssignments() {
           measuring={{ droppable: { strategy: MeasuringStrategy.WhileDragging } }}
           {...logisticsDnd.handlers}
         >
-          {showContainers && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 w-full">
-                <PriorityColumn
-                  title="EARLY OUT"
-                  priority="early-out"
-                  tasks={earlyOutTasks}
-                  droppableId="early-out"
-                  icon="clock"
-                  isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
-                  disableToolbar
-                  flushDropZone
-                  operationsScope="logistics"
-                  highlightedTaskIds={highlightedEarlyOut}
-                  onLogisticsTimelineMutated={reloadLogisticsPage}
-                />
-                <PriorityColumn
-                  title="HIGH PRIORITY"
-                  priority="high"
-                  tasks={highPriorityTasks}
-                  droppableId="high"
-                  icon="alert-circle"
-                  isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
-                  disableToolbar
-                  flushDropZone
-                  operationsScope="logistics"
-                  highlightedTaskIds={highlightedHighPriority}
-                  onLogisticsTimelineMutated={reloadLogisticsPage}
-                />
-                <PriorityColumn
-                  title="LOW PRIORITY"
-                  priority="low"
-                  tasks={lowPriorityTasks}
-                  droppableId="low"
-                  icon="arrow-down"
-                  isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
-                  disableToolbar
-                  flushDropZone
-                  operationsScope="logistics"
-                  highlightedTaskIds={highlightedLowPriority}
-                  onLogisticsTimelineMutated={reloadLogisticsPage}
-                />
+          {hasUnlockedContainerTasks && showContainers && (
+              <div className="mb-4 w-full">
+                <div className="mt-[17px] flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setContainersManuallyCollapsed(true)}
+                    className="relative z-10 -mb-[2px] inline-flex items-center gap-1 rounded-t-lg border-2 border-b-0 border-custom-blue bg-background px-2.5 py-1 text-custom-blue shadow-sm transition-colors hover:bg-accent"
+                    aria-label="Nascondi containers"
+                    title="Nascondi containers"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-3">
+                  <PriorityColumn
+                    title="EARLY OUT"
+                    priority="early-out"
+                    tasks={earlyOutTasks}
+                    droppableId="early-out"
+                    icon="clock"
+                    isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
+                    disableToolbar
+                    flushDropZone
+                    operationsScope="logistics"
+                    highlightedTaskIds={highlightedEarlyOut}
+                    onLogisticsTimelineMutated={reloadLogisticsPage}
+                  />
+                  <PriorityColumn
+                    title="HIGH PRIORITY"
+                    priority="high"
+                    tasks={highPriorityTasks}
+                    droppableId="high"
+                    icon="alert-circle"
+                    isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
+                    disableToolbar
+                    flushDropZone
+                    operationsScope="logistics"
+                    highlightedTaskIds={highlightedHighPriority}
+                    onLogisticsTimelineMutated={reloadLogisticsPage}
+                  />
+                  <PriorityColumn
+                    title="LOW PRIORITY"
+                    priority="low"
+                    tasks={lowPriorityTasks}
+                    droppableId="low"
+                    icon="arrow-down"
+                    isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
+                    disableToolbar
+                    flushDropZone
+                    operationsScope="logistics"
+                    highlightedTaskIds={highlightedLowPriority}
+                    onLogisticsTimelineMutated={reloadLogisticsPage}
+                    className="rounded-tr-none"
+                  />
+                </div>
               </div>
           )}
 
-          <div className="mt-0 grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <div className="mt-0 grid grid-cols-1 gap-4 xl:grid-cols-3">
             <div className="xl:col-span-3">
+              {hasUnlockedContainerTasks && !showContainers && (
+                <div className="mt-[17px] flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setContainersManuallyCollapsed(false)}
+                    className="relative z-10 -mb-[2px] inline-flex items-center gap-1 rounded-t-lg border-2 border-b-0 border-custom-blue bg-background px-2.5 py-1 text-custom-blue shadow-sm transition-colors hover:bg-accent"
+                    aria-label="Mostra containers"
+                    title="Mostra containers"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
               <div className="relative">
                 <LogisticsTimelineView
                   workDate={format(selectedDate, "yyyy-MM-dd")}
@@ -1432,6 +1484,11 @@ export default function GenerateLogisticsAssignments() {
                   activeDragDriverId={activeDragDriverId}
                   lastValidDragIndex={lastValidDragIndex}
                   onRefresh={reloadLogisticsPage}
+                  className={
+                    hasUnlockedContainerTasks && !showContainers
+                      ? "rounded-tr-none"
+                      : undefined
+                  }
                 />
                 <TimelineFloatingPanel
                   side="right"
@@ -1487,7 +1544,7 @@ export default function GenerateLogisticsAssignments() {
             </div>
           </div>
 
-          {!showContainers && (
+          {showSequenceSummary && (
             <AssignedTasksSequenceSummary
               groups={sequenceSummaryGroups}
               searchTask={searchTask}

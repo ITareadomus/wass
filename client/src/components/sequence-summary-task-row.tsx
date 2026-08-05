@@ -1,7 +1,12 @@
-import { MessageCircle, Pause } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SequenceSummaryEntry } from "@/lib/sequence-summary";
 import type { LogisticsTaskExecutionStatus } from "@shared/logistics-task-execution-status";
+import {
+  hasLogisticsExecutionStatusColor,
+  LogisticsExecutionPausedIcon,
+  logisticsExecutionStatusSurfaceClass,
+} from "@/lib/logistics-task-execution-status-ui";
 import { logisticsKindSequenceDotClass, LogisticsSequenceBadge } from "@/lib/logistics-task-kind-ui";
 import {
   Tooltip,
@@ -103,21 +108,6 @@ function SequenceSummaryCustomerNoteIndicator({
   );
 }
 
-function executionStatusRowClass(
-  executionStatus?: LogisticsTaskExecutionStatus | null
-): string | undefined {
-  switch (executionStatus) {
-    case "in_progress":
-      return "sequence-summary-task--in-progress border-blue-500 bg-blue-50 dark:bg-blue-950/35";
-    case "completed":
-      return "sequence-summary-task--completed border-green-500 bg-green-50 dark:bg-green-950/35";
-    case "paused":
-      return "sequence-summary-task--paused border-gray-400 bg-gray-200/90 dark:bg-gray-800/60";
-    default:
-      return undefined;
-  }
-}
-
 export function getSequenceSummaryTaskRowClassName({
   isTimelineViolated,
   isHighlighted,
@@ -129,26 +119,34 @@ export function getSequenceSummaryTaskRowClassName({
   isDragging?: boolean;
   executionStatus?: LogisticsTaskExecutionStatus | null;
 } = {}) {
+  const statusClass = logisticsExecutionStatusSurfaceClass(executionStatus);
+  const statusWinsOverViolation = hasLogisticsExecutionStatusColor(executionStatus);
+  // Violazione lampeggia solo se non c'è colore status; l'icona resta comunque (--violated).
+  const showViolationBlink = isTimelineViolated === true && !statusWinsOverViolation;
+
   return cn(
     "sequence-summary-task relative rounded-md border px-2 py-1.5 text-xs",
-    isTimelineViolated
-      ? "sequence-summary-task--violated animate-blink-inset border-red-500 bg-red-50 dark:bg-red-950/30"
+    isTimelineViolated && "sequence-summary-task--violated",
+    showViolationBlink
+      ? "animate-blink-inset border-red-500 bg-red-50 dark:bg-red-950/30"
       : isHighlighted
         ? "border-amber-400 bg-amber-50 dark:bg-amber-950/30"
-        : executionStatusRowClass(executionStatus) ?? "border-border/70 bg-background",
+        : statusClass
+          ? cn(
+              statusClass,
+              executionStatus === "in_progress" && "sequence-summary-task--in-progress",
+              executionStatus === "completed" && "sequence-summary-task--completed",
+              executionStatus === "paused" && "sequence-summary-task--paused",
+            )
+          : "border-border/70 bg-background",
     isDragging && "cursor-grabbing shadow-md ring-1 ring-custom-blue/40",
   );
 }
 
 export function SequenceSummaryPausedOverlay() {
   return (
-    <span
-      className="pointer-events-none absolute inset-y-0 right-1.5 z-[3] flex items-center"
-      aria-label="In pausa"
-    >
-      <span className="inline-flex items-center justify-center rounded-full bg-gray-500/25 p-1 dark:bg-gray-200/15">
-        <Pause className="h-3.5 w-3.5 fill-gray-700 text-gray-700 dark:fill-gray-200 dark:text-gray-200" />
-      </span>
+    <span className="pointer-events-none absolute inset-y-0 right-1.5 z-[3] flex items-center">
+      <LogisticsExecutionPausedIcon size="summary" />
     </span>
   );
 }
@@ -161,7 +159,7 @@ export function SequenceSummaryTaskContent({
   onCustomerNoteOpen?: (note: string, logisticCode: string) => void;
 }) {
   const isTimelineViolated = entry.timelineViolated === true;
-  const isPaused = !isTimelineViolated && entry.executionStatus === "paused";
+  const isPaused = entry.executionStatus === "paused";
 
   return (
     <>

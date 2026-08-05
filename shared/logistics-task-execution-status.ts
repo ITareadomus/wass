@@ -54,3 +54,33 @@ export function resolveLogisticsTaskExecutionStatus(input: {
   if (hasStart && !hasEnd && !paused) return "in_progress";
   return "not_started";
 }
+
+/** Campi Adam da preservare nei mapper UI timeline/container. */
+export function pickLogisticsExecutionStatusFields(task: any): {
+  lg_real_start: string | null;
+  lg_real_end: string | null;
+  lg_paused: boolean;
+  logistics_execution_status: LogisticsTaskExecutionStatus;
+} {
+  const rawStart = task?.lg_real_start ?? task?.lgRealStart;
+  const rawEnd = task?.lg_real_end ?? task?.lgRealEnd;
+  const lg_real_start =
+    rawStart == null || String(rawStart).trim() === "" ? null : String(rawStart);
+  const lg_real_end =
+    rawEnd == null || String(rawEnd).trim() === "" ? null : String(rawEnd);
+  const lg_paused = parseLogisticsPaused(task?.lg_paused ?? task?.lgPaused);
+  const logistics_execution_status =
+    (task?.logistics_execution_status as LogisticsTaskExecutionStatus | undefined) ??
+    resolveLogisticsTaskExecutionStatus({
+      lg_real_start,
+      lg_real_end,
+      lg_paused,
+    });
+
+  return {
+    lg_real_start,
+    lg_real_end,
+    lg_paused,
+    logistics_execution_status,
+  };
+}

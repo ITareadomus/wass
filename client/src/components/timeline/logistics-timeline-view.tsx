@@ -42,6 +42,7 @@ import {
   pickLogisticsViolationFields,
   sumLogisticsTaskWorkedMinutes,
 } from "@shared/logistics-scheduling-constraints";
+import { pickLogisticsExecutionStatusFields } from "@shared/logistics-task-execution-status";
 import { estimateLogisticsReturnToDepotMinutes } from "@shared/logistics-travel-estimate";
 import {
   AlertDialog,
@@ -130,6 +131,7 @@ interface LogisticsTimelineViewProps {
   /** Indice di insert durante drag cross-autista (per spacer di preview). */
   lastValidDragIndex?: number | null;
   onRefresh: () => Promise<void>;
+  className?: string;
 }
 
 /** Larghezza minima card 15' — anche scala minima della timeline (abilita scroll orizzontale). */
@@ -328,6 +330,7 @@ function timelineTaskToTask(t: any, driverId: number): Task {
     ...(t.logistics_task_kind_source != null
       ? { logistics_task_kind_source: String(t.logistics_task_kind_source) }
       : {}),
+    ...pickLogisticsExecutionStatusFields(t),
     ...( { assignedCleaner: driverId, sequence: t.sequence } as any ),
     ...pickLogisticsViolationFields(t),
   };
@@ -366,6 +369,7 @@ export default function LogisticsTimelineView({
   activeDragDriverId = null,
   lastValidDragIndex = null,
   onRefresh,
+  className,
 }: LogisticsTimelineViewProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -1598,7 +1602,12 @@ export default function LogisticsTimelineView({
 
   return (
     <>
-      <div className="bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm relative overflow-hidden">
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-lg border-2 border-custom-blue bg-custom-blue-light shadow-sm",
+          className
+        )}
+      >
         {(isLoadingOverlay || clearDriversMutation.isPending || isAddingDriverToTimeline) && (
           <div className="absolute inset-0 bg-black/20 dark:bg-black/40 rounded-lg flex items-center justify-center z-40 backdrop-blur-sm pointer-events-none">
             <div className="flex flex-col items-center gap-3">

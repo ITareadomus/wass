@@ -4,6 +4,7 @@ import {
   resolveLogisticsTaskExecutionStatus,
   parseLogisticsPaused,
   isLogisticsExecutionFieldSet,
+  pickLogisticsExecutionStatusFields,
 } from "./logistics-task-execution-status";
 
 describe("resolveLogisticsTaskExecutionStatus", () => {
@@ -63,5 +64,19 @@ describe("parseLogisticsPaused / isLogisticsExecutionFieldSet", () => {
     assert.equal(isLogisticsExecutionFieldSet(null), false);
     assert.equal(isLogisticsExecutionFieldSet(""), false);
     assert.equal(isLogisticsExecutionFieldSet("10:00:00"), true);
+  });
+});
+
+describe("pickLogisticsExecutionStatusFields", () => {
+  it("preserves status for timeline mappers", () => {
+    const picked = pickLogisticsExecutionStatusFields({
+      lg_real_start: "10:22:55",
+      lg_real_end: null,
+      lg_paused: 1,
+      logistics_execution_status: "paused",
+    });
+    assert.equal(picked.logistics_execution_status, "paused");
+    assert.equal(picked.lg_real_start, "10:22:55");
+    assert.equal(picked.lg_paused, true);
   });
 });

@@ -49,6 +49,7 @@ interface PriorityColumnProps {
   operationsScope?: "housekeeping" | "logistics";
   /** Dopo mutazione tipologia logistica (container o timeline). */
   onLogisticsTimelineMutated?: () => void;
+  className?: string;
 }
 
 export default function PriorityColumn({
@@ -66,6 +67,7 @@ export default function PriorityColumn({
   flushDropZone = false,
   operationsScope = "housekeeping",
   onLogisticsTimelineMutated,
+  className,
 }: PriorityColumnProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isHistoricalDateLocked, setIsHistoricalDateLocked] = useState(false);
@@ -404,7 +406,13 @@ export default function PriorityColumn({
   };
 
   return (
-    <div className={`${getColumnClass(priority, tasks)} min-w-0 overflow-visible rounded-lg border-2 p-4`}>
+    <div
+      className={cn(
+        getColumnClass(priority, tasks),
+        "min-w-0 overflow-visible rounded-lg border-2 p-4",
+        className
+      )}
+    >
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-semibold flex items-center text-custom-blue">
