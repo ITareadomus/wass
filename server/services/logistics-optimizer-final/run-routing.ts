@@ -24,7 +24,7 @@ import {
   buildVehicleArcPenalties,
   computeRouteSequenceDiagnostics,
 } from "./groups/route-sequence-penalties";
-import { polishRoutingSolutionWithDiagnostics } from "./route-polishing";
+import { runPostSolvePipeline } from "./post-solve-pipeline";
 
 export interface RunLogisticsRoutingOptions extends BuildLogisticsRoutingInputOptions {
   solver?: RoutingSolverId;
@@ -33,6 +33,8 @@ export interface RunLogisticsRoutingOptions extends BuildLogisticsRoutingInputOp
   debug?: boolean;
   /** Allows greedy-v1 with apply for explicit debug only. */
   allowDebugSolverApply?: boolean;
+  /** Defaults to enabled; env LOGISTICS_SEQUENCE_REFINEMENT=0 disables it globally. */
+  sequenceRefinement?: boolean;
 }
 
 export class GreedySolverNotAllowedForApplyError extends Error {
@@ -91,8 +93,12 @@ export async function runLogisticsRouting(
   }
 
   const solverSolution = await solveRouting(input, { solverId });
-  const polished = polishRoutingSolutionWithDiagnostics(input, solverSolution);
-  const solution = polished.solution;
+  const postSolve = await runPostSolvePipeline({
+    input,
+    solution: solverSolution,
+    options: { solverId, sequenceRefinement: options.sequenceRefinement },
+  });
+  const solution = postSolve.solution;
   const solutionValidation = validateRoutingSolution(input, solution);
   const applyGate = evaluateSolutionApplyGate(solution, {
     allowPartial: options.allowPartial,
@@ -125,7 +131,7 @@ export async function runLogisticsRouting(
         droppedDiagnostics,
         ...(territoryDiagnostics ? { territoryDiagnostics } : {}),
         ...(routeSequenceDiagnostics ? { routeSequenceDiagnostics } : {}),
-        ...(polished.diagnostics ? { routePolishingDiagnostics: polished.diagnostics } : {}),
+        ...postSolve.diagnostics,
       },
     });
   }

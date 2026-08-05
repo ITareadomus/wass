@@ -245,6 +245,7 @@ describe("buildTaskWindow", () => {
       cleanerStartTime: null,
       cleanerTaskStartTime: null,
       priorityWindows,
+      dayEndMin: 1200,
     });
     const hp = buildTaskWindow({
       taskId: 2,
@@ -259,6 +260,7 @@ describe("buildTaskWindow", () => {
       cleanerStartTime: null,
       cleanerTaskStartTime: null,
       priorityWindows,
+      dayEndMin: 1200,
     });
 
     expect(eo.hardWindow.earliestStartMin).toBe(0);
@@ -281,6 +283,7 @@ describe("buildTaskWindow", () => {
       cleanerStartTime: null,
       cleanerTaskStartTime: null,
       priorityWindows,
+      dayEndMin: 1200,
     });
 
     expect(result.hardWindow.earliestStartMin).toBe(0);
@@ -302,6 +305,7 @@ describe("buildTaskWindow", () => {
       cleanerStartTime: "12:00",
       cleanerTaskStartTime: "12:00",
       priorityWindows,
+      dayEndMin: 1200,
     });
 
     expect(result.softWindows[0]?.reason).toBe("EO_EARLY_URGENT_SOFT_PREFERENCE");
@@ -323,6 +327,7 @@ describe("buildTaskWindow", () => {
       cleanerStartTime: null,
       cleanerTaskStartTime: null,
       priorityWindows,
+      dayEndMin: 1200,
     });
 
     expect(result.softWindows).toEqual([]);
@@ -344,6 +349,7 @@ describe("buildTaskWindow", () => {
       cleanerStartTime: null,
       cleanerTaskStartTime: null,
       priorityWindows,
+      dayEndMin: 1200,
     });
 
     expect(result.softWindows[0]?.reason).toBe("EO_EARLY_URGENT_SOFT_PREFERENCE");
@@ -368,6 +374,7 @@ describe("buildTaskWindow", () => {
         HP: { startMin: 630, endMin: 840, graceMin: 0 },
         LP: { startMin: 630, endMin: null, graceMin: 0 },
       },
+      dayEndMin: 1200,
     });
 
     expect(result.hardWindow.earliestStartMin).toBe(0);
@@ -391,6 +398,7 @@ describe("buildTaskWindow", () => {
       cleanerStartTime: null,
       cleanerTaskStartTime: null,
       priorityWindows: customWindows,
+      dayEndMin: 1200,
     };
 
     const hp = buildTaskWindow({ ...base, taskId: 21, priority: "HP" });
@@ -420,6 +428,7 @@ describe("buildTaskWindow", () => {
         HP: { startMin: 630, endMin: 840, graceMin: 0 },
         LP: { startMin: 630, endMin: null, graceMin: 0 },
       },
+      dayEndMin: 1200,
     });
 
     expect(result.hardWindow.earliestStartMin).toBe(720);
@@ -443,6 +452,7 @@ describe("buildTaskWindow", () => {
       cleanerStartTime: null,
       cleanerTaskStartTime: null,
       priorityWindows: customWindows,
+      dayEndMin: 1200,
     };
 
     const hp = buildTaskWindow({ ...base, taskId: 24, priority: "HP" });
@@ -470,6 +480,7 @@ describe("buildTaskWindow", () => {
       cleanerStartTime: null,
       cleanerTaskStartTime: null,
       priorityWindows,
+      dayEndMin: 1200,
     });
     const cleaner = buildTaskWindow({
       taskId: 4,
@@ -484,6 +495,7 @@ describe("buildTaskWindow", () => {
       cleanerStartTime: "10:00",
       cleanerTaskStartTime: null,
       priorityWindows,
+      dayEndMin: 1200,
     });
 
     expect(checkout.hardWindow.earliestStartMin).toBe(720);

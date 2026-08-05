@@ -76,10 +76,22 @@ function getNormalizedTask(task: any): any {
   if (task.followup !== undefined) normalizedTask.followup = task.followup;
   if (task.sequence !== undefined) normalizedTask.sequence = task.sequence;
   if (task.travel_time !== undefined) normalizedTask.travel_time = task.travel_time;
+  if (task.checkout_wait_minutes !== undefined) {
+    normalizedTask.checkout_wait_minutes = task.checkout_wait_minutes;
+  }
+  if (task.manually_moved !== undefined) normalizedTask.manually_moved = task.manually_moved;
+  if (task.is_finished !== undefined) normalizedTask.is_finished = Boolean(task.is_finished);
+  if (task.customer_note !== undefined) normalizedTask.customer_note = task.customer_note;
+  if (task.customer_note_history !== undefined) {
+    normalizedTask.customer_note_history = task.customer_note_history;
+  }
   if (task.logistics_task_kind !== undefined) normalizedTask.logistics_task_kind = task.logistics_task_kind;
   if (task.logistics_task_kind_source !== undefined) {
     normalizedTask.logistics_task_kind_source = task.logistics_task_kind_source;
   }
+  if (task.cleaner_id !== undefined) normalizedTask.cleaner_id = task.cleaner_id;
+  if (task.cleaner_sequence !== undefined) normalizedTask.cleaner_sequence = task.cleaner_sequence;
+  if (task.cleaner_alias !== undefined) normalizedTask.cleaner_alias = task.cleaner_alias;
 
   return normalizedTask;
 }

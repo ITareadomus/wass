@@ -303,6 +303,51 @@
     display: none;
   }
 
+  /* Scrollbar orizzontali dedicate (sopra/sotto timeline), sincronizzate con le righe */
+  .timeline-h-scrollbar {
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(215 20% 65%) hsl(210 40% 96%);
+  }
+
+  .timeline-h-scrollbar::-webkit-scrollbar {
+    height: 12px;
+    display: block;
+  }
+
+  .timeline-h-scrollbar::-webkit-scrollbar-track {
+    background: hsl(210 40% 96%);
+    border-radius: 4px;
+  }
+
+  .timeline-h-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(215 20% 65%);
+    border-radius: 4px;
+  }
+
+  .timeline-h-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(215 25% 55%);
+  }
+
+  .dark .timeline-h-scrollbar {
+    scrollbar-color: hsl(215 20% 45%) hsl(217 32% 17%);
+  }
+
+  .dark .timeline-h-scrollbar::-webkit-scrollbar-track {
+    background: hsl(217 32% 17%);
+  }
+
+  .dark .timeline-h-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(215 20% 45%);
+  }
+
+  .dark .timeline-h-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(215 25% 55%);
+  }
+
   .scrollbar-hide {
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -589,8 +634,8 @@
 
   /* Drop zone effects */
   .drop-zone-active {
-    border-color: hsl(221.2 83.2% 53.3%);
-    background-color: hsl(221.2 83.2% 53.3% / 0.05);
+    border-color: inherit;
+    background-color: transparent;
   }
 
   /* Timeline styling */
@@ -923,6 +968,7 @@
     border-bottom: none !important;
   }
 
+  /* Seq | Codice | Cliente | Indirizzo | Fin.cleaner | Out/In | Cleaner | Divani | Chiavi | Note */
   [data-print-driver-sheet] th:nth-child(1),
   [data-print-driver-sheet] td:nth-child(1) { width: 4% !important; }
   [data-print-driver-sheet] th:nth-child(2),
@@ -934,15 +980,15 @@
   [data-print-driver-sheet] th:nth-child(5),
   [data-print-driver-sheet] td:nth-child(5) { width: 9% !important; }
   [data-print-driver-sheet] th:nth-child(6),
-  [data-print-driver-sheet] td:nth-child(6) { width: 9% !important; }
+  [data-print-driver-sheet] td:nth-child(6) { width: 8% !important; }
   [data-print-driver-sheet] th:nth-child(7),
-  [data-print-driver-sheet] td:nth-child(7) { width: 8% !important; }
+  [data-print-driver-sheet] td:nth-child(7) { width: 9% !important; }
   [data-print-driver-sheet] th:nth-child(8),
-  [data-print-driver-sheet] td:nth-child(8) { width: 9% !important; }
+  [data-print-driver-sheet] td:nth-child(8) { width: 8% !important; }
   [data-print-driver-sheet] th:nth-child(9),
-  [data-print-driver-sheet] td:nth-child(9) { width: 8% !important; }
+  [data-print-driver-sheet] td:nth-child(9) { width: 10% !important; }
   [data-print-driver-sheet] th:nth-child(10),
-  [data-print-driver-sheet] td:nth-child(10) { width: 28% !important; }
+  [data-print-driver-sheet] td:nth-child(10) { width: 27% !important; }
 
   [data-print-driver-sheet] col {
     width: auto !important;

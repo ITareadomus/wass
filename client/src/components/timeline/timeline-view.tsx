@@ -2,12 +2,18 @@ import { Personnel, TaskType as Task } from "@shared/schema";
 import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, UserMinus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap, Lock, Unlock } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
-import { Droppable, Draggable } from "react-beautiful-dnd";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { fetchWithOperation } from "@/lib/operationManager";
 import { useToast } from "@/hooks/use-toast";
-import TaskCard from "@/components/drag-drop/task-card";
+import SortableTaskCard from "@/components/drag-drop/sortable-task-card";
+import { TimelineHorizontalScrollbar } from "@/components/timeline/timeline-horizontal-scrollbar";
+import {
+  DndDroppableSortableContainer,
+  getTaskDndKey,
+  taskDndId,
+  type AppDndItem,
+} from "@/lib/dnd";
 import {
   Dialog,
   DialogContent,
@@ -58,6 +64,7 @@ interface TimelineViewProps {
   isLoadingDragDrop?: boolean; // Mostra loading overlay durante drag&drop
   lastValidDragIndex?: number | null; // Indice valido durante il drag (da container verso timeline)
   draggingOverCleanerId?: number | null; // ID del cleaner su cui si sta trascinando
+  activeDragCleanerId?: number | null; // ID del cleaner sorgente durante il drag
   searchTask?: string; // Ricerca task per ID, logistic code, address o customer reference
   preassignedAnimatedTaskIds?: Set<string>;
 }
@@ -85,6 +92,8 @@ interface Cleaner {
 const DEFAULT_TIMELINE_START_MINUTES = 10 * 60;
 const DEFAULT_TIMELINE_END_MINUTES = 19 * 60;
 const MIN_TIMELINE_TASK_WIDTH_PX = 150;
+/** Durante DnD: stessa larghezza minima delle card logistica (slot 15') */
+const COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX = 56;
 const FALLBACK_SHORTEST_TASK_MINUTES = 30;
 const TIMELINE_END_BUFFER_MINUTES = 60;
 
@@ -156,6 +165,7 @@ export default function TimelineView({
   isLoadingDragDrop = false,
   lastValidDragIndex = null,
   draggingOverCleanerId = null,
+  activeDragCleanerId = null,
   searchTask = "",
   preassignedAnimatedTaskIds = new Set<string>(),
 }: TimelineViewProps) {
@@ -290,7 +300,6 @@ export default function TimelineView({
     false;
   const scopeValue = isOfficeScope ? "office" : "housekeeping";
   const withScope = (url: string) => `${url}${url.includes("?") ? "&" : "?"}scope=${scopeValue}`;
-  const isTimelineInteractionDisabled = isReadOnly;
   const [editingAlias, setEditingAlias] = useState<string>("");
   const [isSavingAlias, setIsSavingAlias] = useState(false);
   const [isSavingCleanerLock, setIsSavingCleanerLock] = useState(false);
@@ -775,6 +784,12 @@ export default function TimelineView({
       });
     },
   });
+
+  const isTimelineInteractionDisabled =
+    isReadOnly ||
+    isLoadingDragDrop ||
+    removeCleanerMutation.isPending ||
+    clearAllSelectedCleanersMutation.isPending;
 
   // Mutation per aggiungere un cleaner alla timeline
   const addCleanerMutation = useMutation({
@@ -2393,6 +2408,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
         </div>
         <div className="flex min-h-0 flex-col overflow-hidden px-1 pt-4 pb-4">
 
+          <TimelineHorizontalScrollbar
+            labelColumnWidth={cleanerColumnWidth}
+            contentWidth={timelineScaledWidth}
+            registerRef={registerTimelineScrollRef}
+            onScroll={handleTimelineScroll}
+          />
+
 {/* Graffe fasce orarie (EO / HP / LP) sopra gli orari */}
 <div className="flex items-stretch mb-0 px-1 h-[40px]">
   {/* colonna pulsante / nome cleaner (vuota per allineamento) */}
@@ -2592,8 +2614,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             </div>
           </div>
 
-          {/* Righe dei cleaners - mostra solo se ci sono cleaners selezionati */}
-          <div className="timeline-rows-scroll relative z-0 flex-1 overflow-x-hidden overflow-y-auto px-1 pb-2 pt-2">
+          {/* Righe cleaners + scrollbar/footer attaccati in fondo al contenuto */}
+          <div className="timeline-rows-scroll relative z-0 min-h-0 flex-none overflow-x-hidden overflow-y-auto px-1 pb-0 pt-2">
             {allCleanersToShow.length === 0 && !isReadOnly ? (
               <div className="mb-0.5 flex min-w-0">
                 <div className="flex min-w-0 flex-1 items-center justify-center rounded-lg border-2 border-yellow-300 bg-yellow-100 dark:border-yellow-700 dark:bg-yellow-950/50 h-64">
@@ -2635,6 +2657,11 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 const cleanerTasks = tasks.filter(task =>
                   (task as any).assignedCleaner === cleaner.id
                 ).map(normalizeTask); // Applica la normalizzazione qui
+
+                // Durante il drag: nascondi travel/checkout così i task possono riordinarsi in modo ottimistico
+                const hideRouteSpacers =
+                  activeDragCleanerId === cleaner.id ||
+                  draggingOverCleanerId === cleaner.id;
 
                 const isRemoved = removedCleanerIds.has(cleaner.id);
 
@@ -2739,30 +2766,51 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                       </div>
                     </div>
                     {/* Timeline per questo cleaner - area unica droppable */}
-                    <Droppable
-                      droppableId={`timeline-${cleaner.id}`}
-                      direction="horizontal"
-                      isDropDisabled={isTimelineInteractionDisabled}
-                    >
-                      {(provided, snapshot) => (
-                        <div
-                          {...provided.droppableProps}
+                    {(() => {
+                      const cleanerTasks = tasks
+                        .filter((task) =>
+                          (task as any).assignedCleaner === cleaner.id
+                        )
+                        .map(normalizeTask)
+                        .sort((a, b) => {
+                          const taskA = a as any;
+                          const taskB = b as any;
+
+                          if (taskA.sequence !== undefined && taskB.sequence !== undefined) {
+                            return taskA.sequence - taskB.sequence;
+                          }
+
+                          const timeA = taskA.start_time || taskA.fw_start_time || taskA.startTime || "00:00";
+                          const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
+                          return timeA.localeCompare(timeB);
+                        });
+                      const itemIds = cleanerTasks.map((task) =>
+                        taskDndId("housekeeping", getTaskDndKey(task), cleaner.id, "timeline")
+                      );
+
+                      return (
+                        <DndDroppableSortableContainer
+                          scope="housekeeping"
+                          type="timeline"
+                          staffId={cleaner.id}
+                          itemIds={itemIds}
+                          insertIndex={cleanerTasks.length}
+                          disabled={isTimelineInteractionDisabled}
+                          orientation="horizontal"
                           data-testid={`timeline-cleaner-${cleaner.id}`}
                           data-cleaner-id={cleaner.id}
-                          ref={(node) => {
-                            provided.innerRef(node);
-                            registerTimelineScrollRef(node);
-                          }}
+                          innerRef={registerTimelineScrollRef}
                           onScroll={handleTimelineScroll}
                           onPointerDown={handleTimelinePointerDown}
                           onPointerMove={handleTimelinePointerMove}
                           onPointerUp={stopTimelinePan}
                           onPointerCancel={stopTimelinePan}
-                          className={`timeline-center-scroll relative min-w-0 min-h-[45px] flex-1 border-l border-border transition-colors duration-200 ${
-                            snapshot.isDraggingOver
-                              ? 'bg-blue-200/40 dark:bg-blue-900/40 border-l-2 border-blue-400 dark:border-blue-600'
-                              : 'bg-background'
-                          }`}
+                          className="timeline-center-scroll relative min-w-0 min-h-[45px] flex-1 border-l border-border bg-background"
+                        >
+                          {(() => {
+                            return (
+                        <div
+                          className="contents"
                         >
                           {/* Griglia oraria di sfondo (solo visiva) con alternanza colori */}
                           <div
@@ -2788,24 +2836,42 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           {/* Task posizionate in sequenza con indicatori di travel time */}
                           <div className="relative z-10 flex items-center h-full" style={{ minHeight: '45px', width: timelineScaledWidth, minWidth: "100%" }}>
                             {(() => {
-                              // Calcola l'array delle task per questo cleaner una sola volta
-                              const cleanerTasks = tasks
-                                .filter((task) =>
-                                  (task as any).assignedCleaner === cleaner.id
-                                )
-                                .map(normalizeTask)
-                                .sort((a, b) => {
-                                  const taskA = a as any;
-                                  const taskB = b as any;
-
-                                  if (taskA.sequence !== undefined && taskB.sequence !== undefined) {
-                                    return taskA.sequence - taskB.sequence;
-                                  }
-
-                                  const timeA = taskA.start_time || taskA.fw_start_time || taskA.startTime || "00:00";
-                                  const timeB = taskB.start_time || taskB.fw_start_time || taskB.startTime || "00:00";
-                                  return timeA.localeCompare(timeB);
-                                });
+                              // Optimistic insert gap sulla riga target quando l'item
+                              // non è nel SortableContext (cross-cleaner o assign da container).
+                              const isExternalAssignTargetRow =
+                                hideRouteSpacers &&
+                                draggingOverCleanerId === cleaner.id &&
+                                activeDragCleanerId == null &&
+                                lastValidDragIndex != null;
+                              const isCrossCleanerTargetRow =
+                                (hideRouteSpacers &&
+                                  draggingOverCleanerId === cleaner.id &&
+                                  activeDragCleanerId != null &&
+                                  activeDragCleanerId !== cleaner.id &&
+                                  lastValidDragIndex != null) ||
+                                isExternalAssignTargetRow;
+                              const isCrossCleanerSourceRow =
+                                hideRouteSpacers &&
+                                activeDragCleanerId === cleaner.id &&
+                                draggingOverCleanerId != null &&
+                                draggingOverCleanerId !== cleaner.id;
+                              const crossCleanerInsertWidthPx = Math.max(
+                                15 * timelinePxPerMinute,
+                                COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX,
+                              );
+                              const renderCrossCleanerInsertSlot = (atIndex: number) =>
+                                isCrossCleanerTargetRow &&
+                                lastValidDragIndex === atIndex ? (
+                                  <div
+                                    key={`cross-insert-${cleaner.id}-${atIndex}`}
+                                    className="flex-shrink-0"
+                                    style={{
+                                      width: `${crossCleanerInsertWidthPx}px`,
+                                      minHeight: "50px",
+                                    }}
+                                    aria-hidden
+                                  />
+                                ) : null;
 
                               return (
                                 <>
@@ -2865,21 +2931,23 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     }
 
                                     // Calcola le larghezze con la stessa scala temporale usata da task e griglia.
-                                    const effectiveTravelMinutes = seq >= 2 && travelTime > 0 && !snapshot.isDraggingOver ? travelTime : 0;
+                                    const effectiveTravelMinutes =
+                                      seq >= 2 && travelTime > 0
+                                        ? travelTime
+                                        : 0;
                                     const travelWidthPx = effectiveTravelMinutes > 0 && timelinePxPerMinute > 0
                                       ? effectiveTravelMinutes * timelinePxPerMinute
                                       : 0;
                                     const initialOffsetWidthPx = seq === 1 && timeOffset > 0 && timelinePxPerMinute > 0
                                       ? timeOffset * timelinePxPerMinute
                                       : 0;
-                                    const shouldShowInitialOffset =
-                                      !snapshot.isDraggingOver && !Boolean(snapshot.draggingFromThisWith);
+                                    const shouldShowInitialOffset = true;
 
                                     // CRITICAL FIX: Calcola il "waitingGap" per task con sequence >= 2
                                     // Il waitingGap rappresenta l'attesa del cleaner quando arriva prima che l'appartamento si liberi
                                     // IMPORTANTE: Mostra il waitingGap SOLO se la task corrente ha un checkout_time reale
                                     let waitingGap = 0;
-                                    if (seq >= 2 && taskObj.start_time && taskObj.checkout_time && !snapshot.isDraggingOver) {
+                                    if (seq >= 2 && taskObj.start_time && taskObj.checkout_time) {
                                       // CRITICAL: L'array è ordinato per sequence, quindi idx-1 è la vera task precedente
                                       const prevTask = idx > 0 ? cleanerTasks[idx - 1] as any : null;
 
@@ -2912,6 +2980,19 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     // Chiave univoca per task collaborative: include cleaner.id
                                     const taskId = taskObj.task_id || taskObj.id;
                                     const uniqueKey = `${taskId}-cleaner-${cleaner.id}`;
+                                    const taskKey = getTaskDndKey(task);
+                                    const dndId = taskDndId("housekeeping", taskKey, cleaner.id, "timeline");
+                                    const dndData: AppDndItem = {
+                                      kind: "task",
+                                      scope: "housekeeping",
+                                      taskId: taskKey,
+                                      index: idx,
+                                      initialIndex: idx,
+                                      from: {
+                                        type: "timeline",
+                                        staffId: cleaner.id,
+                                      },
+                                    };
 
                                     // Verifica compatibilità task-cleaner
                                     const isIncompatible = validationRules && cleanerRole && !isOfficeCleanerRole(cleanerRole)
@@ -2934,7 +3015,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                         )}
 
                                         {/* Travel time marker - FUORI dal Draggable (solo per sequence >= 2) */}
-                                        {seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
+                                        {!hideRouteSpacers && seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
                                           <div
                                             className="flex flex-shrink-0 cursor-pointer items-center"
                                             style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
@@ -2948,7 +3029,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                         )}
 
                                         {/* Waiting gap spacer - FUORI dal Draggable (solo per sequence >= 2) */}
-                                        {seq >= 2 && waitingGap > 0 && waitingGapWidthPx > 0 && (
+                                        {!hideRouteSpacers && seq >= 2 && waitingGap > 0 && waitingGapWidthPx > 0 && (
                                           <div
                                             className="flex items-center justify-center flex-shrink-0 py-3 bg-amber-100/50 dark:bg-amber-900/20 border-y border-dashed border-amber-400"
                                             style={{ width: `${waitingGapWidthPx}px`, minHeight: '50px' }}
@@ -2969,9 +3050,20 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           </div>
                                         )}
 
-                                        {/* TaskCard: non deve mai sparire */}
-                                        <TaskCard
+                                        {renderCrossCleanerInsertSlot(idx)}
+
+                                        {/* TaskCard: in DnD tutti a 15'; l'overlay resta incollato al cursore */}
+                                        <SortableTaskCard
                                           key={uniqueKey}
+                                          dndId={dndId}
+                                          dndData={dndData}
+                                          draggingOpacity={0}
+                                          hideWhileDragging
+                                          collapsePullPx={
+                                            isCrossCleanerSourceRow
+                                              ? crossCleanerInsertWidthPx
+                                              : 0
+                                          }
                                           task={task}
                                           index={idx}
                                           isInTimeline={true}
@@ -2980,22 +3072,29 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           isReadOnly={isReadOnly}
                                           timelineWidthPx={timelineTaskWidthPx}
                                           timelinePxPerMinute={timelinePxPerMinute}
-                                          minTimelineTaskWidthPx={MIN_TIMELINE_TASK_WIDTH_PX}
+                                          minTimelineTaskWidthPx={
+                                            hideRouteSpacers
+                                              ? COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX
+                                              : MIN_TIMELINE_TASK_WIDTH_PX
+                                          }
+                                          compactAdamTimelineUi={hideRouteSpacers}
                                           isHighlighted={highlightedTaskIds.has(String(task.id))}
                                           cleanerId={cleaner.id}
                                         />
                                       </React.Fragment>
                                     );
                                   })}
-                                  {/* Placeholder esattamente come nei container */}
-                                  {provided.placeholder}
+                                  {renderCrossCleanerInsertSlot(cleanerTasks.length)}
                                 </>
                               );
                             })()}
                           </div>
                         </div>
-                      )}
-                    </Droppable>
+                            );
+                          })()}
+                        </DndDroppableSortableContainer>
+                      );
+                    })()}
                     {/* Colonna ore totali lavorate */}
                     <div className="flex-shrink-0 w-20 h-[50px] flex items-center justify-center border-l border-border bg-sky-100/30 dark:bg-sky-900/10 text-center">
                       {(() => {
@@ -3019,46 +3118,56 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 );
               })
             )}
-          </div>
 
-          {/* Riga finale con pulsanti — fuori dallo scroll delle righe cleaner */}
-          <div className="relative z-20 flex shrink-0 items-stretch px-1 pb-1 pt-0 h-[40px]">
-                {/* Pulsante + sotto il nome dell'ultimo cleaner (speculare all'header UserMinus) */}
+            {/* Scrollbar + pulsante +: stessa riga, attaccata all'ultima cleaner */}
+            <div className="relative z-20 -mx-1 flex shrink-0 flex-col bg-custom-blue-light">
+              <TimelineHorizontalScrollbar
+                labelColumnWidth={cleanerColumnWidth}
+                contentWidth={timelineScaledWidth}
+                registerRef={registerTimelineScrollRef}
+                onScroll={handleTimelineScroll}
+                labelContent={
+                  <>
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0 z-0"
+                    >
+                      <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
+                        <path
+                          d="M0,0 C16,0 30,4 44,12 C54,18 60,24 68,28 C72,30 76,31 80,31 C84,31 88,30 92,28 C100,24 106,18 116,12 C130,4 144,0 160,0 Z"
+                          fill="rgba(59,130,246,0.12)"
+                        />
+                      </svg>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        setCleanerToReplace(null);
+                        handleOpenAddCleanerDialog();
+                      }}
+                      variant="ghost"
+                      size="sm"
+                      className="absolute inset-0 z-10 h-full w-full rounded-none border-0 bg-transparent p-0 text-custom-blue hover:bg-transparent hover:text-custom-blue dark:hover:text-custom-blue"
+                      disabled={isReadOnly}
+                      aria-label="Aggiungi cleaner"
+                      title="Aggiungi cleaner"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                    </Button>
+                  </>
+                }
+              />
+              <div className="relative flex h-[40px] shrink-0 items-stretch px-1">
                 <div
-                  className="relative z-10 flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden -translate-y-2"
+                  className="flex-shrink-0 print:hidden"
                   style={{ width: `${cleanerColumnWidth}px` }}
-                >
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-x-0 top-0 h-[38px] z-0"
-                  >
-                    <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
-                      <path
-                        d="M0,0 C16,0 30,4 44,12 C54,18 60,24 68,28 C72,30 76,31 80,31 C84,31 88,30 92,28 C100,24 106,18 116,12 C130,4 144,0 160,0 Z"
-                        fill="rgba(59,130,246,0.12)"
-                      />
-                    </svg>
-                  </div>
-                  <Button
-                    onClick={() => {
-                      setCleanerToReplace(null);
-                      handleOpenAddCleanerDialog();
-                    }}
-                    variant="ghost"
-                    size="sm"
-                    className="absolute inset-x-0 top-0 z-10 h-[38px] w-full rounded-none border-0 bg-transparent p-0 text-custom-blue hover:bg-transparent hover:text-custom-blue dark:hover:text-custom-blue"
-                    disabled={isReadOnly}
-                  >
-                    <UserPlus className="w-4 h-4" />
-                  </Button>
-                </div>
-                {/* Colonna timeline: azione a destra */}
-                <div className="flex-1 pl-2 pr-0 h-full grid grid-cols-[1fr_auto] items-center">
+                  aria-hidden
+                />
+                <div className="grid h-full flex-1 grid-cols-[1fr_auto] items-center pl-2 pr-0">
                   <Button
                     onClick={() => setShowAdamTransferDialog(true)}
                     size="sm"
                     variant="outline"
-                    className="col-start-2 justify-self-end h-[38px] px-3 border-2 border-custom-blue"
+                    className="col-start-2 h-[38px] justify-self-end border-2 border-custom-blue px-3"
                     disabled={isReadOnly || !hasTasksInTimeline || isTransferringToAdam}
                     title={
                       isReadOnly
@@ -3079,9 +3188,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     {isTransferringToAdam ? "Trasferimento..." : "Trasferisci su ADAM"}
                   </Button>
                 </div>
-                {/* Stato centrato rispetto all'intera riga (inclusa colonna blob sinistra) */}
                 <div
-                  className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 text-sm leading-none font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap"
+                  className="pointer-events-none absolute inset-y-0 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap text-sm font-medium leading-none text-slate-600 dark:text-slate-300"
                   data-testid="indicator-adam-last-save"
                 >
                   <CheckCircle className="h-4 w-4 text-custom-blue" />
@@ -3097,6 +3205,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     })()}` : "Nessun salvataggio su ADAM"}
                   </span>
                 </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -1,4 +1,3 @@
-import { Droppable } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
 import TaskCard from "./task-card";
 import { Inbox } from "lucide-react";
@@ -24,24 +23,20 @@ export default function UnassignedTasks({ tasks, hasAssigned = false, isDragDisa
         </span>
       </h3>
 
-      <Droppable droppableId="unassigned">
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.droppableProps}
-            className={`
-              space-y-2 min-h-48 transition-colors duration-200
-              ${snapshot.isDraggingOver ? "drop-zone-active" : ""}
-            `}
-            data-testid="unassigned-tasks-container"
-          >
-            {tasks.map((task, index) => (
-              <TaskCard key={task.id} task={task} index={index} isDragDisabled={isDragDisabled} isReadOnly={isReadOnly} />
-            ))}
-            {provided.placeholder}
-          </div>
-        )}
-      </Droppable>
+      <div
+        className="min-h-48 space-y-2 transition-colors duration-200"
+        data-testid="unassigned-tasks-container"
+      >
+        {tasks.map((task, index) => (
+          <TaskCard
+            key={task.id}
+            task={task}
+            index={index}
+            isDragDisabled={isDragDisabled}
+            isReadOnly={isReadOnly}
+          />
+        ))}
+      </div>
     </div>
   );
 }

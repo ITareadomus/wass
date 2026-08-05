@@ -19,7 +19,10 @@ export function ContainerTaskClip({ children, className }: ContainerTaskClipProp
     const update = () => {
       // Ignore tiny overhangs from borders/shadows/badges; only show the continuation
       // marker when the actual task body is wider than the available container.
-      setIsClipped(el.scrollWidth - el.clientWidth > 10);
+      // Threshold must stay above the horizontal gutter padding below (2+2=1rem=16px),
+      // otherwise cards that merely fill the column get flagged as "clipped" and the
+      // chevron toggling causes a ResizeObserver feedback loop (twitching).
+      setIsClipped(el.scrollWidth - el.clientWidth > 20);
     };
 
     update();
@@ -35,7 +38,12 @@ export function ContainerTaskClip({ children, className }: ContainerTaskClipProp
     >
       <div
         ref={clipRef}
-        className="relative -mr-1.5 -mt-1.5 min-w-0 max-w-full overflow-hidden pr-1.5 pt-1.5"
+        // Symmetric gutter (margin cancels padding) so corner badges at -top/-left/-right
+        // are not clipped by overflow-hidden, without shifting the card in the layout.
+        // No max-w-full here: the outer wrapper already caps width to the column, so a
+        // normal card keeps its natural size (no right-edge clipping), while genuinely
+        // long cards still get shrunk by the flex parent and clipped + chevron.
+        className="relative -ml-2 -mr-2 -mt-2 min-w-0 overflow-hidden pl-2 pr-2 pt-2"
       >
         {children}
         {isClipped && (

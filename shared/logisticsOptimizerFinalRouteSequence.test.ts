@@ -29,6 +29,8 @@ function buildTask(taskId: number, lat: number, lng: number, latestStartMin: num
     nodeIndex: taskId,
     location: { lat, lng },
     priority: "EO",
+    premium: false,
+    straordinaria: false,
     logisticsTaskKind: "pick-up",
     serviceDurationMin: LOGISTICS_SERVICE_DURATION_MIN,
     rawTimes: {
@@ -693,7 +695,7 @@ describe("route sequence penalties", () => {
     expect(diagnostics?.routes[0].acceptedMoves[0].deltaTravelMin).toBeLessThan(0);
   });
 
-  it("lets travel-only improve travel when only scalar route penalty gets worse", () => {
+  it("improves travel when only the scalar route penalty gets worse", () => {
     const northHigh = buildTask(1, 45.49, 9.188, 900);
     const northMid = buildTask(2, 45.485, 9.188, 900);
     const northLow = buildTask(3, 45.48, 9.188, 900);
@@ -719,12 +721,13 @@ describe("route sequence penalties", () => {
     );
 
     expect(solution.routes[0].stops.map((stop) => stop.taskId)).toEqual([1, 3, 2]);
-    const travelOnlyMove = diagnostics?.routes[0].acceptedMoves.find(
-      (move) => move.pass === "travel-only"
+    // Which pass captures it is an implementation detail: fuel outranks the scalar
+    // penalty, so the shorter order has to win somewhere in the polishing.
+    const move = diagnostics?.routes[0].acceptedMoves.find(
+      (candidate) => candidate.deltaTravelMin < 0 && candidate.deltaRoutePenaltyMin > 0
     );
-    expect(travelOnlyMove?.deltaTravelMin).toBeLessThan(0);
-    expect(travelOnlyMove?.deltaRoutePenaltyMin).toBeGreaterThan(0);
-    expect(travelOnlyMove?.deltaSubZonePenaltyMin).toBe(0);
+    expect(move).toBeDefined();
+    expect(move?.deltaSubZonePenaltyMin).toBe(0);
   });
 
   it("rejects travel-only candidates that worsen sub-zone shape", () => {

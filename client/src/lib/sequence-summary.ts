@@ -11,6 +11,14 @@ import {
   resolveLogisticsTaskKind,
   type LogisticsTaskKind,
 } from "@shared/logistics-task-kind";
+import {
+  resolveLogisticsTaskExecutionStatus,
+  type LogisticsTaskExecutionStatus,
+} from "@shared/logistics-task-execution-status";
+import {
+  selectDriverAccessBundles,
+  type StructureAccessBundle,
+} from "@shared/structure-access-keys";
 
 export type SequenceSummaryEntry = {
   sequence: number;
@@ -27,7 +35,11 @@ export type SequenceSummaryEntry = {
   cleanerSequence?: number | null;
   sofabedLabel?: string | null;
   customerNote?: string | null;
+  /** Mazzetti/chiavi utili al driver (preferenza label “autist*”). */
+  accessBundles?: StructureAccessBundle[];
   logisticsTaskKind: LogisticsTaskKind | null;
+  /** Stato esecuzione da Adam lg_real_start / lg_real_end / lg_paused. */
+  executionStatus?: LogisticsTaskExecutionStatus;
   timelineViolated?: boolean;
   violationMessages?: string[];
 };
@@ -197,6 +209,18 @@ function resolveCustomerNote(task: any): string | null {
   return direct || null;
 }
 
+function resolveAccessBundles(task: any): StructureAccessBundle[] {
+  const preferred = task?.driver_access_bundles ?? task?.driverAccessBundles;
+  if (Array.isArray(preferred) && preferred.length > 0) {
+    return preferred as StructureAccessBundle[];
+  }
+  const all = task?.structure_access_bundles ?? task?.structureAccessBundles;
+  if (Array.isArray(all) && all.length > 0) {
+    return selectDriverAccessBundles(all as StructureAccessBundle[]);
+  }
+  return [];
+}
+
 function extractLatestCustomerNoteFromHistory(history: unknown): string | null {
   if (!Array.isArray(history) || history.length === 0) return null;
   for (let idx = history.length - 1; idx >= 0; idx--) {
@@ -226,6 +250,14 @@ function mapTaskToSummaryEntry(
       : [];
   const timelineViolated = violationMessages.length > 0;
 
+  const executionStatus =
+    (task?.logistics_execution_status as LogisticsTaskExecutionStatus | undefined) ??
+    resolveLogisticsTaskExecutionStatus({
+      lg_real_start: task?.lg_real_start ?? task?.lgRealStart,
+      lg_real_end: task?.lg_real_end ?? task?.lgRealEnd,
+      lg_paused: task?.lg_paused ?? task?.lgPaused,
+    });
+
   return {
     sequence: Number.isFinite(sequence) && sequence > 0 ? sequence : fallbackSequence,
     taskId: getTaskId(task),
@@ -244,7 +276,9 @@ function mapTaskToSummaryEntry(
       resolveSofabedCount(task, "double_sofabeds", "doubleSofabeds")
     ),
     customerNote: resolveCustomerNote(task),
+    accessBundles: resolveAccessBundles(task),
     logisticsTaskKind: resolveLogisticsTaskKindForSummary(task),
+    executionStatus,
     timelineViolated,
     violationMessages,
   };

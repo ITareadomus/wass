@@ -1,14 +1,24 @@
-import { Droppable } from "react-beautiful-dnd";
 import { TaskType as Task } from "@shared/schema";
 import { isWorkDateHistoricallyLocked } from "@shared/work-date-access";
-import TaskCard from "./task-card";
+import DraggableTaskCard from "./draggable-task-card";
 import { ContainerTaskClip } from "./container-task-clip";
 import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useState, useEffect, useMemo } from "react";
+import { useDroppable } from "@dnd-kit/core";
 import { fetchWithOperation } from "@/lib/operationManager";
+import { cn } from "@/lib/utils";
+import {
+  getTaskDndKey,
+  priorityContainerDndId,
+  priorityKeyFromLegacyDroppableId,
+  taskDndId,
+  type AppDndContainer,
+  type AppDndItem,
+  type DndScope,
+} from "@/lib/dnd";
 
 interface ContainerMultiSelectState {
   isActive: boolean;
@@ -39,6 +49,7 @@ interface PriorityColumnProps {
   operationsScope?: "housekeeping" | "logistics";
   /** Dopo mutazione tipologia logistica (container o timeline). */
   onLogisticsTimelineMutated?: () => void;
+  className?: string;
 }
 
 export default function PriorityColumn({
@@ -56,6 +67,7 @@ export default function PriorityColumn({
   flushDropZone = false,
   operationsScope = "housekeeping",
   onLogisticsTimelineMutated,
+  className,
 }: PriorityColumnProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isHistoricalDateLocked, setIsHistoricalDateLocked] = useState(false);
@@ -148,9 +160,6 @@ export default function PriorityColumn({
       const duplicateMeta = getTaskDuplicateMeta(task);
       return { task, originalIndex, duplicateMeta };
     });
-    if (operationsScope === "logistics") {
-      return indexed;
-    }
 
     const duplicateItems = indexed.filter((entry) => entry.duplicateMeta.isDuplicateActive);
     const nonDuplicateItems = indexed.filter((entry) => !entry.duplicateMeta.isDuplicateActive);
@@ -173,7 +182,7 @@ export default function PriorityColumn({
     });
 
     return [...duplicateItems, ...nonDuplicateItems];
-  }, [tasks, operationsScope]);
+  }, [tasks]);
 
   const orderedTasks = useMemo(
     () => orderedEntries.map((entry) => entry.task),
@@ -181,10 +190,6 @@ export default function PriorityColumn({
   );
 
   const groupedDuplicateEntries = useMemo(() => {
-    if (operationsScope === "logistics") {
-      return { duplicateBlocks: [], nonDuplicateEntries: orderedEntries };
-    }
-
     const duplicatesByGroup = new Map<string, typeof orderedEntries>();
     for (const entry of orderedEntries) {
       if (!entry.duplicateMeta.isDuplicateActive) continue;
@@ -220,12 +225,66 @@ export default function PriorityColumn({
 
     const nonDuplicateEntries = orderedEntries.filter((entry) => !entry.duplicateMeta.isDuplicateActive);
     return { duplicateBlocks, nonDuplicateEntries };
-  }, [orderedEntries, operationsScope]);
+  }, [orderedEntries]);
 
-  const getContainerDraggableId = (task: Task, index: number) => {
-    if (operationsScope !== "logistics") return undefined;
-    const taskKey = String((task as any).task_id ?? task.id ?? task.name ?? "");
-    return `${taskKey}-container-${droppableId}-${index}`;
+  const dndScope: DndScope = operationsScope === "logistics" ? "logistics" : "housekeeping";
+  const priorityKey = priorityKeyFromLegacyDroppableId(droppableId);
+
+  const priorityContainerId = priorityKey
+    ? priorityContainerDndId(dndScope, priorityKey)
+    : `invalid-priority-container:${dndScope}:${droppableId}`;
+
+  const priorityContainerData: AppDndContainer | undefined = priorityKey
+    ? {
+        kind: "container",
+        scope: dndScope,
+        type: "priority",
+        key: priorityKey,
+        accepts: ["priority", "timeline", "summary"],
+      }
+    : undefined;
+
+  const { setNodeRef: setPriorityDropRef, isOver: isPriorityOver } =
+    useDroppable({
+      id: priorityContainerId,
+      data: priorityContainerData
+        ? {
+            ...priorityContainerData,
+            insertIndex: orderedTasks.length,
+          }
+        : undefined,
+      disabled:
+        !priorityKey ||
+        isDragDisabled ||
+        isHistoricalDateLocked,
+    });
+
+  const selectedTaskIdSet = useMemo(
+    () => new Set(selectedTasks.map((task) => String(task.taskId))),
+    [selectedTasks]
+  );
+
+  const getDndCardProps = (task: Task, index: number) => {
+    const taskKey = getTaskDndKey(task);
+    const dndData: AppDndItem = {
+      kind: "task",
+      scope: dndScope,
+      taskId: taskKey,
+      index,
+      initialIndex: index,
+      from: {
+        type: "priority",
+        key: priorityKey ?? "low_priority",
+      },
+      selectedTaskIds: selectedTaskIdSet.has(taskKey)
+        ? selectedTasks.map((selectedTask) => String(selectedTask.taskId))
+        : undefined,
+    };
+
+    return {
+      dndId: taskDndId(dndScope, taskKey, undefined, "priority"),
+      dndData,
+    };
   };
 
   // Funzione modificata per usare hasAssigned e stato di loading
@@ -347,7 +406,13 @@ export default function PriorityColumn({
   };
 
   return (
-    <div className={`${getColumnClass(priority, tasks)} min-w-0 overflow-visible rounded-lg border-2 p-4`}>
+    <div
+      className={cn(
+        getColumnClass(priority, tasks),
+        "min-w-0 overflow-visible rounded-lg border-2 p-4",
+        className
+      )}
+    >
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-semibold flex items-center text-custom-blue">
@@ -407,18 +472,19 @@ export default function PriorityColumn({
           </Button>
         </div>
       </div>
-      <Droppable droppableId={droppableId}>
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.droppableProps}
-            className={`
-              flex flex-wrap gap-2 min-h-[120px] min-w-0 overflow-visible transition-colors duration-200 content-start border-0
-              ${flushDropZone ? "p-0" : "p-2 pt-4 pl-4"}
-              ${snapshot.isDraggingOver ? "drop-zone-active" : ""}
-            `}
-            data-testid={`priority-column-${droppableId}`}
-          >
+      <div
+        ref={setPriorityDropRef}
+        className={cn(
+          `
+            flex flex-wrap gap-2 min-h-[120px] min-w-0
+            overflow-visible transition-colors duration-200
+            content-start border-0
+            ${flushDropZone ? "p-0" : "p-2 pt-4 pl-4"}
+          `,
+          isPriorityOver && "rounded-md ring-2 ring-custom-blue/60",
+        )}
+        data-testid={`priority-column-${droppableId}`}
+      >
             {(() => {
               let draggableIndex = 0;
               const rendered: React.ReactNode[] = [];
@@ -435,10 +501,12 @@ export default function PriorityColumn({
                         const task = entry.task;
                         const isHighlighted = highlightedTaskIds.has(String(task.id));
                         const currentIndex = draggableIndex++;
+                        const dndCardProps = getDndCardProps(task, currentIndex);
                         return (
                           <div key={`task-${task.id}`} className="duplicate-group-item">
                             <ContainerTaskClip>
-                              <TaskCard
+                              <DraggableTaskCard
+                                {...dndCardProps}
                                 task={task}
                                 index={currentIndex}
                                 isInTimeline={false}
@@ -449,7 +517,6 @@ export default function PriorityColumn({
                                 isReadOnly={isHistoricalDateLocked}
                                 multiSelectContext={multiSelectCtx}
                                 isHighlighted={isHighlighted}
-                                draggableId={getContainerDraggableId(task, currentIndex)}
                                 operationsScope={operationsScope}
                                 onLogisticsTimelineMutated={onLogisticsTimelineMutated}
                               />
@@ -464,6 +531,7 @@ export default function PriorityColumn({
                   const task = entry.task;
                   const isHighlighted = highlightedTaskIds.has(String(task.id));
                   const currentIndex = draggableIndex++;
+                  const dndCardProps = getDndCardProps(task, currentIndex);
                   rendered.push(
                     <div key={`single-row-${block.key}`} className="duplicate-single-row">
                       <div
@@ -472,7 +540,8 @@ export default function PriorityColumn({
                         data-duplicate-group-id={block.groupId || undefined}
                       >
                       <ContainerTaskClip className="max-w-full">
-                        <TaskCard
+                        <DraggableTaskCard
+                          {...dndCardProps}
                           task={task}
                           index={currentIndex}
                           isInTimeline={false}
@@ -483,7 +552,6 @@ export default function PriorityColumn({
                           isReadOnly={isHistoricalDateLocked}
                           multiSelectContext={multiSelectCtx}
                           isHighlighted={isHighlighted}
-                          draggableId={getContainerDraggableId(task, currentIndex)}
                           operationsScope={operationsScope}
                           onLogisticsTimelineMutated={onLogisticsTimelineMutated}
                         />
@@ -498,9 +566,11 @@ export default function PriorityColumn({
                 const task = entry.task;
                 const isHighlighted = highlightedTaskIds.has(String(task.id));
                 const currentIndex = draggableIndex++;
+                const dndCardProps = getDndCardProps(task, currentIndex);
                 rendered.push(
                   <ContainerTaskClip key={`plain-${task.id}`}>
-                    <TaskCard
+                    <DraggableTaskCard
+                      {...dndCardProps}
                       task={task}
                       index={currentIndex}
                       isInTimeline={false}
@@ -511,7 +581,6 @@ export default function PriorityColumn({
                       isReadOnly={isHistoricalDateLocked}
                       multiSelectContext={multiSelectCtx}
                       isHighlighted={isHighlighted}
-                      draggableId={getContainerDraggableId(task, currentIndex)}
                       operationsScope={operationsScope}
                       onLogisticsTimelineMutated={onLogisticsTimelineMutated}
                     />
@@ -521,10 +590,7 @@ export default function PriorityColumn({
 
               return rendered;
             })()}
-            {provided.placeholder}
-          </div>
-        )}
-      </Droppable>
+      </div>
     </div>
   );
 }

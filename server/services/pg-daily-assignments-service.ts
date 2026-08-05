@@ -1,6 +1,7 @@
 import pool, { query } from '../../shared/pg-db';
 import { taskCollaborationService } from './pg-task-collaboration-service';
 import { formatInTimeZone } from 'date-fns-tz';
+import { databaseConfig } from '../../config/database';
 
 const ROME_TZ = 'Europe/Rome';
 
@@ -156,6 +157,7 @@ export interface PgLogisticsAssignmentRow {
   travel_time: number;
   checkout_wait_minutes?: number;
   manually_moved?: boolean;
+  is_finished?: boolean;
   logistics_task_kind?: string | null;
   logistics_task_kind_source?: string | null;
 }
@@ -699,6 +701,12 @@ export class PgDailyAssignmentsService {
       );
       await query(
         `ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS logistics_task_kind_source VARCHAR(20)`
+      );
+      await query(
+        `ALTER TABLE IF EXISTS lg_timeline ADD COLUMN IF NOT EXISTS is_finished BOOLEAN NOT NULL DEFAULT FALSE`
+      );
+      await query(
+        `ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS is_finished BOOLEAN NOT NULL DEFAULT FALSE`
       );
       await query(
         `ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS logistics_task_kind VARCHAR(50)`
@@ -1655,6 +1663,7 @@ export class PgDailyAssignmentsService {
           checkout_wait_minutes:
             task.checkout_wait_minutes != null ? Number(task.checkout_wait_minutes) : 0,
           manually_moved: Boolean(task.manually_moved),
+          is_finished: Boolean(task.is_finished ?? task.isFinished),
           logistics_task_kind:
             task.logistics_task_kind != null ? String(task.logistics_task_kind) : null,
           logistics_task_kind_source:
@@ -1676,6 +1685,33 @@ export class PgDailyAssignmentsService {
       const manualKindsByTaskId = await loadManualLogisticsTimelineTaskKinds(workDate);
       await enrichLogisticsTimelineData(workDate, timeline, { manualKindsByTaskId });
 
+      // Preserve is_finished when callers omit it (e.g. optimizer / DnD payloads).
+      const existingFinished = new Map<number, boolean>();
+      try {
+        const existingRes = await client.query(
+          `SELECT task_id, is_finished FROM lg_timeline WHERE work_date = $1`,
+          [workDate]
+        );
+        for (const r of existingRes.rows) {
+          const tid = Number(r.task_id);
+          if (Number.isFinite(tid)) existingFinished.set(tid, r.is_finished === true);
+        }
+      } catch {
+        // Column may not exist yet on first boot before ensureTables; ignore.
+      }
+      if (timeline?.drivers_assignments && Array.isArray(timeline.drivers_assignments)) {
+        for (const assignment of timeline.drivers_assignments) {
+          for (const task of assignment?.tasks || []) {
+            const tid = Number(task?.task_id);
+            if (!Number.isFinite(tid)) continue;
+            if (task.is_finished != null || task.isFinished != null) continue;
+            if (existingFinished.has(tid)) {
+              task.is_finished = existingFinished.get(tid);
+            }
+          }
+        }
+      }
+
       const rows = this.logisticsTimelineToRows(workDate, timeline);
       await client.query('BEGIN');
       await client.query('DELETE FROM lg_timeline WHERE work_date = $1', [workDate]);
@@ -1693,7 +1729,7 @@ export class PgDailyAssignmentsService {
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
             type_apt, alias, customer_name, customer_reference, customer_note, customer_note_history, reasons, manually_moved, priority,
             start_time, end_time, followup, sequence, travel_time, checkout_wait_minutes,
-            logistics_task_kind, logistics_task_kind_source
+            logistics_task_kind, logistics_task_kind_source, is_finished
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8,
             $9, $10, $11,
@@ -1702,7 +1738,7 @@ export class PgDailyAssignmentsService {
             $22, $23, $24, $25, $26, $27,
             $28, $29, $30, $31, $32, $33, $34, $35, $36,
             $37, $38, $39, $40, $41, $42,
-            $43, $44
+            $43, $44, $45
           )
         `, [
           row.work_date,
@@ -1749,6 +1785,7 @@ export class PgDailyAssignmentsService {
           row.checkout_wait_minutes ?? 0,
           row.logistics_task_kind,
           row.logistics_task_kind_source,
+          row.is_finished === true,
         ]);
       }
       await client.query('COMMIT');
@@ -1841,6 +1878,7 @@ export class PgDailyAssignmentsService {
         }
         if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
         task.manually_moved = row.manually_moved === true;
+        task.is_finished = (row as any).is_finished === true;
         if (row.priority) task.priority = row.priority;
         if (row.start_time) task.start_time = row.start_time;
         if (row.end_time) task.end_time = row.end_time;
@@ -1946,7 +1984,7 @@ export class PgDailyAssignmentsService {
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
             type_apt, alias, customer_name, customer_reference, customer_note, customer_note_history, reasons, manually_moved, priority,
             start_time, end_time, followup, sequence, travel_time, checkout_wait_minutes,
-            logistics_task_kind, logistics_task_kind_source, created_by
+            logistics_task_kind, logistics_task_kind_source, is_finished, created_by
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9,
             $10, $11, $12,
@@ -1955,7 +1993,7 @@ export class PgDailyAssignmentsService {
             $23, $24, $25, $26, $27, $28,
             $29, $30, $31, $32, $33, $34, $35, $36, $37,
             $38, $39, $40, $41, $42, $43,
-            $44, $45, $46
+            $44, $45, $46, $47
           )
         `,
           [
@@ -2004,6 +2042,7 @@ export class PgDailyAssignmentsService {
             row.checkout_wait_minutes ?? 0,
             row.logistics_task_kind,
             row.logistics_task_kind_source,
+            row.is_finished === true,
             createdBy,
           ]
         );
@@ -2134,10 +2173,11 @@ export class PgDailyAssignmentsService {
         try {
           const mysql = await import('mysql2/promise');
           const adamConnection = await mysql.createConnection({
-            host: process.env.DB_HOST,
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            database: process.env.DB_NAME
+            host: databaseConfig.mysql.host,
+            port: databaseConfig.mysql.port,
+            user: databaseConfig.mysql.user,
+            password: databaseConfig.mysql.password,
+            database: databaseConfig.mysql.database,
           });
           
           const logisticCodes = tasksNeedingRef.map(t => t.logistic_code);
@@ -2338,10 +2378,11 @@ export class PgDailyAssignmentsService {
         try {
           const mysql = await import('mysql2/promise');
           const adamConnection = await mysql.createConnection({
-            host: process.env.DB_HOST,
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            database: process.env.DB_NAME
+            host: databaseConfig.mysql.host,
+            port: databaseConfig.mysql.port,
+            user: databaseConfig.mysql.user,
+            password: databaseConfig.mysql.password,
+            database: databaseConfig.mysql.database,
           });
           const logisticCodes = tasksNeedingRef.map(t => t.logistic_code);
           const [rows] = await adamConnection.execute(

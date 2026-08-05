@@ -18,12 +18,14 @@ import {
   buildVehicleArcPenalties,
   computeRouteSequenceDiagnostics,
 } from "./groups/route-sequence-penalties";
-import { polishRoutingSolutionWithDiagnostics } from "./route-polishing";
+import { runPostSolvePipeline } from "./post-solve-pipeline";
 
 export interface RunLogisticsRoutingDryOptions extends BuildLogisticsRoutingInputOptions {
   debug?: boolean;
   solver?: RoutingSolverId;
   validationMode?: ValidationMode;
+  /** Defaults to enabled; env LOGISTICS_SEQUENCE_REFINEMENT=0 disables it globally. */
+  sequenceRefinement?: boolean;
 }
 
 export interface RunLogisticsRoutingDryAutoConvokeSummary {
@@ -97,8 +99,12 @@ export async function runLogisticsRoutingDry(
 
   const solverId = options.solver ?? ORTOOLS_SOLVER_ID;
   const solverSolution = await solveRouting(input, { solverId });
-  const polished = polishRoutingSolutionWithDiagnostics(input, solverSolution);
-  const solution = polished.solution;
+  const postSolve = await runPostSolvePipeline({
+    input,
+    solution: solverSolution,
+    options: { solverId, sequenceRefinement: options.sequenceRefinement },
+  });
+  const solution = postSolve.solution;
   const solutionValidation = validateRoutingSolution(input, solution);
   const applyGate = evaluateSolutionApplyGate(solution);
   const droppedDiagnostics =
@@ -129,7 +135,7 @@ export async function runLogisticsRoutingDry(
         droppedDiagnostics,
         ...(territoryDiagnostics ? { territoryDiagnostics } : {}),
         ...(routeSequenceDiagnostics ? { routeSequenceDiagnostics } : {}),
-        ...(polished.diagnostics ? { routePolishingDiagnostics: polished.diagnostics } : {}),
+        ...postSolve.diagnostics,
       },
     });
     console.log(`📋 Logistics optimizer final dry-run scritto in: ${debugDir}`);

@@ -22,7 +22,6 @@ import {
 } from "./business-rules";
 import { resolveEoEarlyDecision } from "./priority-route-compatibility";
 
-const END_OF_DAY_MIN = 20 * 60;
 export const DRIVER_BRINGS_BAG_TOLERANCE_REASON =
   "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE" as const;
 
@@ -39,6 +38,15 @@ export interface BuildTaskWindowInput {
   cleanerStartTime: string | null;
   cleanerTaskStartTime: string | null;
   priorityWindows: PriorityWindows | null;
+  /**
+   * Fallback upper bound (minutes from midnight) used only when nothing else
+   * (check-in, cleaner tolerance) constrains how late the task can end.
+   * There is no implicit "end of day": the caller must derive this from the
+   * actual work windows of the drivers available that day (e.g. the latest
+   * configured driver end time), so a task is never capped tighter than what
+   * every selected driver could actually work.
+   */
+  dayEndMin: Minutes;
 }
 
 export interface BuiltTaskWindow {
@@ -127,8 +135,8 @@ function addPriorityWindow(
 
 export function buildTaskWindow(input: BuildTaskWindowInput): BuiltTaskWindow {
   const earliestStartCandidates: Minutes[] = [0];
-  const latestStartCandidates: Minutes[] = [END_OF_DAY_MIN - LOGISTICS_SERVICE_DURATION_MIN];
-  const latestEndCandidates: Minutes[] = [END_OF_DAY_MIN];
+  const latestStartCandidates: Minutes[] = [input.dayEndMin - LOGISTICS_SERVICE_DURATION_MIN];
+  const latestEndCandidates: Minutes[] = [input.dayEndMin];
   const reasons: string[] = [];
   const softWindows: TaskSoftWindow[] = [];
   const hardConstraints: HardConstraintSpec[] = [];

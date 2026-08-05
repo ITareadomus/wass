@@ -90,7 +90,7 @@ function buildLogisticsScheduleForDriverOnce(args: {
     const lng = toFiniteCoord(task.lng);
     const travelOverride = Number(task.travelMinutesFromPrevious);
     let travel = 0;
-    if (Number.isFinite(travelOverride) && travelOverride >= 0) {
+    if (Number.isFinite(travelOverride) && travelOverride > 0) {
       travel = travelOverride;
     } else if (prevLat !== null && prevLng !== null && lat !== null && lng !== null) {
       travel = estimateCarTravelMinutes({ lat: prevLat, lng: prevLng }, { lat, lng });

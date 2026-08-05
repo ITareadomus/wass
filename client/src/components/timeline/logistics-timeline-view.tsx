@@ -23,11 +23,11 @@ import {
   type UIEvent,
 } from "react";
 import { useLocation } from "wouter";
-import { Droppable } from "react-beautiful-dnd";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import TaskCard from "@/components/drag-drop/task-card";
+import SortableTaskCard from "@/components/drag-drop/sortable-task-card";
+import { TimelineHorizontalScrollbar } from "@/components/timeline/timeline-horizontal-scrollbar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -42,6 +42,7 @@ import {
   pickLogisticsViolationFields,
   sumLogisticsTaskWorkedMinutes,
 } from "@shared/logistics-scheduling-constraints";
+import { pickLogisticsExecutionStatusFields } from "@shared/logistics-task-execution-status";
 import { estimateLogisticsReturnToDepotMinutes } from "@shared/logistics-travel-estimate";
 import {
   AlertDialog,
@@ -69,6 +70,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DndDroppableSortableContainer,
+  getTaskDndKey,
+  taskDndId,
+  type AppDndItem,
+} from "@/lib/dnd";
 
 type PriorityWindows = {
   hpStart: string;
@@ -119,8 +126,17 @@ interface LogisticsTimelineViewProps {
   isReadOnly?: boolean;
   isLoadingOverlay?: boolean;
   suppressTaskDrag?: boolean;
+  draggingOverDriverId?: number | null;
+  activeDragDriverId?: number | null;
+  /** Indice di insert durante drag cross-autista (per spacer di preview). */
+  lastValidDragIndex?: number | null;
   onRefresh: () => Promise<void>;
+  className?: string;
 }
+
+/** Larghezza minima card 15' — anche scala minima della timeline (abilita scroll orizzontale). */
+const MIN_TIMELINE_TASK_WIDTH_PX = 56;
+const COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX = 56;
 
 const DEFAULT_TIMELINE_START_MINUTES = 10 * 60;
 const DEFAULT_TIMELINE_END_MINUTES = 20 * 60;
@@ -153,6 +169,73 @@ function minutesToTimelineWidthPx(
 ): number {
   if (minutes <= 0 || virtualMinutes <= 0 || timelineWidth <= 0) return 0;
   return (minutes / virtualMinutes) * timelineWidth;
+}
+
+const ROME_TZ = "Europe/Rome";
+
+type RomeClockNow = {
+  dateStr: string;
+  minutes: number;
+  label: string;
+};
+
+function getRomeClockNow(date = new Date()): RomeClockNow {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: ROME_TZ,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  ) as Record<string, string>;
+
+  const hours = Number(parts.hour);
+  const mins = Number(parts.minute);
+  return {
+    dateStr: `${parts.year}-${parts.month}-${parts.day}`,
+    minutes: hours * 60 + mins,
+    label: `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`,
+  };
+}
+
+function LogisticsClockNowLine({
+  leftPx,
+  label,
+  showLabel = false,
+}: {
+  leftPx: number;
+  label?: string;
+  showLabel?: boolean;
+}) {
+  return (
+    <div
+      aria-hidden
+      data-testid="logistics-timeline-now-line"
+      className={cn(
+        "pointer-events-none absolute z-40 flex -translate-x-1/2 flex-col items-center print:hidden",
+        showLabel ? "top-0 bottom-0" : "inset-y-0"
+      )}
+      style={{ left: `${leftPx}px` }}
+    >
+      {showLabel && label ? (
+        <span
+          className={cn(
+            "shrink-0 rounded bg-yellow-400/55 px-1 py-0.5 text-[11px] font-semibold tabular-nums leading-none text-yellow-950/80",
+            "dark:bg-yellow-300/45 dark:text-yellow-100/80"
+          )}
+        >
+          {label}
+        </span>
+      ) : null}
+      <div className="w-px min-h-0 flex-1 bg-yellow-400/55 dark:bg-yellow-300/45" />
+    </div>
+  );
 }
 
 function LogisticsRouteLineSegment({
@@ -240,12 +323,14 @@ function timelineTaskToTask(t: any, driverId: number): Task {
       t.checkout_wait_minutes != null ? Number(t.checkout_wait_minutes) : undefined,
     locked: Boolean(t.locked),
     locked_reason: t.locked_reason != null ? String(t.locked_reason) : undefined,
+    is_finished: Boolean(t.is_finished ?? t.isFinished),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...(t.logistics_task_kind != null ? { logistics_task_kind: String(t.logistics_task_kind) } : {}),
     ...(t.logistics_task_kind_source != null
       ? { logistics_task_kind_source: String(t.logistics_task_kind_source) }
       : {}),
+    ...pickLogisticsExecutionStatusFields(t),
     ...( { assignedCleaner: driverId, sequence: t.sequence } as any ),
     ...pickLogisticsViolationFields(t),
   };
@@ -280,7 +365,11 @@ export default function LogisticsTimelineView({
   isReadOnly = false,
   isLoadingOverlay = false,
   suppressTaskDrag = false,
+  draggingOverDriverId = null,
+  activeDragDriverId = null,
+  lastValidDragIndex = null,
   onRefresh,
+  className,
 }: LogisticsTimelineViewProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -315,6 +404,7 @@ export default function LogisticsTimelineView({
   const [priorityWindows, setPriorityWindows] = useState<PriorityWindows | null>(null);
   const [timelineWidthPx, setTimelineWidthPx] = useState(0);
   const [timelineScrollLeft, setTimelineScrollLeft] = useState(0);
+  const [romeClockNow, setRomeClockNow] = useState<RomeClockNow>(() => getRomeClockNow());
   const timelineRowRef = useRef<HTMLDivElement | null>(null);
   const timelineScrollRefs = useRef<HTMLDivElement[]>([]);
   const isSyncingTimelineScrollRef = useRef(false);
@@ -545,7 +635,7 @@ export default function LogisticsTimelineView({
 
       toast({
         title: "Trasferimento in corso…",
-        description: "Registrazione assegnazioni logistica",
+        description: "Scrittura assegnazioni logistica su ADAM",
         variant: "default",
       });
 
@@ -584,7 +674,7 @@ export default function LogisticsTimelineView({
         }
         toast({
           title: "Trasferimento completato",
-          description: result.message || "Assegnazioni logistica registrate",
+          description: result.message || "Assegnazioni logistica scritte su ADAM",
           variant: "success",
         });
       } else {
@@ -739,7 +829,22 @@ export default function LogisticsTimelineView({
 
   const globalTimeSlots = generateGlobalTimeSlots();
   const globalTimelineMinutes = getGlobalTimelineMinutes();
-  const timelineScaledWidth = timelineWidthPx > 0 ? `${timelineWidthPx}px` : "100%";
+  // Come HK: contenuto almeno largo abbastanza da dare 56px a ogni slot 15',
+  // altrimenti la timeline si comprime nel viewport e le scrollbar non scorrono.
+  const minimumTimelinePxPerMinute =
+    MIN_TIMELINE_TASK_WIDTH_PX / LOGISTICS_SERVICE_DURATION_MIN;
+  const minimumTimelineContentWidthPx =
+    globalTimelineMinutes * minimumTimelinePxPerMinute;
+  const timelineContentWidthPx = Math.max(
+    timelineWidthPx,
+    minimumTimelineContentWidthPx,
+  );
+  const timelinePxPerMinute =
+    globalTimelineMinutes > 0 && timelineContentWidthPx > 0
+      ? timelineContentWidthPx / globalTimelineMinutes
+      : 0;
+  const timelineScaledWidth =
+    timelineContentWidthPx > 0 ? `${timelineContentWidthPx}px` : "100%";
 
   const timeToMinutes = (t: string) => {
     const [h, m] = t.split(":").map(Number);
@@ -755,9 +860,46 @@ export default function LogisticsTimelineView({
   };
 
   useEffect(() => {
+    const tick = () => setRomeClockNow(getRomeClockNow());
+    tick();
+    const id = window.setInterval(tick, 30_000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  const clockNowLineLeftPx = useMemo(() => {
+    // In sviluppo: mostra la linea su qualsiasi data (utile per test).
+    // In produzione: solo se la data selezionata è oggi (Europe/Rome).
+    if (!import.meta.env.DEV && romeClockNow.dateStr !== workDate) return null;
+    if (timelinePxPerMinute <= 0) return null;
+    if (
+      romeClockNow.minutes < timelineStartMinutes ||
+      romeClockNow.minutes > timelineEndMinutes
+    ) {
+      return null;
+    }
+    return (romeClockNow.minutes - timelineStartMinutes) * timelinePxPerMinute;
+  }, [
+    romeClockNow.dateStr,
+    romeClockNow.minutes,
+    timelineEndMinutes,
+    timelinePxPerMinute,
+    timelineStartMinutes,
+    workDate,
+  ]);
+
+  useEffect(() => {
     (window as any).globalTimelineMinutes = globalTimelineMinutes;
     (window as any).globalTimeSlotsCount = globalTimeSlots.length;
-  }, [globalTimelineMinutes, globalTimeSlots.length]);
+    (window as any).timelinePxPerMinute = timelinePxPerMinute;
+    (window as any).minTimelineTaskWidthPx = MIN_TIMELINE_TASK_WIDTH_PX;
+  }, [globalTimelineMinutes, globalTimeSlots.length, timelinePxPerMinute]);
 
   useEffect(() => {
     let resizeObserver: ResizeObserver | null = null;
@@ -1460,7 +1602,12 @@ export default function LogisticsTimelineView({
 
   return (
     <>
-      <div className="bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm relative overflow-hidden">
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-lg border-2 border-custom-blue bg-custom-blue-light shadow-sm",
+          className
+        )}
+      >
         {(isLoadingOverlay || clearDriversMutation.isPending || isAddingDriverToTimeline) && (
           <div className="absolute inset-0 bg-black/20 dark:bg-black/40 rounded-lg flex items-center justify-center z-40 backdrop-blur-sm pointer-events-none">
             <div className="flex flex-col items-center gap-3">
@@ -1508,7 +1655,7 @@ export default function LogisticsTimelineView({
           </div>
         </div>
 
-        <div className="px-1 pt-4 pb-4 overflow-hidden">
+        <div className="flex min-h-0 flex-col overflow-hidden px-1 pt-4 pb-4">
           <div className="flex items-stretch mb-0 px-1 h-[40px]">
             <div className="flex-shrink-0 h-full print:hidden" style={{ width: `${driverColumnWidth}px` }} />
             <div
@@ -1679,6 +1826,13 @@ export default function LogisticsTimelineView({
                     />
                   </div>
                 ))}
+                {clockNowLineLeftPx != null && (
+                  <LogisticsClockNowLine
+                    leftPx={clockNowLineLeftPx}
+                    label={romeClockNow.label}
+                    showLabel
+                  />
+                )}
                 </div>
               </div>
             </div>
@@ -1687,7 +1841,7 @@ export default function LogisticsTimelineView({
             </div>
           </div>
 
-          <div className="timeline-rows-scroll flex-1 overflow-x-hidden overflow-y-auto px-1 pb-1 pt-0">
+          <div className="timeline-rows-scroll min-h-0 flex-none overflow-x-hidden overflow-y-auto px-1 pb-0 pt-0">
             {drivers.length === 0 && !isReadOnly ? (
               <div className="flex items-center justify-center h-64 bg-yellow-100 dark:bg-yellow-950/50 border-2 border-yellow-300 dark:border-yellow-700 rounded-lg">
                 <div className="text-center p-6">
@@ -1714,24 +1868,24 @@ export default function LogisticsTimelineView({
               </div>
             ) : (
               drivers.map((driver) => {
-                const rawTasks = assignmentByDriver.get(driver.id) || [];
+                const rawTasks = [...(assignmentByDriver.get(driver.id) || [])].sort(
+                  (a, b) => Number(a?.sequence ?? 0) - Number(b?.sequence ?? 0)
+                );
                 const rawByTaskId = new Map<number, any>();
                 for (const rt of rawTasks) {
                   const tid = Number((rt as any)?.task_id);
                   if (Number.isFinite(tid)) rawByTaskId.set(tid, rt);
                 }
-                const tasks = rawTasks
-                  .map((t) => timelineTaskToTask(t, driver.id))
-                  .sort((a, b) => {
-                    const sa = (a as any).sequence ?? 0;
-                    const sb = (b as any).sequence ?? 0;
-                    return sa - sb;
-                  });
+                const tasks = rawTasks.map((t) => timelineTaskToTask(t, driver.id));
                 const hi = highlightedIdsForDriverTasks(tasks, searchTask);
                 const driverRowDisplayLabel = getDriverRowDisplayLabel(driver);
                 const driverPlate = getDriverPlate(driver);
+                // Durante il drag: nascondi travel/checkout così i task possono riordinarsi in modo ottimistico
+                const hideRouteSpacers =
+                  activeDragDriverId === driver.id ||
+                  draggingOverDriverId === driver.id;
                 return (
-                  <div key={driver.id} className="flex mb-0.5 h-[50px] min-w-0">
+                  <div key={driver.id} className="mb-0.5 flex h-[50px] min-w-0">
                     <div
                       className={cn(
                         "flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-custom-blue-light",
@@ -1794,30 +1948,27 @@ export default function LogisticsTimelineView({
                         )}
                       </div>
                     </div>
-                    <Droppable
-                      droppableId={`timeline-${driver.id}`}
-                      direction="horizontal"
-                      isDropDisabled={isReadOnly || suppressTaskDrag}
+                    <DndDroppableSortableContainer
+                      scope="logistics"
+                      type="timeline"
+                      staffId={driver.id}
+                      itemIds={tasks.map((task) =>
+                        taskDndId("logistics", getTaskDndKey(task), driver.id, "timeline")
+                      )}
+                      insertIndex={tasks.length}
+                      disabled={isReadOnly || suppressTaskDrag || isLoadingOverlay}
+                      orientation="horizontal"
+                      innerRef={registerTimelineScrollRef}
+                      onScroll={handleTimelineScroll}
+                      onPointerDown={handleTimelinePointerDown}
+                      onPointerMove={handleTimelinePointerMove}
+                      onPointerUp={stopTimelinePan}
+                      onPointerCancel={stopTimelinePan}
+                      className="timeline-center-scroll relative min-w-0 min-h-[45px] flex-1 border-l border-border bg-background"
                     >
-                      {(provided, snapshot) => (
-                        <div
-                          {...provided.droppableProps}
-                          ref={(node) => {
-                            provided.innerRef(node);
-                            registerTimelineScrollRef(node);
-                          }}
-                          onScroll={handleTimelineScroll}
-                          onPointerDown={handleTimelinePointerDown}
-                          onPointerMove={handleTimelinePointerMove}
-                          onPointerUp={stopTimelinePan}
-                          onPointerCancel={stopTimelinePan}
-                          className={cn(
-                            "timeline-center-scroll relative min-w-0 min-h-[45px] flex-1 border-l border-border transition-colors",
-                            snapshot.isDraggingOver
-                              ? "bg-blue-200/40 dark:bg-blue-900/40 border-l-2 border-blue-400"
-                              : "bg-background"
-                          )}
-                        >
+                      {(() => {
+                        return (
+                        <div className="contents">
                           <div
                             className="absolute inset-y-0 left-0 pointer-events-none grid"
                             style={{
@@ -1837,18 +1988,17 @@ export default function LogisticsTimelineView({
                                 )}
                               />
                             ))}
+                            {clockNowLineLeftPx != null && (
+                              <LogisticsClockNowLine leftPx={clockNowLineLeftPx} />
+                            )}
                           </div>
                           <div
-                            className="relative z-10 flex items-center h-full min-h-[45px] px-0 gap-0 flex-wrap"
+                            className="relative z-10 flex items-center h-full min-h-[45px] px-0 gap-0"
                             style={{ width: timelineScaledWidth, minWidth: "100%" }}
                           >
                             {(() => {
                               const virtualMinutes = globalTimelineMinutes;
-                              const timelineWidth = timelineWidthPx || 0;
-                              const timelinePxPerMinute =
-                                virtualMinutes > 0 && timelineWidth > 0
-                                  ? timelineWidth / virtualMinutes
-                                  : 0;
+                              const timelineWidth = timelineContentWidthPx || 0;
                               const lastRawTask =
                                 rawTasks.length > 0 ? rawTasks[rawTasks.length - 1] : null;
                               const returnTravelMinutes =
@@ -1862,6 +2012,37 @@ export default function LogisticsTimelineView({
                                 timelineWidth
                               );
 
+                              // Optimistic cross-driver: spacer invisibile sulla riga target
+                              // (il SortableContext non anima item di un altro container).
+                              const isCrossDriverTargetRow =
+                                hideRouteSpacers &&
+                                draggingOverDriverId === driver.id &&
+                                activeDragDriverId != null &&
+                                activeDragDriverId !== driver.id &&
+                                lastValidDragIndex != null;
+                              const isCrossDriverSourceRow =
+                                hideRouteSpacers &&
+                                activeDragDriverId === driver.id &&
+                                draggingOverDriverId != null &&
+                                draggingOverDriverId !== driver.id;
+                              const crossDriverInsertWidthPx = Math.max(
+                                15 * timelinePxPerMinute,
+                                COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX,
+                              );
+                              const renderCrossDriverInsertSlot = (atIndex: number) =>
+                                isCrossDriverTargetRow &&
+                                lastValidDragIndex === atIndex ? (
+                                  <div
+                                    key={`cross-insert-${driver.id}-${atIndex}`}
+                                    className="flex-shrink-0"
+                                    style={{
+                                      width: `${crossDriverInsertWidthPx}px`,
+                                      minHeight: "50px",
+                                    }}
+                                    aria-hidden
+                                  />
+                                ) : null;
+
                               return (
                                 <>
                             {tasks.map((task, index) => {
@@ -1870,18 +2051,20 @@ export default function LogisticsTimelineView({
                               const prevRaw = index > 0 ? rawTasks[index - 1] : null;
                               const seq = Number(raw?.sequence ?? index + 1);
                               const travelTime =
-                                raw?.travel_time != null ? Number(raw.travel_time) : 0;
+                                raw?.travel_time != null
+                                  ? Number(raw.travel_time)
+                                  : 0;
                               const checkoutWait = computeLogisticsCheckoutWaitGap({
-                                workDate,
-                                sequence: seq,
-                                startTime: raw?.start_time,
-                                checkoutTime: raw?.checkout_time,
-                                checkoutDate: raw?.checkout_date,
-                                checkoutWaitMinutes: raw?.checkout_wait_minutes,
-                                travelMinutes: travelTime,
-                                prevEndTime: prevRaw?.end_time,
-                                prevCheckinDate: prevRaw?.checkin_date,
-                              });
+                                    workDate,
+                                    sequence: seq,
+                                    startTime: raw?.start_time,
+                                    checkoutTime: raw?.checkout_time,
+                                    checkoutDate: raw?.checkout_date,
+                                    checkoutWaitMinutes: raw?.checkout_wait_minutes,
+                                    travelMinutes: travelTime,
+                                    prevEndTime: prevRaw?.end_time,
+                                    prevCheckinDate: prevRaw?.checkin_date,
+                                  });
                               const travelWidthPx = minutesToTimelineWidthPx(
                                 travelTime,
                                 virtualMinutes,
@@ -1893,7 +2076,11 @@ export default function LogisticsTimelineView({
                                 timelineWidth
                               );
                               let initialIdleOffsetPx = 0;
-                              if (seq === 1 && virtualMinutes > 0 && timelineWidth > 0) {
+                              if (
+                                seq === 1 &&
+                                virtualMinutes > 0 &&
+                                timelineWidth > 0
+                              ) {
                                 const gridStartMinutes = timelineStartMinutes;
                                 const taskStartMinutes = parseHmToMinutes(raw?.start_time, null);
                                 const driverStartMinutes =
@@ -1918,18 +2105,23 @@ export default function LogisticsTimelineView({
                                       aria-hidden
                                     />
                                   )}
-                                  <LogisticsRouteLineSegment
-                                    widthPx={travelWidthPx}
-                                    title={
-                                      travelTime > 0
-                                        ? seq === 1
-                                          ? `Partenza da magazzino: ${travelTime} min`
-                                          : `${travelTime} min`
-                                        : undefined
-                                    }
-                                    showStartCap={seq === 1 && travelTime > 0}
-                                  />
-                                  {checkoutWait > 0 && waitingGapWidthPx > 0 && raw?.checkout_time && (
+                                  {!hideRouteSpacers && (
+                                    <LogisticsRouteLineSegment
+                                      widthPx={travelWidthPx}
+                                      title={
+                                        travelTime > 0
+                                          ? seq === 1
+                                            ? `Partenza da magazzino: ${travelTime} min`
+                                            : `${travelTime} min`
+                                          : undefined
+                                      }
+                                      showStartCap={seq === 1 && travelTime > 0}
+                                    />
+                                  )}
+                                  {!hideRouteSpacers &&
+                                    checkoutWait > 0 &&
+                                    waitingGapWidthPx > 0 &&
+                                    raw?.checkout_time && (
                                     <div
                                       className="flex items-center justify-center flex-shrink-0 py-3 bg-amber-100/50 dark:bg-amber-900/20 border-y border-dashed border-amber-400"
                                       style={{ width: `${waitingGapWidthPx}px`, minHeight: "50px" }}
@@ -1949,8 +2141,33 @@ export default function LogisticsTimelineView({
                                       </svg>
                                     </div>
                                   )}
-                                  <TaskCard
+                                  {renderCrossDriverInsertSlot(index)}
+                                  {(() => {
+                                    const taskKey = getTaskDndKey(task);
+                                    const dndData: AppDndItem = {
+                                      kind: "task",
+                                      scope: "logistics",
+                                      taskId: taskKey,
+                                      index,
+                                      initialIndex: index,
+                                      from: {
+                                        type: "timeline",
+                                        staffId: driver.id,
+                                      },
+                                    };
+
+                                    return (
+                                  <SortableTaskCard
                                     key={`${task.id}-${driver.id}`}
+                                    dndId={taskDndId("logistics", taskKey, driver.id, "timeline")}
+                                    dndData={dndData}
+                                    draggingOpacity={0}
+                                    hideWhileDragging
+                                    collapsePullPx={
+                                      isCrossDriverSourceRow
+                                        ? crossDriverInsertWidthPx
+                                        : 0
+                                    }
                                     task={task}
                                     index={index}
                                     isInTimeline
@@ -1959,35 +2176,49 @@ export default function LogisticsTimelineView({
                                     cleanerId={driver.id}
                                     isReadOnly={isReadOnly}
                                     isDragDisabled={
-                                      isReadOnly || suppressTaskDrag || Boolean((task as any).locked)
+                                      isReadOnly ||
+                                      suppressTaskDrag ||
+                                      isLoadingOverlay ||
+                                      Boolean((task as any).locked) ||
+                                      Boolean((task as any).is_finished)
                                     }
-                                    timelineWidthPx={timelineWidthPx}
+                                    timelineWidthPx={timelineContentWidthPx}
                                     timelinePxPerMinute={timelinePxPerMinute}
+                                    minTimelineTaskWidthPx={
+                                      hideRouteSpacers
+                                        ? COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX
+                                        : MIN_TIMELINE_TASK_WIDTH_PX
+                                    }
                                     operationsScope="logistics"
                                     isHighlighted={hi.has(String(task.id))}
                                     timelineRowStaffDisplayLabel={driverRowDisplayLabel}
                                     onLogisticsTimelineMutated={onRefresh}
                                   />
+                                    );
+                                  })()}
                                 </Fragment>
                               );
                             })}
-                            <LogisticsRouteLineSegment
-                              widthPx={returnTravelWidthPx}
-                              title={
-                                returnTravelMinutes > 0
-                                  ? `Rientro in magazzino: ${returnTravelMinutes} min`
-                                  : undefined
-                              }
-                              showEndCap
-                            />
+                            {renderCrossDriverInsertSlot(tasks.length)}
+                            {!hideRouteSpacers && (
+                              <LogisticsRouteLineSegment
+                                widthPx={returnTravelWidthPx}
+                                title={
+                                  returnTravelMinutes > 0
+                                    ? `Rientro in magazzino: ${returnTravelMinutes} min`
+                                    : undefined
+                                }
+                                showEndCap
+                              />
+                            )}
                                 </>
                               );
                             })()}
-                            {provided.placeholder}
                           </div>
                         </div>
-                      )}
-                    </Droppable>
+                        );
+                      })()}
+                    </DndDroppableSortableContainer>
                     <div className="flex-shrink-0 w-20 h-[50px] flex items-center justify-center border-l border-border bg-sky-100/30 dark:bg-sky-900/10 text-center">
                       <span className="text-[13px] font-medium tabular-nums text-foreground">
                         {formatLogisticsWorkedHours(sumLogisticsTaskWorkedMinutes(rawTasks))}
@@ -1998,54 +2229,90 @@ export default function LogisticsTimelineView({
               })
             )}
 
-            {/* Riga finale: +, indicatore salvataggio / storico */}
-            <div className="pt-0" />
-            <div className="relative flex items-stretch mb-0 h-[40px]">
-              <div
-                className="relative flex-shrink-0 p-1 flex items-center justify-center h-full overflow-visible print:hidden"
-                style={{ width: `${driverColumnWidth}px` }}
-              >
+            {/* Scrollbar + pulsante +: stessa riga */}
+            <div className="relative z-20 -mx-1 flex shrink-0 flex-col bg-custom-blue-light">
+              <TimelineHorizontalScrollbar
+                labelColumnWidth={driverColumnWidth}
+                contentWidth={timelineScaledWidth}
+                registerRef={registerTimelineScrollRef}
+                onScroll={handleTimelineScroll}
+                labelContent={
+                  <>
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0 z-0"
+                    >
+                      <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
+                        <path
+                          d="M0,0 C16,0 30,4 44,12 C54,18 60,24 68,28 C72,30 76,31 80,31 C84,31 88,30 92,28 C100,24 106,18 116,12 C130,4 144,0 160,0 Z"
+                          fill="rgba(59,130,246,0.12)"
+                        />
+                      </svg>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={isReadOnly}
+                      className="absolute inset-0 z-10 h-full w-full rounded-none border-0 bg-transparent p-0 text-custom-blue hover:bg-transparent hover:text-custom-blue dark:hover:text-custom-blue"
+                      aria-label="Aggiungi driver"
+                      title="Aggiungi driver"
+                      onClick={() => void handleOpenAddDriverDialog(null)}
+                    >
+                      <UserPlus className="w-4 h-4" />
+                    </Button>
+                  </>
+                }
+              />
+              <div className="relative flex h-[40px] shrink-0 items-stretch px-1">
                 <div
+                  className="flex-shrink-0 print:hidden"
+                  style={{ width: `${driverColumnWidth}px` }}
                   aria-hidden
-                  className="pointer-events-none absolute inset-x-0 top-0 h-[38px] z-0"
-                >
-                  <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
-                    <path
-                        d="M0,0 C16,0 30,4 44,12 C54,18 60,24 68,28 C72,30 76,31 80,31 C84,31 88,30 92,28 C100,24 106,18 116,12 C130,4 144,0 160,0 Z"
-                      fill="rgba(59,130,246,0.12)"
-                    />
-                  </svg>
+                />
+                <div className="grid h-full flex-1 grid-cols-[1fr_auto] items-center pl-2 pr-0">
+                  <Button
+                    onClick={() => setShowAdamTransferDialog(true)}
+                    size="sm"
+                    variant="outline"
+                    className="col-start-2 h-[38px] justify-self-end border-2 border-custom-blue px-3"
+                    disabled={isReadOnly || !hasTasksInTimeline || isTransferringToAdam}
+                    title={
+                      isReadOnly
+                        ? "Non puoi trasferire in modalità storico"
+                        : !hasTasksInTimeline
+                          ? "Nessuna task assegnata nella timeline"
+                          : "Trasferisci le assegnazioni logistica sul database ADAM"
+                    }
+                    data-testid="button-transfer-logistics-adam"
+                  >
+                    {isTransferringToAdam ? (
+                      <RefreshCw className="mr-1 h-4 w-4 animate-spin" />
+                    ) : (
+                      <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                    )}
+                    {isTransferringToAdam ? "Trasferimento..." : "Trasferisci su ADAM"}
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={isReadOnly}
-                  className="absolute inset-x-0 top-0 z-10 h-[38px] w-full rounded-none border-0 bg-transparent p-0 text-custom-blue hover:bg-transparent hover:text-custom-blue dark:hover:text-custom-blue"
-                  aria-label="Aggiungi driver"
-                  title="Aggiungi driver"
-                  onClick={() => void handleOpenAddDriverDialog(null)}
+                <div
+                  className="pointer-events-none absolute inset-y-0 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap text-sm font-medium leading-none text-slate-600 dark:text-slate-300"
+                  data-testid="indicator-logistics-adam-last-save"
                 >
-                  <UserPlus className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="flex-1 pl-2 pr-0 h-full" />
-              <div
-                className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 text-sm leading-none font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap"
-                data-testid="indicator-logistics-adam-last-save"
-              >
-                <CheckCircle className="h-4 w-4 text-custom-blue" />
-                <span>
-                  {lastAdamTransfer ? `Salvato il ${(() => {
-                    const d = new Date(lastAdamTransfer);
-                    const day = String(d.getDate()).padStart(2, "0");
-                    const month = String(d.getMonth() + 1).padStart(2, "0");
-                    const year = d.getFullYear();
-                    const hours = String(d.getHours()).padStart(2, "0");
-                    const minutes = String(d.getMinutes()).padStart(2, "0");
-                    return `${day}/${month}/${year} alle ${hours}:${minutes}`;
-                  })()}` : "Nessun salvataggio su ADAM"}
-                </span>
+                  <CheckCircle className="h-4 w-4 text-custom-blue" />
+                  <span>
+                    {lastAdamTransfer ? `Salvato il ${(() => {
+                      const d = new Date(lastAdamTransfer);
+                      const day = String(d.getDate()).padStart(2, "0");
+                      const month = String(d.getMonth() + 1).padStart(2, "0");
+                      const year = d.getFullYear();
+                      const hours = String(d.getHours()).padStart(2, "0");
+                      const minutes = String(d.getMinutes()).padStart(2, "0");
+                      return `${day}/${month}/${year} alle ${hours}:${minutes}`;
+                    })()}` : "Nessun salvataggio su ADAM"}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

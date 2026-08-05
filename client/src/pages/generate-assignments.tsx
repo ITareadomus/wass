@@ -1,4 +1,4 @@
-import { DragDropContext, DropResult } from "react-beautiful-dnd";
+import { DndContext, MeasuringStrategy } from "@dnd-kit/core";
 import { TaskType as Task } from "@shared/schema";
 import {
   isWorkDateHistoricallyLocked,
@@ -13,6 +13,7 @@ const DEBUG = false;
 const dlog = (...args: any[]) => DEBUG && console.log(...args);
 import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
 import { CalendarIcon, Users, RefreshCw, Settings, Search, Map as MapIcon, BarChart3 } from "lucide-react";
+import TaskCardDragOverlay from "@/components/drag-drop/task-card-drag-overlay";
 import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
 import {
   registerTimelineMapPanelOpener,
@@ -36,6 +37,12 @@ import { cn } from "@/lib/utils";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { useToast } from "@/hooks/use-toast";
 import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
+import {
+  DndRemoveZone,
+  useAssignmentDnd,
+  type DndDropOperation,
+  type DndInsertTarget,
+} from "@/lib/dnd";
 
 const OFFICE_SCOPE_ENABLED = false;
 const getDefaultTimelineMapPanel = () => getDefaultTimelineFloatingPanel("right");
@@ -271,6 +278,7 @@ export default function GenerateAssignments() {
   
   // Traccia il cleaner su cui si sta trascinando per posizionare il placeholder
   const [draggingOverCleanerId, setDraggingOverCleanerId] = useState<number | null>(null);
+  const [activeDragCleanerId, setActiveDragCleanerId] = useState<number | null>(null);
 
   // Stati per selezione multipla INDIPENDENTE per container (ma selezione CROSS-CONTAINER)
   const [multiSelectModes, setMultiSelectModes] = useState<{
@@ -416,6 +424,7 @@ export default function GenerateAssignments() {
 
   // Stato per tracciare se un drag&drop è in corso
   const [isLoadingDragDrop, setIsLoadingDragDrop] = useState(false);
+  const [isDraggingTimelineTask, setIsDraggingTimelineTask] = useState(false);
 
   // Stati di caricamento
   const [isExtracting, setIsExtracting] = useState(true);
@@ -1643,139 +1652,27 @@ export default function GenerateAssignments() {
     }
   };
 
-  // helper: estrae l'id cleaner dal droppableId della timeline (es: "timeline-24")
-  const parseCleanerId = (droppableId: string) => {
-    if (!droppableId) return null;
-    if (droppableId.startsWith('timeline-')) {
-      const n = Number(droppableId.slice('timeline-'.length));
-      return Number.isFinite(n) ? n : null;
+  const pendingRouteSpacerHideRafRef = useRef<number | null>(null);
+
+  const resetDndUiState = useCallback(() => {
+    if (pendingRouteSpacerHideRafRef.current != null) {
+      cancelAnimationFrame(pendingRouteSpacerHideRafRef.current);
+      pendingRouteSpacerHideRafRef.current = null;
     }
-    return null;
-  };
-
-  // Helper per estrarre container key
-  const parseContainerKey = (droppableId: string | undefined | null): "early_out" | "high_priority" | "low_priority" | null => {
-    if (!droppableId) return null;
-    if (droppableId === "early-out") return "early_out";
-    if (droppableId === "high") return "high_priority";
-    if (droppableId === "low") return "low_priority";
-    return null;
-  };
-
-  const onDragUpdate = (update: any) => {
-    const { destination } = update;
-
-    if (!destination) {
-      setDragSequencePreview(null);
-      setLastValidDragIndex(null);
-      lastValidDragIndexRef.current = null;
-      setDraggingOverCleanerId(null);
-      return;
-    }
-
-    const toCleanerId = parseCleanerId(destination.droppableId);
-
-    // Mostriamo il numero di sequenza solo quando siamo sulla timeline di un cleaner
-    if (toCleanerId === null) {
-      setDragSequencePreview(null);
-      setLastValidDragIndex(null);
-      lastValidDragIndexRef.current = null;
-      setDraggingOverCleanerId(null);
-      return;
-    }
-
-    // CRITICAL: Salva l'indice valido durante il drag per evitare bug con destination.index inaffidabile
-    setLastValidDragIndex(destination.index);
-    lastValidDragIndexRef.current = destination.index;
-    setDraggingOverCleanerId(toCleanerId);
-    setDragSequencePreview({
-      // index è 0-based, mostrato come 1-based
-      sequenceIndex: destination.index + 1,
-    });
-  };
-
-  const onDragEnd = async (result: any) => {
+    setIsDraggingTimelineTask(false);
     setDragSequencePreview(null);
     setLastValidDragIndex(null);
+    lastValidDragIndexRef.current = null;
     setDraggingOverCleanerId(null);
+    setActiveDragCleanerId(null);
+  }, []);
 
-    const { destination, source, draggableId } = result;
-    const dragIndexSnapshot = lastValidDragIndexRef.current;
-    
-    // Estrai container e cleaner ID dalle destinazioni
-    const toContainer = parseContainerKey(destination?.droppableId);
-    const toCleanerId = parseCleanerId(destination?.droppableId);
-    const fromContainer = parseContainerKey(source?.droppableId);
-    const fromCleanerId = parseCleanerId(source?.droppableId);
+  const handleDndOperation = useCallback(
+    async (operation: DndDropOperation) => {
+      if (operation.type === "noop") return;
+      if (isDraggingRef.current || isLoadingDragDrop) return;
 
-    try {
-      // niente destinazione => niente da fare (e NON mostrare overlay)
-      if (!destination) {
-        return;
-      }
-
-      // se posizione identica, esci
-      if (
-        destination.droppableId === source.droppableId &&
-        destination.index === source.index
-      ) {
-        return;
-      }
-
-      // solo ora ha senso mostrare overlay
-      setIsLoadingDragDrop(true);
-
-      // CRITICAL: Blocca drag simultanei (con timeout di sicurezza di 10 secondi)
-      if (isDraggingRef.current) {
-        console.log("⚠️ Drag già in corso, operazione annullata per prevenire conflitti");
-        toast({
-          title: "Operazione in corso",
-          description: "Attendi il completamento del movimento precedente",
-          variant: "warning",
-          duration: 2000,
-        });
-        return;
-      }
-
-      // draggableId formato: "{taskId}-cleaner-{cleanerId}" o "{taskId}" (containers)
-      // Estrai solo il taskId dalla chiave composita
-      const taskId = draggableId.includes('-cleaner-') 
-        ? draggableId.split('-cleaner-')[0] 
-        : draggableId;
-      const task = allTasksWithAssignments.find(t => String(t.id) === String(taskId));
-      const logisticCode = task?.name; // name contiene il logistic_code
-      const taskPreAssignedMode = resolvePreAssignedModeFromTask(task);
-      const isReadonlyPreassigned = taskPreAssignedMode === "readonly";
-
-      if (isReadonlyPreassigned) {
-        const isSameCleanerReorder =
-          fromCleanerId !== null &&
-          toCleanerId !== null &&
-          fromCleanerId === toCleanerId;
-        if (!isSameCleanerReorder) {
-          toast({
-            title: "Task pre-assegnata readonly",
-            description: "Puoi solo riordinarla nella stessa riga cleaner.",
-            variant: "warning",
-          });
-          return;
-        }
-      }
-
-      // ENFORCEMENT: Se la task è bloccata, non permettere spostamento in timeline
-      if (task && (task as any).locked && !fromCleanerId) {
-        console.log(`🔒 Task ${taskId} è bloccata, spostamento annullato`);
-        toast({
-          title: "Task bloccata",
-          description: (task as any).locked_reason || "Questa task non può essere assegnata",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Se la timeline è read-only, non permettere modifiche
       if (isTimelineReadOnly) {
-        console.log("Timeline è READ-ONLY, spostamento annullato.");
         toast({
           title: "Operazione non permessa",
           description: "La timeline è in sola visualizzazione per questa data.",
@@ -1784,324 +1681,225 @@ export default function GenerateAssignments() {
         return;
       }
 
-      // Imposta lock con timeout di sicurezza (10 secondi)
+      setIsLoadingDragDrop(true);
       isDraggingRef.current = true;
-      if (dragTimeoutRef.current) {
-        clearTimeout(dragTimeoutRef.current);
-      }
+      if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
       dragTimeoutRef.current = setTimeout(() => {
-        console.log("⏰ Timeout sicurezza: rilascio lock drag forzato");
         isDraggingRef.current = false;
         setIsLoadingDragDrop(false);
       }, 10000);
-      // 🔹 Ramo TIMELINE (drag tra cleaners o riordino nello stesso cleaner)
 
-      // Caso: Riordino nella stessa timeline
-      if (fromCleanerId === toCleanerId && fromCleanerId !== null && toCleanerId !== null) {
-        const cleanerId = toCleanerId;
-        const correctIndex = dragIndexSnapshot !== null ? dragIndexSnapshot : destination.index;
-        console.log(`🔄 Riordino task ${taskId} per cleaner ${cleanerId} da ${source.index} a ${correctIndex}`);
-
-        try {
-          await reorderTimelineAssignment(taskId, logisticCode, cleanerId, source.index, correctIndex);
-
-          // CRITICAL: Marca modifiche dopo riordino
-          setHasUnsavedChanges(true);
-          if (handleTaskMoved) {
-            handleTaskMoved();
-          }
-
-          // Ricarica i dati dal server (server-driven approach)
-          await refreshAssignments("manual");
-
-          toast({
-            title: "Task riordinata",
-            description: `Task ${logisticCode} spostata nella posizione ${correctIndex + 1}`,
-            variant: "success",
-          });
-        } catch (err) {
-          console.error("Errore nel riordino:", err);
-          toast({
-            title: "Errore",
-            description: "Impossibile riordinare la task.",
-            variant: "destructive",
-          });
-        } finally {
-          // Rilascia lock indipendentemente dall'esito
-          isDraggingRef.current = false;
-          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
-          setIsLoadingDragDrop(false);
-        }
-        return;
-      }
-
-      // Spostamento tra cleaners diversi
-      if (fromCleanerId !== null && toCleanerId !== null && fromCleanerId !== toCleanerId) {
-        // CRITICAL: Usa lastValidDragIndex salvato durante onDragUpdate per evitare bug di posizionamento
-        const correctIndex = dragIndexSnapshot !== null ? dragIndexSnapshot : destination.index;
-        dlog(`🔄 Spostamento task ${taskId} da cleaner ${fromCleanerId} a cleaner ${toCleanerId} @ index ${correctIndex}`);
-
-        try {
-          // Usa l'endpoint corretto per spostare tra cleaners
-          const dateStr = format(selectedDate, "yyyy-MM-dd");
-          const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-          const response = await fetch('/api/move-task-between-cleaners', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              taskId,
-              logisticCode,
-              sourceCleanerId: fromCleanerId,
-              destCleanerId: toCleanerId,
-              destIndex: correctIndex,
-              date: dateStr,
-              scope: scopeValue,
-              modified_by: currentUser.username || 'unknown'
-            }),
-          });
-
-          if (!response.ok) {
-            // Gestione errore 423 (Task bloccata o Cleaner bloccato)
-            if (response.status === 423) {
-              const errorData = await response.json().catch(() => ({}));
-              if (errorData.error === 'PREASSIGNED_READONLY') {
-                throw new Error('Task pre-assegnata readonly: non puoi cambiare cleaner');
+      try {
+        switch (operation.type) {
+          case "assign": {
+            const cleanerId = operation.to.staffId;
+            let insertIndex = operation.index;
+            for (const taskId of operation.taskIds) {
+              const task = allTasksWithAssignments.find(
+                (t) => String(t.id) === String(taskId),
+              );
+              if (!task) continue;
+              if ((task as any).locked) {
+                throw new Error(
+                  (task as any).locked_reason ||
+                    "Task bloccata: impossibile assegnare",
+                );
               }
-              if (errorData.error === 'CLEANER_LOCKED') {
-                throw new Error('Cleaner bloccato: impossibile assegnare');
-              }
-              throw new Error(errorData.locked_reason || 'Task bloccata: impossibile assegnare');
+              await saveTaskAssignment(
+                taskId,
+                cleanerId,
+                task.name,
+                insertIndex,
+              );
+              insertIndex += 1;
             }
-            throw new Error('Errore nello spostamento tra cleaners');
+            setHasUnsavedChanges(true);
+            handleTaskMoved?.();
+            await refreshAssignments("manual");
+            break;
           }
 
-          // CRITICAL: Marca modifiche dopo spostamento
-          setHasUnsavedChanges(true);
-          if (handleTaskMoved) {
-            handleTaskMoved();
+          case "reorder": {
+            const cleanerId = operation.in.staffId;
+            let destIndex = operation.toIndex;
+            for (const taskId of operation.taskIds) {
+              const task = allTasksWithAssignments.find(
+                (t) => String(t.id) === String(taskId),
+              );
+              await reorderTimelineAssignment(
+                taskId,
+                task?.name,
+                cleanerId,
+                operation.fromIndex,
+                destIndex,
+              );
+              destIndex += 1;
+            }
+            setHasUnsavedChanges(true);
+            handleTaskMoved?.();
+            await refreshAssignments("manual");
+            break;
           }
 
-          // Ricarica i dati dal server (server-driven approach)
-          await refreshAssignments("manual");
+          case "reassign": {
+            let destIndex = operation.index;
+            for (const taskId of operation.taskIds) {
+              const task = allTasksWithAssignments.find(
+                (t) => String(t.id) === String(taskId),
+              );
+              const logisticCode = task?.name;
+              const taskPreAssignedMode = resolvePreAssignedModeFromTask(task);
+              if (taskPreAssignedMode === "readonly") {
+                throw new Error(
+                  "Task pre-assegnata readonly: non puoi cambiare cleaner",
+                );
+              }
 
-          // PATCH C: Usa ID nel toast invece di fetch
-          const toCleanerName = `ID ${toCleanerId}`;
+              const response = await fetch("/api/move-task-between-cleaners", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  taskId,
+                  logisticCode,
+                  sourceCleanerId: operation.from.staffId,
+                  destCleanerId: operation.to.staffId,
+                  destIndex,
+                  date: format(selectedDate, "yyyy-MM-dd"),
+                  scope: scopeValue,
+                  mode: "move_assignment",
+                  modified_by:
+                    JSON.parse(localStorage.getItem("user") || "{}").username ||
+                    "unknown",
+                }),
+              });
 
-          toast({
-            title: "Task spostata",
-            description: `Task ${logisticCode} assegnata a ${toCleanerName}`,
-            variant: "success",
-          });
-        } catch (err) {
-          console.error("Errore nello spostamento:", err);
-          toast({
-            title: "Errore",
-            description: (err as any)?.message || "Impossibile spostare la task.",
-            variant: "destructive",
-          });
-        } finally {
-          // Rilascia lock indipendentemente dall'esito
-          isDraggingRef.current = false;
-          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
-          setIsLoadingDragDrop(false);
+              if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                if (response.status === 423) {
+                  if (errorData.error === "PREASSIGNED_READONLY") {
+                    throw new Error(
+                      "Task pre-assegnata readonly: non puoi cambiare cleaner",
+                    );
+                  }
+                  if (errorData.error === "CLEANER_LOCKED") {
+                    throw new Error("Cleaner bloccato: impossibile assegnare");
+                  }
+                  throw new Error(
+                    errorData.locked_reason ||
+                      "Task bloccata: impossibile assegnare",
+                  );
+                }
+                throw new Error(
+                  errorData.message ||
+                    errorData.locked_reason ||
+                    "Errore nello spostamento tra cleaners",
+                );
+              }
+              destIndex += 1;
+            }
+            setHasUnsavedChanges(true);
+            handleTaskMoved?.();
+            await refreshAssignments("manual");
+            break;
+          }
+
+          case "remove": {
+            for (const taskId of operation.taskIds) {
+              const task = allTasksWithAssignments.find(
+                (t) => String(t.id) === String(taskId),
+              );
+              await removeTimelineAssignment(taskId, task?.name);
+            }
+            setHasUnsavedChanges(true);
+            handleTaskMoved?.();
+            await refreshAssignments("manual");
+            break;
+          }
         }
-        return;
-      }
-
-
-      // 🔸 BATCH MOVE: Se multi-select è attivo, ci sono task selezionate, E la task trascinata è tra quelle selezionate
-      const isDraggedTaskSelected = selectedTasks.some(st => st.taskId === taskId);
-
-      if (isAnyMultiSelectActive && selectedTasks.length > 0 && isDraggedTaskSelected && toCleanerId !== null && !toContainer) {
-        // CRITICAL: Usa lastValidDragIndex salvato durante onDragUpdate per evitare bug di posizionamento
-        const correctBatchIndex = dragIndexSnapshot !== null ? dragIndexSnapshot : destination.index;
-        dlog(`🔄 BATCH MOVE CROSS-CONTAINER: Spostamento di ${selectedTasks.length} task selezionate a cleaner ${toCleanerId} @ index ${correctBatchIndex}`);
-
-        // ENFORCEMENT: Filtra task locked dalla selezione batch
-        const unlockedSelectedTasks = selectedTasks.filter(st => {
-          const t = allTasksWithAssignments.find(task => String(task.id) === st.taskId);
-          return t && !(t as any).locked;
+      } catch (error) {
+        console.error("Errore nell'operazione drag-and-drop:", error);
+        toast({
+          title: "Errore",
+          description:
+            error instanceof Error
+              ? error.message
+              : "Errore nello spostamento della task",
+          variant: "destructive",
         });
-        const lockedCount = selectedTasks.length - unlockedSelectedTasks.length;
-        
-        if (unlockedSelectedTasks.length === 0) {
-          toast({
-            title: "Tutte le task selezionate sono bloccate",
-            description: "Sblocca le task per poterle assegnare",
-            variant: "destructive",
-          });
-          isDraggingRef.current = false;
-          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
-          setIsLoadingDragDrop(false);
-          return;
-        }
-        
-        if (lockedCount > 0) {
-          toast({
-            title: "Alcune task ignorate",
-            description: `${lockedCount} task bloccate sono state ignorate`,
-            variant: "warning",
-          });
-        }
+      } finally {
+        isDraggingRef.current = false;
+        if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+        setIsLoadingDragDrop(false);
+        resetDndUiState();
+        // Il movimento (anche multi-selezione) è concluso: azzera la selezione
+        // così il prossimo drag riparte da zero e non "trascina" i task
+        // selezionati in precedenza. I drop non validi (noop) escono prima del
+        // try, quindi qui la selezione viene azzerata solo dopo un'operazione reale.
+        clearSelection();
+      }
+    },
+    [
+      allTasksWithAssignments,
+      selectedDate,
+      scopeValue,
+      isTimelineReadOnly,
+      isLoadingDragDrop,
+      reorderTimelineAssignment,
+      refreshAssignments,
+      handleTaskMoved,
+      resetDndUiState,
+      removeTimelineAssignment,
+      saveTaskAssignment,
+      clearSelection,
+      toast,
+    ],
+  );
 
-        const taskIds = unlockedSelectedTasks.map(st => st.taskId);
-        const numTasks = unlockedSelectedTasks.length;
+  const assignmentDnd = useAssignmentDnd({
+    scope: "housekeeping",
+    onOperation: handleDndOperation,
+    onDragStart: (item) => {
+      const isTimelineOrSummary =
+        item.from.type === "timeline" || item.from.type === "summary";
+      setIsDraggingTimelineTask(isTimelineOrSummary);
 
-        try {
-          // PATCH C: Usa ID nel toast invece di fetch
-          const cleanerName = `ID ${toCleanerId}`;
-
-          // Ordina le task selezionate (non locked) per ordine di selezione
-          const sortedTasks = [...unlockedSelectedTasks].sort((a, b) => a.order - b.order);
-
-          // Sposta ciascuna task in sequenza alla destinazione
-          let currentIndex = correctBatchIndex;
-          for (const selectedTask of sortedTasks) {
-            const taskItem = allTasksWithAssignments.find(t => String(t.id) === selectedTask.taskId);
-            if (taskItem) {
-              await saveTaskAssignment(selectedTask.taskId, toCleanerId, taskItem.name, currentIndex);
-              currentIndex++; // Incrementa l'indice per la prossima task
-            }
-          }
-
-          // Pulisci selezione
-          setSelectedTasks([]);
-
-          // Marca modifiche
-          setHasUnsavedChanges(true);
-          if (handleTaskMoved) {
-            handleTaskMoved();
-          }
-
-          // Ricarica i dati dal server (server-driven approach)
-          await refreshAssignments("manual");
-
-          toast({
-            title: "Task assegnate",
-            description: `${numTasks} task cross-container assegnate a ${cleanerName}`,
-            variant: "success",
-          });
-        } catch (err) {
-          console.error("Errore nello spostamento batch:", err);
-          toast({
-            title: "Errore",
-            description: "Impossibile spostare le task selezionate.",
-            variant: "destructive",
-          });
-        } finally {
-          // Rilascia lock indipendentemente dall'esito
-          isDraggingRef.current = false;
-          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
-          setIsLoadingDragDrop(false);
-        }
+      // Ritarda il reflow (hide travel): DragOverlay deve misurare il rect
+      // iniziale PRIMA che i task scalino a sinistra, altrimenti il cursore si stacca.
+      if (pendingRouteSpacerHideRafRef.current != null) {
+        cancelAnimationFrame(pendingRouteSpacerHideRafRef.current);
+      }
+      if (isTimelineOrSummary && item.from.type === "timeline") {
+        const staffId = item.from.staffId;
+        pendingRouteSpacerHideRafRef.current = requestAnimationFrame(() => {
+          pendingRouteSpacerHideRafRef.current = null;
+          setActiveDragCleanerId(staffId);
+        });
+      } else if (isTimelineOrSummary) {
+        setActiveDragCleanerId(item.from.staffId);
+      } else {
+        setActiveDragCleanerId(null);
+      }
+    },
+    onDragOver: (target: DndInsertTarget | null) => {
+      if (target?.container.type !== "timeline" && target?.container.type !== "summary") {
+        setDragSequencePreview(null);
+        setLastValidDragIndex(null);
+        lastValidDragIndexRef.current = null;
+        setDraggingOverCleanerId(null);
         return;
       }
 
-      // ✅ NUOVO CASO: da container (early/high/low) → timeline di un cleaner
-
-      if (!fromCleanerId && fromContainer && toCleanerId !== null && !toContainer) {
-        // CRITICAL: Usa lastValidDragIndex salvato durante onDragUpdate per evitare bug di posizionamento
-        const correctIndex = dragIndexSnapshot !== null ? dragIndexSnapshot : destination.index;
-        dlog(`🔄 Spostamento da container ${fromContainer} a cleaner ${toCleanerId} @ index ${correctIndex}`);
-
-        try {
-          // PATCH C: Usa ID nel toast invece di fetch
-          const cleanerName = `ID ${toCleanerId}`;
-
-          console.log(`🎯 Tentativo assegnazione task ${taskId} a cleaner ${toCleanerId} (potrebbe essere locked)`);
-          console.log(`🎯 Task details: logisticCode=${logisticCode}, correctIndex=${correctIndex}`);
-
-          // Salva in timeline.json (rimuove automaticamente da containers.json)
-          await saveTaskAssignment(taskId, toCleanerId, logisticCode, correctIndex);
-
-          console.log(`✅ Assegnazione completata con successo per task ${taskId}`);
-
-          // CRITICAL: Marca modifiche dopo drag-and-drop da container
-          setHasUnsavedChanges(true);
-          if (handleTaskMoved) {
-            handleTaskMoved();
-          }
-
-          // Ricarica i dati dal server (server-driven approach)
-          await refreshAssignments("manual");
-
-          toast({
-            title: "Task assegnata",
-            description: `Task ${logisticCode} assegnata a ${cleanerName}`,
-            variant: "success",
-          });
-        } catch (err: any) {
-          console.error("❌ Errore nell'assegnazione:", err);
-
-          // Gestione specifica per cleaner bloccato
-          if (err?.message?.includes('Cleaner bloccato')) {
-            toast({
-              title: "Cleaner bloccato",
-              description: "Impossibile assegnare la task: cleaner bloccato",
-              variant: "destructive",
-            });
-          } else {
-            toast({
-              title: "Errore",
-              description: err?.message || "Impossibile assegnare la task.",
-              variant: "destructive",
-            });
-          }
-        } finally {
-          // Rilascia lock indipendentemente dall'esito
-          isDraggingRef.current = false;
-          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
-          setIsLoadingDragDrop(false);
-        }
-        return;
-      }
-
-      // Caso: Da timeline a container
-      if (fromCleanerId !== null && toContainer && !toCleanerId) { // Aggiunto !toCleanerId per evitare sovrapposizioni
-        dlog(`🔄 Spostamento da cleaner ${fromCleanerId} a container ${toContainer}`);
-
-        try {
-          // Rimuovi da timeline.json
-          await removeTimelineAssignment(taskId, logisticCode);
-
-          // CRITICAL: Marca modifiche dopo rimozione da timeline
-          setHasUnsavedChanges(true);
-          if (handleTaskMoved) {
-            handleTaskMoved();
-          }
-
-          // Ricarica i dati dal server (server-driven approach)
-          await refreshAssignments("manual");
-        } catch (err) {
-          console.error("Errore nella rimozione:", err);
-          toast({
-            title: "Errore",
-            description: "Impossibile rimuovere la task dalla timeline.",
-            variant: "destructive",
-          });
-        } finally {
-          isDraggingRef.current = false;
-          if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
-          setIsLoadingDragDrop(false);
-        }
-        return;
-      }
-
-    } catch (error) {
-      console.error('Errore nello spostamento:', error);
-      toast({
-        title: "Errore",
-        description: "Errore nello spostamento della task",
-        variant: "destructive",
+      const cleanerId = target.container.staffId;
+      setLastValidDragIndex(target.index);
+      lastValidDragIndexRef.current = target.index;
+      setDraggingOverCleanerId(cleanerId);
+      setDragSequencePreview({
+        sequenceIndex: target.index + 1,
       });
-    } finally {
-      // CRITICAL: Rilascia SEMPRE il loader e il lock, indipendentemente da come si esce
-      isDraggingRef.current = false;
-      lastValidDragIndexRef.current = null;
-      if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
-      setIsLoadingDragDrop(false);
-    }
-  };
+    },
+    onDragCancel: resetDndUiState,
+    onDragEnd: resetDndUiState,
+  });
 
   const updateTaskJson = async (taskId: string, logisticCode: string | undefined, fromContainer: string | null, toContainer: string | null) => {
     if (!logisticCode || !fromContainer || !toContainer) {
@@ -2241,9 +2039,12 @@ export default function GenerateAssignments() {
           </PageViewportCentered>
         ) : (
         <MultiSelectContext.Provider value={multiSelectContextValue}>
-          <DragDropContext
-            onDragEnd={onDragEnd}
-            onDragUpdate={onDragUpdate}
+          <DndContext
+            sensors={assignmentDnd.sensors}
+            collisionDetection={assignmentDnd.collisionDetection}
+            modifiers={assignmentDnd.modifiers}
+            measuring={{ droppable: { strategy: MeasuringStrategy.WhileDragging } }}
+            {...assignmentDnd.handlers}
           >
             <div className="mb-4 flex items-center gap-3">
               <div className="relative flex-1">
@@ -2428,6 +2229,7 @@ export default function GenerateAssignments() {
                     icon="clock"
                     assignAction={assignEarlyOutToTimeline}
                     assignButtonDisabled={hasRunAssignEo}
+                    isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
                     containerMultiSelectState={getContainerMultiSelectState('early_out')}
                     highlightedTaskIds={highlightedEarlyOut}
                   />
@@ -2439,6 +2241,7 @@ export default function GenerateAssignments() {
                     icon="alert-circle"
                     assignAction={assignHighPriorityToTimeline}
                     assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || hasRunAssignHp}
+                    isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
                     containerMultiSelectState={getContainerMultiSelectState('high_priority')}
                     highlightedTaskIds={highlightedHighPriority}
                   />
@@ -2450,6 +2253,7 @@ export default function GenerateAssignments() {
                     icon="arrow-down"
                     assignAction={assignLowPriorityToTimeline}
                     assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || !timelinePriorityState.hasHpOnTimeline || hasRunAssignLp}
+                    isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
                     containerMultiSelectState={getContainerMultiSelectState('low_priority')}
                     highlightedTaskIds={highlightedLowPriority}
                   />
@@ -2475,6 +2279,7 @@ export default function GenerateAssignments() {
                   isLoadingDragDrop={isLoadingDragDrop}
                   lastValidDragIndex={lastValidDragIndex}
                   draggingOverCleanerId={draggingOverCleanerId}
+                  activeDragCleanerId={activeDragCleanerId}
                   searchTask={searchTask}
                   preassignedAnimatedTaskIds={preassignedAnimatedTaskIds}
                 />
@@ -2538,7 +2343,19 @@ export default function GenerateAssignments() {
               </span>
             </div>
           )}
-        </DragDropContext>
+          <DndRemoveZone
+            scope="housekeeping"
+            visible={isDraggingTimelineTask && !isTimelineReadOnly && !isLoadingDragDrop}
+            disabled={isTimelineReadOnly || isLoadingDragDrop}
+          />
+          <TaskCardDragOverlay
+            activeItem={assignmentDnd.activeItem}
+            activeDragTask={assignmentDnd.activeDragTask}
+            activeRect={assignmentDnd.activeRect}
+            tasks={allTasksWithAssignments}
+            scope="housekeeping"
+          />
+        </DndContext>
         </MultiSelectContext.Provider>
         )}
       </div>

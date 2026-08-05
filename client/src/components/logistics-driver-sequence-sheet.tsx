@@ -1,6 +1,14 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
-import { ArrowLeft, Loader2, MessageCircle, Printer } from "lucide-react";
+import {
+  ArrowLeft,
+  Box,
+  KeyRound,
+  Loader2,
+  MessageCircle,
+  Printer,
+  Smartphone,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SequenceSummaryEntry, SequenceSummaryGroup } from "@/lib/sequence-summary";
 import { logisticsKindSequenceDotClass, LogisticsSequenceBadge } from "@/lib/logistics-task-kind-ui";
@@ -15,6 +23,11 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { PAGE_BELOW_HEADER_MIN_H } from "@/components/page-viewport-centered";
+import {
+  formatStructureAccessTypeLabel,
+  resolveStructureAccessKeyKind,
+  type StructureAccessBundle,
+} from "@shared/structure-access-keys";
 
 function SheetCheckInOut({
   checkoutTime,
@@ -104,6 +117,83 @@ function SheetCustomerNoteCell({
   );
 }
 
+function AccessKeyIcon({
+  bundle,
+  className,
+}: {
+  bundle: StructureAccessBundle;
+  className?: string;
+}) {
+  const kind = resolveStructureAccessKeyKind(bundle);
+  if (kind === "smart") {
+    return <Smartphone className={cn("h-4 w-4 text-sky-700", className)} aria-hidden />;
+  }
+  if (kind === "kbox") {
+    return <Box className={cn("h-4 w-4 text-amber-700", className)} aria-hidden />;
+  }
+  return <KeyRound className={cn("h-4 w-4 text-slate-700", className)} aria-hidden />;
+}
+
+function formatAccessBundlePrintLines(bundles: StructureAccessBundle[]): string[] {
+  const lines: string[] = [];
+  for (const bundle of bundles) {
+    const typeLabel = formatStructureAccessTypeLabel(bundle);
+    const meta = [
+      bundle.keysLabel,
+      bundle.keysNumber ? `N. ${bundle.keysNumber}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    lines.push(meta ? `${typeLabel} (${meta})` : typeLabel);
+
+    for (const choice of bundle.choices) {
+      const parts = [
+        choice.name,
+        choice.typeLabel,
+        choice.value ? `→ ${choice.value}` : null,
+      ].filter(Boolean);
+      if (parts.length > 0) lines.push(`  ${parts.join(" · ")}`);
+    }
+  }
+  return lines;
+}
+
+function SheetAccessKeysCell({
+  bundles,
+  logisticCode,
+  onOpen,
+}: {
+  bundles: StructureAccessBundle[];
+  logisticCode: string;
+  onOpen: (bundles: StructureAccessBundle[], logisticCode: string) => void;
+}) {
+  if (!bundles.length) return <span className="text-muted-foreground">—</span>;
+
+  const primary = bundles[0];
+  const typeLabel = formatStructureAccessTypeLabel(primary);
+  const printLines = formatAccessBundlePrintLines(bundles);
+
+  return (
+    <>
+      <button
+        type="button"
+        className="group inline-flex items-center justify-center rounded-sm p-1 hover:bg-muted print:hidden"
+        title={`${typeLabel} — clicca per dettagli`}
+        aria-label={`Chiavi ${typeLabel} per task ${logisticCode}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onOpen(bundles, logisticCode);
+        }}
+      >
+        <AccessKeyIcon bundle={primary} className="group-hover:scale-105 transition-transform" />
+      </button>
+      <span className="hidden whitespace-pre-wrap break-words text-[7px] leading-tight print:inline">
+        {printLines.join("\n")}
+      </span>
+    </>
+  );
+}
+
 interface LogisticsDriverSequenceSheetProps {
   group: SequenceSummaryGroup;
   workDate: string;
@@ -123,6 +213,11 @@ export default function LogisticsDriverSequenceSheet({
     note: string;
     logisticCode: string;
   }>({ open: false, note: "", logisticCode: "" });
+  const [accessKeysDialog, setAccessKeysDialog] = useState<{
+    open: boolean;
+    logisticCode: string;
+    bundles: StructureAccessBundle[];
+  }>({ open: false, logisticCode: "", bundles: [] });
   const [violationDialog, setViolationDialog] = useState<{
     open: boolean;
     logisticCode: string;
@@ -261,10 +356,6 @@ export default function LogisticsDriverSequenceSheet({
                   Indirizzo
                 </th>
                 <th className="h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
-                  <span className="print:hidden">Finestra di lavoro driver</span>
-                  <span className="hidden print:inline">Fin. driver</span>
-                </th>
-                <th className="h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   <span className="print:hidden">Finestra di lavoro cleaner</span>
                   <span className="hidden print:inline">Fin. cleaner</span>
                 </th>
@@ -277,6 +368,9 @@ export default function LogisticsDriverSequenceSheet({
                 </th>
                 <th className="h-9 min-w-[100px] border-r border-border/60 px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   Divani
+                </th>
+                <th className="h-9 w-[56px] min-w-[56px] max-w-[72px] border-r border-border/60 px-1 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                  Chiavi
                 </th>
                 <th className="h-9 min-w-[160px] px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   Note
@@ -346,9 +440,6 @@ export default function LogisticsDriverSequenceSheet({
                       {entry.address || "—"}
                     </td>
                     <td className="border-r border-border/40 px-2 py-2 text-center align-middle whitespace-nowrap print:min-w-0 print:whitespace-normal print:px-1 print:py-1">
-                      {entry.lgWindow}
-                    </td>
-                    <td className="border-r border-border/40 px-2 py-2 text-center align-middle whitespace-nowrap print:min-w-0 print:whitespace-normal print:px-1 print:py-1">
                       {entry.hkWindow}
                     </td>
                     <td className="border-r border-border/40 px-2 py-2 text-center align-middle">
@@ -369,6 +460,17 @@ export default function LogisticsDriverSequenceSheet({
                     </td>
                     <td className="border-r border-border/40 px-2 py-2 align-top whitespace-nowrap print:min-w-0 print:whitespace-normal print:px-1 print:py-1">
                       {entry.sofabedLabel || "—"}
+                    </td>
+                    <td className="border-r border-border/40 px-1 py-2 text-center align-middle">
+                      <div className="flex justify-center">
+                        <SheetAccessKeysCell
+                          bundles={entry.accessBundles ?? []}
+                          logisticCode={entry.logisticCode || "N/D"}
+                          onOpen={(bundles, logisticCode) =>
+                            setAccessKeysDialog({ open: true, bundles, logisticCode })
+                          }
+                        />
+                      </div>
                     </td>
                     <td className="px-2 py-2 align-top print:min-w-0 print:whitespace-pre-wrap print:break-words print:px-1 print:py-1">
                       <SheetCustomerNoteCell
@@ -413,6 +515,78 @@ export default function LogisticsDriverSequenceSheet({
               size="sm"
               className="border-2 border-custom-blue"
               onClick={() => setCustomerNoteDialog((prev) => ({ ...prev, open: false }))}
+            >
+              Chiudi
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={accessKeysDialog.open}
+        onOpenChange={(open) => setAccessKeysDialog((prev) => ({ ...prev, open }))}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex flex-wrap items-baseline gap-x-1">
+              <span>Chiavi di accesso</span>
+              <span className="text-sm font-normal text-muted-foreground">
+                task <strong>{accessKeysDialog.logisticCode}</strong>
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-2 space-y-3">
+            {accessKeysDialog.bundles.map((bundle, index) => {
+              const typeLabel = formatStructureAccessTypeLabel(bundle);
+              return (
+                <div
+                  key={`${accessKeysDialog.logisticCode}-bundle-${bundle.keysId ?? index}`}
+                  className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/40"
+                >
+                  <div className="flex items-start gap-2">
+                    <AccessKeyIcon bundle={bundle} className="mt-0.5 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-foreground">{typeLabel}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {[
+                          bundle.keysLabel,
+                          bundle.keysNumber ? `N. mazzo ${bundle.keysNumber}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ") || "—"}
+                      </p>
+                      {bundle.choices.length > 0 && (
+                        <ul className="mt-2 space-y-1.5">
+                          {bundle.choices.map((choice, choiceIndex) => (
+                            <li
+                              key={`${bundle.keysId ?? index}-choice-${choiceIndex}`}
+                              className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-900"
+                            >
+                              <div className="font-medium text-foreground">{choice.name}</div>
+                              <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-muted-foreground">
+                                {choice.typeLabel && <span>{choice.typeLabel}</span>}
+                                {choice.value && (
+                                  <span className="font-mono font-semibold text-foreground">
+                                    {choice.value}
+                                  </span>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-2 border-custom-blue"
+              onClick={() => setAccessKeysDialog((prev) => ({ ...prev, open: false }))}
             >
               Chiudi
             </Button>

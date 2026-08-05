@@ -28,12 +28,24 @@ export interface BuildSameBuildingDriverConstraintsArgs {
   drivers: DriverNode[];
   travelMatrixMin: number[][];
   existingRequiredDriverByTaskId: Map<TaskId, DriverId>;
+  /**
+   * Territory-level preference calculated before synthetic same-building locks.
+   * It is deliberately soft here: a different feasible driver may be selected
+   * when the preferred one cannot serve the group.
+   */
+  preferredDriverByTaskId?: Map<TaskId, DriverId>;
 }
 
 export interface BuildSameBuildingDriverConstraintsResult {
   constraints: HardConstraintSpec[];
   lockedGroupCount: number;
   skippedGroups: SkippedSameBuildingGroup[];
+}
+
+interface DriverGroupScore {
+  territoryPreferenceDeficit: number;
+  provisionalLoadMin: number;
+  travelToFirstMin: number;
 }
 
 function orderTasksForSameBuildingVisit(tasks: TaskNode[]): TaskNode[] {
@@ -78,45 +90,103 @@ function tryScheduleTasksOnDriver(
 function scoreDriverForGroup(
   travelMatrixMin: number[][],
   driver: DriverNode,
-  orderedTasks: TaskNode[]
-): number | null {
+  orderedTasks: TaskNode[],
+  territoryPreferenceDeficit: number,
+  provisionalLoadMin: number
+): DriverGroupScore | null {
   if (!tryScheduleTasksOnDriver(travelMatrixMin, driver, orderedTasks)) {
     return null;
   }
 
-  const travelToFirst = travelMatrixMin[DEPOT_NODE_INDEX]?.[orderedTasks[0].nodeIndex];
-  return Number.isFinite(travelToFirst) ? travelToFirst : null;
+  const travelToFirstMin = travelMatrixMin[DEPOT_NODE_INDEX]?.[orderedTasks[0].nodeIndex];
+  if (!Number.isFinite(travelToFirstMin)) return null;
+
+  return {
+    territoryPreferenceDeficit,
+    provisionalLoadMin,
+    travelToFirstMin,
+  };
 }
 
-function pickDriverForGroup(
+function isBetterDriverScore(
+  candidate: DriverGroupScore,
+  candidateDriverId: DriverId,
+  best: DriverGroupScore | null,
+  bestDriverId: DriverId | null
+): boolean {
+  if (best === null || bestDriverId === null) return true;
+
+  if (candidate.territoryPreferenceDeficit !== best.territoryPreferenceDeficit) {
+    return candidate.territoryPreferenceDeficit < best.territoryPreferenceDeficit;
+  }
+  if (candidate.provisionalLoadMin !== best.provisionalLoadMin) {
+    return candidate.provisionalLoadMin < best.provisionalLoadMin;
+  }
+  if (candidate.travelToFirstMin !== best.travelToFirstMin) {
+    return candidate.travelToFirstMin < best.travelToFirstMin;
+  }
+  return candidateDriverId < bestDriverId;
+}
+
+function buildTerritoryPreferenceVotes(
   drivers: DriverNode[],
-  travelMatrixMin: number[][],
   orderedTasks: TaskNode[],
-  preferredDriverId?: DriverId
-): DriverId | null {
-  if (preferredDriverId !== undefined) {
-    const preferred = drivers.find((driver) => driver.id === preferredDriverId);
+  preferredDriverByTaskId?: Map<TaskId, DriverId>
+): Map<DriverId, number> {
+  const selectedDriverIds = new Set(drivers.map((driver) => driver.id));
+  const votes = new Map<DriverId, number>();
+
+  if (!preferredDriverByTaskId) return votes;
+
+  for (const task of orderedTasks) {
+    const driverId = preferredDriverByTaskId.get(task.taskId);
+    if (driverId === undefined || !selectedDriverIds.has(driverId)) continue;
+    votes.set(driverId, (votes.get(driverId) ?? 0) + 1);
+  }
+
+  return votes;
+}
+
+function pickDriverForGroup(args: {
+  drivers: DriverNode[];
+  travelMatrixMin: number[][];
+  orderedTasks: TaskNode[];
+  requiredDriverId?: DriverId;
+  preferredDriverByTaskId?: Map<TaskId, DriverId>;
+  provisionalLoadMinByDriver: Map<DriverId, number>;
+}): DriverId | null {
+  if (args.requiredDriverId !== undefined) {
+    const requiredDriver = args.drivers.find((driver) => driver.id === args.requiredDriverId);
     if (
-      preferred &&
-      tryScheduleTasksOnDriver(travelMatrixMin, preferred, orderedTasks)
+      requiredDriver &&
+      tryScheduleTasksOnDriver(args.travelMatrixMin, requiredDriver, args.orderedTasks)
     ) {
-      return preferredDriverId;
+      return args.requiredDriverId;
     }
     return null;
   }
 
-  let bestDriverId: DriverId | null = null;
-  let bestScore: number | null = null;
+  const territoryVotes = buildTerritoryPreferenceVotes(
+    args.drivers,
+    args.orderedTasks,
+    args.preferredDriverByTaskId
+  );
+  const maxTerritoryVotes = Math.max(0, ...territoryVotes.values());
 
-  for (const driver of drivers) {
-    const score = scoreDriverForGroup(travelMatrixMin, driver, orderedTasks);
+  let bestDriverId: DriverId | null = null;
+  let bestScore: DriverGroupScore | null = null;
+
+  for (const driver of args.drivers) {
+    const score = scoreDriverForGroup(
+      args.travelMatrixMin,
+      driver,
+      args.orderedTasks,
+      maxTerritoryVotes - (territoryVotes.get(driver.id) ?? 0),
+      args.provisionalLoadMinByDriver.get(driver.id) ?? 0
+    );
     if (score === null) continue;
 
-    if (
-      bestScore === null ||
-      score < bestScore ||
-      (score === bestScore && (bestDriverId === null || driver.id < bestDriverId))
-    ) {
+    if (isBetterDriverScore(score, driver.id, bestScore, bestDriverId)) {
       bestScore = score;
       bestDriverId = driver.id;
     }
@@ -125,12 +195,53 @@ function pickDriverForGroup(
   return bestDriverId;
 }
 
+function buildInitialProvisionalLoadMinByDriver(args: {
+  tasks: TaskNode[];
+  drivers: DriverNode[];
+  existingRequiredDriverByTaskId: Map<TaskId, DriverId>;
+}): Map<DriverId, number> {
+  const provisionalLoadMinByDriver = new Map<DriverId, number>(
+    args.drivers.map((driver) => [driver.id, 0])
+  );
+
+  for (const task of args.tasks) {
+    const driverId = args.existingRequiredDriverByTaskId.get(task.taskId);
+    if (driverId === undefined || !provisionalLoadMinByDriver.has(driverId)) continue;
+    provisionalLoadMinByDriver.set(
+      driverId,
+      (provisionalLoadMinByDriver.get(driverId) ?? 0) + task.serviceDurationMin
+    );
+  }
+
+  return provisionalLoadMinByDriver;
+}
+
+function estimateIncrementalGroupLoadMin(
+  travelMatrixMin: number[][],
+  orderedTasks: TaskNode[]
+): number {
+  let estimatedLoadMin = 0;
+  let previousNodeIndex = DEPOT_NODE_INDEX;
+
+  for (const task of orderedTasks) {
+    const travelMin = travelMatrixMin[previousNodeIndex]?.[task.nodeIndex];
+    if (Number.isFinite(travelMin)) {
+      estimatedLoadMin += travelMin;
+    }
+    estimatedLoadMin += task.serviceDurationMin;
+    previousNodeIndex = task.nodeIndex;
+  }
+
+  return estimatedLoadMin;
+}
+
 export function buildSameBuildingDriverConstraints(
   args: BuildSameBuildingDriverConstraintsArgs
 ): BuildSameBuildingDriverConstraintsResult {
   const taskById = new Map(args.tasks.map((task) => [task.taskId, task]));
   const constraints: HardConstraintSpec[] = [];
   const skippedGroups: SkippedSameBuildingGroup[] = [];
+  const provisionalLoadMinByDriver = buildInitialProvisionalLoadMinByDriver(args);
   let lockedGroupCount = 0;
 
   for (const group of args.businessGroups) {
@@ -171,23 +282,25 @@ export function buildSameBuildingDriverConstraints(
       continue;
     }
 
-    const preferredDriverId = preAssignedDriverIds[0];
-    const selectedDriverId = pickDriverForGroup(
-      args.drivers,
-      args.travelMatrixMin,
+    const requiredDriverId = preAssignedDriverIds[0];
+    const selectedDriverId = pickDriverForGroup({
+      drivers: args.drivers,
+      travelMatrixMin: args.travelMatrixMin,
       orderedTasks,
-      preferredDriverId
-    );
+      requiredDriverId,
+      preferredDriverByTaskId: args.preferredDriverByTaskId,
+      provisionalLoadMinByDriver,
+    });
 
     if (selectedDriverId === null) {
       skippedGroups.push({
         groupId: group.groupId,
         taskIds: [...group.taskIds],
         reason:
-          preferredDriverId !== undefined
+          requiredDriverId !== undefined
             ? "PRE_ASSIGNED_DRIVER_INFEASIBLE_FOR_GROUP"
             : "NO_DRIVER_CAN_SERVE_GROUP",
-        ...(preferredDriverId !== undefined ? { driverIds: [preferredDriverId] } : {}),
+        ...(requiredDriverId !== undefined ? { driverIds: [requiredDriverId] } : {}),
       });
       continue;
     }
@@ -201,6 +314,11 @@ export function buildSameBuildingDriverConstraints(
       });
     }
 
+    provisionalLoadMinByDriver.set(
+      selectedDriverId,
+      (provisionalLoadMinByDriver.get(selectedDriverId) ?? 0) +
+        estimateIncrementalGroupLoadMin(args.travelMatrixMin, tasksNeedingLock)
+    );
     lockedGroupCount += 1;
   }
 

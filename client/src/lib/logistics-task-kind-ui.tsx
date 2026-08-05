@@ -141,9 +141,17 @@ export function logisticsKindBadgeClass(kind: LogisticsTaskKind): string {
   return LOGISTICS_KIND_BADGE_CLASSES[kind];
 }
 
-export function LogisticsKindBadge({ kind }: { kind: LogisticsTaskKind }) {
-  if (kind === "delivery/pick-up") {
-    return (
+export function LogisticsKindBadge({
+  kind,
+  onClick,
+  disabled = false,
+}: {
+  kind: LogisticsTaskKind;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
+  const badge =
+    kind === "delivery/pick-up" ? (
       <Badge
         variant="outline"
         className={cn(
@@ -159,16 +167,36 @@ export function LogisticsKindBadge({ kind }: { kind: LogisticsTaskKind }) {
         />
         <span className="relative z-[1]">{LOGISTICS_KIND_BADGE_LABEL[kind]}</span>
       </Badge>
+    ) : (
+      <Badge
+        variant="outline"
+        className={cn(LOGISTICS_KIND_BADGE_BASE_CLASS, logisticsKindBadgeClass(kind))}
+      >
+        {LOGISTICS_KIND_BADGE_LABEL[kind]}
+      </Badge>
     );
-  }
+
+  if (!onClick) return badge;
 
   return (
-    <Badge
-      variant="outline"
-      className={cn(LOGISTICS_KIND_BADGE_BASE_CLASS, logisticsKindBadgeClass(kind))}
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      disabled={disabled}
+      aria-label="Modifica tipologia task logistico"
+      title="Modifica tipologia"
+      className={cn(
+        "inline-flex items-center justify-center rounded transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+        disabled
+          ? "cursor-not-allowed opacity-50"
+          : "cursor-pointer hover:opacity-80"
+      )}
     >
-      {LOGISTICS_KIND_BADGE_LABEL[kind]}
-    </Badge>
+      {badge}
+    </button>
   );
 }
 
@@ -205,12 +233,14 @@ export function LogisticsKindPickerDialog({
   taskLabel,
   onSelect,
   isSaving = false,
+  currentKind = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   taskLabel: string;
   onSelect: (kind: LogisticsTaskKind) => void;
   isSaving?: boolean;
+  currentKind?: LogisticsTaskKind | null;
 }) {
   return (
     <Dialog open={open} onOpenChange={(next) => !isSaving && onOpenChange(next)}>
@@ -222,28 +252,41 @@ export function LogisticsKindPickerDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="mt-2 space-y-2">
-          {LOGISTICS_KIND_PICKER_OPTIONS.map((option) => (
-            <button
-              key={option.kind}
-              type="button"
-              disabled={isSaving}
-              onClick={() => onSelect(option.kind)}
-              className={cn(
-                "flex w-full items-center gap-3 rounded-md border border-border bg-background p-3 text-left transition-colors",
-                isSaving
-                  ? "cursor-not-allowed opacity-60"
-                  : "cursor-pointer hover:border-sky-600 hover:bg-muted/40"
-              )}
-            >
-              <div className="flex w-[5.5rem] shrink-0 items-center justify-start">
-                <LogisticsKindBadge kind={option.kind} />
-              </div>
-              <div className="min-w-0 flex-1 space-y-0.5">
-                <p className="text-sm font-semibold leading-tight text-foreground">{option.title}</p>
-                <p className="text-xs leading-snug text-muted-foreground">{option.description}</p>
-              </div>
-            </button>
-          ))}
+          {LOGISTICS_KIND_PICKER_OPTIONS.map((option) => {
+            const isCurrent = currentKind === option.kind;
+            return (
+              <button
+                key={option.kind}
+                type="button"
+                disabled={isSaving}
+                onClick={() => onSelect(option.kind)}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-md border bg-background p-3 text-left transition-colors",
+                  isCurrent
+                    ? "border-sky-600 bg-sky-50/70 dark:bg-sky-950/40"
+                    : "border-border",
+                  isSaving
+                    ? "cursor-not-allowed opacity-60"
+                    : "cursor-pointer hover:border-sky-600 hover:bg-muted/40"
+                )}
+              >
+                <div className="flex w-[5.5rem] shrink-0 items-center justify-start">
+                  <LogisticsKindBadge kind={option.kind} />
+                </div>
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <p className="text-sm font-semibold leading-tight text-foreground">
+                    {option.title}
+                    {isCurrent ? (
+                      <span className="ml-2 text-xs font-medium text-sky-700 dark:text-sky-300">
+                        (attuale)
+                      </span>
+                    ) : null}
+                  </p>
+                  <p className="text-xs leading-snug text-muted-foreground">{option.description}</p>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </DialogContent>
     </Dialog>

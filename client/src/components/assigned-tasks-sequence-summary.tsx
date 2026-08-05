@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
-import { Draggable, Droppable } from "react-beautiful-dnd";
-import { ListOrdered, Loader2, Maximize2, MessageCircle } from "lucide-react";
+import { Fragment, useMemo, useRef, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { ListOrdered, Loader2, Maximize2 } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import type { SequenceSummaryGroup } from "@/lib/sequence-summary";
-import { logisticsKindSequenceDotClass, LogisticsSequenceBadge } from "@/lib/logistics-task-kind-ui";
 import {
   Dialog,
   DialogContent,
@@ -13,14 +14,23 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { SequenceSummaryGroupHeading } from "@/components/sequence-summary-group-heading";
+import {
+  getSequenceSummaryTaskRowClassName,
+  SequenceSummaryTaskContent,
+} from "@/components/sequence-summary-task-row";
+import {
+  appDndDraggableAttributes,
+  appDndHandleAttributes,
+  DND_SORTABLE_ID_ATTRIBUTE,
+  DndDroppableSortableContainer,
+  taskDndId,
+  type AppDndItem,
+} from "@/lib/dnd";
+
+/** Altezza spacer di insert cross-driver (riga summary ~ py-1.5 + testo). */
+const SUMMARY_CROSS_INSERT_HEIGHT_PX = 40;
 
 interface AssignedTasksSequenceSummaryProps {
   groups: SequenceSummaryGroup[];
@@ -29,6 +39,91 @@ interface AssignedTasksSequenceSummaryProps {
   isDragDisabled?: boolean;
   loadingDriverIds?: number[];
   workDate?: string;
+  draggingOverDriverId?: number | null;
+  activeDragDriverId?: number | null;
+  lastValidDragIndex?: number | null;
+}
+
+function DndSummaryTaskItem({
+  id,
+  data,
+  disabled,
+  className,
+  collapsePullPx = 0,
+  onClick,
+  onKeyDown,
+  role,
+  tabIndex,
+  ariaLabel,
+  children,
+}: {
+  id: string;
+  data: AppDndItem;
+  disabled: boolean;
+  className: string;
+  /** Chiude il buco sulla riga sorgente in drag cross-driver (marginBottom negativo). */
+  collapsePullPx?: number;
+  onClick: () => void;
+  onKeyDown: (event: React.KeyboardEvent<HTMLLIElement>) => void;
+  role?: string;
+  tabIndex?: number;
+  ariaLabel?: string;
+  children: (state: { isDragging: boolean }) => ReactNode;
+}) {
+  const nodeRef = useRef<HTMLLIElement | null>(null);
+  const dataWithOverlayRect = useMemo(
+    () => ({
+      ...data,
+      getDragOverlayRect: () => {
+        const rect = nodeRef.current?.getBoundingClientRect();
+        return rect ? { width: rect.width, height: rect.height } : null;
+      },
+    }),
+    [data],
+  );
+  const sortable = useSortable({
+    id,
+    data: dataWithOverlayRect,
+    disabled,
+    transition: {
+      duration: 180,
+      easing: "cubic-bezier(0.25, 1, 0.5, 1)",
+    },
+  });
+
+  const shouldPullSiblings = collapsePullPx > 0 && sortable.isDragging;
+
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(sortable.transform),
+    transition: sortable.transition,
+    opacity: sortable.isDragging ? 0 : undefined,
+    visibility: sortable.isDragging ? "hidden" : undefined,
+    // Mantieni l'altezza per active.rect; il margin negativo chiude il buco.
+    ...(shouldPullSiblings ? { marginBottom: -collapsePullPx } : null),
+  };
+
+  return (
+    <li
+      ref={(node) => {
+        nodeRef.current = node;
+        sortable.setNodeRef(node);
+      }}
+      {...sortable.attributes}
+      {...sortable.listeners}
+      {...appDndDraggableAttributes}
+      {...appDndHandleAttributes}
+      {...{ [DND_SORTABLE_ID_ATTRIBUTE]: String(id) }}
+      style={style}
+      className={className}
+      role={role}
+      tabIndex={tabIndex}
+      aria-label={ariaLabel}
+      onClick={onClick}
+      onKeyDown={onKeyDown}
+    >
+      {children({ isDragging: sortable.isDragging })}
+    </li>
+  );
 }
 
 function matchesSearch(entry: SequenceSummaryGroup["tasks"][number], query: string): boolean {
@@ -41,99 +136,6 @@ function matchesSearch(entry: SequenceSummaryGroup["tasks"][number], query: stri
   );
 }
 
-function SequenceSummaryCheckInOut({
-  checkoutTime,
-  checkinTime,
-}: {
-  checkoutTime?: string | null;
-  checkinTime?: string | null;
-}) {
-  const checkout = String(checkoutTime ?? "").trim();
-  const checkin = String(checkinTime ?? "").trim();
-  if (!checkout && !checkin) return null;
-
-  return (
-    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap">
-      {checkout && (
-        <span className="inline-flex items-center gap-0.5 leading-none">
-          <span className="font-black text-[11px] leading-none text-[#257537]">↑</span>
-          <span className="text-[11px] font-bold leading-none text-[#137537]">{checkout}</span>
-        </span>
-      )}
-      {checkin && (
-        <span className="inline-flex items-center gap-0.5 leading-none">
-          <span className="font-black text-[11px] leading-none text-red-600">↓</span>
-          <span className="text-[11px] font-bold leading-none text-red-600">{checkin}</span>
-        </span>
-      )}
-    </span>
-  );
-}
-
-function SequenceSummaryCleanerAssignment({
-  cleanerLabel,
-  cleanerSequence,
-}: {
-  cleanerLabel?: string | null;
-  cleanerSequence?: number | null;
-}) {
-  const label = String(cleanerLabel ?? "").trim();
-  const sequence =
-    cleanerSequence != null && Number.isFinite(cleanerSequence) && cleanerSequence > 0
-      ? cleanerSequence
-      : null;
-
-  if (!label && sequence == null) return null;
-
-  return (
-    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
-      {label && <span className="font-medium text-foreground/90">{label}</span>}
-      {sequence != null && (
-        <LogisticsSequenceBadge
-          sequence={sequence}
-          size="inline"
-          className="text-foreground/90"
-        />
-      )}
-    </span>
-  );
-}
-
-function SequenceSummaryCustomerNoteIndicator({
-  note,
-  logisticCode,
-  onOpen,
-}: {
-  note: string;
-  logisticCode: string;
-  onOpen: (note: string, logisticCode: string) => void;
-}) {
-  const text = String(note ?? "").trim();
-  if (!text) return null;
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          className="relative inline-flex shrink-0 cursor-pointer items-center rounded-sm border-0 bg-transparent p-0 focus:outline-none"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpen(text, logisticCode);
-          }}
-          aria-label="Note del cliente da leggere"
-        >
-          <MessageCircle className="h-[11px] w-[11px] text-muted-foreground" aria-hidden />
-          <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-red-500 ring-1 ring-background" />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="top" className="text-xs">
-        Note del cliente da leggere
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
 export default function AssignedTasksSequenceSummary({
   groups,
   searchTask = "",
@@ -141,6 +143,9 @@ export default function AssignedTasksSequenceSummary({
   isDragDisabled = false,
   loadingDriverIds = [],
   workDate = "",
+  draggingOverDriverId = null,
+  activeDragDriverId = null,
+  lastValidDragIndex = null,
 }: AssignedTasksSequenceSummaryProps) {
   const [customerNoteDialog, setCustomerNoteDialog] = useState<{
     open: boolean;
@@ -167,6 +172,8 @@ export default function AssignedTasksSequenceSummary({
   };
 
   const loadingDriverIdSet = useMemo(() => new Set(loadingDriverIds), [loadingDriverIds]);
+  const isSummaryDragging =
+    activeDragDriverId != null || draggingOverDriverId != null;
 
   if (groups.length === 0) {
     return null;
@@ -188,6 +195,31 @@ export default function AssignedTasksSequenceSummary({
             const isLoadOrder = loadOrderDriverIds.has(group.id);
             const displayedTasks = isLoadOrder ? [...group.tasks].reverse() : group.tasks;
             const isGroupDragDisabled = isDragDisabled || isLoadOrder;
+            const itemIds = displayedTasks.map((entry) =>
+              taskDndId("logistics", entry.taskId, group.id, "summary")
+            );
+
+            const isCrossDriverTargetCol =
+              isSummaryDragging &&
+              draggingOverDriverId === group.id &&
+              activeDragDriverId != null &&
+              activeDragDriverId !== group.id &&
+              lastValidDragIndex != null;
+            const isCrossDriverSourceCol =
+              isSummaryDragging &&
+              activeDragDriverId === group.id &&
+              draggingOverDriverId != null &&
+              draggingOverDriverId !== group.id;
+
+            const renderCrossDriverInsertSlot = (atIndex: number) =>
+              isCrossDriverTargetCol && lastValidDragIndex === atIndex ? (
+                <li
+                  key={`cross-insert-${group.id}-${atIndex}`}
+                  className="list-none flex-shrink-0 rounded-md border border-dashed border-custom-blue/40 bg-custom-blue/5"
+                  style={{ height: `${SUMMARY_CROSS_INSERT_HEIGHT_PX}px` }}
+                  aria-hidden
+                />
+              ) : null;
 
             return (
             <div
@@ -237,24 +269,26 @@ export default function AssignedTasksSequenceSummary({
                 </div>
               </div>
 
-              <Droppable
-                droppableId={`summary-${group.id}`}
-                direction="vertical"
-                isDropDisabled={isGroupDragDisabled}
+              <DndDroppableSortableContainer
+                scope="logistics"
+                type="summary"
+                staffId={group.id}
+                itemIds={itemIds}
+                insertIndex={displayedTasks.length}
+                disabled={isGroupDragDisabled}
+                orientation="vertical"
+                className={({ isOver }) =>
+                  cn(
+                    "sequence-summary-driver-scroll flex min-h-0 min-w-0 flex-1 flex-col rounded-md bg-background/70 pb-0.5",
+                    isOver && "ring-1 ring-custom-blue/30",
+                  )
+                }
               >
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className={cn(
-                      "sequence-summary-driver-scroll flex min-h-0 min-w-0 flex-1 flex-col rounded-md bg-background/70 pb-0.5",
-                      snapshot.isDraggingOver && "ring-1 ring-custom-blue/30"
-                    )}
-                  >
+                {({ isOver }) => (
                     <ol
                       className={cn(
                         "sequence-summary-task-list flex min-w-max flex-col gap-1.5",
-                        snapshot.isDraggingOver && "rounded-md bg-custom-blue/5"
+                        isOver && "rounded-md bg-custom-blue/5"
                       )}
                     >
                       {displayedTasks.map((entry, index) => {
@@ -265,142 +299,81 @@ export default function AssignedTasksSequenceSummary({
                         const violationMessages = entry.violationMessages ?? [];
 
                         return (
-                          <Draggable
-                            key={`${group.id}-${entry.taskId}`}
-                            draggableId={`${entry.taskId}-summary-${group.id}`}
-                            index={index}
-                            isDragDisabled={isGroupDragDisabled}
-                          >
-                            {(dragProvided, dragSnapshot) => (
-                              <li
-                                ref={dragProvided.innerRef}
-                                {...dragProvided.draggableProps}
-                                {...dragProvided.dragHandleProps}
-                                style={dragProvided.draggableProps.style}
-                                className={cn(
-                                  "sequence-summary-task relative rounded-md border px-2 py-1.5 text-xs",
-                                  isTimelineViolated
-                                    ? "sequence-summary-task--violated animate-blink-inset border-red-500 bg-red-50 dark:bg-red-950/30"
-                                    : isHighlighted
-                                    ? "border-amber-400 bg-amber-50 dark:bg-amber-950/30"
-                                    : "border-border/70 bg-background",
-                                  dragSnapshot.isDragging && "shadow-lg ring-2 ring-custom-blue/40",
-                                  !isGroupDragDisabled &&
-                                    !isTimelineViolated &&
-                                    "cursor-grab active:cursor-grabbing"
-                                )}
-                                role={isTimelineViolated ? "button" : undefined}
-                                tabIndex={isTimelineViolated ? 0 : undefined}
-                                aria-label={
-                                  isTimelineViolated
-                                    ? `Mostra violazione timeline per task ${entry.logisticCode || "N/D"}`
-                                    : undefined
-                                }
-                                onClick={() => {
-                                  if (!isTimelineViolated || dragSnapshot.isDragging) return;
+                          <Fragment key={`${group.id}-${entry.taskId}`}>
+                            {renderCrossDriverInsertSlot(index)}
+                            <DndSummaryTaskItem
+                              id={taskDndId("logistics", entry.taskId, group.id, "summary")}
+                              data={{
+                                kind: "task",
+                                scope: "logistics",
+                                taskId: String(entry.taskId),
+                                index,
+                                initialIndex: index,
+                                from: {
+                                  type: "summary",
+                                  staffId: group.id,
+                                },
+                                getTask: () => entry,
+                              }}
+                              disabled={isGroupDragDisabled}
+                              collapsePullPx={
+                                isCrossDriverSourceCol
+                                  ? SUMMARY_CROSS_INSERT_HEIGHT_PX
+                                  : 0
+                              }
+                              className={cn(
+                                getSequenceSummaryTaskRowClassName({
+                                  isTimelineViolated,
+                                  isHighlighted,
+                                  executionStatus: entry.executionStatus,
+                                }),
+                                !isGroupDragDisabled &&
+                                  !isTimelineViolated &&
+                                  "cursor-grab active:cursor-grabbing",
+                              )}
+                              role={isTimelineViolated ? "button" : undefined}
+                              tabIndex={isTimelineViolated ? 0 : undefined}
+                              ariaLabel={
+                                isTimelineViolated
+                                  ? `Mostra violazione timeline per task ${entry.logisticCode || "N/D"}`
+                                  : undefined
+                              }
+                              onClick={() => {
+                                if (!isTimelineViolated) return;
+                                setViolationDialog({
+                                  open: true,
+                                  messages: violationMessages,
+                                  logisticCode: entry.logisticCode || "N/D",
+                                });
+                              }}
+                              onKeyDown={(event) => {
+                                if (!isTimelineViolated) return;
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
                                   setViolationDialog({
                                     open: true,
                                     messages: violationMessages,
                                     logisticCode: entry.logisticCode || "N/D",
                                   });
-                                }}
-                                onKeyDown={(event) => {
-                                  if (!isTimelineViolated) return;
-                                  if (event.key === "Enter" || event.key === " ") {
-                                    event.preventDefault();
-                                    setViolationDialog({
-                                      open: true,
-                                      messages: violationMessages,
-                                      logisticCode: entry.logisticCode || "N/D",
-                                    });
+                                }
+                              }}
+                            >
+                              {() => (
+                                <SequenceSummaryTaskContent
+                                  entry={entry}
+                                  onCustomerNoteOpen={(note, logisticCode) =>
+                                    setCustomerNoteDialog({ open: true, note, logisticCode })
                                   }
-                                }}
-                              >
-                                {isTimelineViolated && (
-                                  <SequenceSummaryViolationIndicator />
-                                )}
-                                <div className="min-w-max">
-                                  <div className="flex flex-nowrap items-center gap-x-1 whitespace-nowrap text-[11px]">
-                                      <span className={logisticsKindSequenceDotClass(entry.logisticsTaskKind)}>
-                                        {entry.sequence}
-                                      </span>
-                                      <span className="shrink-0 text-muted-foreground/60">|</span>
-                                      <span className="shrink-0 font-semibold text-foreground">
-                                        {entry.logisticCode || "N/D"}
-                                      </span>
-                                      {entry.customerAlias && (
-                                        <>
-                                          <span className="shrink-0 text-muted-foreground/60">|</span>
-                                          <span className="shrink-0 text-muted-foreground">{entry.customerAlias}</span>
-                                        </>
-                                      )}
-                                      {entry.address && (
-                                        <>
-                                          <span className="shrink-0 text-muted-foreground/60">|</span>
-                                          <span className="shrink-0 text-muted-foreground">{entry.address}</span>
-                                        </>
-                                      )}
-                                      <span className="shrink-0 text-muted-foreground/60">|</span>
-                                      <span className="shrink-0 whitespace-nowrap text-muted-foreground">
-                                        <span className="font-medium text-foreground/80">LG window:</span>{" "}
-                                        {entry.lgWindow}
-                                      </span>
-                                      {entry.sofabedLabel && (
-                                        <>
-                                          <span className="shrink-0 text-muted-foreground/60">|</span>
-                                          <span className="shrink-0 whitespace-nowrap text-muted-foreground">
-                                            {entry.sofabedLabel}
-                                          </span>
-                                        </>
-                                      )}
-                                    </div>
-                                    <div className="mt-1 flex flex-nowrap items-center gap-x-1 whitespace-nowrap text-[11px] text-muted-foreground">
-                                      {(entry.cleanerLabel || entry.cleanerSequence) && (
-                                        <>
-                                          <SequenceSummaryCleanerAssignment
-                                            cleanerLabel={entry.cleanerLabel}
-                                            cleanerSequence={entry.cleanerSequence}
-                                          />
-                                          <span className="shrink-0 text-muted-foreground/60">|</span>
-                                        </>
-                                      )}
-                                      <span className="shrink-0 whitespace-nowrap">
-                                        <span className="font-medium text-foreground/80">HK window:</span>{" "}
-                                        {entry.hkWindow}
-                                      </span>
-                                      {(entry.checkoutTime || entry.checkinTime) && (
-                                        <>
-                                          <span className="shrink-0 text-muted-foreground/60">|</span>
-                                          <SequenceSummaryCheckInOut
-                                            checkoutTime={entry.checkoutTime}
-                                            checkinTime={entry.checkinTime}
-                                          />
-                                        </>
-                                      )}
-                                      {entry.customerNote && (
-                                        <>
-                                          <span className="shrink-0 text-muted-foreground/60">|</span>
-                                          <SequenceSummaryCustomerNoteIndicator
-                                            note={entry.customerNote}
-                                            logisticCode={entry.logisticCode || "N/D"}
-                                            onOpen={(note, logisticCode) =>
-                                              setCustomerNoteDialog({ open: true, note, logisticCode })
-                                            }
-                                          />
-                                        </>
-                                      )}
-                                    </div>
-                                </div>
-                              </li>
-                            )}
-                          </Draggable>
+                                />
+                              )}
+                            </DndSummaryTaskItem>
+                          </Fragment>
                         );
                       })}
-                      {provided.placeholder}
+                      {renderCrossDriverInsertSlot(displayedTasks.length)}
                     </ol>
-                  </div>
                 )}
-              </Droppable>
+              </DndDroppableSortableContainer>
             </div>
           );
           })}

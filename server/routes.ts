@@ -922,6 +922,13 @@ function buildKey(isoDate: string) {
   return { key: `${folder}/${filename}`, d };
 }
 
+const normalizeTaskSequence = (tasks: any[]) => {
+  tasks.forEach((task, index) => {
+    task.sequence = index + 1;
+    task.followup = index > 0;
+  });
+};
+
 /**
  * Helper function to recalculate travel_time, start_time, end_time for a cleaner's tasks
  * CRITICAL: Ensures cleaner's start_time is loaded from PostgreSQL before recalculation
@@ -1171,12 +1178,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`✅ Containers rigenerati da ADAM`);
       }
 
-      const rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
-        workDate,
-        currentUsername,
-        resolveScopeFromReq(req)
-      );
-      const rehydratedPreassigned = rehydrateResult.rehydrated;
+      // In DEVELOPMENT resettiamo TUTTO, comprese le task pre-assegnate:
+      // non le reidratiamo così tornano nei container come le altre.
+      // In PRODUZIONE il comportamento resta invariato (reidratazione attiva).
+      const { isDevelopmentEnvironment } = await import("../shared/work-date-access");
+      const isDev = isDevelopmentEnvironment();
+
+      let rehydratedPreassigned = 0;
+      if (isDev) {
+        console.log(`🧪 [DEV] Reset totale: le task pre-assegnate NON vengono reidratate`);
+      } else {
+        const rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
+          workDate,
+          currentUsername,
+          resolveScopeFromReq(req)
+        );
+        rehydratedPreassigned = rehydrateResult.rehydrated;
+      }
 
       // === RESET: NON modificare selected_cleaners ===
       console.log(`✅ Reset completato - selected_cleaners NON modificato`);
@@ -1196,7 +1214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint per spostare una task tra cleaners diversi nella timeline
   app.post("/api/move-task-between-cleaners", async (req, res) => {
     try {
-      const { taskId, logisticCode, sourceCleanerId, destCleanerId, destIndex, date } = req.body;
+      const { taskId, logisticCode, sourceCleanerId, destCleanerId, destIndex, date, mode } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const resolvedScope = resolveScopeFromReq(req);
 
@@ -1275,7 +1293,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const collab = await taskCollaborationService.getCollaboration(workDate, numTaskId);
         
-        if (collab.count > 1 && collab.cleanerIds.includes(numSourceCleanerId)) {
+        if (
+          mode !== "move_assignment" &&
+          collab.count > 1 &&
+          collab.cleanerIds.includes(numSourceCleanerId)
+        ) {
           // ENFORCEMENT: blocca replace collaborator verso cleaner locked
           const locked = await isCleanerLocked(workDate, numDestCleanerId);
           if (locked) {
@@ -1345,7 +1367,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // NB: identità per task_id (univoco). Il logistic_code (codice ADAM) NON è
       // univoco: se il cleaner ha più task con lo stesso codice ADAM, il match per
       // logistic_code prenderebbe la prima e sposterebbe quella sbagliata.
-      const sourceEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === sourceCleanerId);
+      const sourceEntry = timelineData.cleaners_assignments.find(
+        (c: any) => Number(c.cleaner?.id) === Number(sourceCleanerId)
+      );
       if (sourceEntry) {
         const hasTaskIdMove = String(taskId ?? "").trim().length > 0;
         const hasLogisticCodeMove = String(logisticCode ?? "").trim().length > 0;
@@ -1360,11 +1384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         if (taskIndex !== -1) {
           taskToMove = sourceEntry.tasks.splice(taskIndex, 1)[0];
-          // Ricalcola sequence per il cleaner di origine
-          sourceEntry.tasks.forEach((t: any, i: number) => {
-            t.sequence = i + 1;
-            t.followup = i > 0;
-          });
+          normalizeTaskSequence(sourceEntry.tasks);
         }
       }
 
@@ -1373,13 +1393,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 2. Aggiungi la task al cleaner di destinazione
-      let destEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === destCleanerId);
+      let destEntry = timelineData.cleaners_assignments.find(
+        (c: any) => Number(c.cleaner?.id) === Number(destCleanerId)
+      );
 
       // Se il cleaner di destinazione non esiste ancora, crealo
       if (!destEntry) {
         // Carica i dati del cleaner da PostgreSQL
         const cleanersData = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
-        const cleanerInfo = cleanersData?.cleaners?.find((c: any) => c.id === destCleanerId);
+        const cleanerInfo = cleanersData?.cleaners?.find(
+          (c: any) => Number(c.id) === Number(destCleanerId)
+        );
 
         if (!cleanerInfo) {
           return res.status(404).json({ success: false, message: "Cleaner di destinazione non trovato" });
@@ -1393,8 +1417,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 3. Inserisci la task nella posizione specificata e aggiorna reason
-      const targetIndex = destIndex !== undefined
-        ? Math.max(0, Math.min(destIndex, destEntry.tasks.length))
+      const requestedIndex = Number(destIndex);
+      const targetIndex = Number.isFinite(requestedIndex)
+        ? Math.max(
+            0,
+            Math.min(
+              Math.trunc(requestedIndex),
+              destEntry.tasks.length,
+            ),
+          )
         : destEntry.tasks.length;
 
       // Aggiorna la reason per indicare lo spostamento manuale
@@ -1409,6 +1440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       taskToMove.manually_moved = true;
 
       destEntry.tasks.splice(targetIndex, 0, taskToMove);
+      normalizeTaskSequence(destEntry.tasks);
 
       // 4. Ricalcola tempi per il cleaner di origine e destinazione
       try {
@@ -1417,6 +1449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await hydrateTasksFromContainers(sourceEntry, workDate);
           const updatedSourceData = await recalculateCleanerTimes(sourceEntry, workDate);
           sourceEntry.tasks = updatedSourceData.tasks;
+          normalizeTaskSequence(sourceEntry.tasks);
           console.log(`✅ Tempi ricalcolati per cleaner sorgente ${sourceCleanerId}`);
         }
 
@@ -1424,6 +1457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await hydrateTasksFromContainers(destEntry, workDate);
         const updatedDestData = await recalculateCleanerTimes(destEntry, workDate);
         destEntry.tasks = updatedDestData.tasks;
+        normalizeTaskSequence(destEntry.tasks);
         console.log(`✅ Tempi ricalcolati per cleaner destinazione ${destCleanerId}`);
       } catch (pythonError: any) {
         console.error(`⚠️ Errore nel ricalcolo dei tempi, continuo senza ricalcolare:`, pythonError.message);
@@ -2475,6 +2509,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
           metadata: { date: workDate },
         });
       }
+
+      // Evita duplicati UI: togli dai containers i task già in timeline (e persisti se serve).
+      const timeline = await workspaceFiles.loadLogisticsTimeline(workDate);
+      const assignedTaskIds = new Set<number>();
+      for (const entry of timeline?.drivers_assignments || []) {
+        for (const task of entry?.tasks || []) {
+          const tid = Number(task?.task_id);
+          if (Number.isFinite(tid)) assignedTaskIds.add(tid);
+        }
+      }
+
+      let removedCount = 0;
+      if (assignedTaskIds.size > 0 && containers.containers) {
+        for (const containerType of ["early_out", "high_priority", "low_priority"] as const) {
+          const container = containers.containers?.[containerType];
+          if (!container?.tasks) continue;
+          const before = container.tasks.length;
+          container.tasks = container.tasks.filter((t: any) => {
+            const tid = Number(t?.task_id);
+            return !Number.isFinite(tid) || !assignedTaskIds.has(tid);
+          });
+          container.count = container.tasks.length;
+          removedCount += before - container.tasks.length;
+        }
+        if (removedCount > 0) {
+          containers.summary = {
+            early_out: containers.containers.early_out?.count || 0,
+            high_priority: containers.containers.high_priority?.count || 0,
+            low_priority: containers.containers.low_priority?.count || 0,
+            total_tasks:
+              (containers.containers.early_out?.count || 0) +
+              (containers.containers.high_priority?.count || 0) +
+              (containers.containers.low_priority?.count || 0),
+          };
+          try {
+            await workspaceFiles.saveLogisticsContainers(workDate, containers);
+            console.log(
+              `✅ GET logistics-containers: rimosse ${removedCount} task già in timeline per ${workDate}`
+            );
+          } catch (saveErr) {
+            console.warn("⚠️ GET logistics-containers: sync save fallita:", saveErr);
+          }
+        }
+      }
+
       res.json({
         ...containers,
         metadata: { ...(containers as any).metadata, date: workDate },
@@ -2572,11 +2651,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { enrichLogisticsTimelineStructureSofabeds } = await import(
           "./services/adam-structure-sofabeds"
         );
+        const { enrichLogisticsTimelineStructureKeys } = await import(
+          "./services/adam-structure-keys"
+        );
         const { enrichLogisticsTimelineCustomerNotes } = await import(
           "./services/logistics-customer-notes-enrichment"
         );
+        const { enrichLogisticsTimelineExecutionStatus } = await import(
+          "./services/adam-logistics-execution-status-enrichment"
+        );
         await enrichLogisticsTimelineStructureSofabeds(timeline);
+        await enrichLogisticsTimelineStructureKeys(timeline);
         await enrichLogisticsTimelineCustomerNotes(workDate, timeline);
+        await enrichLogisticsTimelineExecutionStatus(timeline);
         if (scheduleChanged) {
           await workspaceFiles.saveLogisticsTimeline(
             workDate,
@@ -4074,9 +4161,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   /**
-   * Registra una revisione `transfer_to_adam` della timeline logistica su PG (senza sync ADAM).
+   * Registra una revisione `transfer_to_adam` della timeline logistica su PG e scrive i dati
+   * logistica su ADAM `app_housekeeping` (`driven_by_us`, `lg_sequence`, `lg_*`), senza toccare le colonne
+   * housekeeping dei cleaner.
    */
   app.post("/api/transfer-logistics-to-adam", async (req, res) => {
+    let connection: any = null;
     try {
       const { date, username: reqUsername } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
@@ -4108,13 +4198,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         []
       );
 
+      const { pgUsersService } = await import("./services/pg-users-service");
+      const userRecord = await pgUsersService.getUserByUsername(username);
+      const adamUpdatedBy = userRecord?.adam_id ? `E${userRecord.adam_id}` : username;
+
+      const { syncLogisticsTimelineToAdam } = await import(
+        "./services/adam-logistics-transfer-service"
+      );
+
+      connection = await mysql.createConnection({
+        host: databaseConfig.mysql.host,
+        port: databaseConfig.mysql.port,
+        user: databaseConfig.mysql.user,
+        password: databaseConfig.mysql.password,
+        database: databaseConfig.mysql.database,
+      });
+
+      const syncResult = await syncLogisticsTimelineToAdam(connection, {
+        workDate,
+        timeline: timelineData,
+        adamUpdatedBy,
+        nowRome: format(new Date(), "yyyy-MM-dd HH:mm:ss"),
+      });
+
+      const messageParts = [`${syncResult.updated} task logistica scritte su ADAM`];
+      if (syncResult.cleared > 0) messageParts.push(`${syncResult.cleared} liberate`);
+      if (syncResult.errors.length > 0) messageParts.push(`${syncResult.errors.length} errori`);
+
       res.json({
-        success: true,
-        message: "Trasferimento logistica registrato (revisione e snapshot su PostgreSQL).",
+        success: syncResult.errors.length === 0,
+        message: `Trasferimento logistica: ${messageParts.join(", ")}.`,
+        workDate,
+        totalUpdated: syncResult.updated,
+        totalCleared: syncResult.cleared,
+        taskErrors: syncResult.errors.length,
+        clearErrors: syncResult.clearErrors.length,
+        errors: syncResult.errors,
+        clearErrorDetails: syncResult.clearErrors,
       });
     } catch (error: any) {
       console.error("POST /api/transfer-logistics-to-adam:", error);
       res.status(500).json({ success: false, message: error.message });
+    } finally {
+      if (connection) {
+        try {
+          await connection.end();
+        } catch {
+          /* ignore */
+        }
+      }
     }
   });
 
@@ -4540,10 +4672,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timelineData.cleaners_assignments.push(cleanerEntry);
       }
 
-      // Rimuovi il task se già presente (evita duplicazioni)
-      cleanerEntry.tasks = cleanerEntry.tasks.filter((t: any) =>
-        String(t.logistic_code) !== normalizedLogisticCode && String(t.task_id) !== normalizedTaskId
-      );
+      // Rimuovi il task da TUTTI i cleaner prima di riassegnarlo.
+      // Un assegnamento manuale (drag&drop, anche multi-selezione) è un "move":
+      // il task deve risultare su UN SOLO cleaner. Se lo rimuovessimo solo dal
+      // cleaner di destinazione, un task già presente su un altro cleaner
+      // resterebbe duplicato e il reconciler lo promuoverebbe erroneamente a
+      // collaborazione. Le collaborazioni vere passano da endpoint dedicati
+      // (/collaborators/add, /collaborators/assign), non da qui.
+      const matchesTaskToAssign = (t: any): boolean =>
+        String(t.logistic_code) === normalizedLogisticCode || String(t.task_id) === normalizedTaskId;
+      for (const entry of timelineData.cleaners_assignments) {
+        if (!entry || !Array.isArray(entry.tasks)) continue;
+        entry.tasks = entry.tasks.filter((t: any) => !matchesTaskToAssign(t));
+      }
 
       const preAssignedMode =
         resolvePreassignedModeFromTask(fullTaskData) ||
@@ -9777,7 +9918,9 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       }
 
       // Trova il cleaner
-      const cleanerEntry = timelineData.cleaners_assignments.find((c: any) => c.cleaner.id === cleanerId);
+      const cleanerEntry = timelineData.cleaners_assignments.find(
+        (c: any) => Number(c.cleaner?.id) === Number(cleanerId)
+      );
 
       if (!cleanerEntry) {
         return res.status(404).json({ success: false, message: "Cleaner non trovato" });
@@ -9817,13 +9960,14 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
       // Inserisci nella nuova posizione toIndex
       cleanerEntry.tasks.splice(toIndex, 0, task);
+      normalizeTaskSequence(cleanerEntry.tasks);
 
       // Ricalcola travel_time, start_time, end_time usando lo script Python
       try {
         await hydrateTasksFromContainers(cleanerEntry, workDate);
         const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate);
-        // Sostituisci le task con quelle ricalcolate
         cleanerEntry.tasks = updatedCleanerData.tasks;
+        normalizeTaskSequence(cleanerEntry.tasks);
         console.log(`✅ Tempi ricalcolati per cleaner ${cleanerId}`);
       } catch (pythonError: any) {
         console.error(`⚠️ Errore nel ricalcolo dei tempi, continuo senza ricalcolare:`, pythonError.message);

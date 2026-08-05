@@ -12,6 +12,14 @@ type Deps = {
   getRomeTimestamp: () => string;
 };
 
+function normalizeLogisticsPriorityContainer(priority: unknown): "early_out" | "high_priority" | "low_priority" {
+  const value = String(priority ?? "").trim().toLowerCase();
+  if (value === "early_out" || value === "early-out") return "early_out";
+  if (value === "high_priority" || value === "high" || value === "high-priority") return "high_priority";
+  if (value === "low_priority" || value === "low" || value === "low-priority") return "low_priority";
+  return "low_priority";
+}
+
 export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps) {
   const { getCurrentUsername, getRomeTimestamp } = deps;
 
@@ -265,6 +273,20 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       }
 
       let removedTask: any = null;
+      for (const driverEntry of assignmentsData.drivers_assignments || []) {
+        const found = (driverEntry.tasks || []).find(
+          (t: any) =>
+            String(t.logistic_code) === String(logisticCode) ||
+            String(t.task_id) === String(taskId)
+        );
+        if (found && Boolean(found.is_finished)) {
+          return res.status(423).json({
+            success: false,
+            error: "TASK_FINISHED",
+            message: "Task già completata: impossibile rimuovere",
+          });
+        }
+      }
       assignmentsData.drivers_assignments = assignmentsData.drivers_assignments
         .map((driverEntry: any) => {
           const initial = driverEntry.tasks?.length || 0;
@@ -329,9 +351,8 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
               },
               summary: {},
             };
-          const pr = removedTask.priority || "low_priority";
-          const containerType =
-            pr === "early_out" ? "early_out" : pr === "high_priority" ? "high_priority" : "low_priority";
+          const containerType = normalizeLogisticsPriorityContainer(removedTask.priority);
+          removedTask.priority = containerType;
           delete removedTask.start_time;
           delete removedTask.end_time;
           delete removedTask.travel_time;
@@ -396,11 +417,21 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       if (!driverEntry) {
         return res.status(404).json({ success: false, message: "Driver non trovato" });
       }
+      driverEntry.tasks = [...driverEntry.tasks].sort(
+        (left: any, right: any) => Number(left?.sequence ?? 0) - Number(right?.sequence ?? 0)
+      );
       const actualFrom = driverEntry.tasks.findIndex(
         (t: any) => String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
       );
       if (actualFrom === -1) {
         return res.status(404).json({ success: false, message: "Task non trovata" });
+      }
+      if (Boolean(driverEntry.tasks[actualFrom]?.is_finished)) {
+        return res.status(423).json({
+          success: false,
+          error: "TASK_FINISHED",
+          message: "Task già completata: impossibile spostare",
+        });
       }
       if (toIndex < 0 || toIndex > driverEntry.tasks.length) {
         return res.status(400).json({ success: false, message: "toIndex non valido" });
@@ -488,6 +519,13 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       }
       if (!taskToMove) {
         return res.status(404).json({ success: false, message: "Task non trovata" });
+      }
+      if (Boolean(taskToMove.is_finished)) {
+        return res.status(423).json({
+          success: false,
+          error: "TASK_FINISHED",
+          message: "Task già completata: impossibile spostare",
+        });
       }
 
       let destEntry = timelineData.drivers_assignments.find(

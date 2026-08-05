@@ -25,6 +25,8 @@ export interface RawLogisticsTaskInput {
   cleanerTaskStartTime: string | null;
   cleanerSequence: number | null;
   premium: boolean;
+  /** Pulizia straordinaria/extra. Come `premium`, rende un EO altrettanto urgente di un HP. */
+  straordinaria: boolean;
   paxIn: number | null;
   logisticsTaskKind?: LogisticsTaskKind | string | null;
   logisticsTaskKindSource?: "auto" | "manual" | string | null;
@@ -114,6 +116,10 @@ export interface TaskNode {
     addressGroupId?: number | null;
   };
   priority: Priority | null;
+  /** Premium accommodation flag. Used by the OR-Tools adapter to distinguish urgent EO from ordinary EO. */
+  premium: boolean;
+  /** Straordinaria/extra cleaning flag. Same effect as `premium` on urgent EO classification. */
+  straordinaria: boolean;
   logisticsTaskKind: LogisticsTaskKind | null;
   serviceDurationMin: Minutes;
   rawTimes: {

@@ -94,8 +94,9 @@ function buildTimelineTaskFromStop(args: {
   stop: RoutingStopSolution;
   inputTask: RoutingProblemInput["tasks"][number] | undefined;
   containerTask: any;
+  previousTimelineTask?: any;
 }): any {
-  const { stop, inputTask, containerTask } = args;
+  const { stop, inputTask, containerTask, previousTimelineTask } = args;
   const taskId = stop.taskId;
   const logisticCode = Number(
     inputTask?.logisticCode ?? containerTask.logistic_code ?? 0
@@ -155,6 +156,9 @@ function buildTimelineTaskFromStop(args: {
     travel_time: Number(stop.travelFromPreviousMin || 0),
     checkout_wait_minutes: Number(stop.waitMin || 0),
     manually_moved: false,
+    is_finished: Boolean(
+      previousTimelineTask?.is_finished ?? previousTimelineTask?.isFinished
+    ),
     ...(containerTask.logistics_task_kind != null
       ? {
           logistics_task_kind: String(containerTask.logistics_task_kind),
@@ -219,6 +223,14 @@ export async function applyLogisticsRoutingSolution(
   }
 
   const taskById = flattenContainerTasks(containersData);
+
+  const previousTimelineTaskById = new Map<number, any>();
+  for (const da of ensureArray(currentTimeline?.drivers_assignments)) {
+    for (const task of ensureArray(da?.tasks)) {
+      const taskId = Number(task?.task_id);
+      if (Number.isFinite(taskId)) previousTimelineTaskById.set(taskId, task);
+    }
+  }
 
   const solverAssignedTaskIds = new Set<number>();
   for (const route of solution.routes) {
@@ -293,6 +305,7 @@ export async function applyLogisticsRoutingSolution(
         stop,
         inputTask: inputTaskById.get(stop.taskId),
         containerTask: taskById.get(stop.taskId) || {},
+        previousTimelineTask: previousTimelineTaskById.get(stop.taskId),
       })
     );
 

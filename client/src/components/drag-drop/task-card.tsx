@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
-import { Draggable } from "react-beautiful-dnd";
 import { useQuery } from "@tanstack/react-query";
 import { TaskType as Task } from "@shared/schema";
 import {
@@ -11,6 +10,10 @@ import {
   type LogisticsTaskKind,
 } from "@shared/logistics-task-kind";
 import {
+  resolveLogisticsTaskExecutionStatus,
+  type LogisticsTaskExecutionStatus,
+} from "@shared/logistics-task-execution-status";
+import {
   DIALOG_SECTION_CORNER_BADGE_WRAP_CLASS,
   LOGISTICS_KIND_BADGE_LABEL,
   LogisticsKindAddBadge,
@@ -19,6 +22,11 @@ import {
   LogisticsSequenceBadge,
   logisticsKindStripeClass,
 } from "@/lib/logistics-task-kind-ui";
+import {
+  hasLogisticsExecutionStatusColor,
+  LogisticsExecutionPausedIcon,
+  logisticsExecutionStatusSurfaceClass,
+} from "@/lib/logistics-task-execution-status-ui";
 import { format, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
 import { fetchWithOperation } from '@/lib/operationManager';
@@ -76,12 +84,6 @@ import {
 
 // Normalizza la chiave di una task indipendentemente dal campo usato
 const getTaskKey = (t: any) => String(t?.id ?? t?.task_id ?? t?.logistic_code ?? "");
-
-// Genera chiave univoca per DnD includendo cleanerId (per task collaborative)
-const getUniqueDraggableId = (t: any, cleanerId?: number | null) => {
-  const taskKey = getTaskKey(t);
-  return cleanerId != null ? `${taskKey}-cleaner-${cleanerId}` : taskKey;
-};
 
 // Chiave di navigazione per il dialog (evita collisioni su task_id duplicati).
 const getTaskNavigationKey = (t: any, listIndex?: number) =>
@@ -203,7 +205,7 @@ interface MultiSelectContextType {
   getTaskOrder: (taskId: string) => number | undefined;
 }
 
-interface TaskCardProps {
+export interface TaskCardProps {
   task: Task;
   index: number;
   isInTimeline?: boolean;
@@ -217,6 +219,7 @@ interface TaskCardProps {
   timelineWidthPx?: number;
   timelinePxPerMinute?: number;
   minTimelineTaskWidthPx?: number;
+  dragOverlayWidthPx?: number;
   travelTime?: number;
   travelWidthPx?: number;
   waitingGap?: number;
@@ -224,8 +227,17 @@ interface TaskCardProps {
   isHighlighted?: boolean;
   cleanerId?: number | null;
   draggableId?: string;
+  dragWrapper?: "none";
+  externalIsDragging?: boolean;
+  externalDragHandleProps?: React.HTMLAttributes<HTMLDivElement> &
+    React.RefAttributes<HTMLDivElement>;
   /** housekeeping → /api/operations (enable_wass); logistics → enable_wass_route */
   operationsScope?: "housekeeping" | "office" | "logistics";
+  /**
+   * Solo housekeeping/office: durante il DnD timeline, card compatte a 15 min
+   * con solo codice ADAM (come la timeline logistica).
+   */
+  compactAdamTimelineUi?: boolean;
   /** Solo timeline logistica: nome driver (colonna sinistra). Non usare per HK — lì sarebbe il cleaner. */
   timelineRowStaffDisplayLabel?: string | null;
   /** Dopo mutazione timeline logistica (es. tipologia manuale). */
@@ -355,14 +367,17 @@ export default function TaskCard({
   timelineWidthPx = 0,
   timelinePxPerMinute = 0,
   minTimelineTaskWidthPx = 0,
+  dragOverlayWidthPx,
   travelTime = 0,
   travelWidthPx = 0,
   waitingGap = 0,
   waitingGapWidthPx = 0,
   isHighlighted = false,
   cleanerId = null,
-  draggableId,
+  externalIsDragging = false,
+  externalDragHandleProps,
   operationsScope = "housekeeping",
+  compactAdamTimelineUi = false,
   timelineRowStaffDisplayLabel = null,
   onLogisticsTimelineMutated,
 }: TaskCardProps) {
@@ -509,10 +524,11 @@ const displayClickableInputClass =
   // Estrai locked e locked_reason dal task per dependency stabili
   const taskLocked = (task as any).locked ?? false;
   const taskLockedReason = (task as any).locked_reason ?? '';
+  const isFinished = Boolean((task as any).is_finished ?? (task as any).isFinished);
   const preAssignedMode = resolvePreAssignedModeFromTask(task);
   const isPreAssigned = preAssignedMode === "readonly" || preAssignedMode === "normal";
   const isPreAssignedReadonly = preAssignedMode === "readonly";
-  const isTaskReadOnly = isReadOnly || isPreAssignedReadonly;
+  const isTaskReadOnly = isReadOnly || isPreAssignedReadonly || isFinished;
   
   // Stato per blocco task
   const [isLocked, setIsLocked] = useState(taskLocked);
@@ -617,6 +633,10 @@ const displayClickableInputClass =
   const lastCollaboratorsTaskIdRef = useRef<number | null>(null);
   const initializedEditFieldsTaskKeyRef = useRef<string>("");
   const isLogisticsTimelineDetails = operationsScope === "logistics" && isInTimeline;
+  /** Timeline logistica (sempre) o HK in DnD: card 15' + solo codice ADAM */
+  const showCompactAdamTimelineUi =
+    isInTimeline &&
+    (operationsScope === "logistics" || compactAdamTimelineUi);
   const isHousekeepingDetails = operationsScope === "housekeeping";
   const isHousekeepingTimelineDetails = operationsScope === "housekeeping" && isInTimeline;
   const isLogisticsDetails = operationsScope === "logistics";
@@ -1200,8 +1220,9 @@ const displayClickableInputClass =
         })
       : null;
 
-  const categoryStripeClass =
-    operationsScope === "logistics"
+  const categoryStripeClass = isFinished
+    ? "bg-gray-400"
+    : operationsScope === "logistics"
       ? logisticsKindStripeClass(cardLogisticsTaskKind)
       : HOUSEKEEPING_STRIPE_CLASS[cardHousekeepingTier];
 
@@ -1223,13 +1244,34 @@ const displayClickableInputClass =
   const cardLogisticsSequenceLabel =
     cardLogisticsSequence != null ? String(cardLogisticsSequence) : null;
 
+  const logisticsExecutionStatus: LogisticsTaskExecutionStatus | null =
+    operationsScope === "logistics"
+      ? ((cardTaskAny.logistics_execution_status as
+          | LogisticsTaskExecutionStatus
+          | undefined) ??
+        resolveLogisticsTaskExecutionStatus({
+          lg_real_start: cardTaskAny.lg_real_start ?? cardTaskAny.lgRealStart,
+          lg_real_end: cardTaskAny.lg_real_end ?? cardTaskAny.lgRealEnd,
+          lg_paused: cardTaskAny.lg_paused ?? cardTaskAny.lgPaused,
+        }))
+      : null;
+  const logisticsExecutionSurfaceClass =
+    operationsScope === "logistics" && isInTimeline
+      ? logisticsExecutionStatusSurfaceClass(logisticsExecutionStatus, "strong")
+      : undefined;
+
   // Nei container: sfondo pagina per contrasto con la colonna; in timeline resta custom-blue-light.
-  const cardSurfaceClass =
-    isLocked && !isInTimeline
-      ? "bg-muted/80 border-border/60 opacity-70"
-      : !isInTimeline
-        ? "bg-background border-border shadow-sm"
-        : "bg-custom-blue-light border-border/60";
+  // Logistica in timeline: colori da stato Adam (lg_real_*), senza opacity che riduce leggibilità.
+  // Task finished: grigio in timeline e container (salvo status esecuzione logistica già colorato).
+  const cardSurfaceClass = logisticsExecutionSurfaceClass
+    ? logisticsExecutionSurfaceClass
+    : isFinished
+      ? "bg-gray-200 dark:bg-gray-800 border-gray-400 dark:border-gray-600 opacity-70"
+      : isLocked && !isInTimeline
+        ? "bg-muted/80 border-border/60 opacity-70"
+        : !isInTimeline
+          ? "bg-background border-border shadow-sm"
+          : "bg-custom-blue-light border-border/60";
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -2184,25 +2226,23 @@ const displayClickableInputClass =
       // Se la task è < 60 minuti, usa sempre 60 minuti (larghezza di 1 ora)
       const displayMinutes = effectiveMinutes < 60 ? 60 : effectiveMinutes;
       const halfHours = Math.ceil(displayMinutes / 30);
-      const baseWidth = halfHours * 50;
+      // Larghezza per mezz'ora + base fissa che riserva lo spazio della colonna
+      // orari (check-in/out posizionati in absolute a destra), così il customer
+      // reference non ci finisce sotto.
+      const baseWidth = halfHours * 54 + 56;
       return `${baseWidth}px`;
     }
   };
 
-  // LOGISTICS: in timeline ogni task vale 15 minuti (solo UI)
-  const effectiveDurationForUi =
-    operationsScope === "logistics" && isInTimeline ? "0.15" : (task.duration || "0.0");
+  // LOGISTICS (sempre) / HK durante DnD: in timeline ogni task vale 15 minuti (solo UI)
+  const effectiveDurationForUi = showCompactAdamTimelineUi
+    ? "0.15"
+    : (task.duration || "0.0");
 
-  // Mostra frecce solo per task >= 1 ora
-  const [hours, mins] = effectiveDurationForUi.split('.').map(Number);
-  const totalMinutes = (hours || 0) * 60 + (mins || 0);
-
-  // CRITICAL: In timeline, mostra frecce SOLO se >= 1h
-  // Nei container, mostra frecce SEMPRE (anche per < 1h)
-  const shouldShowCheckInOutArrows = isInTimeline ? totalMinutes >= 60 : true;
-
-  // Mostra orari nel tooltip solo per task < 1 ora E quando le frecce sono nascoste
-  const shouldShowTooltipTimes = totalMinutes < 60 && !shouldShowCheckInOutArrows;
+  // Mostra sempre le frecce check-in/out (anche in timeline per task < 1h)
+  const shouldShowCheckInOutArrows = true;
+  // Fallback tooltip disabilitato: gli orari restano sempre sulla card
+  const shouldShowTooltipTimes = false;
   const cardTooltipAddressLabel =
     String(displayTask.address ?? "").trim().toUpperCase() || "INDIRIZZO NON DISPONIBILE";
   const cardTooltipClientAlias = String(displayTask.alias ?? "").trim();
@@ -2307,12 +2347,6 @@ const displayClickableInputClass =
     : hasSingleRow
       ? "top-1/2 -translate-y-1/2"
       : "top-[5px]";
-
-  // Il drag viene bloccato solo da stato pagina/task, non dai campi orari ADAM.
-  const shouldDisableDrag =
-    isDragDisabled ||
-    isLocked ||
-    isPreAssignedReadonly;
 
   const currentDetailsTaskKey = getTaskKey(displayTask) || getTaskKey(task);
   const taskAny = task as any;
@@ -2484,10 +2518,15 @@ const displayClickableInputClass =
       {dialogHousekeepingTypeLabel}
     </Badge>
   );
+  const canEditLogisticsKind = isLogisticsDetails && !isTaskReadOnly;
   const dialogLogisticsKindBadgeCorner =
     effectiveLogisticsTaskKind != null ? (
-      <LogisticsKindBadge kind={effectiveLogisticsTaskKind} />
-    ) : isLogisticsDetails && !isTaskReadOnly ? (
+      <LogisticsKindBadge
+        kind={effectiveLogisticsTaskKind}
+        onClick={canEditLogisticsKind ? () => setLogisticsKindPickerOpen(true) : undefined}
+        disabled={isSavingLogisticsKind}
+      />
+    ) : canEditLogisticsKind ? (
       <LogisticsKindAddBadge
         onClick={() => setLogisticsKindPickerOpen(true)}
         disabled={isSavingLogisticsKind}
@@ -2973,28 +3012,48 @@ const displayClickableInputClass =
     </>
   );
 
-  return (
-    <>
-      <Draggable
-        draggableId={draggableId ?? getUniqueDraggableId(task, cleanerId)}
-        index={index}
-        isDragDisabled={shouldDisableDrag}
-      >
-        {(provided, snapshot) => {
-          const cardWidth = calculateWidth(effectiveDurationForUi, isInTimeline);
+  const renderTaskCardContent = ({
+    isDragging,
+    dragHandleProps,
+    draggableProps,
+    draggableStyle,
+    innerRef,
+  }: {
+    isDragging: boolean;
+    dragHandleProps?:
+      | (React.HTMLAttributes<HTMLDivElement> &
+          React.RefAttributes<HTMLDivElement>)
+      | null;
+    draggableProps?: React.HTMLAttributes<HTMLDivElement>;
+    draggableStyle?: React.CSSProperties;
+    innerRef?: React.Ref<HTMLDivElement>;
+  }) => {
+    const cardWidth =
+      typeof dragOverlayWidthPx === "number" && dragOverlayWidthPx > 0
+        ? `${dragOverlayWidthPx}px`
+        : calculateWidth(effectiveDurationForUi, isInTimeline);
 
-          return (
+    // Nei container gli orari check-in/out sono in absolute a destra: riserviamo
+    // spazio sul contenuto così il customer reference non ci si sovrappone.
+    const reserveTimesSpace =
+      !isInTimeline &&
+      shouldShowCheckInOutArrows &&
+      (Boolean((taskWithPendingEdits as any).checkout_time) ||
+        Boolean((taskWithPendingEdits as any).checkin_time) ||
+        isFutureCheckin);
+
+    return (
             <div
-              ref={provided.innerRef}
-              {...provided.draggableProps}
+              ref={innerRef}
+              {...draggableProps}
               style={{
-                ...provided.draggableProps.style,
-                zIndex: snapshot.isDragging ? 9999 : 'auto',
+                ...draggableStyle,
+                zIndex: isDragging ? 9999 : 'auto',
               }}
               className={isInTimeline ? "flex items-center" : ""}
             >
           {/* Task card con drag handle */}
-          <div {...provided.dragHandleProps} className="focus-visible:outline-none">
+          <div {...(dragHandleProps ?? undefined)} className="focus-visible:outline-none">
             {/* Task card effettiva */}
             <TooltipProvider delayDuration={300}>
               <Tooltip>
@@ -3003,12 +3062,17 @@ const displayClickableInputClass =
                     className={cn(
                       cardSurfaceClass,
                       "rounded-md border transition-colors duration-200",
-                      isLogisticsTimelineDetails ? "px-1 py-0" : "flex items-center px-2 py-1",
-                      snapshot.isDragging && "shadow-lg",
+                      showCompactAdamTimelineUi ? "px-1 py-0" : "flex items-center px-2 py-1",
                       isSelected && isMultiSelectMode && !isInTimeline && "z-[1] ring-2 ring-sky-500 ring-inset",
-                      isOverdue && isInTimeline && "animate-blink",
-                      !snapshot.isDragging && isMapFiltered && "task-border-map-filtered",
-                      !snapshot.isDragging && !isMapFiltered && isHighlighted && "task-border-search-highlighted",
+                      isOverdue &&
+                        isInTimeline &&
+                        !(
+                          operationsScope === "logistics" &&
+                          hasLogisticsExecutionStatusColor(logisticsExecutionStatus)
+                        ) &&
+                        "animate-blink",
+                      !isDragging && isMapFiltered && "task-border-map-filtered",
+                      !isDragging && !isMapFiltered && isHighlighted && "task-border-search-highlighted",
                       "cursor-pointer flex-shrink-0 relative group"
                     )}
                     style={{
@@ -3020,17 +3084,18 @@ const displayClickableInputClass =
                       maxHeight: isInTimeline ? "40px" : undefined,
                       overflow: isInTimeline ? "visible" : undefined,
                       zIndex:
-                        snapshot.isDragging
+                        isDragging
                           ? 9999
-                          : operationsScope === "logistics" && isInTimeline
+                          : showCompactAdamTimelineUi
                             ? 20
                             : isMapFiltered
                               ? 10
                               : 'auto',
                     }}
+                    data-dnd-task-card-surface="true"
                     data-testid={`task-card-${getTaskKey(task)}`}
                     onClick={(e) => {
-                      if (!snapshot.isDragging) {
+                      if (!isDragging) {
                         handleCardClick(e);
                       }
                     }}
@@ -3045,7 +3110,15 @@ const displayClickableInputClass =
                         className="absolute -top-1.5 -right-1.5 z-[65]"
                       />
                     )}
-                    {operationsScope === "logistics" && isInTimeline ? (
+                    {operationsScope === "logistics" &&
+                      isInTimeline &&
+                      logisticsExecutionStatus === "paused" && (
+                        <LogisticsExecutionPausedIcon
+                          size="timeline"
+                          className="absolute bottom-0.5 right-0.5 z-[40]"
+                        />
+                      )}
+                    {showCompactAdamTimelineUi ? (
                       <LogisticsAdamCodeLabel code={logisticsAdamCode} />
                     ) : (
                       <>
@@ -3181,7 +3254,7 @@ const displayClickableInputClass =
                         );
                       })()}
 
-                    <div className="flex flex-col items-start justify-center flex-1 min-w-0 gap-0.5 pl-2 pr-1 overflow-visible">
+                    <div className={cn("flex flex-col items-start justify-center flex-1 min-w-0 gap-0.5 pl-2 overflow-visible", reserveTimesSpace ? "pr-[52px]" : "pr-1")}>
                       <div className="flex items-center gap-1 w-full min-w-0 overflow-visible">
                         <span
                           className="text-foreground font-extrabold text-[13px] leading-none shrink-0"
@@ -3239,8 +3312,14 @@ const displayClickableInputClass =
               </div>
             </div>
           );
-        }}
-      </Draggable>
+  };
+
+  return (
+    <>
+      {renderTaskCardContent({
+        isDragging: externalIsDragging,
+        dragHandleProps: externalDragHandleProps,
+      })}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent
           className={cn(
@@ -3946,13 +4025,14 @@ const displayClickableInputClass =
         </DialogContent>
       </Dialog>
 
-      {/* Dialog scelta tipologia logistica (task non determinati) */}
+      {/* Dialog scelta / modifica tipologia logistica */}
       <LogisticsKindPickerDialog
         open={logisticsKindPickerOpen}
         onOpenChange={setLogisticsKindPickerOpen}
         taskLabel={`#${getTaskKey(displayTask)}`}
         onSelect={handleSelectLogisticsKind}
         isSaving={isSavingLogisticsKind}
+        currentKind={effectiveLogisticsTaskKind}
       />
 
       {/* Dialog Modifica Tipologia intervento - stesso stile di Pax-In / Check-out / Check-in */}

@@ -1,6 +1,8 @@
 import type { DriverNode, RoutingProblemInput, TaskNode } from "../../input-contract";
 import { BUSINESS_GROUP_THRESHOLDS } from "../../groups/group-weights";
 import { buildVehicleTaskPenalties } from "../../groups/territory-penalties";
+import { hasTightCheckinDeadline } from "../../priority-route-compatibility";
+import { requiresDriverBeforeCleaner } from "../../../../../shared/logistics-task-kind";
 import {
   ORTOOLS_SOLVER_ID,
   ROUTING_SOLUTION_SCHEMA_VERSION,
@@ -11,8 +13,20 @@ import {
 
 const DEPOT_NODE_INDEX = 0;
 
+/**
+ * Drop penalty per priorita' (piu' alto = piu' costoso lasciare fuori il task).
+ *
+ * Regola di business: un task e' davvero "urgente" solo se ha una finestra
+ * check-in/checkout stretta, o e' driver-before-cleaner, o l'alloggio e' premium,
+ * o la pulizia e' straordinaria.
+ * HP ha per definizione queste caratteristiche -> penalty alta.
+ * Un EO con le stesse caratteristiche (EO_URGENT) e' altrettanto importante di un HP.
+ * Un EO "ordinario" (senza nessuna di queste caratteristiche) NON deve pesare piu'
+ * di un HP: viene trattato come LP.
+ */
 export const DROP_PENALTY_BY_PRIORITY = {
-  EO: 100_000,
+  EO_URGENT: 50_000,
+  EO_ORDINARY: 25_000,
   HP: 50_000,
   LP: 25_000,
   default: 10_000,
@@ -73,7 +87,9 @@ export interface OrToolsRoutingPayload {
   vehicleTaskPenalties?: number[][];
   vehicleArcPenalties?: number[][][];
   territoryDebug?: RoutingProblemInput["metadata"]["dailyTerritoryAssignment"];
-  options: { timeLimitSec: number };
+  /** Node indices per vehicle, depot excluded, used as warm start. */
+  initialRoutes?: number[][];
+  options: { timeLimitSec: number; firstSolutionStrategy?: string };
 }
 
 export interface OrToolsRawRoute {
@@ -90,6 +106,7 @@ export interface OrToolsRawSolution {
   droppedTaskIds?: number[];
   objectiveValue?: number;
   solveDurationMs?: number;
+  initialAssignmentUsed?: boolean;
 }
 
 export interface OrToolsAdapterMaps {
@@ -104,10 +121,33 @@ function sortDrivers(drivers: DriverNode[]): DriverNode[] {
   return [...drivers].sort((left, right) => left.id - right.id);
 }
 
-function getDropPenalty(priority: TaskNode["priority"]): number {
-  if (priority === "EO") return DROP_PENALTY_BY_PRIORITY.EO;
-  if (priority === "HP") return DROP_PENALTY_BY_PRIORITY.HP;
-  if (priority === "LP") return DROP_PENALTY_BY_PRIORITY.LP;
+/**
+ * An EO task is "urgent" (as important as HP) when it has a tight check-in/checkout
+ * deadline, requires the driver before the cleaner, or the accommodation is premium
+ * or the cleaning is "straordinaria" (extra). Without any of these, it is an
+ * "ordinary" EO and must not outweigh HP.
+ */
+function isUrgentEoTask(task: TaskNode): boolean {
+  if (task.premium || task.straordinaria) return true;
+
+  const tightCheckin = hasTightCheckinDeadline({
+    customerCheckinMin: task.debug?.sourceTimes?.customerCheckinMin ?? null,
+    latestStartMin: task.hardWindow.latestStartMin,
+  });
+  if (tightCheckin) return true;
+
+  const cleanerTaskStartMin = task.debug?.sourceTimes?.cleanerTaskStartMin ?? null;
+  return requiresDriverBeforeCleaner(task.logisticsTaskKind) && cleanerTaskStartMin !== null;
+}
+
+function getDropPenalty(task: TaskNode): number {
+  if (task.priority === "EO") {
+    return isUrgentEoTask(task)
+      ? DROP_PENALTY_BY_PRIORITY.EO_URGENT
+      : DROP_PENALTY_BY_PRIORITY.EO_ORDINARY;
+  }
+  if (task.priority === "HP") return DROP_PENALTY_BY_PRIORITY.HP;
+  if (task.priority === "LP") return DROP_PENALTY_BY_PRIORITY.LP;
   return DROP_PENALTY_BY_PRIORITY.default;
 }
 
@@ -217,6 +257,15 @@ function extractSoftConstraints(input: RoutingProblemInput): ExtractedSoftConstr
   return { softGroups, softTimeWindows, balanceDriverLoadWeight };
 }
 
+/**
+ * Share of the real travel time an intra-group leg always keeps. Without it the group
+ * bonus drives every short leg to zero, and the solver — seeing a whole cluster as free
+ * — orders it arbitrarily, which is what produces the back-and-forth inside a zone.
+ * Keeping a proportional floor preserves the incentive to group while still making the
+ * shorter leg the cheaper one.
+ */
+const INTRA_GROUP_MIN_TRAVEL_RATIO = 0.5;
+
 function applyIntraGroupCostBonus(
   cost: number[][],
   travelMatrixMin: number[][],
@@ -241,10 +290,11 @@ function applyIntraGroupCostBonus(
         if (!Number.isFinite(travel) || travel > bonusMaxTravelMin) continue;
       }
       const current = cost[from][to];
-      const maxReduction =
-        preserveMinimumTravelMin > 0
-          ? Math.max(0, current - preserveMinimumTravelMin)
-          : current;
+      const proportionalFloor = Number.isFinite(travel)
+        ? Math.ceil(travel * INTRA_GROUP_MIN_TRAVEL_RATIO)
+        : 0;
+      const floor = Math.max(preserveMinimumTravelMin, proportionalFloor);
+      const maxReduction = Math.max(0, current - floor);
       cost[from][to] = Math.max(0, current - Math.min(bonus, maxReduction));
     }
   }
@@ -377,7 +427,7 @@ export function buildOrToolsPayload(
       ...(requiredDriverId !== undefined && requiredVehicleIndex !== undefined
         ? { requiredDriverId, requiredVehicleIndex }
         : {}),
-      dropPenalty: getDropPenalty(task.priority),
+      dropPenalty: getDropPenalty(task),
     };
   });
 
@@ -399,6 +449,78 @@ export function buildOrToolsPayload(
         ? { territoryDebug: input.metadata.dailyTerritoryAssignment }
         : {}),
       options: { timeLimitSec: options?.timeLimitSec ?? 30 },
+    },
+  };
+}
+
+/**
+ * Penalty that makes dropping an already-assigned task strictly worse than any possible
+ * shape or travel gain, so the refinement pass can only reorder, never lose coverage.
+ */
+const REFINEMENT_MANDATORY_DROP_PENALTY = 10_000_000;
+
+/**
+ * Second solve that keeps every task on the driver the previous phase chose and only
+ * looks for a better visiting order. This is the one place where route-sequence arc
+ * penalties enter OR-Tools: in the main solve they could be paid for by dropping a task,
+ * here coverage and driver assignment are already frozen.
+ */
+export function buildSequenceRefinementPayload(args: {
+  input: RoutingProblemInput;
+  routes: Array<{ driverId: number; orderedTaskIds: number[] }>;
+  vehicleArcPenalties?: number[][][];
+  timeLimitSec?: number;
+}): { payload: OrToolsRoutingPayload; maps: OrToolsAdapterMaps } | null {
+  const { input, vehicleArcPenalties } = args;
+  const { payload, maps } = buildOrToolsPayload(input, {
+    timeLimitSec: args.timeLimitSec ?? 10,
+  });
+
+  const initialRoutes: number[][] = payload.vehicles.map(() => []);
+  const vehicleIndexByTaskId = new Map<number, number>();
+
+  for (const route of args.routes) {
+    const vehicleIndex = maps.driverIdToVehicleIndex.get(route.driverId);
+    if (vehicleIndex === undefined) continue;
+    for (const taskId of route.orderedTaskIds) {
+      const nodeIndex = maps.taskIdToNodeIndex.get(taskId);
+      if (nodeIndex === undefined) continue;
+      initialRoutes[vehicleIndex].push(nodeIndex);
+      vehicleIndexByTaskId.set(taskId, vehicleIndex);
+    }
+  }
+
+  if (vehicleIndexByTaskId.size === 0) return null;
+
+  const tasks = payload.tasks.map((task) => {
+    const vehicleIndex = vehicleIndexByTaskId.get(task.taskId);
+    if (vehicleIndex === undefined) {
+      // Task the previous phase could not place. It keeps its normal drop penalty so
+      // the refinement actively tries to fit it into the slack the new sequences free
+      // up, while staying droppable when it genuinely does not fit. Dropping it at
+      // zero cost would make any recovered coverage pure luck.
+      return task;
+    }
+
+    return {
+      ...task,
+      requiredDriverId: maps.vehicleIndexToDriverId.get(vehicleIndex) ?? task.requiredDriverId,
+      requiredVehicleIndex: vehicleIndex,
+      dropPenalty: REFINEMENT_MANDATORY_DROP_PENALTY,
+    };
+  });
+
+  return {
+    maps,
+    payload: {
+      ...payload,
+      tasks,
+      initialRoutes,
+      ...(vehicleArcPenalties ? { vehicleArcPenalties } : {}),
+      options: {
+        timeLimitSec: args.timeLimitSec ?? 10,
+        firstSolutionStrategy: "PARALLEL_CHEAPEST_INSERTION",
+      },
     },
   };
 }

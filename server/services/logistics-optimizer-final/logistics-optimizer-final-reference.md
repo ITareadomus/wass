@@ -1402,9 +1402,10 @@ Debug artifacts (`server/debug/logistics-optimizer-final/`):
 - Task time windows (`transit = service(from) + travel`)
 - `startMin ∈ [earliestStartMin, latestStartMin]` e `startMin + serviceDurationMin ≤ latestEndMin` (esplicito in Python)
 - Driver work windows
-- `REQUIRED_DRIVER_TASK` → vincolo veicolo hard (no disjunction)
+- `REQUIRED_DRIVER_TASK` → `VehicleVar([requiredVehicle, -1])` + `AddDisjunction` con penalty alta (EO/HP/LP). Solo `VehicleVar` senza disjunction rende infeasible l’intero modello quando esistono task opzionali.
 - Driver required non tra i selected: hint skippato in pre-solver; safety net adapter → `INVALID` (`REQUIRED_DRIVER_NOT_SELECTED`) senza chiamare Python
 - Task liberi → `AddDisjunction` con penalty **EO 100k > HP 50k > LP 25k**
+- First solution strategy: `PARALLEL_CHEAPEST_INSERTION` (più affidabile di `PATH_CHEAPEST_ARC` con time windows strette)
 
 ### Soft constraints (cost shaping)
 

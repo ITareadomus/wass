@@ -136,10 +136,14 @@ def solve_payload(payload):
         time_dimension.CumulVar(index).SetRange(earliest, max_start)
 
         required_vehicle_index = task.get("requiredVehicleIndex")
+        penalty = int(task.get("dropPenalty", 10000))
         if required_vehicle_index is not None:
-            routing.VehicleVar(index).SetValues([int(required_vehicle_index)])
+            # Required tasks must participate in the disjunction framework like optional
+            # nodes: VehicleVar-only (no AddDisjunction / no -1) makes the whole model
+            # infeasible as soon as any other node is optional.
+            routing.VehicleVar(index).SetValues([int(required_vehicle_index), -1])
+            routing.AddDisjunction([index], penalty)
         else:
-            penalty = int(task.get("dropPenalty", 10000))
             routing.AddDisjunction([index], penalty)
 
     for entry in payload.get("softTimeWindows", []):
@@ -153,16 +157,40 @@ def solve_payload(payload):
     if balance_weight > 0:
         time_dimension.SetGlobalSpanCostCoefficient(balance_weight)
 
+    options = payload.get("options", {})
     search_params = pywrapcp.DefaultRoutingSearchParameters()
-    search_params.first_solution_strategy = (
-        routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
+    # PARALLEL_CHEAPEST_INSERTION finds TW-feasible first solutions much more reliably
+    # than PATH_CHEAPEST_ARC on logistics instances with tight windows.
+    strategy_name = options.get("firstSolutionStrategy") or "PARALLEL_CHEAPEST_INSERTION"
+    search_params.first_solution_strategy = getattr(
+        routing_enums_pb2.FirstSolutionStrategy,
+        strategy_name,
+        routing_enums_pb2.FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION,
     )
     search_params.local_search_metaheuristic = (
         routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
     )
-    search_params.time_limit.seconds = int(payload.get("options", {}).get("timeLimitSec", 30))
+    search_params.time_limit.seconds = int(options.get("timeLimitSec", 30))
 
-    solution = routing.SolveWithParameters(search_params)
+    # Sequence refinement re-solves an existing plan: starting from it guarantees the
+    # refined result is never worse than what we already had.
+    initial_routes = payload.get("initialRoutes")
+    solution = None
+    initial_assignment_used = False
+    if initial_routes:
+        try:
+            initial_assignment = routing.ReadAssignmentFromRoutes(initial_routes, True)
+        except Exception:
+            initial_assignment = None
+        if initial_assignment is not None:
+            solution = routing.SolveFromAssignmentWithParameters(
+                initial_assignment, search_params
+            )
+            initial_assignment_used = solution is not None
+
+    if solution is None:
+        solution = routing.SolveWithParameters(search_params)
+
     solve_duration_ms = int((time.time() - started) * 1000)
 
     if solution is None:
@@ -215,6 +243,7 @@ def solve_payload(payload):
         "droppedTaskIds": dropped_task_ids,
         "objectiveValue": int(solution.ObjectiveValue()),
         "solveDurationMs": solve_duration_ms,
+        "initialAssignmentUsed": initial_assignment_used,
     }
 
 
