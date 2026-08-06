@@ -25,6 +25,30 @@
   animation: blink-border 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* Stesso ritmo del blink rosso timeline, in giallo (es. task logistici senza tipologia) */
+@keyframes blink-border-yellow {
+  0%, 100% {
+    border-color: rgb(202, 138, 4);
+    box-shadow: 0 0 10px 2px rgba(234, 179, 8, 0.9);
+  }
+  25% {
+    border-color: rgb(234, 179, 8);
+    box-shadow: 0 0 16px 4px rgba(250, 204, 21, 0.95);
+  }
+  50% {
+    border-color: rgb(254, 240, 138);
+    box-shadow: 0 0 24px 7px rgba(250, 204, 21, 1);
+  }
+  75% {
+    border-color: rgb(234, 179, 8);
+    box-shadow: 0 0 16px 4px rgba(250, 204, 21, 0.95);
+  }
+}
+
+.animate-blink-yellow {
+  animation: blink-border-yellow 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
 /* Summary tasks: inset glow avoids expanding horizontal scroll area */
 @keyframes blink-border-inset {
   0%, 100% {
@@ -190,21 +214,6 @@
   /* No scrollbar-gutter here: it narrows row columns vs the hour header and breaks grid alignment. */
   .timeline-rows-scroll {
     scrollbar-gutter: auto;
-  }
-
-  /* Animazione lampeggiante gialla per task duplicate */
-  @keyframes blink-yellow {
-    0%, 100% {
-      box-shadow: 0 0 0 rgba(234, 179, 8, 0);
-    }
-    50% {
-      box-shadow: 0 0 10px 3px rgba(234, 179, 8, 0.8);
-      border-color: #eab308;
-    }
-  }
-
-  .animate-blink-yellow {
-    animation: blink-yellow 1.5s ease-in-out infinite;
   }
 
   /* Nasconde l'icona dell'orologio negli input time */
