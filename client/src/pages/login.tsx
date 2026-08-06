@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff } from "lucide-react";
+import { homePathForRole, isLogisticaRole } from "@/lib/auth-role";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -18,7 +19,11 @@ export default function Login() {
 
   useEffect(() => {
     const user = localStorage.getItem("user");
-    if (user) {
+    if (!user) return;
+    try {
+      const parsed = JSON.parse(user) as { role?: string };
+      setLocation(homePathForRole(parsed.role));
+    } catch {
       setLocation("/");
     }
   }, [setLocation]);
@@ -40,12 +45,15 @@ export default function Login() {
 
       if (response.ok && data.success) {
         localStorage.setItem("user", JSON.stringify(data.user));
+        if (isLogisticaRole(data.user?.role)) {
+          localStorage.setItem("assignments_scope", "logistics");
+        }
         toast({
           title: "Login effettuato",
           description: `Benvenuto/a ${data.user.username}!`,
           variant: "success",
         });
-        setLocation("/");
+        setLocation(isLogisticaRole(data.user?.role) ? homePathForRole(data.user?.role) : "/");
       } else {
         toast({
           title: "Errore di login",

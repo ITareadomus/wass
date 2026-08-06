@@ -2,6 +2,7 @@ import { Building2, Truck } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import type { MouseEvent } from "react";
+import { getStoredUserRole, isLogisticaRole } from "@/lib/auth-role";
 
 export type AssignmentsFlow = "housekeeping" | "office" | "logistics";
 
@@ -22,11 +23,36 @@ export function HousekeepingLogisticsSwitch({
   active,
   className,
 }: HousekeepingLogisticsSwitchProps) {
+  const logisticsOnly = isLogisticaRole(getStoredUserRole());
+
   const goHousekeeping = (e: MouseEvent) => {
     e.preventDefault();
+    if (logisticsOnly) return;
     localStorage.setItem("assignments_scope", "housekeeping");
     window.location.assign("/generate-assignments");
   };
+
+  if (logisticsOnly) {
+    return (
+      <div
+        className={cn(
+          "inline-flex items-center gap-0.5 rounded-md border-2 border-custom-blue bg-background p-0.5",
+          className
+        )}
+        role="tablist"
+        aria-label="Ambito Logistica"
+      >
+        <span
+          className={cn(segmentCommon, segmentActive)}
+          aria-current="page"
+          data-testid="switch-logistics"
+        >
+          <Truck className="h-4 w-4 shrink-0" aria-hidden />
+          Logistica
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div

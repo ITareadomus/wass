@@ -31,7 +31,7 @@ interface Account {
   username: string;
   password: string;
   plain_password?: string;
-  role: "admin" | "user" | "viewer";
+  role: "admin" | "user" | "viewer" | "logistica";
 }
 
 interface TaskTypeRules {
@@ -368,7 +368,7 @@ export default function Settings() {
                         <Label htmlFor="new-role">Ruolo</Label>
                         <Select
                           value={newAccount.role}
-                          onValueChange={(value: "admin" | "user" | "viewer") =>
+                          onValueChange={(value: "admin" | "user" | "viewer" | "logistica") =>
                             setNewAccount({ ...newAccount, role: value })
                           }
                         >
@@ -379,6 +379,7 @@ export default function Settings() {
                             <SelectItem value="admin">Admin</SelectItem>
                             <SelectItem value="user">User</SelectItem>
                             <SelectItem value="viewer">Viewer</SelectItem>
+                            <SelectItem value="logistica">Logistica</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -441,7 +442,7 @@ export default function Settings() {
                           <Label>Ruolo</Label>
                           <Select
                             value={editingAccount.role}
-                            onValueChange={(value: "admin" | "user" | "viewer") =>
+                            onValueChange={(value: "admin" | "user" | "viewer" | "logistica") =>
                               setEditingAccount({ ...editingAccount, role: value })
                             }
                             disabled={editingAccount.id === 1 && editingAccount.role === 'admin'}
@@ -453,6 +454,7 @@ export default function Settings() {
                               <SelectItem value="admin">Admin</SelectItem>
                               <SelectItem value="user">User</SelectItem>
                               <SelectItem value="viewer">Viewer</SelectItem>
+                              <SelectItem value="logistica">Logistica</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>

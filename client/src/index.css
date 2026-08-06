@@ -868,10 +868,25 @@
     padding: 0 !important;
   }
 
-  [data-print-driver-sheet] *,
+  /* Stampa B/N: testo e bordi neri; niente fill sugli SVG (altrimenti le icone diventano blob) */
+  [data-print-driver-sheet],
+  [data-print-driver-sheet] *:not(svg):not(svg *),
   [data-print-driver-sheet] *::before,
   [data-print-driver-sheet] *::after {
     box-sizing: border-box !important;
+    color: #000 !important;
+    border-color: #000 !important;
+    outline-color: #000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  [data-print-driver-sheet] [class*="bg-"],
+  [data-print-driver-sheet] [class*="from-"],
+  [data-print-driver-sheet] [class*="to-"],
+  [data-print-driver-sheet] [style*="background"] {
+    background: #fff !important;
+    background-image: none !important;
   }
 
   [data-print-driver-sheet] .flex-1 {
@@ -892,25 +907,32 @@
 
   [data-print-driver-sheet] header {
     background: #fff !important;
-    border-bottom: 1px solid #333 !important;
-    margin-bottom: 0.25rem !important;
+    border-bottom: 1px solid #000 !important;
+    margin-bottom: 0.35rem !important;
   }
 
   [data-print-driver-sheet] header > div.relative {
-    padding-bottom: 0.25rem !important;
+    padding-bottom: 0.35rem !important;
   }
 
   [data-print-driver-sheet] header h1 {
-    font-size: 11px !important;
-    line-height: 1.2 !important;
+    font-size: 18px !important;
+    line-height: 1.25 !important;
     margin: 0 !important;
+    font-weight: 700 !important;
+  }
+
+  [data-print-driver-sheet] header h1 span {
+    font-size: inherit !important;
+    color: #000 !important;
   }
 
   [data-print-driver-sheet] header p {
-    margin-top: 0.2rem !important;
+    margin-top: 0.25rem !important;
     margin-bottom: 0 !important;
-    line-height: 1.2 !important;
-    font-size: 9px !important;
+    line-height: 1.25 !important;
+    font-size: 13px !important;
+    color: #000 !important;
   }
 
   [data-print-driver-sheet] .driver-sheet-print-table {
@@ -934,7 +956,7 @@
     right: 0 !important;
     z-index: 20 !important;
     display: block !important;
-    border-top: 1px solid #666 !important;
+    border-top: 1px solid #000 !important;
     pointer-events: none !important;
   }
 
@@ -968,27 +990,29 @@
     border-bottom: none !important;
   }
 
-  /* Seq | Codice | Cliente | Indirizzo | Fin.cleaner | Out/In | Cleaner | Divani | Chiavi | Note */
+  /* Seq | Tipo | Codice | Cliente | Indirizzo | Fin.cleaner | Out/In | Cleaner | Divani | Chiavi | Note */
   [data-print-driver-sheet] th:nth-child(1),
   [data-print-driver-sheet] td:nth-child(1) { width: 4% !important; }
   [data-print-driver-sheet] th:nth-child(2),
-  [data-print-driver-sheet] td:nth-child(2) { width: 6% !important; }
+  [data-print-driver-sheet] td:nth-child(2) { width: 4% !important; }
   [data-print-driver-sheet] th:nth-child(3),
-  [data-print-driver-sheet] td:nth-child(3) { width: 6% !important; }
+  [data-print-driver-sheet] td:nth-child(3) { width: 8% !important; }
   [data-print-driver-sheet] th:nth-child(4),
-  [data-print-driver-sheet] td:nth-child(4) { width: 13% !important; }
+  [data-print-driver-sheet] td:nth-child(4) { width: 9% !important; }
   [data-print-driver-sheet] th:nth-child(5),
-  [data-print-driver-sheet] td:nth-child(5) { width: 9% !important; }
+  [data-print-driver-sheet] td:nth-child(5) { width: 13% !important; }
   [data-print-driver-sheet] th:nth-child(6),
-  [data-print-driver-sheet] td:nth-child(6) { width: 8% !important; }
+  [data-print-driver-sheet] td:nth-child(6) { width: 7% !important; }
   [data-print-driver-sheet] th:nth-child(7),
-  [data-print-driver-sheet] td:nth-child(7) { width: 9% !important; }
+  [data-print-driver-sheet] td:nth-child(7) { width: 7% !important; }
   [data-print-driver-sheet] th:nth-child(8),
   [data-print-driver-sheet] td:nth-child(8) { width: 8% !important; }
   [data-print-driver-sheet] th:nth-child(9),
-  [data-print-driver-sheet] td:nth-child(9) { width: 10% !important; }
+  [data-print-driver-sheet] td:nth-child(9) { width: 6% !important; }
   [data-print-driver-sheet] th:nth-child(10),
-  [data-print-driver-sheet] td:nth-child(10) { width: 27% !important; }
+  [data-print-driver-sheet] td:nth-child(10) { width: 6% !important; }
+  [data-print-driver-sheet] th:nth-child(11),
+  [data-print-driver-sheet] td:nth-child(11) { width: 28% !important; }
 
   [data-print-driver-sheet] col {
     width: auto !important;
@@ -1015,17 +1039,21 @@
 
   [data-print-driver-sheet] th,
   [data-print-driver-sheet] td {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
     min-width: 0 !important;
     max-width: none !important;
-    padding: 0.15rem 0.2rem !important;
-    border: 1px solid #666 !important;
+    padding: 1px 3px !important;
+    border: 1px solid #000 !important;
     color: #000 !important;
     background: #fff !important;
-    vertical-align: top !important;
+    vertical-align: middle !important;
     overflow: visible !important;
     word-wrap: break-word !important;
     overflow-wrap: anywhere !important;
     hyphens: auto !important;
+    line-height: 1.1 !important;
   }
 
   [data-print-driver-sheet] thead th {
@@ -1037,17 +1065,80 @@
   }
 
   [data-print-driver-sheet] th {
-    background: #eee !important;
+    background: #fff !important;
     font-weight: 700 !important;
     letter-spacing: 0 !important;
     text-transform: uppercase !important;
-    padding-top: 0.1rem !important;
-    padding-bottom: 0.1rem !important;
+    padding: 1px 2px !important;
+    line-height: 1.05 !important;
+  }
+
+  /* Indirizzo, Cleaner */
+  [data-print-driver-sheet] .driver-sheet-col-emphasis {
+    font-size: 11px !important;
+    line-height: 1.1 !important;
+  }
+
+  [data-print-driver-sheet] th.driver-sheet-col-emphasis {
+    font-size: 8px !important;
+  }
+
+  /* Seq, Tipo, Codice, Cliente — testo grande, zero padding: usa tutta la casella */
+  [data-print-driver-sheet] th.driver-sheet-col-lead,
+  [data-print-driver-sheet] td.driver-sheet-col-lead {
+    font-size: 13px !important;
+    line-height: 1 !important;
+    font-weight: 700 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    overflow: visible !important;
+    overflow-wrap: normal !important;
+    word-wrap: normal !important;
+    hyphens: none !important;
+  }
+
+  [data-print-driver-sheet] th.driver-sheet-col-lead {
+    font-size: 9px !important;
+  }
+
+  /* Tipo: resta 15px */
+  [data-print-driver-sheet] td.driver-sheet-col-lead:nth-child(2) {
+    font-size: 15px !important;
+    white-space: nowrap !important;
+  }
+
+  /* Seq / Codice / Cliente (leggermente sotto il doppio pieno) */
+  [data-print-driver-sheet] td.driver-sheet-col-lead:nth-child(1) {
+    font-size: 24px !important;
+    white-space: nowrap !important;
+  }
+
+  [data-print-driver-sheet] td.driver-sheet-col-lead:nth-child(3),
+  [data-print-driver-sheet] td.driver-sheet-col-lead:nth-child(4) {
+    font-size: 20px !important;
+    white-space: normal !important;
+  }
+
+  [data-print-driver-sheet] td.driver-sheet-col-lead > *,
+  [data-print-driver-sheet] th.driver-sheet-col-lead > * {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  /* Wrapper interni: niente padding/altezza extra in stampa */
+  [data-print-driver-sheet] td > div,
+  [data-print-driver-sheet] th > div {
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    gap: 0 !important;
   }
 
   [data-print-driver-sheet] td:last-child,
   [data-print-driver-sheet] th:last-child {
-    padding-right: 0.25rem !important;
+    padding-right: 3px !important;
   }
 
   [data-print-driver-sheet] .shadow-sm {
@@ -1079,8 +1170,19 @@
     color: #000 !important;
     border: 1px solid #000 !important;
     box-shadow: none !important;
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
+  }
+
+  [data-print-driver-sheet] svg {
+    color: #000 !important;
+    fill: none !important;
+    stroke: #000 !important;
+  }
+
+  [data-print-driver-sheet] svg,
+  [data-print-driver-sheet] svg * {
+    fill: none !important;
+    stroke: #000 !important;
+    color: #000 !important;
   }
 }
 
