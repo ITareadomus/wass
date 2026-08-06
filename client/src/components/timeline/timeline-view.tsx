@@ -1,5 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
-import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, UserMinus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap, Lock, Unlock } from "lucide-react";
+import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, UserMinus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap, Lock, Unlock, AlertCircle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { useMutation } from "@tanstack/react-query";
@@ -52,6 +52,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
 interface TimelineViewProps {
   personnel: Personnel[];
@@ -91,7 +92,7 @@ interface Cleaner {
 
 const DEFAULT_TIMELINE_START_MINUTES = 10 * 60;
 const DEFAULT_TIMELINE_END_MINUTES = 19 * 60;
-const MIN_TIMELINE_TASK_WIDTH_PX = 150;
+const MIN_TIMELINE_TASK_WIDTH_PX = 100;
 /** Durante DnD: stessa larghezza minima delle card logistica (slot 15') */
 const COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX = 56;
 const FALLBACK_SHORTEST_TASK_MINUTES = 30;
@@ -468,6 +469,10 @@ export default function TimelineView({
 
   const handleTimelinePointerDown = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const scrollContainer = event.currentTarget;
+    // I contenuti in portal (dialog, select, popover) bollono nell'albero React ma
+    // vivono fuori dal container nel DOM: senza questo check il pan catturava il
+    // puntatore e rompeva la selezione (es. orari check-out).
+    if (!(event.target instanceof Node) || !scrollContainer.contains(event.target)) return;
     if (event.button !== 0 || !canStartTimelinePan(event.target)) return;
     if (scrollContainer.scrollWidth <= scrollContainer.clientWidth) return;
 
@@ -2380,7 +2385,29 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 )}
               </h2>
             </div>
-            <div className="flex gap-3 print:hidden">
+            <div className="flex items-center gap-3 print:hidden">
+              {!isOfficeScope && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-yellow-500 hover:text-yellow-600 hover:bg-yellow-500/10"
+                      aria-label="Info visualizzazione task brevi"
+                    >
+                      <AlertCircle className="w-4 h-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="end"
+                    className="w-80 text-sm leading-relaxed"
+                  >
+                    Sulle task sotto l&apos;ora, check-out/in e codice cliente restano
+                    nascosti: passa il mouse sulla card per vederli.
+                  </PopoverContent>
+                </Popover>
+              )}
               <Button
                 onClick={() => setLocation(isOfficeScope ? '/convocazioni?kind=office' : '/convocazioni')}
                 variant="outline"

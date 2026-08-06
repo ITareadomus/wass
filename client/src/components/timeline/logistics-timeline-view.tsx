@@ -452,6 +452,10 @@ export default function LogisticsTimelineView({
 
   const handleTimelinePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const scrollContainer = event.currentTarget;
+    // I contenuti in portal (dialog, select, popover) bollono nell'albero React ma
+    // vivono fuori dal container nel DOM: senza questo check il pan catturava il
+    // puntatore e rompeva la selezione nei dialog aperti dalle card.
+    if (!(event.target instanceof Node) || !scrollContainer.contains(event.target)) return;
     if (event.button !== 0 || !canStartTimelinePan(event.target)) return;
     if (scrollContainer.scrollWidth <= scrollContainer.clientWidth) return;
 
