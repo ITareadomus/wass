@@ -62,17 +62,22 @@ export function requiresDriverBeforeCleaner(kind: LogisticsTaskKind | null): boo
   return kind === "delivery/pick-up";
 }
 
-/** Codice per ADAM `app_housekeeping.lg_operation` (VARCHAR(10)): D&P abbreviato in `d&p`. */
+/**
+ * Codice per ADAM `app_housekeeping.lg_operation` (VARCHAR(10)):
+ * `1` = delivery, `2` = pick-up, `3` = delivery/pick-up (D&P).
+ */
+export type AdamLogisticsOperationCode = "1" | "2" | "3";
+
 export function toAdamLogisticsOperation(
   kind: LogisticsTaskKind | string | null | undefined
-): string | null {
+): AdamLogisticsOperationCode | null {
   switch (normalizeLogisticsTaskKind(kind, "manual")) {
-    case "delivery/pick-up":
-      return "d&p";
     case "delivery":
-      return "delivery";
+      return "1";
     case "pick-up":
-      return "pick-up";
+      return "2";
+    case "delivery/pick-up":
+      return "3";
     default:
       return null;
   }
@@ -80,6 +85,11 @@ export function toAdamLogisticsOperation(
 
 export function fromAdamLogisticsOperation(value: unknown): LogisticsTaskKind | null {
   const raw = String(value ?? "").trim().toLowerCase();
+  // Numeric codes written by WASS → ADAM.
+  if (raw === "1") return "delivery";
+  if (raw === "2") return "pick-up";
+  if (raw === "3") return "delivery/pick-up";
+  // Legacy textual codes (pre-numeric mapping).
   if (raw === "d&p") return "delivery/pick-up";
   return normalizeLogisticsTaskKind(raw, "manual");
 }
