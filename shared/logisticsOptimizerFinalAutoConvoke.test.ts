@@ -254,17 +254,18 @@ describe("autoConvokeLogisticsDriversWithPreAssignedTasks", () => {
 });
 
 describe("buildRoutingProblemInputFromSource pre-assigned + selected drivers", () => {
-  it("skips REQUIRED when pre-assigned driver is not selected", () => {
+  it("does not create REQUIRED from timeline even when pre-assigned driver is not selected", () => {
     const sourceData = buildBaseSourceData();
     const input = buildRoutingProblemInputFromSource(sourceData);
 
-    expect(input.metadata.skippedTimelineAssignmentHintsCount).toBe(1);
+    expect(input.metadata.skippedTimelineAssignmentHintsCount).toBe(0);
+    expect(input.metadata.preAssignedRequiredCount).toBe(0);
     expect(
       input.hardConstraints.filter((constraint) => constraint.type === "REQUIRED_DRIVER_TASK")
     ).toHaveLength(0);
   });
 
-  it("creates REQUIRED when pre-assigned driver is selected (post auto-convoke)", () => {
+  it("keeps auto-convoke metadata without REQUIRED_DRIVER_TASK locks", () => {
     const sourceData = buildBaseSourceData({
       selectedDrivers: [
         {
@@ -296,19 +297,17 @@ describe("buildRoutingProblemInputFromSource pre-assigned + selected drivers", (
     expect(input.metadata.skippedTimelineAssignmentHintsCount).toBe(0);
     expect(input.metadata.autoConvokedDriverIds).toEqual([8]);
     expect(input.metadata.autoConvokedDriversCount).toBe(1);
-    expect(input.hardConstraints).toContainEqual(
-      expect.objectContaining({
-        type: "REQUIRED_DRIVER_TASK",
-        taskId: 101,
-        driverId: 8,
-      })
-    );
+    expect(input.metadata.preAssignedRequiredCount).toBe(0);
+    expect(
+      input.hardConstraints.filter((constraint) => constraint.type === "REQUIRED_DRIVER_TASK")
+    ).toHaveLength(0);
   });
 });
 
 describe("buildRequiredDriverConstraints driver-not-selected skip", () => {
-  it("skips hint when driver is not selected", () => {
+  it("skips hint when driver is not selected and locks are enabled", () => {
     const result = buildRequiredDriverConstraints({
+      enableTimelineRequiredDriverLocks: true,
       hints: [
         {
           taskId: 101,
@@ -371,9 +370,10 @@ describe("buildLogisticsRoutingInput auto-convoke hook", () => {
     expect(loadLogisticsRoutingSourceData).toHaveBeenCalledWith("2026-06-04");
     expect(input.metadata.autoConvokedDriverIds).toEqual([8]);
     expect(input.metadata.skippedTimelineAssignmentHintsCount).toBe(0);
+    expect(input.metadata.preAssignedRequiredCount).toBe(0);
     expect(
       input.hardConstraints.filter((constraint) => constraint.type === "REQUIRED_DRIVER_TASK")
-    ).toHaveLength(1);
+    ).toHaveLength(0);
   });
 
   it("skips auto-convoke when skipAutoConvoke is true", async () => {
@@ -383,7 +383,8 @@ describe("buildLogisticsRoutingInput auto-convoke hook", () => {
     const input = await buildLogisticsRoutingInput("2026-06-04", { skipAutoConvoke: true });
 
     expect(workspaceFiles.loadLogisticsTimeline).not.toHaveBeenCalled();
-    expect(input.metadata.skippedTimelineAssignmentHintsCount).toBe(1);
+    expect(input.metadata.skippedTimelineAssignmentHintsCount).toBe(0);
+    expect(input.metadata.preAssignedRequiredCount).toBe(0);
     expect(input.metadata.autoConvokedDriversCount).toBe(0);
   });
 });

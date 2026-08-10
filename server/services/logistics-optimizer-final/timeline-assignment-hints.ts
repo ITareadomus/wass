@@ -65,10 +65,21 @@ export async function loadTimelineAssignmentHints(workDate: string): Promise<Tim
   return parsePreAssignedTimelineEntries(timeline).hints;
 }
 
+/**
+ * Product rule: logistics has no "mandatory for a specific driver" lock.
+ * Timeline assignments stay re-optimizable and must not become hard
+ * REQUIRED_DRIVER_TASK constraints (those made the solver INVALID via
+ * REQUIRED_DRIVER_DROPPED when a task could not stay on that driver).
+ * Hints remain used for auto-convoke / metadata only.
+ */
+export const ENABLE_TIMELINE_REQUIRED_DRIVER_LOCKS = false;
+
 export interface BuildRequiredDriverConstraintsArgs {
   hints: TimelineAssignmentHint[];
   schedulableTaskIds: Iterable<TaskId>;
   selectedDriverIds: Iterable<DriverId>;
+  /** Test-only override; production uses ENABLE_TIMELINE_REQUIRED_DRIVER_LOCKS. */
+  enableTimelineRequiredDriverLocks?: boolean;
 }
 
 export interface RequiredDriverConstraintBuildError {
@@ -86,6 +97,12 @@ export interface BuildRequiredDriverConstraintsResult {
 export function buildRequiredDriverConstraints(
   args: BuildRequiredDriverConstraintsArgs
 ): BuildRequiredDriverConstraintsResult {
+  const enabled =
+    args.enableTimelineRequiredDriverLocks ?? ENABLE_TIMELINE_REQUIRED_DRIVER_LOCKS;
+  if (!enabled) {
+    return { constraints: [], skippedHints: [], errors: [] };
+  }
+
   const schedulableIds = new Set(args.schedulableTaskIds);
   const driverIds = new Set(args.selectedDriverIds);
   const hintsByTask = new Map<TaskId, TimelineAssignmentHint[]>();
