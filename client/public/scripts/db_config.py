@@ -11,7 +11,23 @@ Environment Variables:
 """
 
 import os
+import sys
 from pathlib import Path
+
+
+def _configure_stdio_utf8() -> None:
+    """Avoid UnicodeEncodeError on Windows consoles (cp1252) when printing emoji/logs."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if not callable(reconfigure):
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
+_configure_stdio_utf8()
 
 # Load .env.local in development (like Node.js dotenv does)
 ENV = os.getenv("NODE_ENV", "development")
@@ -51,7 +67,7 @@ db_config = get_mysql_config()
 
 # Log configuration on import (without password)
 if db_config["host"]:
-    print(f"📊 Python DB config loaded for environment: {ENV}")
+    print(f"[db] Python DB config loaded for environment: {ENV}")
     print(f"   MySQL: {db_config['host']}:{db_config['port']}/{db_config['database']}")
 else:
-    print(f"⚠️ Python DB config: MySQL credentials not found in environment")
+    print("[db] Python DB config: MySQL credentials not found in environment")

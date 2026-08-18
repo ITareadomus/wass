@@ -1,4 +1,5 @@
 import type { RoutingSolution } from "./solution-contract";
+import { formatSolutionApplyGateForUser } from "./user-facing-errors";
 
 export type SolutionApplyGateReason =
   | "OK"
@@ -16,7 +17,7 @@ export class SolutionCannotBeAppliedError extends Error {
   readonly gate: SolutionApplyGateResult;
 
   constructor(gate: SolutionApplyGateResult) {
-    super(`Solution cannot be applied: ${gate.reason}`);
+    super(formatSolutionApplyGateForUser(gate));
     this.name = "SolutionCannotBeAppliedError";
     this.gate = gate;
   }

@@ -186,6 +186,20 @@ function buildTaskNode(args: {
   };
 }
 
+function isTaskHardWindowFeasible(task: TaskNode): boolean {
+  const { earliestStartMin, latestStartMin, latestEndMin } = task.hardWindow;
+  if (
+    !Number.isFinite(earliestStartMin) ||
+    !Number.isFinite(latestStartMin) ||
+    !Number.isFinite(latestEndMin)
+  ) {
+    return false;
+  }
+  if (earliestStartMin > latestStartMin) return false;
+  if (latestStartMin + task.serviceDurationMin > latestEndMin) return false;
+  return true;
+}
+
 function buildTaskNodes(
   sourceData: LogisticsRoutingSourceData,
   workDate: string,
@@ -194,6 +208,11 @@ function buildTaskNodes(
   tasks: TaskNode[];
   hardConstraints: HardConstraintSpec[];
   softConstraints: SoftConstraintSpec[];
+  excludedInvalidHardWindowTasks: Array<{
+    taskId: number;
+    logisticCode: number | null;
+    detail: string;
+  }>;
 } {
   const tasks: TaskNode[] = [];
   const hardConstraints: HardConstraintSpec[] = [];
@@ -201,21 +220,45 @@ function buildTaskNodes(
     { type: "MINIMIZE_TOTAL_TRAVEL", weight: 1 },
     { type: "BALANCE_DRIVER_LOAD", weight: 1 },
   ];
+  const excludedInvalidHardWindowTasks: Array<{
+    taskId: number;
+    logisticCode: number | null;
+    detail: string;
+  }> = [];
 
-  sourceData.schedulableTasks.forEach((taskData, index) => {
+  for (const taskData of sourceData.schedulableTasks) {
     const builtTask = buildTaskNode({
       taskData,
-      nodeIndex: index + 1,
+      // Temporary index; compacted after filtering infeasible windows.
+      nodeIndex: tasks.length + 1,
       workDate,
       sourceData,
       dayEndMin,
     });
-    tasks.push(builtTask.task);
-    hardConstraints.push(...builtTask.hardConstraints);
-    softConstraints.push(...builtTask.softWindows);
-  });
 
-  return { tasks, hardConstraints, softConstraints };
+    if (!isTaskHardWindowFeasible(builtTask.task)) {
+      const { earliestStartMin, latestStartMin, latestEndMin } = builtTask.task.hardWindow;
+      excludedInvalidHardWindowTasks.push({
+        taskId: builtTask.task.taskId,
+        logisticCode: Number.isFinite(builtTask.task.logisticCode)
+          ? builtTask.task.logisticCode
+          : null,
+        detail: `earliestStart=${earliestStartMin}, latestStart=${latestStartMin}, latestEnd=${latestEndMin}`,
+      });
+      continue;
+    }
+
+    const nodeIndex = tasks.length + 1;
+    builtTask.task.nodeIndex = nodeIndex;
+    for (const constraint of builtTask.hardConstraints) {
+      // Constraints reference taskId, not nodeIndex — safe as-is.
+      hardConstraints.push(constraint);
+    }
+    softConstraints.push(...builtTask.softWindows);
+    tasks.push(builtTask.task);
+  }
+
+  return { tasks, hardConstraints, softConstraints, excludedInvalidHardWindowTasks };
 }
 
 function buildDriverConstraints(drivers: DriverNode[]): HardConstraintSpec[] {
@@ -233,6 +276,11 @@ function buildMetadata(args: {
   skippedTimelineAssignmentHintsCount: number;
   sameBuildingDriverLockCount: number;
   skippedSameBuildingGroupsCount: number;
+  excludedInvalidHardWindowTasks: Array<{
+    taskId: number;
+    logisticCode: number | null;
+    detail: string;
+  }>;
   autoConvokeResult?: AutoConvokeLogisticsDriversResult;
 }): RoutingProblemMetadata {
   const {
@@ -241,6 +289,7 @@ function buildMetadata(args: {
     skippedTimelineAssignmentHintsCount,
     sameBuildingDriverLockCount,
     skippedSameBuildingGroupsCount,
+    excludedInvalidHardWindowTasks,
     autoConvokeResult,
   } = args;
   const autoConvokedDriverIds = autoConvokeResult?.autoConvokedDriverIds ?? [];
@@ -248,12 +297,15 @@ function buildMetadata(args: {
   const noCoordinateIds = sourceData.tasksExcludedNoCoordinatesIds;
   const lockedTasks = sourceData.allTaskData.filter((task) => task.locked);
   const timelineAssignmentHints = sourceData.timelineAssignmentHints;
+  const invalidHardWindowIds = excludedInvalidHardWindowTasks.map((entry) => entry.taskId);
   return {
     generatedAt: new Date().toISOString(),
     totalLogisticsTasks: sourceData.allTaskData.length,
     lockedTasksExcluded: sourceData.lockedTasksExcluded,
     tasksExcludedNoCoordinatesCount: noCoordinateIds.length,
     tasksExcludedNoCoordinatesIds: noCoordinateIds,
+    tasksExcludedInvalidHardWindowCount: invalidHardWindowIds.length,
+    tasksExcludedInvalidHardWindowIds: invalidHardWindowIds,
     noSelectedDrivers: sourceData.selectedDrivers.length === 0,
     timelineAssignmentHints,
     timelineAssignmentHintsCount: timelineAssignmentHints.length,
@@ -271,10 +323,17 @@ function buildMetadata(args: {
         taskId: task.taskId,
         reason: "LOCKED" as const,
         detail: task.lockedReason,
+        logisticCode: task.logisticCode,
       })),
       ...noCoordinateIds.map((taskId) => ({
         taskId,
         reason: "NO_COORDINATES" as const,
+      })),
+      ...excludedInvalidHardWindowTasks.map((entry) => ({
+        taskId: entry.taskId,
+        reason: "INVALID_HARD_WINDOW" as const,
+        detail: entry.detail,
+        logisticCode: entry.logisticCode,
       })),
     ],
     validation: {
@@ -317,11 +376,12 @@ export function buildRoutingProblemInputFromSource(
   const workDate = sourceData.workDate;
   const drivers = buildDriverNodes(sourceData);
   const dayEndMin = resolveDayEndMin(drivers);
-  const { tasks, hardConstraints, softConstraints: taskSoftConstraints } = buildTaskNodes(
-    sourceData,
-    workDate,
-    dayEndMin
-  );
+  const {
+    tasks,
+    hardConstraints,
+    softConstraints: taskSoftConstraints,
+    excludedInvalidHardWindowTasks,
+  } = buildTaskNodes(sourceData, workDate, dayEndMin);
   const requiredDriverBuild = buildRequiredDriverConstraints({
     hints: sourceData.timelineAssignmentHints,
     schedulableTaskIds: tasks.map((task) => task.taskId),
@@ -364,11 +424,20 @@ export function buildRoutingProblemInputFromSource(
     skippedTimelineAssignmentHintsCount: requiredDriverBuild.skippedHints.length,
     sameBuildingDriverLockCount: sameBuildingDriverBuild.lockedGroupCount,
     skippedSameBuildingGroupsCount: sameBuildingDriverBuild.skippedGroups.length,
+    excludedInvalidHardWindowTasks,
     autoConvokeResult: options?.autoConvokeResult,
   });
   if (territoryBuild.assignment) {
     metadata.dailyTerritoryAssignment = territoryBuild.assignment;
   }
+
+  // Final safety net: logistics never hard-locks a task to a specific driver.
+  const hardConstraintsWithoutRequiredDriver = [
+    ...buildDriverConstraints(drivers),
+    ...hardConstraints,
+    ...requiredDriverBuild.constraints,
+    ...sameBuildingDriverBuild.constraints,
+  ].filter((constraint) => constraint.type !== "REQUIRED_DRIVER_TASK");
 
   const input: RoutingProblemInput = {
     schemaVersion: "logistics-routing-input/v1",
@@ -379,12 +448,7 @@ export function buildRoutingProblemInputFromSource(
     tasks,
     travelMatrixMin,
     serviceDurationMin: LOGISTICS_SERVICE_DURATION_MIN,
-    hardConstraints: [
-      ...buildDriverConstraints(drivers),
-      ...hardConstraints,
-      ...requiredDriverBuild.constraints,
-      ...sameBuildingDriverBuild.constraints,
-    ],
+    hardConstraints: hardConstraintsWithoutRequiredDriver,
     softConstraints: [...taskSoftConstraints, ...businessSoftConstraints],
     businessGroups,
     metadata,

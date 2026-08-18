@@ -9,10 +9,10 @@ import {
 } from "./logistics-task-kind";
 
 describe("toAdamLogisticsOperation", () => {
-  it("abbrevia delivery/pick-up in d&p per stare in VARCHAR(10)", () => {
-    expect(toAdamLogisticsOperation("delivery/pick-up")).toBe("d&p");
-    expect(toAdamLogisticsOperation("delivery")).toBe("delivery");
-    expect(toAdamLogisticsOperation("pick-up")).toBe("pick-up");
+  it("mappa i kind WASS ai codici numerici ADAM (VARCHAR)", () => {
+    expect(toAdamLogisticsOperation("delivery")).toBe("1");
+    expect(toAdamLogisticsOperation("pick-up")).toBe("2");
+    expect(toAdamLogisticsOperation("delivery/pick-up")).toBe("3");
   });
 
   it("restituisce null per valori non riconosciuti", () => {
@@ -25,6 +25,12 @@ describe("toAdamLogisticsOperation", () => {
     for (const kind of ["delivery/pick-up", "delivery", "pick-up"] as const) {
       expect(fromAdamLogisticsOperation(toAdamLogisticsOperation(kind))).toBe(kind);
     }
+  });
+
+  it("legge ancora i codici testuali legacy da ADAM", () => {
+    expect(fromAdamLogisticsOperation("delivery")).toBe("delivery");
+    expect(fromAdamLogisticsOperation("pick-up")).toBe("pick-up");
+    expect(fromAdamLogisticsOperation("d&p")).toBe("delivery/pick-up");
   });
 });
 
@@ -90,7 +96,8 @@ describe("buildLogisticsAdamUpdates", () => {
         travelTime: 12,
         startTime: "10:15:00",
         endTime: "10:30:00",
-        operation: "d&p",
+        operation: "3",
+        vehicleId: null,
       },
       {
         taskId: 102,
@@ -100,6 +107,34 @@ describe("buildLogisticsAdamUpdates", () => {
         startTime: "10:45:00",
         endTime: "11:00:00",
         operation: null,
+        vehicleId: null,
+      },
+    ]);
+  });
+
+  it("propaga lg_vehicle dal furgone assegnato al driver", () => {
+    const updates = buildLogisticsAdamUpdates(
+      {
+        drivers_assignments: [
+          {
+            driver: { id: 7 },
+            tasks: [{ task_id: 101, sequence: 1, start_time: "10:00", end_time: "10:15" }],
+          },
+        ],
+      },
+      { "7": { vehicle_id: 55, vehicle_name: "Furgone A" } }
+    );
+
+    expect(updates).toEqual([
+      {
+        taskId: 101,
+        driverId: 7,
+        sequence: 1,
+        travelTime: null,
+        startTime: "10:00:00",
+        endTime: "10:15:00",
+        operation: null,
+        vehicleId: 55,
       },
     ]);
   });

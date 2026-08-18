@@ -29,6 +29,8 @@ export interface SolutionValidationIssue {
   message: string;
   path?: string;
   taskId?: number;
+  /** Codice ADAM (`logistic_code`) per messaggi utente. */
+  logisticCode?: number;
   driverId?: number;
   expected?: unknown;
   actual?: unknown;

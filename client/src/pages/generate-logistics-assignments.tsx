@@ -18,6 +18,7 @@ import {
   BarChart3,
   ChevronUp,
   ChevronDown,
+  Zap,
 } from "lucide-react";
 import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
 import {
@@ -408,18 +409,8 @@ type AdamFingerprint = {
 
 export default function GenerateLogisticsAssignments() {
   const { toast } = useToast();
-  const [selectedDate, setSelectedDate] = useState<Date>(() => {
-    const saved = localStorage.getItem("selected_work_date");
-    if (saved) {
-      try {
-        const [y, m, d] = saved.split("-").map(Number);
-        return new Date(y, m - 1, d);
-      } catch {
-        /* fallthrough */
-      }
-    }
-    return new Date();
-  });
+  // Logistics: all'apertura sempre la data odierna (non condivide la data salvata di housekeeping)
+  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [searchTask, setSearchTask] = useState("");
   const timelineMapPanel = useTimelineFloatingPanel("right", getDefaultTimelineMapPanel);
   const timelineStatsPanel = useTimelineFloatingPanel("right", getDefaultTimelineStatsPanel);
@@ -435,6 +426,7 @@ export default function GenerateLogisticsAssignments() {
   /** Solo sul pulsante refresh (come generate-assignments), nessun overlay pagina */
   const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
   const [isRunningLogisticsOptimizer, setIsRunningLogisticsOptimizer] = useState(false);
+  const [isRecalculatingOperations, setIsRecalculatingOperations] = useState(false);
   const [showMissingLogisticsKindWarningDialog, setShowMissingLogisticsKindWarningDialog] = useState(false);
   const [missingLogisticsKindTaskCount, setMissingLogisticsKindTaskCount] = useState(0);
   const [missingLogisticsKindTaskCodes, setMissingLogisticsKindTaskCodes] = useState<string[]>([]);
@@ -470,7 +462,8 @@ export default function GenerateLogisticsAssignments() {
   const isTimelineReadOnly = isWorkDateHistoricallyLocked(selectedDate);
 
   useEffect(() => {
-    localStorage.setItem("selected_work_date", format(selectedDate, "yyyy-MM-dd"));
+    // Solo per logistics: non sovrascrivere selected_work_date di housekeeping
+    localStorage.setItem("selected_logistics_work_date", format(selectedDate, "yyyy-MM-dd"));
   }, [selectedDate]);
 
   useEffect(() => {
@@ -796,6 +789,42 @@ export default function GenerateLogisticsAssignments() {
     }
   }, [selectedDate, toast, fetchAdamLogisticsFingerprint, reloadLogisticsPage]);
 
+  const recalculateLogisticsOperations = useCallback(async () => {
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    setIsRecalculatingOperations(true);
+    try {
+      toast({
+        title: "Ricalcolo operazioni…",
+        description: "Aggiorno tipologie e lg_operation su ADAM",
+        variant: "default",
+      });
+      const response = await fetch("/api/sync-logistics-operations-to-adam", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: dateStr }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.message || `Server error: ${response.status}`);
+      }
+      toast({
+        variant: "success",
+        title: "Operazioni ricalcolate",
+        description: result.message || "lg_operation aggiornate su ADAM",
+      });
+      await reloadLogisticsPage();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Errore sconosciuto";
+      toast({
+        variant: "destructive",
+        title: "Errore ricalcolo operazioni",
+        description: msg,
+      });
+    } finally {
+      setIsRecalculatingOperations(false);
+    }
+  }, [selectedDate, toast, reloadLogisticsPage]);
+
   const executeLogisticsOptimizer = useCallback(async () => {
     const dateStr = format(selectedDate, "yyyy-MM-dd");
     setIsRunningLogisticsOptimizer(true);
@@ -826,23 +855,37 @@ export default function GenerateLogisticsAssignments() {
       const unassignedCount = Number(
         data?.solutionSummary?.droppedTaskCount ?? data?.solution?.droppedTasks?.length ?? 0
       );
+      const skippedInvalidWindow = Array.isArray(data?.excludedFromSolve?.invalidHardWindow)
+        ? data.excludedFromSolve.invalidHardWindow
+        : [];
+      const skippedCodes = skippedInvalidWindow
+        .map((entry: { logisticCode?: number | null; taskId?: number }) =>
+          entry?.logisticCode != null && Number.isFinite(Number(entry.logisticCode))
+            ? String(entry.logisticCode)
+            : entry?.taskId != null
+              ? `task ${entry.taskId}`
+              : null
+        )
+        .filter((value: string | null): value is string => Boolean(value));
       const debugDir = typeof data?.debugDir === "string" ? data.debugDir : null;
       if (debugDir) {
         console.info("[logistics-optimizer-final] Debug JSON:", debugDir);
       }
+      const skippedPart =
+        skippedCodes.length > 0
+          ? ` · ${skippedCodes.length} lasciate fuori per finestra oraria invalida (codici ADAM: ${skippedCodes.join(", ")})`
+          : "";
       toast({
         variant: "success",
         title: "Assegnazione completata",
-        description: debugDir
-          ? `${assignedCount} task assegnate, ${unassignedCount} non assegnate. Debug: server/debug/logistics-optimizer-final/… (vedi console)`
-          : `${assignedCount} task assegnate, ${unassignedCount} non assegnate`,
+        description: `${assignedCount} task assegnate, ${unassignedCount} non assegnate${skippedPart}`,
       });
       await reloadLogisticsPage();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Errore sconosciuto";
       toast({
         variant: "destructive",
-        title: "Errore",
+        title: "Assegnazione non riuscita",
         description: msg || "Errore durante l'assegnazione automatica",
       });
     } finally {
@@ -1371,7 +1414,29 @@ export default function GenerateLogisticsAssignments() {
               <Button
                 variant="ghost"
                 size="sm"
-                disabled={isRunningLogisticsOptimizer}
+                disabled={isRunningLogisticsOptimizer || isRecalculatingOperations || isRefreshingContainers}
+                onClick={() => void recalculateLogisticsOperations()}
+                className="flex items-center gap-2 rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
+                title="Ricalcola pick-up/delivery e scrive lg_operation su ADAM"
+                data-testid="button-recalculate-logistics-operations"
+              >
+                {isRecalculatingOperations ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Ricalcolo…
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-4 w-4" />
+                    Ricalcola operazioni
+                  </>
+                )}
+              </Button>
+              <div className="h-6 w-px bg-black/20 dark:bg-white/20" />
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={isRunningLogisticsOptimizer || isRecalculatingOperations}
                 onClick={() => void handleRunLogisticsOptimizer()}
                 className="flex items-center gap-2 rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
                 data-testid="button-run-logistics-optimizer"

@@ -69,6 +69,12 @@ export interface RunLogisticsRoutingResult {
     totalTravelMin: number;
     totalWaitMin: number;
   };
+  excludedFromSolve: {
+    invalidHardWindow: Array<{
+      taskId: number;
+      logisticCode: number | null;
+    }>;
+  };
 }
 
 export async function runLogisticsRouting(
@@ -150,6 +156,15 @@ export async function runLogisticsRouting(
   }
 
   const assignedTaskCount = solution.routes.reduce((sum, route) => sum + route.stops.length, 0);
+  const invalidHardWindowExcluded = input.metadata.excludedTasks
+    .filter((entry) => entry.reason === "INVALID_HARD_WINDOW")
+    .map((entry) => ({
+      taskId: entry.taskId,
+      logisticCode:
+        entry.logisticCode != null && Number.isFinite(Number(entry.logisticCode))
+          ? Number(entry.logisticCode)
+          : null,
+    }));
 
   return {
     workDate,
@@ -171,6 +186,9 @@ export async function runLogisticsRouting(
       droppedTaskCount: solution.droppedTasks.length,
       totalTravelMin: solution.objectiveBreakdown?.totalTravelMin ?? 0,
       totalWaitMin: solution.objectiveBreakdown?.totalWaitMin ?? 0,
+    },
+    excludedFromSolve: {
+      invalidHardWindow: invalidHardWindowExcluded,
     },
   };
 }

@@ -22,6 +22,12 @@ export interface SkippedSameBuildingGroup {
   driverIds?: DriverId[];
 }
 
+/**
+ * Product rule: logistics never hard-locks a task to a specific driver.
+ * Same-building co-location stays a soft preference via business groups.
+ */
+export const ENABLE_SAME_BUILDING_REQUIRED_DRIVER_LOCKS = false;
+
 export interface BuildSameBuildingDriverConstraintsArgs {
   businessGroups: RoutingBusinessGroup[];
   tasks: TaskNode[];
@@ -34,6 +40,8 @@ export interface BuildSameBuildingDriverConstraintsArgs {
    * when the preferred one cannot serve the group.
    */
   preferredDriverByTaskId?: Map<TaskId, DriverId>;
+  /** Test-only override; production uses ENABLE_SAME_BUILDING_REQUIRED_DRIVER_LOCKS. */
+  enableSameBuildingRequiredDriverLocks?: boolean;
 }
 
 export interface BuildSameBuildingDriverConstraintsResult {
@@ -238,6 +246,12 @@ function estimateIncrementalGroupLoadMin(
 export function buildSameBuildingDriverConstraints(
   args: BuildSameBuildingDriverConstraintsArgs
 ): BuildSameBuildingDriverConstraintsResult {
+  const enabled =
+    args.enableSameBuildingRequiredDriverLocks ?? ENABLE_SAME_BUILDING_REQUIRED_DRIVER_LOCKS;
+  if (!enabled) {
+    return { constraints: [], lockedGroupCount: 0, skippedGroups: [] };
+  }
+
   const taskById = new Map(args.tasks.map((task) => [task.taskId, task]));
   const constraints: HardConstraintSpec[] = [];
   const skippedGroups: SkippedSameBuildingGroup[] = [];

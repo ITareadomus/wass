@@ -15,6 +15,10 @@ import type {
   ValidationIssueCode,
   ValidationMode,
 } from "./validation-contract";
+import {
+  enrichInputIssuesWithLogisticCodes,
+  formatRoutingInputValidationForUser,
+} from "./user-facing-errors";
 
 const DAY_END_MIN = 24 * 60;
 
@@ -331,6 +335,7 @@ function validateTaskHardWindow(
       code: "INVALID_TASK_HARD_WINDOW",
       message: `Task ${task.taskId} has inconsistent hard window`,
       taskId: task.taskId,
+      logisticCode: task.logisticCode,
       path: `tasks[${index}].hardWindow`,
       actual: task.hardWindow,
     });
@@ -342,6 +347,7 @@ function validateTaskHardWindow(
       code: "TASK_SERVICE_EXCEEDS_WINDOW",
       message: `Task ${task.taskId} latestStart + service exceeds latestEnd`,
       taskId: task.taskId,
+      logisticCode: task.logisticCode,
       path: `tasks[${index}].hardWindow`,
       expected: `latestStartMin + ${task.serviceDurationMin} <= latestEndMin`,
       actual: {
@@ -1098,7 +1104,7 @@ function validateMetadataAndWarnings(
   mode: ValidationMode
 ): void {
   const strictMode = mode === "solver" || mode === "apply";
-  const allowedReasons = new Set(["LOCKED", "NO_COORDINATES"]);
+  const allowedReasons = new Set(["LOCKED", "NO_COORDINATES", "INVALID_HARD_WINDOW"]);
   const seenExcludedTaskIds = new Set<number>();
 
   for (const excluded of input.metadata.excludedTasks) {
@@ -1139,6 +1145,9 @@ function validateMetadataAndWarnings(
   const noCoordExcludedCount = input.metadata.excludedTasks.filter(
     (entry) => entry.reason === "NO_COORDINATES"
   ).length;
+  const invalidHardWindowExcludedCount = input.metadata.excludedTasks.filter(
+    (entry) => entry.reason === "INVALID_HARD_WINDOW"
+  ).length;
 
   if (input.metadata.lockedTasksExcluded !== lockedExcludedCount) {
     pushWarning(warnings, {
@@ -1160,6 +1169,18 @@ function validateMetadataAndWarnings(
     });
   }
 
+  if (
+    (input.metadata.tasksExcludedInvalidHardWindowCount ?? 0) !== invalidHardWindowExcludedCount
+  ) {
+    pushWarning(warnings, {
+      code: "EXCLUDED_TASK_COUNT_MISMATCH",
+      message: `tasksExcludedInvalidHardWindowCount (${input.metadata.tasksExcludedInvalidHardWindowCount}) !== INVALID_HARD_WINDOW excludedTasks count (${invalidHardWindowExcludedCount})`,
+      path: "metadata.tasksExcludedInvalidHardWindowCount",
+      expected: invalidHardWindowExcludedCount,
+      actual: input.metadata.tasksExcludedInvalidHardWindowCount,
+    });
+  }
+
   const noCoordIdsFromExcluded = input.metadata.excludedTasks
     .filter((entry) => entry.reason === "NO_COORDINATES")
     .map((entry) => entry.taskId)
@@ -1174,6 +1195,24 @@ function validateMetadataAndWarnings(
       path: "metadata.tasksExcludedNoCoordinatesIds",
       expected: noCoordIdsFromExcluded,
       actual: noCoordIdsFromMetadata,
+    });
+  }
+
+  const invalidHwIdsFromExcluded = input.metadata.excludedTasks
+    .filter((entry) => entry.reason === "INVALID_HARD_WINDOW")
+    .map((entry) => entry.taskId)
+    .sort((a, b) => a - b);
+  const invalidHwIdsFromMetadata = [
+    ...(input.metadata.tasksExcludedInvalidHardWindowIds ?? []),
+  ].sort((a, b) => a - b);
+  if (JSON.stringify(invalidHwIdsFromExcluded) !== JSON.stringify(invalidHwIdsFromMetadata)) {
+    pushWarning(warnings, {
+      code: "EXCLUDED_TASK_COUNT_MISMATCH",
+      message:
+        "tasksExcludedInvalidHardWindowIds does not match INVALID_HARD_WINDOW excludedTasks",
+      path: "metadata.tasksExcludedInvalidHardWindowIds",
+      expected: invalidHwIdsFromExcluded,
+      actual: invalidHwIdsFromMetadata,
     });
   }
 
@@ -1276,8 +1315,8 @@ export function validateRoutingProblemInput(
 
   return {
     valid: errors.length === 0,
-    errors,
-    warnings,
+    errors: enrichInputIssuesWithLogisticCodes(input, errors),
+    warnings: enrichInputIssuesWithLogisticCodes(input, warnings),
   };
 }
 
@@ -1287,8 +1326,15 @@ export function assertRoutingProblemInputValid(
 ): void {
   const validation = validateRoutingProblemInput(input, options);
   if (!validation.valid) {
-    const summary = validation.errors.map(formatValidationIssue).join("\n");
-    throw new Error(`Invalid RoutingProblemInput:\n${summary}`);
+    const err = new Error(
+      formatRoutingInputValidationForUser(validation.errors)
+    ) as Error & {
+      name: string;
+      inputValidation: RoutingProblemValidationResult;
+    };
+    err.name = "RoutingInputValidationError";
+    err.inputValidation = validation;
+    throw err;
   }
 }
 

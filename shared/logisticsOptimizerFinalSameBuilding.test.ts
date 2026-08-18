@@ -92,6 +92,7 @@ describe("buildSameBuildingDriverConstraints", () => {
     const businessGroups = buildBusinessGroups(tasks, travelMatrixMin);
 
     const result = buildSameBuildingDriverConstraints({
+      enableSameBuildingRequiredDriverLocks: true,
       businessGroups,
       tasks,
       drivers,
@@ -131,6 +132,7 @@ describe("buildSameBuildingDriverConstraints", () => {
     const businessGroups = buildBusinessGroups(tasks, travelMatrixMin);
 
     const result = buildSameBuildingDriverConstraints({
+      enableSameBuildingRequiredDriverLocks: true,
       businessGroups,
       tasks,
       drivers,
@@ -159,6 +161,7 @@ describe("buildSameBuildingDriverConstraints", () => {
     const businessGroups = buildBusinessGroups(tasks, travelMatrixMin);
 
     const result = buildSameBuildingDriverConstraints({
+      enableSameBuildingRequiredDriverLocks: true,
       businessGroups,
       tasks,
       drivers,
@@ -209,6 +212,7 @@ describe("buildSameBuildingDriverConstraints", () => {
     const travelMatrixMin = buildTravelMatrixMin(buildLocationNodes(tasks));
     const businessGroups = buildBusinessGroups(tasks, travelMatrixMin);
     const sameBuilding = buildSameBuildingDriverConstraints({
+      enableSameBuildingRequiredDriverLocks: true,
       businessGroups,
       tasks,
       drivers,
@@ -306,6 +310,7 @@ describe("buildSameBuildingDriverConstraints", () => {
     const businessGroups = buildBusinessGroups(tasks, travelMatrixMin);
 
     const result = buildSameBuildingDriverConstraints({
+      enableSameBuildingRequiredDriverLocks: true,
       businessGroups,
       tasks,
       drivers,
@@ -432,20 +437,15 @@ describe("buildRoutingProblemInputFromSource integration", () => {
         constraint.source === "same_coordinates_building"
     );
 
-    expect(sameBuildingConstraints).toHaveLength(2);
-    const driverIds = sameBuildingConstraints.map((c) =>
-      c.type === "REQUIRED_DRIVER_TASK" ? c.driverId : null
-    );
-    expect(driverIds[0]).toBe(driverIds[1]);
-    expect(input.metadata.sameBuildingDriverLockCount).toBe(1);
+    // Product rule: no hard driver locks in logistics (same-building stays soft).
+    expect(sameBuildingConstraints).toHaveLength(0);
+    expect(input.metadata.sameBuildingDriverLockCount).toBe(0);
     expect(
-      input.metadata.validation.warnings.some(
-        (warning) => warning.path === "metadata.preAssignedRequiredCount"
-      )
-    ).toBe(false);
+      input.hardConstraints.filter((constraint) => constraint.type === "REQUIRED_DRIVER_TASK")
+    ).toHaveLength(0);
   });
 
-  it("derives same-building locks from the territory assignment, not the other way around", () => {
+  it("does not hard-lock same-building pairs even when territories prefer drivers", () => {
     const sourceData: LogisticsRoutingSourceData = {
       workDate: "2026-06-18",
       allTaskData: [],
@@ -541,31 +541,17 @@ describe("buildRoutingProblemInputFromSource integration", () => {
     const territoryAssignment = input.metadata.dailyTerritoryAssignment;
     expect(territoryAssignment).toBeDefined();
 
-    const preferredDriverByTaskId = new Map(
-      territoryAssignment!.taskPreferredDriverId.map((entry) => [entry.taskId, entry.driverId])
-    );
     const sameBuildingConstraints = input.hardConstraints.filter(
       (constraint) =>
         constraint.type === "REQUIRED_DRIVER_TASK" &&
         constraint.source === "same_coordinates_building"
     );
 
-    expect(input.metadata.sameBuildingDriverLockCount).toBe(2);
-    expect(sameBuildingConstraints).toHaveLength(4);
-
-    const mismatches = sameBuildingConstraints.filter(
-      (constraint) =>
-        constraint.type === "REQUIRED_DRIVER_TASK" &&
-        preferredDriverByTaskId.get(constraint.taskId) !== constraint.driverId
-    );
-    expect(mismatches).toEqual([]);
-
-    const lockedDriverIds = new Set(
-      sameBuildingConstraints.map((constraint) =>
-        constraint.type === "REQUIRED_DRIVER_TASK" ? constraint.driverId : null
-      )
-    );
-    expect(lockedDriverIds).toEqual(new Set([737, 1078]));
+    expect(input.metadata.sameBuildingDriverLockCount).toBe(0);
+    expect(sameBuildingConstraints).toHaveLength(0);
+    expect(
+      input.hardConstraints.filter((constraint) => constraint.type === "REQUIRED_DRIVER_TASK")
+    ).toHaveLength(0);
   });
 });
 

@@ -13,6 +13,8 @@ export interface LogisticsAdamUpdate {
   startTime: string | null;
   endTime: string | null;
   operation: string | null;
+  /** ID struttura veicolo ADAM → colonna `lg_vehicle`. */
+  vehicleId: number | null;
 }
 
 export interface LogisticsAdamSyncResult {
@@ -61,6 +63,23 @@ function toLogisticsSequence(value: unknown): number {
   return Math.round(n);
 }
 
+/** ID veicolo da `lg_selected_drivers.vehicle_assignments` (chiave = driver_id). */
+export function resolveLogisticsVehicleIdForDriver(
+  driverId: number,
+  vehicleAssignments: Record<string, any> | null | undefined
+): number | null {
+  if (!vehicleAssignments || !Number.isFinite(driverId) || driverId <= 0) return null;
+  const raw =
+    vehicleAssignments[String(driverId)] ??
+    (vehicleAssignments as any)[driverId];
+  if (!raw || typeof raw !== "object") return null;
+  const vehicleIdRaw = raw.vehicle_id;
+  if (vehicleIdRaw == null || vehicleIdRaw === "") return null;
+  const n = Number(vehicleIdRaw);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
+}
+
 function parseHmSortKey(value: unknown): number {
   const raw = String(value ?? "").trim();
   const match = /^(\d{1,2}):(\d{2})/.exec(raw);
@@ -91,9 +110,11 @@ function compareLogisticsRouteOrder(left: any, right: any): number {
  * Una task assegnata a più driver non può esistere: vince la prima occorrenza.
  * `lg_sequence` usa la `sequence` di `lg_timeline` (PG); se manca, fallback 1..n
  * sull'ordine di giro del driver.
+ * `lg_vehicle` viene risolto dalle assegnazioni furgone per driver (opzionale).
  */
 export function buildLogisticsAdamUpdates(
-  timeline: { drivers_assignments?: any[] } | null | undefined
+  timeline: { drivers_assignments?: any[] } | null | undefined,
+  vehicleAssignments?: Record<string, any> | null
 ): LogisticsAdamUpdate[] {
   const updates: LogisticsAdamUpdate[] = [];
   const seen = new Set<number>();
@@ -102,6 +123,7 @@ export function buildLogisticsAdamUpdates(
     const driverId = Number(entry?.driver?.id);
     if (!Number.isFinite(driverId) || driverId <= 0) continue;
 
+    const vehicleId = resolveLogisticsVehicleIdForDriver(driverId, vehicleAssignments);
     const tasks = [...(entry?.tasks ?? [])].sort(compareLogisticsRouteOrder);
     let routeSequence = 0;
 
@@ -121,6 +143,7 @@ export function buildLogisticsAdamUpdates(
         startTime: formatLogisticsTimeForMySQL(task?.start_time ?? task?.startTime),
         endTime: formatLogisticsTimeForMySQL(task?.end_time ?? task?.endTime),
         operation: toAdamLogisticsOperation(task?.logistics_task_kind),
+        vehicleId,
       });
     }
   }
@@ -156,22 +179,23 @@ async function listDrivenHousekeepingTaskIds(
 
 /**
  * Scrive su ADAM `app_housekeeping` i dati generati dalla logistica
- * (`driven_by_us`, `lg_sequence`, `lg_travel_time`, `lg_start_time`, `lg_end_time`, `lg_operation`)
- * e azzera le task non più assegnate. Non tocca le colonne housekeeping
- * (`cleaned_by_us`, `travel_time`, `start_time`, `end_time`, `sequence`).
+ * (`driven_by_us`, `lg_sequence`, `lg_travel_time`, `lg_start_time`, `lg_end_time`,
+ * `lg_operation`, `lg_vehicle`) e azzera le task non più assegnate. Non tocca le
+ * colonne housekeeping (`cleaned_by_us`, `travel_time`, `start_time`, `end_time`, `sequence`).
  */
 export async function syncLogisticsTimelineToAdam(
   connection: Connection,
   params: {
     workDate: string;
     timeline: { drivers_assignments?: any[] } | null | undefined;
+    vehicleAssignments?: Record<string, any> | null;
     adamUpdatedBy: string;
     nowRome: string;
   }
 ): Promise<LogisticsAdamSyncResult> {
-  const { workDate, timeline, adamUpdatedBy, nowRome } = params;
+  const { workDate, timeline, vehicleAssignments, adamUpdatedBy, nowRome } = params;
 
-  const updates = buildLogisticsAdamUpdates(timeline);
+  const updates = buildLogisticsAdamUpdates(timeline, vehicleAssignments);
   const assignedTaskIds = new Set(updates.map((u) => u.taskId));
   const errors: string[] = [];
   const clearErrors: string[] = [];
@@ -189,6 +213,7 @@ export async function syncLogisticsTimelineToAdam(
            lg_start_time = ?,
            lg_end_time = ?,
            lg_operation = ?,
+           lg_vehicle = ?,
            updated_by = ?,
            updated_at = ?
          WHERE id = ?`,
@@ -199,6 +224,7 @@ export async function syncLogisticsTimelineToAdam(
           u.startTime,
           u.endTime,
           u.operation,
+          u.vehicleId,
           adamUpdatedBy,
           nowRome,
           u.taskId,
@@ -230,6 +256,7 @@ export async function syncLogisticsTimelineToAdam(
            lg_start_time = NULL,
            lg_end_time = NULL,
            lg_operation = NULL,
+           lg_vehicle = NULL,
            updated_by = ?,
            updated_at = ?
          WHERE id = ?`,

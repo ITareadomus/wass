@@ -26,8 +26,10 @@ L’ottimizzatore **non** li sposta in timeline e **non** li assegna.
 
 ### Task già in timeline (pre-assegnati)
 Se un task è già sulla timeline di un autista:
-- resta di **quell’autista** (non può cambiare driver);
-- può però essere **spostato in orario e in ordine** di percorso, se le finestre lo permettono.
+- **non** è bloccato su quell’autista (la logica “task obbligatoria per un driver” è deprecata);
+- al re-ottimizza può essere riassegnato a **qualsiasi** autista disponibile;
+- gli autisti che avevano già task in timeline restano comunque auto-convocati.
+- Anche le task nello stesso edificio **non** vengono hard-lockate a un autista (resta solo preferenza soft).
 
 ### Task liberi
 I task in pool (nei container, non bloccati) possono andare a **qualsiasi** autista disponibile, se c’è spazio e le regole di orario lo consentono.

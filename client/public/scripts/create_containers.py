@@ -55,6 +55,36 @@ def varchar_to_str(value):
     s = str(value).strip()
     return s if s else None
 
+def normalize_time_hhmm(value):
+    """Normalizza TIME MySQL / stringhe a HH:MM (compatibile con PG VARCHAR(10))."""
+    if value is None:
+        return None
+    # datetime.timedelta from MySQL TIME
+    try:
+        from datetime import timedelta
+        if isinstance(value, timedelta):
+            total = int(value.total_seconds())
+            if total < 0:
+                return None
+            hh = (total // 3600) % 24
+            mm = (total % 3600) // 60
+            return f"{hh:02d}:{mm:02d}"
+    except Exception:
+        pass
+    s = varchar_to_str(value)
+    if not s:
+        return None
+    # "14:30:00" / "14:30" / "9:05:00"
+    parts = s.replace(".", ":").split(":")
+    try:
+        hh = int(parts[0])
+        mm = int(parts[1]) if len(parts) > 1 else 0
+        if 0 <= hh <= 23 and 0 <= mm <= 59:
+            return f"{hh:02d}:{mm:02d}"
+    except (TypeError, ValueError):
+        return s
+    return s
+
 def normalize_coord(coord):
     if coord is None:
         return None
@@ -244,8 +274,8 @@ def get_tasks_from_db(selected_date, assigned_task_ids=None, workflow="housekeep
             "cleaning_time": r.get("cleaning_time"),
             "checkin_date": date_to_str(r.get("checkin")) if r.get("checkin") else None,
             "checkout_date": date_to_str(r.get("checkout")) if r.get("checkout") else None,
-            "checkin_time": varchar_to_str(r.get("checkin_time")),
-            "checkout_time": varchar_to_str(r.get("checkout_time")),
+            "checkin_time": normalize_time_hhmm(r.get("checkin_time")),
+            "checkout_time": normalize_time_hhmm(r.get("checkout_time")),
             "pax_in": r.get("pax_in"),
             "pax_out": r.get("pax_out"),
             "small_equipment": small_equipment_bool,
@@ -512,16 +542,27 @@ def main():
         target_date, assigned_task_ids=set(), workflow=workflow
     )  # Non filtrare
 
-    # CRITICAL: Preserva timeline.json aggiornando SOLO i dati modificati dal DB
+    # CRITICAL: Preserva timeline aggiornando SOLO i dati modificati dal DB
     if workflow != "logistics" and timeline_data and assigned_task_ids:
-        db_tasks_map = {task["task_id"]: task for task in all_tasks_from_db}
+        db_tasks_map = {}
+        for task in all_tasks_from_db:
+            tid = task.get("task_id")
+            try:
+                tid_int = int(tid)
+            except (TypeError, ValueError):
+                continue
+            db_tasks_map[tid_int] = task
         updated_count = 0
 
         for cleaner_entry in timeline_data.get("cleaners_assignments", []):
             for task in cleaner_entry.get("tasks", []):
                 task_id = task.get("task_id")
-                if task_id and task_id in db_tasks_map:
-                    fresh_data = db_tasks_map[task_id]
+                try:
+                    task_id_int = int(task_id) if task_id is not None else None
+                except (TypeError, ValueError):
+                    task_id_int = None
+                if task_id_int and task_id_int in db_tasks_map:
+                    fresh_data = db_tasks_map[task_id_int]
 
                     # CRITICAL: Campi da aggiornare dal DB (NON toccare campi timeline)
                     # Preserva: start_time, end_time, travel_time, sequence, followup, priority, reasons
@@ -530,7 +571,7 @@ def main():
                         "cleaning_time", "checkin_date", "checkout_date", "checkin_time",
                         "checkout_time", "pax_in", "pax_out", "small_equipment",
                         "operation_id", "confirmed_operation", "straordinaria",
-                        "type_apt", "alias", "customer_name"
+                        "type_apt", "alias", "customer_name", "customer_reference"
                     ]
 
                     for field in fields_to_update:
@@ -541,10 +582,14 @@ def main():
 
         if updated_count > 0:
             # Salva timeline via API preservando metadata e struttura
+            # skip_recalculate=True: solo patch campi ADAM, senza ricalcolo orari
+            # (evita timeout HTTP e non deve cambiare start/end/travel in modalità apt)
+            if "metadata" not in timeline_data or timeline_data["metadata"] is None:
+                timeline_data["metadata"] = {}
             timeline_data["metadata"]["last_updated"] = datetime.now().isoformat()
             # NON cambiare la data - mantieni quella della timeline
-            api_client.save_timeline(target_date, timeline_data)
-            print(f"✅ Aggiornate {updated_count} task in timeline via API (preservati campi timeline: start_time, end_time, travel_time, sequence)")
+            api_client.save_timeline(target_date, timeline_data, skip_recalculate=True)
+            print(f"✅ Aggiornate {updated_count} task in timeline via API (preservati campi timeline: start_time, end_time, travel_time, sequence; skipRecalculate)")
 
     # Filtra le task già assegnate per containers.json (solo housekeeping)
     if workflow != "logistics":
@@ -723,8 +768,8 @@ def extract_tasks_from_db(work_date=None, assigned_task_ids=None, workflow="hous
             "cleaning_time": r.get("cleaning_time"),
             "checkin_date": date_to_str(r.get("checkin")) if r.get("checkin") else None,
             "checkout_date": date_to_str(r.get("checkout")) if r.get("checkout") else None,
-            "checkin_time": varchar_to_str(r.get("checkin_time")),
-            "checkout_time": varchar_to_str(r.get("checkout_time")),
+            "checkin_time": normalize_time_hhmm(r.get("checkin_time")),
+            "checkout_time": normalize_time_hhmm(r.get("checkout_time")),
             "pax_in": r.get("pax_in"),
             "pax_out": r.get("pax_out"),
             "small_equipment": small_equipment_bool,

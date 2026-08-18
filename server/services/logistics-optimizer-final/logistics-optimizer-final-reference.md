@@ -1309,24 +1309,24 @@ Glossario (termini di dominio):
 | Termine | Definizione |
 |---|---|
 | **Container-locked** | Task bloccato in container (`daily_task_locks` / `lg_containers`). Non entra in timeline, escluso da `RoutingProblemInput.tasks`. |
-| **Pre-assigned** | Task su logistics timeline driver, già assegnato a un driver. Genera `REQUIRED_DRIVER_TASK`; driver fisso, tempo/ordine flessibili in `hardWindow`. |
+| **Pre-assigned** | Task su logistics timeline driver. Usato per auto-convoke driver; **non** genera `REQUIRED_DRIVER_TASK` (nessun lock obbligatorio per autista). |
 | **Free** | Task in pool senza vincolo driver. |
 
 **Non esiste “locked on timeline”.** In logistics non ci sono task bloccati in timeline. Il check `task.locked === true` in `loadTimelineAssignmentHints` è solo un guard difensivo: un container-locked non dovrebbe mai comparire in timeline; se succede, l'hint viene ignorato.
 
 1. **Container-locked** (`daily_task_locks` / `lg_containers`): stay in containers, never enter timeline, excluded from `RoutingProblemInput.tasks`, never moved by solver.
 
-2. **Pre-assigned** (assignment on driver timeline): enter `RoutingProblemInput.tasks`, generate hard `REQUIRED_DRIVER_TASK`, must stay on the same driver, may shift in time and route order within `hardWindow`.
+2. **Pre-assigned** (assignment on driver timeline): enter `RoutingProblemInput.tasks` as free-to-reassign tasks; hints feed auto-convoke / metadata only (`ENABLE_TIMELINE_REQUIRED_DRIVER_LOCKS = false`).
 
 3. **Free tasks**: enter `tasks[]`, no `REQUIRED_DRIVER_TASK`, any feasible driver.
 
 - `manually_moved` is metadata only; it does not lock the task.
-- Logistics differs from housekeeping pre-assigned: housekeeping excludes timeline tasks from Phase1 and keeps them time-fixed; logistics keeps them in the solver pool with flexible timing on the required driver.
-- Apply preserva task fuori dal pool solver e merge solver output per free/pre-assigned (`apply-routing-solution.ts`).
+- Timeline pre-assignments must not create hard `REQUIRED_DRIVER_TASK` locks (avoids `REQUIRED_DRIVER_DROPPED` / INVALID when the solver reassigns).
+- Apply preserva task fuori dal pool solver e merge solver output (`apply-routing-solution.ts`).
 
 | # | Domanda | Decisione |
 |---|---|---|
-| 1 | Task pre-assegnati in timeline | **Integrati in 4b.** `REQUIRED_DRIVER_TASK` hard in `hardConstraints`; greedy rispetta driver mandato; drop `REQUIRED_DRIVER_INFEASIBLE` → `status: INVALID`. |
+| 1 | Task pre-assegnati in timeline | **Nessun lock driver.** Hint solo per auto-convoke/metadata; il solver può riassegnare. |
 | 2 | Driver end window | **Sì.** Ogni driver ha un orario massimo giornaliero (`endTime` / `DRIVER_WORK_WINDOW`). Già implementato in `buildDriverNodes`. |
 | 3 | Start location | **Sempre depot** (`45.434029, 9.180008`). `startLocationNodeId: "depot"` per tutti i driver. |
 | 4 | Task senza coordinate | **Sempre esclusi.** Nessun geocoding/fallback. Già implementato in `loaders.ts` → `schedulableTasks`. |

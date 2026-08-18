@@ -248,9 +248,13 @@ export interface RoutingProblemMetadata {
   noSelectedDrivers: boolean;
   excludedTasks: Array<{
     taskId: TaskId;
-    reason: "LOCKED" | "NO_COORDINATES";
+    reason: "LOCKED" | "NO_COORDINATES" | "INVALID_HARD_WINDOW";
     detail?: string | null;
+    logisticCode?: number | null;
   }>;
+  /** Task escluse perché checkout/check-in (o vincoli cleaner) rendono la finestra impossibile. */
+  tasksExcludedInvalidHardWindowCount?: number;
+  tasksExcludedInvalidHardWindowIds?: TaskId[];
   /** @deprecated Non popolato dal builder 4b+. Usare `timelineAssignmentHints`. */
   existingLockedAssignments?: ExistingLockedAssignment[];
   existingLockedAssignmentsCount?: number;

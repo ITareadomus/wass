@@ -88,8 +88,29 @@ describe("buildRequiredDriverConstraints", () => {
     expect(result.errors).toEqual([]);
   });
 
-  it("creates REQUIRED_DRIVER_TASK for a valid pre-assigned task", () => {
+  it("product default: does not create REQUIRED_DRIVER_TASK from timeline hints", () => {
     const result = buildRequiredDriverConstraints({
+      hints: [
+        {
+          taskId: 101,
+          driverId: 7,
+          source: "timeline",
+          sequence: 1,
+          manuallyMoved: false,
+        },
+      ],
+      schedulableTaskIds: [101],
+      selectedDriverIds: [7],
+    });
+
+    expect(result.constraints).toEqual([]);
+    expect(result.skippedHints).toEqual([]);
+    expect(result.errors).toEqual([]);
+  });
+
+  it("creates REQUIRED_DRIVER_TASK for a valid pre-assigned task when locks enabled", () => {
+    const result = buildRequiredDriverConstraints({
+      enableTimelineRequiredDriverLocks: true,
       hints: [
         {
           taskId: 101,
@@ -114,8 +135,9 @@ describe("buildRequiredDriverConstraints", () => {
     expect(result.errors).toEqual([]);
   });
 
-  it("preserves manuallyMoved metadata without extra lock semantics", () => {
+  it("preserves manuallyMoved metadata without extra lock semantics when locks enabled", () => {
     const result = buildRequiredDriverConstraints({
+      enableTimelineRequiredDriverLocks: true,
       hints: [
         {
           taskId: 101,
@@ -135,7 +157,7 @@ describe("buildRequiredDriverConstraints", () => {
     });
   });
 
-  it("skips hints for non-schedulable tasks", () => {
+  it("skips hints for non-schedulable tasks when locks enabled", () => {
     const hint = {
       taskId: 999,
       driverId: 7,
@@ -144,6 +166,7 @@ describe("buildRequiredDriverConstraints", () => {
       manuallyMoved: false,
     };
     const result = buildRequiredDriverConstraints({
+      enableTimelineRequiredDriverLocks: true,
       hints: [hint],
       schedulableTaskIds: [101],
       selectedDriverIds: [7],
@@ -153,7 +176,7 @@ describe("buildRequiredDriverConstraints", () => {
     expect(result.skippedHints).toEqual([hint]);
   });
 
-  it("skips hints for non-selected drivers", () => {
+  it("skips hints for non-selected drivers when locks enabled", () => {
     const hint = {
       taskId: 101,
       driverId: 99,
@@ -162,6 +185,7 @@ describe("buildRequiredDriverConstraints", () => {
       manuallyMoved: false,
     };
     const result = buildRequiredDriverConstraints({
+      enableTimelineRequiredDriverLocks: true,
       hints: [hint],
       schedulableTaskIds: [101],
       selectedDriverIds: [7],
@@ -171,8 +195,9 @@ describe("buildRequiredDriverConstraints", () => {
     expect(result.skippedHints).toEqual([hint]);
   });
 
-  it("returns MULTIPLE_REQUIRED_DRIVERS_FOR_TASK when same task has different drivers", () => {
+  it("returns MULTIPLE_REQUIRED_DRIVERS_FOR_TASK when same task has different drivers and locks enabled", () => {
     const result = buildRequiredDriverConstraints({
+      enableTimelineRequiredDriverLocks: true,
       hints: [
         {
           taskId: 101,
@@ -204,6 +229,20 @@ describe("buildRequiredDriverConstraints", () => {
   });
 });
 
+function injectTimelineRequiredDriverTask(
+  input: RoutingProblemInput,
+  taskId: number,
+  driverId: number
+): void {
+  input.hardConstraints.push({
+    type: "REQUIRED_DRIVER_TASK",
+    taskId,
+    driverId,
+    source: "timeline_pre_assigned",
+  });
+  input.metadata.preAssignedRequiredCount += 1;
+}
+
 describe("buildRoutingProblemInputFromSource timeline integration", () => {
   it("excludes task locked nei containers from tasks and REQUIRED", () => {
     const lockedTask = buildBaseTask(103, { locked: true, lockedReason: "manual_lock" });
@@ -229,10 +268,10 @@ describe("buildRoutingProblemInputFromSource timeline integration", () => {
     expect(
       input.hardConstraints.filter((constraint) => constraint.type === "REQUIRED_DRIVER_TASK")
     ).toHaveLength(0);
-    expect(input.metadata.skippedTimelineAssignmentHintsCount).toBe(1);
+    expect(input.metadata.skippedTimelineAssignmentHintsCount).toBe(0);
   });
 
-  it("keeps pre-assigned tasks in tasks[] with REQUIRED_DRIVER_TASK", () => {
+  it("keeps pre-assigned tasks in tasks[] without REQUIRED_DRIVER_TASK lock", () => {
     const input = buildRoutingProblemInputFromSource(
       buildBaseSourceData({
         timelineAssignmentHints: [
@@ -248,13 +287,11 @@ describe("buildRoutingProblemInputFromSource timeline integration", () => {
     );
 
     expect(input.tasks.map((task) => task.taskId)).toEqual([101]);
-    expect(input.hardConstraints).toContainEqual({
-      type: "REQUIRED_DRIVER_TASK",
-      taskId: 101,
-      driverId: 7,
-      source: "timeline_pre_assigned",
-    });
-    expect(input.metadata.preAssignedRequiredCount).toBe(1);
+    expect(
+      input.hardConstraints.filter((constraint) => constraint.type === "REQUIRED_DRIVER_TASK")
+    ).toHaveLength(0);
+    expect(input.metadata.preAssignedRequiredCount).toBe(0);
+    expect(input.metadata.timelineAssignmentHintsCount).toBe(1);
     expect(input.metadata.lockedAssignmentsSolverIntegration).toBe("integrated_v4b");
   });
 });
@@ -330,7 +367,7 @@ describe("validateRoutingProblemInput REQUIRED_DRIVER_TASK", () => {
     );
   });
 
-  it("surfaces MULTIPLE_REQUIRED_DRIVERS_FOR_TASK from builder", () => {
+  it("does not surface MULTIPLE_REQUIRED_DRIVERS_FOR_TASK while timeline locks are disabled", () => {
     const input = buildRoutingProblemInputFromSource(
       buildBaseSourceData({
         timelineAssignmentHints: [
@@ -352,11 +389,10 @@ describe("validateRoutingProblemInput REQUIRED_DRIVER_TASK", () => {
       })
     );
 
-    expect(input.metadata.validation.valid).toBe(false);
-    expect(input.metadata.validation.errors).toContainEqual(
+    expect(input.metadata.preAssignedRequiredCount).toBe(0);
+    expect(input.metadata.validation.errors).not.toContainEqual(
       expect.objectContaining({
         code: "MULTIPLE_REQUIRED_DRIVERS_FOR_TASK",
-        taskId: 101,
       })
     );
   });
@@ -364,19 +400,8 @@ describe("validateRoutingProblemInput REQUIRED_DRIVER_TASK", () => {
 
 describe("solveGreedyRouting REQUIRED_DRIVER_TASK", () => {
   it("assigns required task to the mandated driver", () => {
-    const input = buildRoutingProblemInputFromSource(
-      buildBaseSourceData({
-        timelineAssignmentHints: [
-          {
-            taskId: 101,
-            driverId: 8,
-            source: "timeline",
-            sequence: 1,
-            manuallyMoved: false,
-          },
-        ],
-      })
-    );
+    const input = buildRoutingProblemInputFromSource(buildBaseSourceData());
+    injectTimelineRequiredDriverTask(input, 101, 8);
     const solution = solveGreedyRouting(input, {
       generatedAt: "2026-06-04T00:00:00.000Z",
       solveDurationMs: 0,
@@ -399,17 +424,9 @@ describe("solveGreedyRouting REQUIRED_DRIVER_TASK", () => {
         allTaskData: [buildBaseTask(101), freeTask],
         unlockedTaskData: [buildBaseTask(101), freeTask],
         schedulableTasks: [buildBaseTask(101), freeTask],
-        timelineAssignmentHints: [
-          {
-            taskId: 102,
-            driverId: 7,
-            source: "timeline",
-            sequence: 2,
-            manuallyMoved: false,
-          },
-        ],
       })
     );
+    injectTimelineRequiredDriverTask(input, 102, 7);
     const solution = solveGreedyRouting(input, {
       generatedAt: "2026-06-04T00:00:00.000Z",
       solveDurationMs: 0,
@@ -421,19 +438,8 @@ describe("solveGreedyRouting REQUIRED_DRIVER_TASK", () => {
   });
 
   it("drops required task with REQUIRED_DRIVER_INFEASIBLE and INVALID status", () => {
-    const input = buildRoutingProblemInputFromSource(
-      buildBaseSourceData({
-        timelineAssignmentHints: [
-          {
-            taskId: 101,
-            driverId: 7,
-            source: "timeline",
-            sequence: 1,
-            manuallyMoved: false,
-          },
-        ],
-      })
-    );
+    const input = buildRoutingProblemInputFromSource(buildBaseSourceData());
+    injectTimelineRequiredDriverTask(input, 101, 7);
     input.tasks[0].hardWindow = {
       earliestStartMin: 1200,
       latestStartMin: 1200,
@@ -475,19 +481,8 @@ describe("solveGreedyRouting REQUIRED_DRIVER_TASK", () => {
 
 describe("validateRoutingSolution REQUIRED_DRIVER_TASK", () => {
   it("flags REQUIRED_DRIVER_VIOLATION when task is on wrong driver", () => {
-    const input = buildRoutingProblemInputFromSource(
-      buildBaseSourceData({
-        timelineAssignmentHints: [
-          {
-            taskId: 101,
-            driverId: 7,
-            source: "timeline",
-            sequence: 1,
-            manuallyMoved: false,
-          },
-        ],
-      })
-    );
+    const input = buildRoutingProblemInputFromSource(buildBaseSourceData());
+    injectTimelineRequiredDriverTask(input, 101, 7);
     const solution = solveGreedyRouting(input, {
       generatedAt: "2026-06-04T00:00:00.000Z",
       solveDurationMs: 0,

@@ -50,6 +50,8 @@ export interface ValidationIssue {
   message: string;
   path?: string;
   taskId?: number;
+  /** Codice ADAM (`logistic_code`) per messaggi utente. */
+  logisticCode?: number;
   driverId?: number;
   nodeIndex?: number;
   expected?: unknown;

@@ -19,6 +19,7 @@ import {
   computeRouteSequenceDiagnostics,
 } from "./groups/route-sequence-penalties";
 import { runPostSolvePipeline } from "./post-solve-pipeline";
+import { formatRoutingInputValidationForUser } from "./user-facing-errors";
 
 export interface RunLogisticsRoutingDryOptions extends BuildLogisticsRoutingInputOptions {
   debug?: boolean;
@@ -66,10 +67,7 @@ export class RoutingInputValidationError extends Error {
   readonly inputValidation: RoutingProblemValidationResult;
 
   constructor(inputValidation: RoutingProblemValidationResult) {
-    const summary = inputValidation.errors
-      .map((issue) => `${issue.code}: ${issue.message}`)
-      .join("\n");
-    super(`Invalid RoutingProblemInput:\n${summary}`);
+    super(formatRoutingInputValidationForUser(inputValidation.errors));
     this.name = "RoutingInputValidationError";
     this.inputValidation = inputValidation;
   }

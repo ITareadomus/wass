@@ -1814,6 +1814,11 @@ export class PgDailyAssignmentsService {
 
   async loadLogisticsTimeline(workDate: string): Promise<any | null> {
     try {
+      try {
+        await this.ensureDefaultLocksForAdamLogisticCode1741(workDate);
+      } catch (lockError) {
+        console.warn('⚠️ PG: ensureDefaultLocksForAdamLogisticCode1741 a load timeline:', lockError);
+      }
       const rows = await this.getLogisticsAssignments(workDate);
       if (rows.length === 0) {
         return null;
@@ -2248,6 +2253,11 @@ export class PgDailyAssignmentsService {
   async loadLogisticsContainers(workDate: string): Promise<any | null> {
     try {
       await query(`ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS sort_order INTEGER`);
+      try {
+        await this.ensureDefaultLocksForAdamLogisticCode1741(workDate);
+      } catch (lockError) {
+        console.warn('⚠️ PG: ensureDefaultLocksForAdamLogisticCode1741 a load:', lockError);
+      }
       const result = await query(
         'SELECT * FROM lg_containers WHERE work_date = $1 ORDER BY priority, sort_order NULLS LAST, task_id',
         [workDate]
@@ -2658,6 +2668,11 @@ export class PgDailyAssignmentsService {
 
       await client.query('COMMIT');
       console.log(`✅ PG: Logistics containers salvati per ${workDate} (${totalInserted} task)`);
+      try {
+        await this.ensureDefaultLocksForAdamLogisticCode1741(workDate);
+      } catch (lockError) {
+        console.warn('⚠️ PG: ensureDefaultLocksForAdamLogisticCode1741 dopo save:', lockError);
+      }
       return true;
     } catch (error) {
       await client.query('ROLLBACK');
@@ -2666,6 +2681,61 @@ export class PgDailyAssignmentsService {
     } finally {
       client.release();
     }
+  }
+
+  /**
+   * Task con codice ADAM 1741: locked di default.
+   * Crea il record in daily_task_locks solo se non esiste già (così uno sblocco manuale resta).
+   */
+  async ensureDefaultLocksForAdamLogisticCode1741(workDate: string): Promise<number> {
+    await this.ensureTaskLocksTable();
+    const reason = "Codice ADAM 1741 (lock automatico)";
+
+    const insertResult = await query(
+      `
+        INSERT INTO daily_task_locks (work_date, task_id, locked, locked_reason, locked_by, updated_at)
+        SELECT $1, task_id, true, $2, 'system', NOW()
+        FROM (
+          SELECT DISTINCT task_id
+          FROM (
+            SELECT task_id
+            FROM lg_containers
+            WHERE work_date = $1 AND CAST(logistic_code AS TEXT) = '1741'
+            UNION
+            SELECT task_id
+            FROM lg_timeline
+            WHERE work_date = $1 AND CAST(logistic_code AS TEXT) = '1741'
+          ) src
+          WHERE task_id IS NOT NULL
+        ) t
+        ON CONFLICT (work_date, task_id) DO NOTHING
+      `,
+      [workDate, reason]
+    );
+
+    await query(
+      `
+        UPDATE lg_containers c
+        SET locked = true,
+            locked_reason = $2,
+            updated_at = NOW()
+        FROM daily_task_locks l
+        WHERE c.work_date = l.work_date
+          AND c.task_id = l.task_id
+          AND c.work_date = $1
+          AND l.locked = true
+          AND CAST(c.logistic_code AS TEXT) = '1741'
+      `,
+      [workDate, reason]
+    );
+
+    const lockedCount = insertResult.rowCount ?? 0;
+    if (lockedCount > 0) {
+      console.log(
+        `🔒 PG: Auto-lock codice ADAM 1741 per ${workDate}: ${lockedCount} nuovi lock`
+      );
+    }
+    return lockedCount;
   }
 
   async updateLogisticsContainerTaskKind(
