@@ -9,6 +9,10 @@ import type {
   RoutingSolutionValidationResult,
   SolutionValidationIssue,
 } from "./solution-validation-contract";
+import {
+  enrichSolutionIssuesWithLogisticCodes,
+  formatRoutingSolutionValidationForUser,
+} from "./user-facing-errors";
 
 const DAY_END_MIN = 24 * 60;
 const DEPOT_NODE_INDEX = 0;
@@ -36,12 +40,11 @@ function isValidMinute(value: unknown): value is number {
 }
 
 export function formatSolutionValidationIssue(issue: SolutionValidationIssue): string {
-  const target =
-    issue.taskId !== undefined
-      ? ` taskId=${issue.taskId}`
-      : issue.driverId !== undefined
-        ? ` driverId=${issue.driverId}`
-        : "";
+  const targetParts: string[] = [];
+  if (issue.taskId !== undefined) targetParts.push(`taskId=${issue.taskId}`);
+  if (issue.logisticCode !== undefined) targetParts.push(`logisticCode=${issue.logisticCode}`);
+  if (issue.driverId !== undefined) targetParts.push(`driverId=${issue.driverId}`);
+  const target = targetParts.length > 0 ? ` ${targetParts.join(" ")}` : "";
   return `${issue.code}${target}: ${issue.message}`;
 }
 
@@ -659,8 +662,8 @@ export function validateRoutingSolution(
 
   return {
     valid: errors.length === 0,
-    errors,
-    warnings,
+    errors: enrichSolutionIssuesWithLogisticCodes(input, errors),
+    warnings: enrichSolutionIssuesWithLogisticCodes(input, warnings),
   };
 }
 
@@ -668,10 +671,7 @@ export class RoutingSolutionValidationError extends Error {
   readonly solutionValidation: RoutingSolutionValidationResult;
 
   constructor(solutionValidation: RoutingSolutionValidationResult) {
-    const summary = solutionValidation.errors
-      .map(formatSolutionValidationIssue)
-      .join("\n");
-    super(`Invalid RoutingSolution:\n${summary}`);
+    super(formatRoutingSolutionValidationForUser(solutionValidation));
     this.name = "RoutingSolutionValidationError";
     this.solutionValidation = solutionValidation;
   }

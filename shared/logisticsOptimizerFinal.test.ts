@@ -662,9 +662,10 @@ describe("buildRoutingProblemInputFromSource", () => {
     expect(input.metadata.tasksExcludedNoCoordinatesIds).toEqual([102]);
     expect(input.metadata.lockedTasksExcluded).toBe(1);
     expect(input.metadata.excludedTasks).toEqual([
-      { taskId: 103, reason: "LOCKED", detail: "manual_lock" },
+      { taskId: 103, reason: "LOCKED", detail: "manual_lock", logisticCode: 5003 },
       { taskId: 102, reason: "NO_COORDINATES" },
     ]);
+    expect(input.metadata.tasksExcludedInvalidHardWindowCount).toBe(0);
     expect(input.metadata.timelineAssignmentHints).toEqual([]);
     expect(input.metadata.timelineAssignmentHintsCount).toBe(0);
     expect(input.metadata.preAssignedRequiredCount).toBe(0);

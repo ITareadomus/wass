@@ -62,6 +62,12 @@ interface TimelineViewProps {
   onWaveAssignStateReset?: () => void;
   isReadOnly?: boolean; // Modalità read-only: disabilita tutte le modifiche
   isLoadingDragDrop?: boolean; // Mostra loading overlay durante drag&drop
+  /** Testo overlay quando isLoadingDragDrop è true */
+  loadingMessage?: string;
+  /** Apre il dialog refresh ADAM (duplicato del pulsante sopra i containers) */
+  onAdamRefreshClick?: () => void;
+  isRefreshingFromAdam?: boolean;
+  hasAdamUpdates?: boolean;
   lastValidDragIndex?: number | null; // Indice valido durante il drag (da container verso timeline)
   draggingOverCleanerId?: number | null; // ID del cleaner su cui si sta trascinando
   activeDragCleanerId?: number | null; // ID del cleaner sorgente durante il drag
@@ -90,8 +96,8 @@ interface Cleaner {
 }
 
 const DEFAULT_TIMELINE_START_MINUTES = 10 * 60;
-const DEFAULT_TIMELINE_END_MINUTES = 19 * 60;
-const MIN_TIMELINE_TASK_WIDTH_PX = 150;
+const DEFAULT_TIMELINE_END_MINUTES = 18 * 60;
+const MIN_TIMELINE_TASK_WIDTH_PX = 75;
 /** Durante DnD: stessa larghezza minima delle card logistica (slot 15') */
 const COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX = 56;
 const FALLBACK_SHORTEST_TASK_MINUTES = 30;
@@ -144,6 +150,74 @@ const formatTimelineSlot = (minutes: number) => {
   const hours = Math.floor(minutes / 60);
   return `${String(hours).padStart(2, "0")}:00`;
 };
+
+const ROME_TZ = "Europe/Rome";
+
+type RomeClockNow = {
+  dateStr: string;
+  minutes: number;
+  label: string;
+};
+
+function getRomeClockNow(date = new Date()): RomeClockNow {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: ROME_TZ,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  ) as Record<string, string>;
+
+  const hours = Number(parts.hour);
+  const mins = Number(parts.minute);
+  return {
+    dateStr: `${parts.year}-${parts.month}-${parts.day}`,
+    minutes: hours * 60 + mins,
+    label: `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`,
+  };
+}
+
+function HousekeepingClockNowLine({
+  leftPx,
+  label,
+  showLabel = false,
+}: {
+  leftPx: number;
+  label?: string;
+  showLabel?: boolean;
+}) {
+  return (
+    <div
+      aria-hidden
+      data-testid="housekeeping-timeline-now-line"
+      className={cn(
+        "pointer-events-none absolute z-40 flex -translate-x-1/2 flex-col items-center print:hidden",
+        showLabel ? "top-0 bottom-0" : "inset-y-0"
+      )}
+      style={{ left: `${leftPx}px` }}
+    >
+      {showLabel && label ? (
+        <span
+          className={cn(
+            "shrink-0 rounded bg-yellow-400/55 px-1 py-0.5 text-[11px] font-semibold tabular-nums leading-none text-yellow-950/80",
+            "dark:bg-yellow-300/45 dark:text-yellow-100/80"
+          )}
+        >
+          {label}
+        </span>
+      ) : null}
+      <div className="w-px min-h-0 flex-1 bg-yellow-400/55 dark:bg-yellow-300/45" />
+    </div>
+  );
+}
+
 type CleanerDirectoryEntry = {
   id: number;
   name?: string;
@@ -163,6 +237,10 @@ export default function TimelineView({
   onWaveAssignStateReset,
   isReadOnly = false,
   isLoadingDragDrop = false,
+  loadingMessage,
+  onAdamRefreshClick,
+  isRefreshingFromAdam = false,
+  hasAdamUpdates = false,
   lastValidDragIndex = null,
   draggingOverCleanerId = null,
   activeDragCleanerId = null,
@@ -420,6 +498,7 @@ export default function TimelineView({
   // Larghezza della timeline in pixel per calcolo larghezze task
   const [timelineWidthPx, setTimelineWidthPx] = useState<number>(0);
   const [timelineScrollLeft, setTimelineScrollLeft] = useState(0);
+  const [romeClockNow, setRomeClockNow] = useState<RomeClockNow>(() => getRomeClockNow());
   const timelineRowRef = useRef<HTMLDivElement | null>(null);
   const timelineScrollRefs = useRef<HTMLDivElement[]>([]);
   const isSyncingTimelineScrollRef = useRef(false);
@@ -1016,7 +1095,9 @@ export default function TimelineView({
     if (endCandidates.length === 0) return DEFAULT_TIMELINE_END_MINUTES;
 
     const latestEnd = Math.max(...endCandidates);
+    // Dinamico sui task, ma almeno fino alle 18:00.
     return Math.max(
+      DEFAULT_TIMELINE_END_MINUTES,
       timelineStartMinutes + 60,
       roundUpToHour(latestEnd + TIMELINE_END_BUFFER_MINUTES)
     );
@@ -1047,6 +1128,41 @@ export default function TimelineView({
   const timelinePxPerMinute = timelineContentWidthPx / globalTimelineMinutes;
   const timelineScaledWidth = timelineContentWidthPx > 0 ? `${timelineContentWidthPx}px` : "100%";
   const timelineTaskWidthPx = timelineContentWidthPx;
+
+  useEffect(() => {
+    const tick = () => setRomeClockNow(getRomeClockNow());
+    tick();
+    const id = window.setInterval(tick, 30_000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  const clockNowLineLeftPx = React.useMemo(() => {
+    // In sviluppo: mostra la linea su qualsiasi data (utile per test).
+    // In produzione: solo se la data selezionata è oggi (Europe/Rome).
+    if (!import.meta.env.DEV && romeClockNow.dateStr !== workDate) return null;
+    if (timelinePxPerMinute <= 0) return null;
+    if (
+      romeClockNow.minutes < timelineStartMinutes ||
+      romeClockNow.minutes > timelineEndMinutes
+    ) {
+      return null;
+    }
+    return (romeClockNow.minutes - timelineStartMinutes) * timelinePxPerMinute;
+  }, [
+    romeClockNow.dateStr,
+    romeClockNow.minutes,
+    timelineEndMinutes,
+    timelinePxPerMinute,
+    timelineStartMinutes,
+    workDate,
+  ]);
 
 
 // Helpers to render EO/HP/LP brackets above the time header
@@ -2350,12 +2466,17 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
         ref={timelineRef}
         className={`bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm relative overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
       >
-        {/* Loading overlay durante drag&drop e rimozione cleaner */}
+        {/* Loading overlay durante drag&drop, rimozione cleaner, refresh ADAM, ecc. */}
         {(isLoadingDragDrop || removeCleanerMutation.isPending || clearAllSelectedCleanersMutation.isPending) && (
-          <div className="absolute inset-0 bg-black/20 dark:bg-black/40 rounded-lg flex items-center justify-center z-40 backdrop-blur-sm pointer-events-none">
+          <div className="absolute inset-0 bg-black/20 dark:bg-black/40 rounded-lg flex items-center justify-center z-40 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
-              <p className="text-sm font-medium text-foreground">La timeline sta ragionando...</p>
+              <p className="text-sm font-medium text-foreground">
+                {loadingMessage ||
+                  (removeCleanerMutation.isPending || clearAllSelectedCleanersMutation.isPending
+                    ? "Aggiornamento timeline..."
+                    : "La timeline sta ragionando...")}
+              </p>
             </div>
           </div>
         )}
@@ -2381,6 +2502,30 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               </h2>
             </div>
             <div className="flex gap-3 print:hidden">
+              {onAdamRefreshClick && (
+                <Button
+                  type="button"
+                  onClick={onAdamRefreshClick}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 border-2 border-custom-blue"
+                  disabled={isReadOnly || isRefreshingFromAdam || isTimelineInteractionDisabled}
+                  title="Aggiorna dati da ADAM"
+                >
+                  <span className="relative inline-flex">
+                    <RefreshCw
+                      className={`w-4 h-4 ${isRefreshingFromAdam ? "animate-spin" : ""}`}
+                    />
+                    {hasAdamUpdates && !isRefreshingFromAdam && (
+                      <span
+                        className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-red-500"
+                        title="Aggiornamenti disponibili da ADAM"
+                      />
+                    )}
+                  </span>
+                  Refresh
+                </Button>
+              )}
               <Button
                 onClick={() => setLocation(isOfficeScope ? '/convocazioni?kind=office' : '/convocazioni')}
                 variant="outline"
@@ -2606,6 +2751,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     />
                   </div>
                 ))}
+                {clockNowLineLeftPx != null && (
+                  <HousekeepingClockNowLine
+                    leftPx={clockNowLineLeftPx}
+                    label={romeClockNow.label}
+                    showLabel
+                  />
+                )}
                 </div>
               </div>
             </div>
@@ -2831,6 +2983,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                 ></div>
                               );
                             })}
+                            {clockNowLineLeftPx != null && (
+                              <HousekeepingClockNowLine leftPx={clockNowLineLeftPx} />
+                            )}
                           </div>
 
                           {/* Task posizionate in sequenza con indicatori di travel time */}

@@ -97,6 +97,7 @@ describe("buildLogisticsAdamUpdates", () => {
         startTime: "10:15:00",
         endTime: "10:30:00",
         operation: "3",
+        vehicleId: null,
       },
       {
         taskId: 102,
@@ -106,6 +107,34 @@ describe("buildLogisticsAdamUpdates", () => {
         startTime: "10:45:00",
         endTime: "11:00:00",
         operation: null,
+        vehicleId: null,
+      },
+    ]);
+  });
+
+  it("propaga lg_vehicle dal furgone assegnato al driver", () => {
+    const updates = buildLogisticsAdamUpdates(
+      {
+        drivers_assignments: [
+          {
+            driver: { id: 7 },
+            tasks: [{ task_id: 101, sequence: 1, start_time: "10:00", end_time: "10:15" }],
+          },
+        ],
+      },
+      { "7": { vehicle_id: 55, vehicle_name: "Furgone A" } }
+    );
+
+    expect(updates).toEqual([
+      {
+        taskId: 101,
+        driverId: 7,
+        sequence: 1,
+        travelTime: null,
+        startTime: "10:00:00",
+        endTime: "10:15:00",
+        operation: null,
+        vehicleId: 55,
       },
     ]);
   });

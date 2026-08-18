@@ -134,20 +134,23 @@ class ApiClient:
         data = self._get("/api/timeline", self._params_with_scope({"date": date}))
         return data
     
-    def save_timeline(self, date: str, timeline_data: Dict) -> Dict:
+    def save_timeline(self, date: str, timeline_data: Dict, skip_recalculate: bool = False) -> Dict:
         """
         Salva timeline su PostgreSQL.
         
         Args:
             date: Data nel formato YYYY-MM-DD
             timeline_data: Dati timeline da salvare
+            skip_recalculate: se True, salva senza ricalcolare travel/start/end
+                (usato da create_containers per patch campi ADAM sulle task assegnate)
             
         Returns:
             Risposta API con conferma
         """
         payload = self._payload_with_scope({
             "date": date,
-            "timeline": timeline_data
+            "timeline": timeline_data,
+            "skipRecalculate": bool(skip_recalculate),
         })
         return self._post("/api/timeline", payload)
     

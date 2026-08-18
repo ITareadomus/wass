@@ -2314,15 +2314,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/timeline - Salva timeline completa (per script Python)
   app.post("/api/timeline", async (req, res) => {
     try {
-      const { date, timeline, scope } = req.body;
+      const { date, timeline, scope, skipRecalculate } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       const resolvedScope = isOfficeScope(scope) ? "office" : "housekeeping";
+      const shouldSkipRecalculate = skipRecalculate === true || skipRecalculate === "true" || skipRecalculate === 1;
 
       if (!timeline) {
         return res.status(400).json({ success: false, error: "timeline data required" });
       }
 
-      console.log(`📝 POST /api/timeline - Salvando timeline per ${workDate}`);
+      console.log(`📝 POST /api/timeline - Salvando timeline per ${workDate}${shouldSkipRecalculate ? " (skipRecalculate)" : ""}`);
 
       // Assicura che metadata abbia la data corretta
       const timelineData = {
@@ -2335,7 +2336,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Hydrate coords + recalculate times per ogni cleaner
-      if (timelineData.cleaners_assignments && Array.isArray(timelineData.cleaners_assignments)) {
+      // skipRecalculate: usato da create_containers per patch soli campi ADAM (checkin_time ecc.)
+      // senza rischiare timeout HTTP sul ricalcolo completo.
+      if (
+        !shouldSkipRecalculate &&
+        timelineData.cleaners_assignments &&
+        Array.isArray(timelineData.cleaners_assignments)
+      ) {
         for (let idx = 0; idx < timelineData.cleaners_assignments.length; idx++) {
           let entry = timelineData.cleaners_assignments[idx];
           const tasks = entry.tasks;
@@ -2383,7 +2390,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true, 
         message: `Timeline salvata per ${workDate}`,
         cleaners_count: timelineData.cleaners_assignments?.length || 0,
-        tasks_count: taskCount
+        tasks_count: taskCount,
+        skipRecalculate: shouldSkipRecalculate,
       });
     } catch (error: any) {
       console.error("Errore nel salvataggio timeline:", error);
@@ -2450,32 +2458,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/containers/refresh - Force refresh containers da ADAM
   app.post("/api/containers/refresh", async (req, res) => {
     try {
-      const { date, modified_by, scope } = req.body;
+      const {
+        date,
+        modified_by,
+        scope,
+        mode,
+        confirmUnlockLocked,
+        skipContainersRefresh,
+      } = req.body || {};
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       const currentUsername = modified_by || getCurrentUsername(req);
       const officeScope = isOfficeScope(scope);
+      const refreshMode = mode === "assignments" ? "assignments" : "apt";
 
-      console.log(`🔄 Force refresh containers da ADAM per ${workDate}...`);
+      console.log(
+        `🔄 Force refresh containers da ADAM per ${workDate} mode=${refreshMode}...`
+      );
 
       const { refreshContainersFromAdam } = await import("./services/containers-refresh-service");
       const refreshResult = await refreshContainersFromAdam(
         workDate,
         currentUsername,
-        officeScope ? "office" : "housekeeping"
+        officeScope ? "office" : "housekeeping",
+        {
+          mode: refreshMode,
+          confirmUnlockLocked: Boolean(confirmUnlockLocked),
+          skipContainersRefresh: Boolean(skipContainersRefresh),
+        }
       );
 
       if (!refreshResult.success) {
         return res.status(500).json({
           success: false,
-          error: refreshResult.error || "Errore nel refresh containers"
+          error: refreshResult.error || "Errore nel refresh containers",
+          mode: refreshResult.mode,
+          assignmentSync: refreshResult.assignmentSync,
         });
       }
 
-      console.log(`✅ Containers refreshati da ADAM: rimossi ${refreshResult.removedCount} duplicati già assegnati`);
+      if (refreshResult.needsUnlockConfirm) {
+        return res.status(200).json({
+          success: true,
+          needsUnlockConfirm: true,
+          lockedTasks: refreshResult.lockedTasks || [],
+          mode: refreshResult.mode,
+          message: `Containers aggiornati; confermare sblocco di ${(refreshResult.lockedTasks || []).length} task locked`,
+          removedDuplicates: refreshResult.removedCount,
+        });
+      }
+
+      console.log(
+        `✅ Containers refreshati da ADAM: rimossi ${refreshResult.removedCount} duplicati già assegnati`
+      );
       res.json({
         success: true,
-        message: `Containers rigenerati da ADAM per ${workDate}`,
-        removedDuplicates: refreshResult.removedCount
+        message:
+          refreshMode === "assignments"
+            ? `Dati apt + assegnazioni sincronizzati da ADAM per ${workDate}`
+            : `Containers rigenerati da ADAM per ${workDate}`,
+        removedDuplicates: refreshResult.removedCount,
+        mode: refreshResult.mode,
+        assignmentSync: refreshResult.assignmentSync,
       });
     } catch (error: any) {
       console.error("Errore nel refresh containers:", error);
@@ -4162,7 +4205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   /**
    * Registra una revisione `transfer_to_adam` della timeline logistica su PG e scrive i dati
-   * logistica su ADAM `app_housekeeping` (`driven_by_us`, `lg_sequence`, `lg_*`), senza toccare le colonne
+   * logistica su ADAM `app_housekeeping` (`driven_by_us`, `lg_sequence`, `lg_*`, `lg_vehicle`), senza toccare le colonne
    * housekeeping dei cleaner.
    */
   app.post("/api/transfer-logistics-to-adam", async (req, res) => {
@@ -4214,9 +4257,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         database: databaseConfig.mysql.database,
       });
 
+      const vehicleAssignments =
+        await pgDailyAssignmentsService.loadSelectedLogisticsDriverVehicleAssignments(workDate);
+
       const syncResult = await syncLogisticsTimelineToAdam(connection, {
         workDate,
         timeline: timelineData,
+        vehicleAssignments,
         adamUpdatedBy,
         nowRome: format(new Date(), "yyyy-MM-dd HH:mm:ss"),
       });
@@ -4238,6 +4285,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("POST /api/transfer-logistics-to-adam:", error);
+      res.status(500).json({ success: false, message: error.message });
+    } finally {
+      if (connection) {
+        try {
+          await connection.end();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  });
+
+  /**
+   * Ricalcola logistics_task_kind su WASS e scrive solo `lg_operation` su ADAM
+   * (senza transfer completo di driver/orari/veicolo).
+   */
+  app.post("/api/sync-logistics-operations-to-adam", async (req, res) => {
+    let connection: any = null;
+    try {
+      const { date } = req.body || {};
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+
+      connection = await mysql.createConnection({
+        host: databaseConfig.mysql.host,
+        port: databaseConfig.mysql.port,
+        user: databaseConfig.mysql.user,
+        password: databaseConfig.mysql.password,
+        database: databaseConfig.mysql.database,
+      });
+
+      const { recomputeAndSyncLogisticsOperationsToAdam } = await import(
+        "./services/adam-logistics-operation-sync"
+      );
+      const result = await recomputeAndSyncLogisticsOperationsToAdam(connection, workDate);
+
+      res.json({
+        success: result.success,
+        message: result.message,
+        workDate,
+        recomputedPg: result.recomputedPg,
+        updatedAdam: result.updatedAdam,
+        skippedNoKind: result.skippedNoKind,
+        errors: result.errors,
+      });
+    } catch (error: any) {
+      console.error("POST /api/sync-logistics-operations-to-adam:", error);
       res.status(500).json({ success: false, message: error.message });
     } finally {
       if (connection) {
@@ -10663,6 +10756,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         return res.status(400).json({
           success: false,
           error: error.message,
+          message: error.message,
           inputValidation: error.inputValidation,
         });
       }
@@ -10747,6 +10841,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         apply: result.applyResult,
         droppedDiagnostics: result.droppedDiagnostics,
         solutionSummary: result.solutionSummary,
+        excludedFromSolve: result.excludedFromSolve,
         debugDir: result.debugDir,
         solution: result.solution,
       });
@@ -10755,6 +10850,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         return res.status(400).json({
           success: false,
           error: error.message,
+          message: error.message,
           inputValidation: error.inputValidation,
         });
       }
@@ -10763,7 +10859,9 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         return res.status(503).json({
           success: false,
           error: "ORTOOLS_UNAVAILABLE",
-          message: error.message,
+          message:
+            error.message ||
+            "Il motore di ottimizzazione OR-Tools non è disponibile su questo server.",
           reason: error.reason,
         });
       }
@@ -10772,6 +10870,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         return res.status(409).json({
           success: false,
           error: error.message,
+          message: error.message,
           applyGate: error.gate,
         });
       }
@@ -10780,6 +10879,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         return res.status(409).json({
           success: false,
           error: error.message,
+          message: error.message,
           solutionValidation: error.solutionValidation,
         });
       }

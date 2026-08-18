@@ -66,11 +66,9 @@ export async function loadTimelineAssignmentHints(workDate: string): Promise<Tim
 }
 
 /**
- * Product rule: logistics has no "mandatory for a specific driver" lock.
- * Timeline assignments stay re-optimizable and must not become hard
- * REQUIRED_DRIVER_TASK constraints (those made the solver INVALID via
- * REQUIRED_DRIVER_DROPPED when a task could not stay on that driver).
- * Hints remain used for auto-convoke / metadata only.
+ * Deprecated product rule: logistics never hard-locks a task to a driver.
+ * Timeline hints remain for auto-convoke / metadata only.
+ * Keep false permanently unless an explicit product decision reintroduces locks.
  */
 export const ENABLE_TIMELINE_REQUIRED_DRIVER_LOCKS = false;
 

@@ -59,9 +59,9 @@ function runPythonScript(
       clearTimeout(timer);
       if (code !== 0) {
         try {
-          const data = JSON.parse(stdout) as OrToolsRawSolution;
+          const data = extractOrToolsJson(stdout);
           if (data.status === "infeasible") {
-            resolve(stdout);
+            resolve(JSON.stringify(data));
             return;
           }
           if (data.status === "error" && data.message) {
@@ -87,12 +87,42 @@ function runPythonScript(
   });
 }
 
-function parseRawSolution(stdout: string): OrToolsRawSolution {
-  try {
-    return JSON.parse(stdout) as OrToolsRawSolution;
-  } catch {
-    throw new Error("OR-Tools routing invalid JSON output");
+/**
+ * On Windows, ortools may print native "load ...dll..." lines on stdout before
+ * the JSON result. Extract the last parseable JSON object from the stream.
+ */
+function extractOrToolsJson(stdout: string): OrToolsRawSolution {
+  const text = String(stdout ?? "").trim();
+  if (!text) {
+    throw new Error("Il motore OR-Tools non ha prodotto alcun output.");
   }
+
+  try {
+    return JSON.parse(text) as OrToolsRawSolution;
+  } catch {
+    // continue with extraction
+  }
+
+  let searchFrom = text.length;
+  while (searchFrom > 0) {
+    const start = text.lastIndexOf("{", searchFrom - 1);
+    if (start < 0) break;
+    const candidate = text.slice(start);
+    try {
+      return JSON.parse(candidate) as OrToolsRawSolution;
+    } catch {
+      searchFrom = start;
+    }
+  }
+
+  const preview = text.replace(/\s+/g, " ").slice(0, 240);
+  throw new Error(
+    `Il motore OR-Tools non ha restituito un risultato leggibile. Dettaglio: ${preview}`
+  );
+}
+
+function parseRawSolution(stdout: string): OrToolsRawSolution {
+  return extractOrToolsJson(stdout);
 }
 
 function defaultScriptPath(): string {
