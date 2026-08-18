@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -52,7 +53,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
 interface TimelineViewProps {
   personnel: Personnel[];
@@ -2506,7 +2506,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 )}
               </h2>
             </div>
-            <div className="flex gap-3 print:hidden">
+            <div className="flex items-center gap-3 print:hidden">
               {onAdamRefreshClick && (
                 <Button
                   type="button"
@@ -2530,7 +2530,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   </span>
                   Refresh
                 </Button>
-            <div className="flex items-center gap-3 print:hidden">
+              )}
               {!isOfficeScope && (
                 <Popover>
                   <PopoverTrigger asChild>
