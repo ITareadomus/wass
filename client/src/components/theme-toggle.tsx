@@ -16,6 +16,7 @@ import {
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { getStoredUserRole, homePathForRole, isLogisticaRole } from "@/lib/auth-role";
 
 interface Account {
   id: number;
@@ -126,6 +127,8 @@ export function ThemeToggle({ showHomeButton = true, showAccountMenu = true, gap
   const currentUser = getCurrentUser();
 
   const getHomePath = (): string => {
+    const role = getStoredUserRole();
+    if (isLogisticaRole(role)) return homePathForRole(role);
     if (typeof window !== "undefined" && (location === "/convocazioni" || location.startsWith("/convocazioni?"))) {
       const kind = new URLSearchParams(window.location.search).get("kind");
       if (kind === "drivers") return "/generate-logistics-assignments";

@@ -170,6 +170,25 @@ const normalizeTime = (timeStr: any): string => {
   return "";
 };
 
+const PORTAL_LAYER_SELECTOR =
+  '[data-radix-select-content],[data-radix-popper-content-wrapper],[role="listbox"]';
+
+/**
+ * Select e Popover vivono in un portal fuori dal DialogContent: senza questo guard
+ * Radix legge il click sull'opzione come interazione esterna e chiude il dialog.
+ * Il nodo cliccato sta in `detail.originalEvent`, non in `event.target` (che è il layer).
+ */
+const preventDialogDismissForPortals = (event: any) => {
+  const originalEvent = event?.detail?.originalEvent;
+  const target = (originalEvent?.composedPath?.()[0] ??
+    originalEvent?.target ??
+    event?.target) as HTMLElement | null;
+
+  if (target?.closest?.(PORTAL_LAYER_SELECTOR)) {
+    event.preventDefault();
+  }
+};
+
 const PREASSIGNED_REASON_NORMAL = "preassigned_enable_wass";
 const PREASSIGNED_REASON_READONLY = "preassigned_enable_wass_readonly";
 type PreAssignedMode = "normal" | "readonly";
@@ -1262,13 +1281,14 @@ const displayClickableInputClass =
 
   // Nei container: sfondo pagina per contrasto con la colonna; in timeline resta custom-blue-light.
   // Logistica in timeline: colori da stato Adam (lg_real_*), senza opacity che riduce leggibilità.
-  // Task finished: grigio in timeline e container (salvo status esecuzione logistica già colorato).
+  // Task finished / bloccati (locked o pre-assegnati readonly): grigio.
+  const isBlockedTask = isLocked || isPreAssignedReadonly;
   const cardSurfaceClass = logisticsExecutionSurfaceClass
     ? logisticsExecutionSurfaceClass
     : isFinished
       ? "bg-gray-200 dark:bg-gray-800 border-gray-400 dark:border-gray-600 opacity-70"
-      : isLocked && !isInTimeline
-        ? "bg-muted/80 border-border/60 opacity-70"
+      : isBlockedTask
+        ? "bg-gray-300 dark:bg-gray-700 border-gray-500 dark:border-gray-500 opacity-80 text-muted-foreground"
         : !isInTimeline
           ? "bg-background border-border shadow-sm"
           : "bg-custom-blue-light border-border/60";
@@ -2239,10 +2259,24 @@ const displayClickableInputClass =
     ? "0.15"
     : (task.duration || "0.0");
 
-  // Mostra sempre le frecce check-in/out (anche in timeline per task < 1h)
-  const shouldShowCheckInOutArrows = true;
-  // Fallback tooltip disabilitato: gli orari restano sempre sulla card
-  const shouldShowTooltipTimes = false;
+  const effectiveDurationMinutesForUi = (() => {
+    const durationStr = String(effectiveDurationForUi ?? "0.0");
+    const [hStr, mStr] = durationStr.split(".");
+    const hours = Number(hStr || 0);
+    const mins = Number(mStr || 0);
+    const total = (Number.isFinite(hours) ? hours : 0) * 60 + (Number.isFinite(mins) ? mins : 0);
+    return total === 0 ? 60 : total;
+  })();
+
+  // Timeline HK: task < 1h → nascondi check-in/out e codice cliente sulla card (visibili in tooltip)
+  const isShortHousekeepingTimelineTask =
+    isInTimeline &&
+    operationsScope === "housekeeping" &&
+    effectiveDurationMinutesForUi < 60;
+
+  const shouldShowCheckInOutArrows = !isShortHousekeepingTimelineTask;
+  const shouldShowTooltipTimes = isShortHousekeepingTimelineTask;
+  const shouldShowTooltipCustomerRef = isShortHousekeepingTimelineTask;
   const cardTooltipAddressLabel =
     String(displayTask.address ?? "").trim().toUpperCase() || "INDIRIZZO NON DISPONIBILE";
   const cardTooltipClientAlias = String(displayTask.alias ?? "").trim();
@@ -3071,6 +3105,12 @@ const displayClickableInputClass =
                           hasLogisticsExecutionStatusColor(logisticsExecutionStatus)
                         ) &&
                         "animate-blink",
+                      operationsScope === "logistics" &&
+                        !isInTimeline &&
+                        cardLogisticsTaskKind == null &&
+                        !isFinished &&
+                        !isBlockedTask &&
+                        "animate-blink-yellow",
                       !isDragging && isMapFiltered && "task-border-map-filtered",
                       !isDragging && !isMapFiltered && isHighlighted && "task-border-search-highlighted",
                       "cursor-pointer flex-shrink-0 relative group"
@@ -3155,17 +3195,17 @@ const displayClickableInputClass =
                         </div>
                       </div>
                     )}
-                    {isPreAssigned && (
+                    {(isPreAssigned || isLocked) && (
                       <div className="absolute -top-1.5 -right-1.5 z-[70]">
                         <div
                           className={[
                             "w-4 h-4 rounded-full flex items-center justify-center text-white border-2 shadow-md",
-                            isPreAssignedReadonly
-                              ? "bg-amber-600 border-amber-700"
+                            isBlockedTask
+                              ? "bg-gray-600 border-gray-700 dark:bg-gray-500 dark:border-gray-400"
                               : "bg-sky-500 border-sky-600",
                           ].join(" ")}
                         >
-                          {isPreAssignedReadonly ? (
+                          {isBlockedTask ? (
                             <Lock className="w-2.5 h-2.5" strokeWidth={2.5} />
                           ) : (
                             <LockOpen className="w-2.5 h-2.5" strokeWidth={2.5} />
@@ -3262,7 +3302,7 @@ const displayClickableInputClass =
                         >
                           {task.name}
                         </span>
-                        {(task as any).customer_reference && (
+                        {(task as any).customer_reference && !isShortHousekeepingTimelineTask && (
                           <span className="text-red-600 dark:text-red-400 font-bold text-[11px] whitespace-nowrap">
                             ({(task as any).customer_reference})
                           </span>
@@ -3289,19 +3329,36 @@ const displayClickableInputClass =
                 >
                   <div className="flex flex-col items-center gap-2">
                     <p className="font-semibold">{cardTooltipAddressLine}</p>
-                    {shouldShowTooltipTimes && ((displayTask as any).checkout_time || (displayTask as any).checkin_time) && (
+                    {shouldShowTooltipCustomerRef && (task as any).customer_reference && (
+                      <p className="text-sm font-bold text-red-500">
+                        ({(task as any).customer_reference})
+                      </p>
+                    )}
+                    {shouldShowTooltipTimes &&
+                      ((taskWithPendingEdits as any).checkout_time ||
+                        (taskWithPendingEdits as any).checkin_time ||
+                        isFutureCheckin) && (
                       <div className="flex items-center gap-3 text-sm">
-                        {(displayTask as any).checkout_time && (
+                        {(taskWithPendingEdits as any).checkout_time && (
                           <div className="flex items-center gap-1">
                             <span className="text-green-500">↑</span>
-                            <span>{(displayTask as any).checkout_time}</span>
+                            <span>{(taskWithPendingEdits as any).checkout_time}</span>
                           </div>
                         )}
-                        {(displayTask as any).checkin_time && (
-                          <div className="flex items-center gap-1">
-                            <span className="text-red-500">↓</span>
-                            <span>{(displayTask as any).checkin_time}</span>
+                        {isFutureCheckin ? (
+                          <div className="flex items-center gap-1 text-red-500">
+                            <CalendarIcon className="w-3.5 h-3.5" strokeWidth={2.5} />
+                            {(taskWithPendingEdits as any).checkin_time && (
+                              <span>{(taskWithPendingEdits as any).checkin_time}</span>
+                            )}
                           </div>
+                        ) : (
+                          (taskWithPendingEdits as any).checkin_time && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-red-500">↓</span>
+                              <span>{(taskWithPendingEdits as any).checkin_time}</span>
+                            </div>
+                          )
                         )}
                       </div>
                     )}
@@ -3803,7 +3860,11 @@ const displayClickableInputClass =
 
       {/* Dialog Modifica Check-out - stesso stile di Pax-In */}
       <Dialog open={checkoutDialogOpen} onOpenChange={(open) => !open && setCheckoutDialogOpen(false)}>
-        <DialogContent className="sm:max-md">
+        <DialogContent
+          className="sm:max-w-md"
+          onPointerDownOutside={preventDialogDismissForPortals}
+          onInteractOutside={preventDialogDismissForPortals}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="w-5 h-5 text-custom-blue" />
@@ -3828,7 +3889,7 @@ const displayClickableInputClass =
                       : "Seleziona data"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-2" align="start">
+                <PopoverContent className="z-[200] w-auto p-2" align="start">
                   <CalendarPicker
                     mode="single"
                     selected={editingCheckoutDateInDialog ? (editingCheckoutDateInDialog.length === 10 ? parseISO(editingCheckoutDateInDialog) : new Date(editingCheckoutDateInDialog)) : undefined}
@@ -3855,7 +3916,7 @@ const displayClickableInputClass =
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="Ora" />
                   </SelectTrigger>
-                  <SelectContent side="bottom" className="max-h-44">
+                  <SelectContent side="bottom" className="max-h-60">
                     {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")).map((h) => (
                       <SelectItem key={h} value={h}>{h}</SelectItem>
                     ))}
@@ -3871,7 +3932,7 @@ const displayClickableInputClass =
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="Min" />
                   </SelectTrigger>
-                  <SelectContent side="bottom" className="max-h-44">
+                  <SelectContent side="bottom" className="max-h-60">
                     {Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0")).map((m) => (
                       <SelectItem key={m} value={m}>{m}</SelectItem>
                     ))}
@@ -3915,7 +3976,11 @@ const displayClickableInputClass =
 
       {/* Dialog Modifica Check-in - stesso stile di Pax-In */}
       <Dialog open={checkinDialogOpen} onOpenChange={(open) => !open && setCheckinDialogOpen(false)}>
-        <DialogContent className="sm:max-md">
+        <DialogContent
+          className="sm:max-w-md"
+          onPointerDownOutside={preventDialogDismissForPortals}
+          onInteractOutside={preventDialogDismissForPortals}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="w-5 h-5 text-custom-blue" />
@@ -3940,7 +4005,7 @@ const displayClickableInputClass =
                       : "Seleziona data"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-2" align="start">
+                <PopoverContent className="z-[200] w-auto p-2" align="start">
                   <CalendarPicker
                     mode="single"
                     selected={editingCheckinDateInDialog ? (editingCheckinDateInDialog.length === 10 ? parseISO(editingCheckinDateInDialog) : new Date(editingCheckinDateInDialog)) : undefined}
@@ -3967,7 +4032,7 @@ const displayClickableInputClass =
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="Ora" />
                   </SelectTrigger>
-                  <SelectContent side="bottom" className="max-h-44">
+                  <SelectContent side="bottom" className="max-h-60">
                     {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")).map((h) => (
                       <SelectItem key={h} value={h}>{h}</SelectItem>
                     ))}
@@ -3983,7 +4048,7 @@ const displayClickableInputClass =
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="Min" />
                   </SelectTrigger>
-                  <SelectContent side="bottom" className="max-h-44">
+                  <SelectContent side="bottom" className="max-h-60">
                     {Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0")).map((m) => (
                       <SelectItem key={m} value={m}>{m}</SelectItem>
                     ))}
@@ -4037,7 +4102,11 @@ const displayClickableInputClass =
 
       {/* Dialog Modifica Tipologia intervento - stesso stile di Pax-In / Check-out / Check-in */}
       <Dialog open={operationDialogOpen} onOpenChange={(open) => !open && setOperationDialogOpen(false)}>
-        <DialogContent className="sm:max-md">
+        <DialogContent
+          className="sm:max-w-md"
+          onPointerDownOutside={preventDialogDismissForPortals}
+          onInteractOutside={preventDialogDismissForPortals}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="w-5 h-5 text-custom-blue" />

@@ -18,12 +18,21 @@ import { WassSiteHeader } from "@/components/wass-site-header";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { HelpCircle, Home } from "lucide-react";
+import {
+  getStoredUserRole,
+  homePathForRole,
+  isLogisticaPathAllowed,
+  isLogisticaRole,
+  LOGISTICS_HOME_PATH,
+} from "@/lib/auth-role";
 
 const OFFICE_SCOPE_ENABLED = false;
 
 function GlobalHeader() {
   const [location] = useLocation();
-  const assignmentsHomeHref = "/generate-assignments";
+  const role = getStoredUserRole();
+  const logisticsOnly = isLogisticaRole(role);
+  const assignmentsHomeHref = homePathForRole(role);
   const selectedDate =
     typeof window !== "undefined" ? localStorage.getItem("selected_work_date") : null;
   const unconfirmedHref = selectedDate
@@ -35,7 +44,8 @@ function GlobalHeader() {
     location === "/unconfirmed-tasks" || location.startsWith("/unconfirmed-tasks?");
   const showHomeButton =
     isConvocazioniPage || location === "/settings" || location === "/account-settings";
-  const showUnconfirmedButton = !showHomeButton && !isUnconfirmedTasksPage;
+  const showUnconfirmedButton =
+    !logisticsOnly && !showHomeButton && !isUnconfirmedTasksPage;
 
   useEffect(() => {
     if (typeof window === "undefined" || OFFICE_SCOPE_ENABLED) return;
@@ -62,10 +72,11 @@ function GlobalHeader() {
   }, [location]);
 
   const homeHref =
-    isConvocazioniPage &&
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("kind") === "drivers"
-      ? "/generate-logistics-assignments"
+    logisticsOnly ||
+    (isConvocazioniPage &&
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("kind") === "drivers")
+      ? LOGISTICS_HOME_PATH
       : assignmentsHomeHref;
 
   return (
@@ -113,18 +124,35 @@ function LoginHeader() {
 }
 
 function ProtectedRoute({ component: Component }: { component: () => JSX.Element }) {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
   useEffect(() => {
     const user = localStorage.getItem("user");
     if (!user) {
       setLocation("/login");
+      return;
     }
-  }, [setLocation]);
+
+    const role = getStoredUserRole();
+    if (!isLogisticaRole(role)) return;
+
+    const search = typeof window !== "undefined" ? window.location.search : "";
+    if (!isLogisticaPathAllowed(location, search)) {
+      setLocation(LOGISTICS_HOME_PATH);
+    }
+  }, [location, setLocation]);
 
   const user = localStorage.getItem("user");
   if (!user) {
     return null;
+  }
+
+  const role = getStoredUserRole();
+  if (isLogisticaRole(role)) {
+    const search = typeof window !== "undefined" ? window.location.search : "";
+    if (!isLogisticaPathAllowed(location, search)) {
+      return null;
+    }
   }
 
   return (

@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
-import GenerateAssignments from "./generate-assignments";
+import { getStoredUserRole, isLogisticaRole, LOGISTICS_HOME_PATH } from "@/lib/auth-role";
 
 interface UnconfirmedSummary {
   unconfirmedCount: number;
@@ -42,6 +42,10 @@ export default function HomeGate() {
   useEffect(() => {
     if (hasRedirected) return;
     setHasRedirected(true);
+    if (isLogisticaRole(getStoredUserRole())) {
+      setLocation(LOGISTICS_HOME_PATH);
+      return;
+    }
     setLocation(`/unconfirmed-tasks?date=${selectedDate}`);
   }, [hasRedirected, setLocation, selectedDate]);
 

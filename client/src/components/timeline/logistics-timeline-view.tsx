@@ -452,6 +452,10 @@ export default function LogisticsTimelineView({
 
   const handleTimelinePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const scrollContainer = event.currentTarget;
+    // I contenuti in portal (dialog, select, popover) bollono nell'albero React ma
+    // vivono fuori dal container nel DOM: senza questo check il pan catturava il
+    // puntatore e rompeva la selezione nei dialog aperti dalle card.
+    if (!(event.target instanceof Node) || !scrollContainer.contains(event.target)) return;
     if (event.button !== 0 || !canStartTimelinePan(event.target)) return;
     if (scrollContainer.scrollWidth <= scrollContainer.clientWidth) return;
 
@@ -2546,9 +2550,9 @@ export default function LogisticsTimelineView({
           }
         }}
       >
-        <DialogContent className="sm:max-w-md relative">
+        <DialogContent className="sm:max-w-md">
           {isAddingDriverToTimeline && (
-            <div className="absolute inset-0 bg-background/80 rounded-lg flex items-center justify-center z-50 backdrop-blur-sm">
+            <div className="absolute inset-0 z-50 flex items-center justify-center rounded-lg bg-background/80 backdrop-blur-sm">
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
                 <p className="text-sm font-medium text-foreground">La timeline sta ragionando...</p>

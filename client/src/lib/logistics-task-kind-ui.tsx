@@ -46,6 +46,18 @@ export const LOGISTICS_KIND_BADGE_LABEL: Record<LogisticsTaskKind, string> = {
   "pick-up": "PICK-UP",
 };
 
+/** Abbreviazioni compatte (scheda driver, colonne strette). */
+export const LOGISTICS_KIND_SHORT_LABEL: Record<LogisticsTaskKind, string> = {
+  "pick-up": "P",
+  delivery: "D",
+  "delivery/pick-up": "D&P",
+};
+
+export function logisticsKindShortLabel(kind: LogisticsTaskKind | null | undefined): string {
+  if (!kind) return "—";
+  return LOGISTICS_KIND_SHORT_LABEL[kind] ?? "—";
+}
+
 export const LOGISTICS_KIND_PICKER_OPTIONS: Array<{
   kind: LogisticsTaskKind;
   title: string;

@@ -2,16 +2,20 @@ import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import {
   ArrowLeft,
-  Box,
+  Keyboard,
   KeyRound,
   Loader2,
+  Lock,
   MessageCircle,
   Printer,
-  Smartphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SequenceSummaryEntry, SequenceSummaryGroup } from "@/lib/sequence-summary";
-import { logisticsKindSequenceDotClass, LogisticsSequenceBadge } from "@/lib/logistics-task-kind-ui";
+import {
+  logisticsKindSequenceDotClass,
+  logisticsKindShortLabel,
+  LogisticsSequenceBadge,
+} from "@/lib/logistics-task-kind-ui";
 import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
 import { SequenceSummaryGroupHeading } from "@/components/sequence-summary-group-heading";
 import { Button } from "@/components/ui/button";
@@ -44,14 +48,14 @@ function SheetCheckInOut({
     <span className="inline-flex items-center gap-2 whitespace-nowrap">
       {checkout && (
         <span className="inline-flex items-center gap-0.5">
-          <span className="font-black text-[#257537]">↑</span>
-          <span className="font-semibold text-[#137537]">{checkout}</span>
+          <span className="font-black text-[#257537] print:text-black">↑</span>
+          <span className="font-semibold text-[#137537] print:text-black">{checkout}</span>
         </span>
       )}
       {checkin && (
         <span className="inline-flex items-center gap-0.5">
-          <span className="font-black text-red-600">↓</span>
-          <span className="font-semibold text-red-600">{checkin}</span>
+          <span className="font-black text-red-600 print:text-black">↓</span>
+          <span className="font-semibold text-red-600 print:text-black">{checkin}</span>
         </span>
       )}
     </span>
@@ -126,36 +130,12 @@ function AccessKeyIcon({
 }) {
   const kind = resolveStructureAccessKeyKind(bundle);
   if (kind === "smart") {
-    return <Smartphone className={cn("h-4 w-4 text-sky-700", className)} aria-hidden />;
+    return <Keyboard className={cn("h-4 w-4 text-sky-700 print:text-black", className)} aria-hidden />;
   }
   if (kind === "kbox") {
-    return <Box className={cn("h-4 w-4 text-amber-700", className)} aria-hidden />;
+    return <Lock className={cn("h-4 w-4 text-amber-700 print:text-black", className)} aria-hidden />;
   }
-  return <KeyRound className={cn("h-4 w-4 text-slate-700", className)} aria-hidden />;
-}
-
-function formatAccessBundlePrintLines(bundles: StructureAccessBundle[]): string[] {
-  const lines: string[] = [];
-  for (const bundle of bundles) {
-    const typeLabel = formatStructureAccessTypeLabel(bundle);
-    const meta = [
-      bundle.keysLabel,
-      bundle.keysNumber ? `N. ${bundle.keysNumber}` : null,
-    ]
-      .filter(Boolean)
-      .join(" · ");
-    lines.push(meta ? `${typeLabel} (${meta})` : typeLabel);
-
-    for (const choice of bundle.choices) {
-      const parts = [
-        choice.name,
-        choice.typeLabel,
-        choice.value ? `→ ${choice.value}` : null,
-      ].filter(Boolean);
-      if (parts.length > 0) lines.push(`  ${parts.join(" · ")}`);
-    }
-  }
-  return lines;
+  return <KeyRound className={cn("h-4 w-4 text-slate-700 print:text-black", className)} aria-hidden />;
 }
 
 function SheetAccessKeysCell({
@@ -169,27 +149,29 @@ function SheetAccessKeysCell({
 }) {
   if (!bundles.length) return <span className="text-muted-foreground">—</span>;
 
-  const primary = bundles[0];
-  const typeLabel = formatStructureAccessTypeLabel(primary);
-  const printLines = formatAccessBundlePrintLines(bundles);
+  const typeLabels = bundles.map((bundle) => formatStructureAccessTypeLabel(bundle));
+  const summaryLabel = typeLabels.join(", ");
 
   return (
     <>
       <button
         type="button"
-        className="group inline-flex items-center justify-center rounded-sm p-1 hover:bg-muted print:hidden"
-        title={`${typeLabel} — clicca per dettagli`}
-        aria-label={`Chiavi ${typeLabel} per task ${logisticCode}`}
+        className="group inline-flex max-w-full flex-wrap items-center justify-center gap-1 rounded-sm p-1 hover:bg-muted print:pointer-events-none print:p-0"
+        title={`${summaryLabel} — clicca per dettagli`}
+        aria-label={`Chiavi ${summaryLabel} per task ${logisticCode}`}
         onClick={(event) => {
           event.stopPropagation();
           onOpen(bundles, logisticCode);
         }}
       >
-        <AccessKeyIcon bundle={primary} className="group-hover:scale-105 transition-transform" />
+        {bundles.map((bundle, index) => (
+          <AccessKeyIcon
+            key={`${logisticCode}-key-${bundle.keysId ?? index}`}
+            bundle={bundle}
+            className="group-hover:scale-105 transition-transform"
+          />
+        ))}
       </button>
-      <span className="hidden whitespace-pre-wrap break-words text-[7px] leading-tight print:inline">
-        {printLines.join("\n")}
-      </span>
     </>
   );
 }
@@ -262,10 +244,10 @@ export default function LogisticsDriverSequenceSheet({
                   <SequenceSummaryGroupHeading
                     group={group}
                     as="h1"
-                    className="print:text-base print:text-black"
-                    vehicleNameClassName="print:text-black/70"
-                    plateClassName="print:border-black print:bg-white print:text-[11px] print:text-black"
-                    taskCountClassName="print:text-black"
+                    className="print:text-[18px] print:leading-tight print:text-black"
+                    vehicleNameClassName="print:text-[16px] print:text-black"
+                    plateClassName="print:border-black print:bg-white print:px-2 print:text-[14px] print:leading-5 print:text-black"
+                    taskCountClassName="print:text-[16px] print:text-black"
                   />
                 </div>
                 {(group.warehouseDepartureTime || group.warehouseReturnTime) && (
@@ -283,8 +265,8 @@ export default function LogisticsDriverSequenceSheet({
                   </div>
                 )}
               </div>
-              <p className="mt-0.5 hidden text-[11px] text-muted-foreground print:block print:text-black/70">
-                {workDate} · {isLoadOrder ? "Ordine di carico" : "Ordine di sequenza"}
+              <p className="mt-0.5 hidden text-[11px] text-muted-foreground print:mt-1 print:block print:text-[13px] print:text-black">
+                {workDate} · {isLoadOrder ? "Ordine di carico" : "Ordine di giro"}
               </p>
             </div>
           </div>
@@ -292,13 +274,13 @@ export default function LogisticsDriverSequenceSheet({
             {(group.warehouseDepartureTime || group.warehouseReturnTime) && (
               <div className="hidden flex-col items-end gap-0.5 text-right print:flex">
                 {group.warehouseDepartureTime && (
-                  <p className="whitespace-nowrap text-[11px] text-black">
+                  <p className="whitespace-nowrap text-[13px] text-black">
                     <span className="font-semibold">Partenza magazzino stimata:</span>{" "}
                     {group.warehouseDepartureTime}
                   </p>
                 )}
                 {group.warehouseReturnTime && (
-                  <p className="whitespace-nowrap text-[11px] text-black">
+                  <p className="whitespace-nowrap text-[13px] text-black">
                     <span className="font-semibold">Ritorno magazzino stimato:</span>{" "}
                     {group.warehouseReturnTime}
                   </p>
@@ -324,7 +306,7 @@ export default function LogisticsDriverSequenceSheet({
               className="flex h-7 shrink-0 items-center gap-1 border-2 border-custom-blue px-2 text-[10px] font-semibold print:hidden"
               onClick={() => setIsLoadOrder((prev) => !prev)}
             >
-              {isLoadOrder ? "Ordine di sequenza" : "Ordine di carico"}
+              {isLoadOrder ? "Ordine di giro" : "Ordine di carico"}
             </Button>
           </div>
         </div>
@@ -342,17 +324,20 @@ export default function LogisticsDriverSequenceSheet({
           <table className="w-full border-collapse text-xs print:table-fixed print:text-[8px]">
             <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur-sm print:static print:bg-[#eee]">
               <tr className="border-b border-custom-blue/30 print:border-black/40">
-                <th className="h-9 w-[52px] min-w-[52px] max-w-[52px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                <th className="driver-sheet-col-lead h-9 w-[52px] min-w-[52px] max-w-[52px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   Seq.
                 </th>
-                <th className="h-9 min-w-[88px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                <th className="driver-sheet-col-lead h-9 w-[44px] min-w-[44px] max-w-[56px] border-r border-border/60 px-1 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                  Tipo
+                </th>
+                <th className="driver-sheet-col-lead h-9 min-w-[88px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   <span className="print:hidden">Codice adam</span>
                   <span className="hidden print:inline">Codice</span>
                 </th>
-                <th className="h-9 min-w-[100px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                <th className="driver-sheet-col-lead h-9 min-w-[100px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   Cliente
                 </th>
-                <th className="h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                <th className="driver-sheet-col-emphasis h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   Indirizzo
                 </th>
                 <th className="h-9 min-w-[140px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
@@ -363,13 +348,13 @@ export default function LogisticsDriverSequenceSheet({
                   <span className="print:hidden">Check-out / Check-in</span>
                   <span className="hidden print:inline">Out/In</span>
                 </th>
-                <th className="h-9 min-w-[120px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                <th className="driver-sheet-col-emphasis h-9 min-w-[120px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   Cleaner
                 </th>
                 <th className="h-9 min-w-[100px] border-r border-border/60 px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   Divani
                 </th>
-                <th className="h-9 w-[56px] min-w-[56px] max-w-[72px] border-r border-border/60 px-1 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                <th className="h-9 min-w-[72px] max-w-[120px] border-r border-border/60 px-1 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   Chiavi
                 </th>
                 <th className="h-9 min-w-[160px] px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
@@ -418,25 +403,31 @@ export default function LogisticsDriverSequenceSheet({
                       }
                     }}
                     >
-                    <td className="relative w-[52px] min-w-[52px] max-w-[52px] overflow-visible border-r border-border/40 px-2 py-2 text-center align-middle print:static print:overflow-hidden">
+                    <td className="driver-sheet-col-lead relative w-[52px] min-w-[52px] max-w-[52px] overflow-visible border-r border-border/40 px-2 py-2 text-center align-middle print:static print:overflow-hidden">
                       {isTimelineViolated && (
                         <span className="print:hidden">
                           <SequenceSummaryViolationIndicator />
                         </span>
                       )}
-                      <div className="flex items-center justify-center">
+                      <div className="flex items-center justify-center print:hidden">
                         <span className={logisticsKindSequenceDotClass(entry.logisticsTaskKind)}>
                           {entry.sequence}
                         </span>
                       </div>
+                      <span className="hidden font-bold tabular-nums print:inline">
+                        {entry.sequence}
+                      </span>
                     </td>
-                    <td className="border-r border-border/40 px-2 py-2 text-center align-middle font-semibold">
+                    <td className="driver-sheet-col-lead w-[44px] min-w-[44px] max-w-[56px] border-r border-border/40 px-1 py-2 text-center align-middle font-bold tabular-nums">
+                      {logisticsKindShortLabel(entry.logisticsTaskKind)}
+                    </td>
+                    <td className="driver-sheet-col-lead border-r border-border/40 px-2 py-2 text-center align-middle font-semibold">
                       {entry.logisticCode || "N/D"}
                     </td>
-                    <td className="border-r border-border/40 px-2 py-2 text-center align-middle">
+                    <td className="driver-sheet-col-lead border-r border-border/40 px-2 py-2 text-center align-middle">
                       {entry.customerAlias || "—"}
                     </td>
-                    <td className="border-r border-border/40 px-2 py-2 align-top">
+                    <td className="driver-sheet-col-emphasis border-r border-border/40 px-2 py-2 align-top">
                       {entry.address || "—"}
                     </td>
                     <td className="border-r border-border/40 px-2 py-2 text-center align-middle whitespace-nowrap print:min-w-0 print:whitespace-normal print:px-1 print:py-1">
@@ -450,7 +441,7 @@ export default function LogisticsDriverSequenceSheet({
                         />
                       </div>
                     </td>
-                    <td className="border-r border-border/40 px-2 py-2 text-center align-middle">
+                    <td className="driver-sheet-col-emphasis border-r border-border/40 px-2 py-2 text-center align-middle">
                       <div className="flex justify-center">
                         <SheetCleanerCell
                           cleanerLabel={entry.cleanerLabel}

@@ -263,7 +263,7 @@ export default function AssignedTasksSequenceSummary({
                       className="flex h-7 shrink-0 items-center gap-1 border-2 border-custom-blue px-2 text-[10px] font-semibold"
                       onClick={() => toggleDriverLoadOrder(group.id)}
                     >
-                      {isLoadOrder ? "Ordine di sequenza" : "Ordine di carico"}
+                      {isLoadOrder ? "Ordine di giro" : "Ordine di carico"}
                     </Button>
                   </div>
                 </div>
