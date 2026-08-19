@@ -23,8 +23,13 @@ export interface AssignmentSyncResult {
   needsUnlockConfirm?: boolean;
   lockedTasks?: LockedConflictTask[];
   moved?: number;
-  unassigned?: number;
   assigned?: number;
+  /** Tolte dalla timeline (ADAM senza cleaner) e rimesse nei containers. */
+  unassigned?: number;
+  /** Tolte dalla timeline senza rientro nei containers: tipologia non gestita da WASS. */
+  removedUnhandled?: number;
+  /** Ignorate: tipologia non gestita da WASS e cleaner ADAM non convocato. */
+  skippedReadonly?: number;
   collaborationUpdated?: number;
   recalculatedCleaners?: number;
   unlockedTaskIds?: number[];
@@ -68,7 +73,7 @@ function isTrue(value: any): boolean {
   return value === true || value === 1 || value === "1";
 }
 
-function applyReadonlyPreassignedMode(task: any): any {
+function applyPreassignedMode(task: any, mode: "normal" | "readonly"): any {
   const reasons = Array.isArray(task?.reasons) ? task.reasons : [];
   const nextReasons: string[] = [];
   const seen = new Set<string>();
@@ -85,9 +90,11 @@ function applyReadonlyPreassignedMode(task: any): any {
     seen.add(reason);
     nextReasons.push(reason);
   }
-  nextReasons.push(PREASSIGNED_REASON_READONLY);
+  nextReasons.push(
+    mode === "readonly" ? PREASSIGNED_REASON_READONLY : PREASSIGNED_REASON_NORMAL
+  );
   task.reasons = nextReasons;
-  task.preAssignedMode = "readonly";
+  task.preAssignedMode = mode;
   return task;
 }
 
@@ -118,6 +125,11 @@ function sameIdSet(a: number[], b: number[]): boolean {
   return true;
 }
 
+/**
+ * Stato ADAM della giornata sulle operazioni di interesse WASS, incluse le task
+ * senza cleaner: la sync è uno specchio, quindi anche l'assenza di assegnazione
+ * è un'informazione da riportare in timeline.
+ */
 async function fetchAdamAssignmentsForDate(
   workDate: string,
   scope: "housekeeping" | "office"
@@ -346,10 +358,7 @@ function buildTaskFromAdam(row: AdamAssignmentRow, existing?: any): any {
       }
     : row;
   const payload = cloneTaskPayload(source);
-  if (row.enableWassReadonly) {
-    applyReadonlyPreassignedMode(payload);
-  }
-  return payload;
+  return applyPreassignedMode(payload, row.enableWassReadonly ? "readonly" : "normal");
 }
 
 function assignmentDiffers(
@@ -379,7 +388,16 @@ function assignmentDiffers(
 }
 
 /**
- * Sync timeline cleaner / sequence / collaborations from ADAM.
+ * Porta la timeline WASS allo stato corrente di ADAM (cleaner, sequenza, collaborazioni).
+ *
+ * - task con cleaner in ADAM → assegnata a quel cleaner, che viene auto-convocato;
+ * - task senza cleaner in ADAM → esce dalla timeline e torna nei containers;
+ * - tipologia intervento non gestita da WASS (enable_wass_readonly) → passa solo se
+ *   il cleaner ADAM che la possiede è già convocato, e non convoca mai nessuno;
+ *   se in ADAM non ha cleaner esce dalla timeline senza tornare nei containers
+ *   (i containers coprono solo le operazioni enable_wass, vedi create_containers.py).
+ *
+ * Fuori dal perimetro ADAM della giornata la timeline non viene toccata.
  * ADAM wins. Locked WASS tasks that would move need confirmUnlockLocked.
  */
 export async function syncTimelineAssignmentsFromAdam(
@@ -389,8 +407,7 @@ export async function syncTimelineAssignmentsFromAdam(
   options: { confirmUnlockLocked?: boolean } = {}
 ): Promise<AssignmentSyncResult> {
   try {
-    const adamRows = await fetchAdamAssignmentsForDate(workDate, scope);
-    const adamById = new Map(adamRows.map((row) => [row.task_id, row]));
+    const allAdamRows = await fetchAdamAssignmentsForDate(workDate, scope);
 
     const timelineData =
       (await workspaceFiles.loadTimeline(workDate, scope)) ||
@@ -402,6 +419,33 @@ export async function syncTimelineAssignmentsFromAdam(
     timelineData.cleaners_assignments = Array.isArray(timelineData.cleaners_assignments)
       ? timelineData.cleaners_assignments
       : [];
+
+    const selectedCleanersData =
+      (await workspaceFiles.loadSelectedCleaners(workDate, scope)) || { cleaners: [] };
+    const selectedById = new Map<number, any>(
+      (selectedCleanersData.cleaners || [])
+        .map((cleaner: any) => [Number(cleaner?.id), cleaner] as const)
+        .filter(([id]: readonly [number, any]) => Number.isFinite(id) && id > 0)
+    );
+    const initiallySelected = new Set(selectedById.keys());
+
+    // Tipologia non gestita da WASS: passa solo se il cleaner ADAM che la possiede è
+    // già convocato. Senza cleaner in ADAM la riga resta nel perimetro perché la task
+    // va comunque rimossa dalla timeline.
+    const skippedReadonlyTaskIds: number[] = [];
+    const adamRows = allAdamRows.filter((row) => {
+      if (!row.enableWassReadonly) return true;
+      if (!row.primaryCleanerId) return true;
+      if (initiallySelected.has(row.primaryCleanerId)) return true;
+      skippedReadonlyTaskIds.push(row.task_id);
+      return false;
+    });
+    const adamById = new Map(adamRows.map((row) => [row.task_id, row]));
+    if (skippedReadonlyTaskIds.length > 0) {
+      console.log(
+        `ℹ️ Sync ADAM ${workDate}: ${skippedReadonlyTaskIds.length} task con tipologia non gestita da WASS ignorate (cleaner non convocato)`
+      );
+    }
 
     const locksMap = await pgDailyAssignmentsService.getLocksMap(workDate);
 
@@ -450,22 +494,12 @@ export async function syncTimelineAssignmentsFromAdam(
     }
 
     const lockedConflicts: LockedConflictTask[] = [];
-    const relevantTaskIds = new Set<number>([
-      ...currentByTask.keys(),
-      ...adamRows.filter((r) => r.primaryCleanerId).map((r) => r.task_id),
-    ]);
-
-    for (const taskId of relevantTaskIds) {
+    // Conflitto solo dentro il perimetro ADAM: una task locked che ADAM ha spostato o
+    // sbiancato va confermata, le altre restano ferme e non richiedono unlock.
+    for (const [taskId, desired] of adamById.entries()) {
       const lock = locksMap.get(taskId);
       if (!lock?.locked) continue;
       const current = currentByTask.get(taskId);
-      const desired = adamById.get(taskId) || ({
-        task_id: taskId,
-        logistic_code: current?.task?.logistic_code ?? null,
-        primaryCleanerId: null,
-        sequence: 9999,
-        secondaryCleanerIds: [],
-      } as Partial<AdamAssignmentRow> as AdamAssignmentRow);
 
       const differs = assignmentDiffers(
         current?.cleanerIds || [],
@@ -517,21 +551,15 @@ export async function syncTimelineAssignmentsFromAdam(
       }
     }
 
-    const selectedCleanersData =
-      (await workspaceFiles.loadSelectedCleaners(workDate, scope)) || { cleaners: [] };
-    const selectedById = new Map<number, any>(
-      (selectedCleanersData.cleaners || [])
-        .map((cleaner: any) => [Number(cleaner?.id), cleaner] as const)
-        .filter(([id]: readonly [number, any]) => Number.isFinite(id) && id > 0)
-    );
-    const initiallySelected = new Set(selectedById.keys());
-
+    // Auto-convocazione solo dai pre-assegnati non readonly.
     const neededCleanerIds = normalizeIdSet(
-      adamRows.flatMap((row) =>
-        row.primaryCleanerId
-          ? [row.primaryCleanerId, ...row.secondaryCleanerIds]
-          : []
-      )
+      adamRows
+        .filter((row) => !row.enableWassReadonly)
+        .flatMap((row) =>
+          row.primaryCleanerId
+            ? [row.primaryCleanerId, ...row.secondaryCleanerIds]
+            : []
+        )
     );
     const missingCleanerIds = neededCleanerIds.filter((id) => !selectedById.has(id));
     if (missingCleanerIds.length > 0) {
@@ -629,19 +657,21 @@ export async function syncTimelineAssignmentsFromAdam(
     };
 
     let moved = 0;
-    let unassigned = 0;
     let assigned = 0;
+    let unassigned = 0;
+    let removedUnhandled = 0;
     let collaborationUpdated = 0;
     const tasksToReturnToContainers: any[] = [];
-    const handledTaskIds = new Set<number>();
 
-    // Unassign: in timeline but ADAM has no primary
+    // ADAM non ha più un cleaner: la task esce dalla timeline. Torna nei containers solo
+    // se la tipologia è gestita da WASS, altrimenti sparisce dal giorno.
     for (const [taskId, current] of currentByTask.entries()) {
       const desired = adamById.get(taskId);
-      if (desired?.primaryCleanerId) continue;
-      // If ADAM row missing entirely, leave as-is (out of scope)
-      if (!desired) continue;
-      handledTaskIds.add(taskId);
+      if (!desired || desired.primaryCleanerId) continue;
+      if (desired.enableWassReadonly) {
+        removedUnhandled += 1;
+        continue;
+      }
       tasksToReturnToContainers.push(
         cloneTaskPayload(current.task, {
           start_time: undefined,
@@ -656,13 +686,11 @@ export async function syncTimelineAssignmentsFromAdam(
         })
       );
       unassigned += 1;
-      if (current.cleanerIds.length > 0) moved += 1;
     }
 
-    // Preserve timeline tasks not present in ADAM scope (do not drop them)
+    // Fuori perimetro ADAM: la timeline WASS non si tocca
     for (const [taskId, current] of currentByTask.entries()) {
       if (adamById.has(taskId)) continue;
-      handledTaskIds.add(taskId);
       for (const cleanerId of current.cleanerIds) {
         const entry = ensureCleanerEntry(cleanerId);
         const copy = cloneTaskPayload(current.task, {
@@ -701,15 +729,20 @@ export async function syncTimelineAssignmentsFromAdam(
       });
 
     for (const row of assignedAdamRows) {
-      handledTaskIds.add(row.task_id);
       const current = currentByTask.get(row.task_id);
       const existingTask =
         current?.task || containerTaskById.get(row.task_id) || null;
       const taskPayload = buildTaskFromAdam(row, existingTask || undefined);
+      // Su readonly nessuna convocazione: i collaboratori ADAM entrano solo se già in roster.
       const collaboratorIds = normalizeIdSet([
         row.primaryCleanerId,
         ...row.secondaryCleanerIds,
-      ]);
+      ]).filter(
+        (cleanerId) =>
+          !row.enableWassReadonly ||
+          cleanerId === row.primaryCleanerId ||
+          selectedById.has(cleanerId)
+      );
       const collabCount = Math.max(1, collaboratorIds.length);
       const baseCleaning =
         Number(
@@ -736,7 +769,6 @@ export async function syncTimelineAssignmentsFromAdam(
       );
       if (!current) {
         assigned += 1;
-        moved += 1;
       } else if (differs) {
         moved += 1;
       }
@@ -832,7 +864,7 @@ export async function syncTimelineAssignmentsFromAdam(
       scope
     );
 
-    // Rebuild containers: remove assigned; add unassigned back
+    // Rebuild containers: remove tasks now on timeline, add back the unassigned ones
     if (containersData?.containers) {
       const assignedIds = new Set(
         assignedAdamRows.map((r) => r.task_id)
@@ -924,14 +956,16 @@ export async function syncTimelineAssignmentsFromAdam(
     }
 
     console.log(
-      `✅ Sync assegnazioni ADAM→WASS ${workDate}: moved=${moved}, unassigned=${unassigned}, assigned=${assigned}, recalc=${recalculatedCleaners}`
+      `✅ Sync assegnazioni ADAM→WASS ${workDate}: moved=${moved}, assigned=${assigned}, unassigned=${unassigned}, removedUnhandled=${removedUnhandled}, skipped=${skippedReadonlyTaskIds.length}, recalc=${recalculatedCleaners}`
     );
 
     return {
       success: true,
       moved,
-      unassigned,
       assigned,
+      unassigned,
+      removedUnhandled,
+      skippedReadonly: skippedReadonlyTaskIds.length,
       collaborationUpdated,
       recalculatedCleaners,
       unlockedTaskIds,

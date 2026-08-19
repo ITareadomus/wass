@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import {
   Select,
@@ -65,10 +66,6 @@ interface TimelineViewProps {
   isLoadingDragDrop?: boolean; // Mostra loading overlay durante drag&drop
   /** Testo overlay quando isLoadingDragDrop è true */
   loadingMessage?: string;
-  /** Apre il dialog refresh ADAM (duplicato del pulsante sopra i containers) */
-  onAdamRefreshClick?: () => void;
-  isRefreshingFromAdam?: boolean;
-  hasAdamUpdates?: boolean;
   lastValidDragIndex?: number | null; // Indice valido durante il drag (da container verso timeline)
   draggingOverCleanerId?: number | null; // ID del cleaner su cui si sta trascinando
   activeDragCleanerId?: number | null; // ID del cleaner sorgente durante il drag
@@ -239,9 +236,6 @@ export default function TimelineView({
   isReadOnly = false,
   isLoadingDragDrop = false,
   loadingMessage,
-  onAdamRefreshClick,
-  isRefreshingFromAdam = false,
-  hasAdamUpdates = false,
   lastValidDragIndex = null,
   draggingOverCleanerId = null,
   activeDragCleanerId = null,
@@ -289,7 +283,6 @@ export default function TimelineView({
   const [pendingCleaner, setPendingCleaner] = useState<any>(null); // Added to track pending cleaner ID
   const [showAdamTransferDialog, setShowAdamTransferDialog] = useState(false); // Stato per il dialog di trasferimento ADAM
   const [showResetDialog, setShowResetDialog] = useState(false); // Stato per il dialog di reset assegnazioni
-  const [showPreassignedTasksDialog, setShowPreassignedTasksDialog] = useState(false);
   const [lastAdamTransfer, setLastAdamTransfer] = useState<string | null>(null); // Timestamp ultimo trasferimento ADAM
   const [lockedCleaners, setLockedCleaners] = useState<Set<number>>(new Set()); // Set degli ID dei cleaner bloccati
 
@@ -395,7 +388,8 @@ export default function TimelineView({
   const [showOptimizerDialog, setShowOptimizerDialog] = useState(false);
   const [isRunningOptimizer, setIsRunningOptimizer] = useState(false);
   const [optimizerResult, setOptimizerResult] = useState<any>(null);
-  const [showClearAllSelectedCleanersDialog, setShowClearAllSelectedCleanersDialog] = useState(false);
+  const [showRemoveCleanersDialog, setShowRemoveCleanersDialog] = useState(false);
+  const [cleanerIdsToRemove, setCleanerIdsToRemove] = useState<number[]>([]);
 
   // Stato per le regole di validazione task-cleaner
   const [validationRules, setValidationRules] = useState<any>(null);
@@ -681,82 +675,6 @@ export default function TimelineView({
 
   const cleanerDirectoryIdsKey = cleanerDirectoryIds.join(",");
 
-  const preassignedTasksSummary = React.useMemo(() => {
-    const getPreassignedCleanerLabel = (cleaner: any, cleanerId: number) => {
-      return getCleanerDisplayDataByRaw(cleaner, cleanerId).primaryLabel;
-    };
-
-    const cleanerLabelById = new Map<number, string>();
-    for (const cleaner of allCleanersToShow) {
-      const cleanerId = Number((cleaner as any)?.id);
-      if (!Number.isFinite(cleanerId)) continue;
-      cleanerLabelById.set(cleanerId, getPreassignedCleanerLabel(cleaner, cleanerId));
-    }
-    for (const entry of timelineCleaners || []) {
-      const cleanerId = Number(entry?.cleaner?.id);
-      if (!Number.isFinite(cleanerId)) continue;
-      const label = getPreassignedCleanerLabel(entry?.cleaner, cleanerId);
-      const timelineAlias = String(cleanersAliases[cleanerId]?.alias ?? entry?.cleaner?.alias ?? "").trim();
-      if (!cleanerLabelById.has(cleanerId) || timelineAlias) {
-        cleanerLabelById.set(cleanerId, label);
-      }
-    }
-
-    const seen = new Set<string>();
-    const rows: Array<{
-      key: string;
-      mode: "readonly" | "normal";
-      logisticCode: string;
-      address: string;
-      cleanerLabel: string;
-    }> = [];
-
-    for (const task of tasks) {
-      const mode = resolvePreassignedMode(task);
-      if (!mode) continue;
-
-      const assignedCleanerRaw = (task as any).assignedCleaner ?? (task as any).cleanerId;
-      const assignedCleanerId = Number(assignedCleanerRaw);
-      const logisticCode = String(
-        (task as any).logistic_code ??
-        (task as any).logisticCode ??
-        (task as any).name ??
-        (task as any).task_id ??
-        (task as any).id ??
-        "N/D"
-      );
-      const cleanerLabel = Number.isFinite(assignedCleanerId)
-        ? (cleanerLabelById.get(assignedCleanerId) || `ID ${assignedCleanerId}`)
-        : "Non assegnata";
-      const address = String((task as any).address ?? "").trim().toUpperCase();
-
-      const key = `${String((task as any).task_id ?? (task as any).id ?? logisticCode)}-${Number.isFinite(assignedCleanerId) ? assignedCleanerId : "na"}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      rows.push({ key, mode, logisticCode, address, cleanerLabel });
-    }
-
-    rows.sort((a, b) =>
-      a.logisticCode.localeCompare(b.logisticCode, undefined, { numeric: true, sensitivity: "base" })
-    );
-
-    return {
-      all: rows,
-      readonly: rows.filter((row) => row.mode === "readonly"),
-      normal: rows.filter((row) => row.mode === "normal"),
-    };
-  }, [tasks, allCleanersToShow, timelineCleaners, cleanersAliases, cleanersDirectory]);
-
-  const visiblePreassignedTasksSummary = React.useMemo(() => {
-    if (!lastAdamTransfer) return preassignedTasksSummary;
-    return {
-      all: preassignedTasksSummary.readonly,
-      readonly: preassignedTasksSummary.readonly,
-      normal: [] as typeof preassignedTasksSummary.normal,
-    };
-  }, [preassignedTasksSummary, lastAdamTransfer]);
-
   // Crea Set di ID cleaner rimossi per facile lookup
   const removedCleanerIds = React.useMemo(() => {
     const selectedIds = new Set(cleaners.map(c => c.id));
@@ -824,22 +742,44 @@ export default function TimelineView({
     },
   });
 
-  // Mutation per svuotare tutti i cleaners convocati (selected_cleaners) per la data corrente
-  const clearAllSelectedCleanersMutation = useMutation({
-    mutationFn: async () => {
+  // Mutation per rimuovere uno o più cleaners convocati (stessa API della scheda cleaner)
+  const removeSelectedCleanersMutation = useMutation({
+    mutationFn: async (cleanerIds: number[]) => {
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-      const response = await apiRequest("POST", "/api/save-selected-cleaners", {
-        cleaners: [],
-        total_selected: 0,
-        date: workDate,
-        scope: scopeValue,
-        action_type: "CLEAR_ALL",
-        modified_by: currentUser.username || 'unknown'
-      });
-      return await response.json();
+      const results: Array<{
+        cleanerId: number;
+        success: boolean;
+        removedFromTimeline?: boolean;
+        readonlyTasksRemoved?: number;
+        error?: string;
+      }> = [];
+      for (const cleanerId of cleanerIds) {
+        try {
+          const response = await apiRequest("POST", "/api/remove-cleaner-from-selected", {
+            cleanerId,
+            date: workDate,
+            scope: scopeValue,
+            modified_by: currentUser.username || 'unknown'
+          });
+          const data = await response.json();
+          results.push({
+            cleanerId,
+            success: Boolean(data?.success),
+            removedFromTimeline: data?.removedFromTimeline,
+            readonlyTasksRemoved: data?.readonlyTasksRemoved,
+            error: data?.error || data?.message,
+          });
+        } catch (error: any) {
+          results.push({
+            cleanerId,
+            success: false,
+            error: error?.message || "Impossibile rimuovere il cleaner",
+          });
+        }
+      }
+      return results;
     },
-    onSuccess: async (data) => {
-      // CRITICAL: Marca modifiche SOLO dopo azioni utente
+    onSuccess: async (results) => {
       if ((window as any).setHasUnsavedChanges) {
         (window as any).setHasUnsavedChanges(true);
       }
@@ -847,23 +787,46 @@ export default function TimelineView({
         onTaskMoved();
       }
 
-      // Ricarica timeline e selected_cleaners per riflettere lo svuotamento
       await Promise.all([
         loadTimelineCleaners(),
         loadTimelineData(),
         loadCleaners(true),
       ]);
 
-      toast({
-        title: "Cleaners convocati rimossi",
-        description: "La selezione dei cleaners convocati è stata svuotata per questa data.",
-        variant: "success",
-      });
+      const ok = results.filter((r) => r.success);
+      const failed = results.filter((r) => !r.success);
+      const keptOnTimeline = ok.filter((r) => !r.removedFromTimeline).length;
+      const fullyRemoved = ok.filter((r) => r.removedFromTimeline).length;
+
+      if (ok.length > 0) {
+        toast({
+          title: ok.length === 1 ? "Cleaner rimosso" : "Cleaners rimossi",
+          description:
+            `${ok.length} ${ok.length === 1 ? "cleaner rimosso" : "cleaners rimossi"} dalla convocazione.` +
+            (keptOnTimeline > 0
+              ? ` ${keptOnTimeline} ${keptOnTimeline === 1 ? "resta" : "restano"} in timeline con le task modificabili.`
+              : "") +
+            (fullyRemoved > 0
+              ? ` ${fullyRemoved} ${fullyRemoved === 1 ? "è stato rimosso" : "sono stati rimossi"} completamente (nessuna task modificabile).`
+              : ""),
+          variant: "success",
+        });
+      }
+      if (failed.length > 0) {
+        toast({
+          title: "Errore",
+          description: `Impossibile rimuovere ${failed.length} cleaner.`,
+          variant: "destructive",
+        });
+      }
+
+      setShowRemoveCleanersDialog(false);
+      setCleanerIdsToRemove([]);
     },
     onError: (error: any) => {
       toast({
         title: "Errore",
-        description: error.message || "Impossibile rimuovere tutti i cleaners convocati",
+        description: error.message || "Impossibile rimuovere i cleaners convocati",
         variant: "destructive",
       });
     },
@@ -873,7 +836,7 @@ export default function TimelineView({
     isReadOnly ||
     isLoadingDragDrop ||
     removeCleanerMutation.isPending ||
-    clearAllSelectedCleanersMutation.isPending;
+    removeSelectedCleanersMutation.isPending;
 
   // Mutation per aggiungere un cleaner alla timeline
   const addCleanerMutation = useMutation({
@@ -2472,13 +2435,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
         className={`bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm relative overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
       >
         {/* Loading overlay durante drag&drop, rimozione cleaner, refresh ADAM, ecc. */}
-        {(isLoadingDragDrop || removeCleanerMutation.isPending || clearAllSelectedCleanersMutation.isPending) && (
+        {(isLoadingDragDrop || removeCleanerMutation.isPending || removeSelectedCleanersMutation.isPending) && (
           <div className="absolute inset-0 bg-black/20 dark:bg-black/40 rounded-lg flex items-center justify-center z-40 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
               <p className="text-sm font-medium text-foreground">
                 {loadingMessage ||
-                  (removeCleanerMutation.isPending || clearAllSelectedCleanersMutation.isPending
+                  (removeCleanerMutation.isPending || removeSelectedCleanersMutation.isPending
                     ? "Aggiornamento timeline..."
                     : "La timeline sta ragionando...")}
               </p>
@@ -2492,45 +2455,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               <h2 className="text-xl font-bold text-foreground flex items-center">
                 <CalendarIcon className="w-5 h-5 mr-2 text-custom-blue" />
                 {isOfficeScope ? "Timeline Ufficio" : "Timeline Housekeeping"} - {cleaners.length} Cleaners
-                {visiblePreassignedTasksSummary.all.length > 0 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="ml-2 h-7 w-7 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10"
-                    title={`Task pre-assegnate ADAM: ${visiblePreassignedTasksSummary.all.length}`}
-                    onClick={() => setShowPreassignedTasksDialog(true)}
-                  >
-                    <Lock className="w-4 h-4" />
-                  </Button>
-                )}
               </h2>
             </div>
             <div className="flex items-center gap-3 print:hidden">
-              {onAdamRefreshClick && (
-                <Button
-                  type="button"
-                  onClick={onAdamRefreshClick}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2 border-2 border-custom-blue"
-                  disabled={isReadOnly || isRefreshingFromAdam || isTimelineInteractionDisabled}
-                  title="Aggiorna dati da ADAM"
-                >
-                  <span className="relative inline-flex">
-                    <RefreshCw
-                      className={`w-4 h-4 ${isRefreshingFromAdam ? "animate-spin" : ""}`}
-                    />
-                    {hasAdamUpdates && !isRefreshingFromAdam && (
-                      <span
-                        className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-red-500"
-                        title="Aggiornamenti disponibili da ADAM"
-                      />
-                    )}
-                  </span>
-                  Refresh
-                </Button>
-              )}
               {!isOfficeScope && (
                 <Popover>
                   <PopoverTrigger asChild>
@@ -2704,28 +2631,28 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 </svg>
               </div>
               <Button
-                onClick={() => setShowClearAllSelectedCleanersDialog(true)}
+                onClick={() => {
+                  setCleanerIdsToRemove([]);
+                  setShowRemoveCleanersDialog(true);
+                }}
                 variant="ghost"
                 size="sm"
                 disabled={
                   isReadOnly ||
                   cleaners.length === 0 ||
-                  hasTasksInTimeline ||
-                  clearAllSelectedCleanersMutation.isPending
+                  removeSelectedCleanersMutation.isPending
                 }
                 className={cn(
                   "absolute inset-x-0 bottom-0 z-10 h-[38px] w-full rounded-none border-0 bg-transparent p-0",
                   "text-red-700 dark:text-red-400 hover:bg-transparent hover:text-red-700 dark:hover:text-red-400"
                 )}
-                aria-label="Rimuovi tutti i cleaners convocati"
+                aria-label="Rimuovi cleaners convocati"
                 title={
                   isReadOnly
                     ? "Non disponibile in modalità storico (data passata)"
                     : cleaners.length === 0
                       ? "Nessun cleaner convocato da rimuovere"
-                      : hasTasksInTimeline
-                        ? "Disabilitato: ci sono task nella timeline"
-                        : `Rimuovi tutti i convocati (${cleaners.length})`
+                      : `Rimuovi convocati (${cleaners.length})`
                 }
               >
                 <UserMinus className="w-4 h-4" />
@@ -3394,63 +3321,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       </div>
 
       {/* Incompatible Tasks Warning Dialog */}
-      <Dialog open={showPreassignedTasksDialog} onOpenChange={setShowPreassignedTasksDialog}>
-        <DialogContent className="w-[min(96vw,600px)] max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Lock className="w-5 h-5 text-amber-600" />
-              Task pre-assegnati da ADAM
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 text-sm">
-            <div className="rounded-md border border-amber-300/70 bg-amber-50/40 dark:bg-amber-950/20 p-3">
-              <div className="font-semibold text-amber-700 dark:text-amber-300 mb-2 flex items-center gap-2">
-                <Lock className="w-4 h-4" />
-                Read-only ({visiblePreassignedTasksSummary.readonly.length})
-              </div>
-              {visiblePreassignedTasksSummary.readonly.length === 0 ? (
-                <p className="text-muted-foreground">Nessuna task read-only pre-assegnata.</p>
-              ) : (
-                <div className="space-y-1.5">
-                  {visiblePreassignedTasksSummary.readonly.map((row) => (
-                    <div key={`ro-${row.key}`} className="flex items-center justify-between gap-3 flex-nowrap min-w-0">
-                      <span className="font-medium min-w-0 truncate whitespace-nowrap">
-                        {row.logisticCode}
-                        {row.address ? ` - ${row.address}` : ""}
-                      </span>
-                      <span className="text-muted-foreground shrink-0 whitespace-nowrap text-right">{`assegnato a ${row.cleanerLabel}`}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            {!lastAdamTransfer && (
-              <div className="rounded-md border border-sky-300/70 bg-sky-50/40 dark:bg-sky-950/20 p-3">
-                <div className="font-semibold text-sky-700 dark:text-sky-300 mb-2 flex items-center gap-2">
-                  <Unlock className="w-4 h-4" />
-                  Non read-only ({visiblePreassignedTasksSummary.normal.length})
-                </div>
-                {visiblePreassignedTasksSummary.normal.length === 0 ? (
-                  <p className="text-muted-foreground">Nessuna task pre-assegnata non read-only.</p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {visiblePreassignedTasksSummary.normal.map((row) => (
-                      <div key={`rw-${row.key}`} className="flex items-center justify-between gap-3 flex-nowrap min-w-0">
-                        <span className="font-medium min-w-0 truncate whitespace-nowrap">
-                          {row.logisticCode}
-                          {row.address ? ` - ${row.address}` : ""}
-                        </span>
-                        <span className="text-muted-foreground shrink-0 whitespace-nowrap text-right">{`assegnato a ${row.cleanerLabel}`}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={incompatibleDialog.open} onOpenChange={(open) => !open && setIncompatibleDialog({ open: false, cleanerId: null, tasks: [] })}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -3800,6 +3670,161 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               className="border-2 border-custom-blue hover:bg-accent hover:text-accent-foreground"
             >
               Conferma Rimozione
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog per rimuovere cleaners convocati (stesso stile di Aggiungi Cleaner) */}
+      <Dialog
+        open={showRemoveCleanersDialog}
+        onOpenChange={(open) => {
+          setShowRemoveCleanersDialog(open);
+          if (!open) setCleanerIdsToRemove([]);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Rimuovi Cleaner dalla Timeline</DialogTitle>
+            <DialogDescription>
+              Seleziona uno o più cleaners convocati da rimuovere. Le task modificabili restano in timeline finché non vengono riassegnate; se un cleaner ha solo task read-only, spariscono insieme a lui.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-between mt-4 mb-2">
+            <p className="text-sm text-muted-foreground">
+              {cleanerIdsToRemove.length} selezionat{cleanerIdsToRemove.length === 1 ? "o" : "i"} su {cleaners.length}
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-custom-blue"
+              disabled={cleaners.length === 0 || removeSelectedCleanersMutation.isPending}
+              onClick={() => {
+                if (cleanerIdsToRemove.length === cleaners.length) {
+                  setCleanerIdsToRemove([]);
+                } else {
+                  setCleanerIdsToRemove(cleaners.map((c) => Number(c.id)).filter((id) => Number.isFinite(id)));
+                }
+              }}
+            >
+              {cleanerIdsToRemove.length === cleaners.length && cleaners.length > 0
+                ? "Deseleziona tutti"
+                : "Seleziona tutti"}
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {cleaners.length === 0 ? (
+              <div className="flex min-h-[min(50vh,280px)] flex-col items-center justify-center py-8 px-2">
+                <p className="text-muted-foreground text-center">Nessun cleaner convocato da rimuovere.</p>
+              </div>
+            ) : (
+              [...cleaners]
+                .sort((a, b) => {
+                  const labelA = `${a.lastname || ""} ${a.name || ""}`.trim();
+                  const labelB = `${b.lastname || ""} ${b.name || ""}`.trim();
+                  return labelA.localeCompare(labelB, "it", { sensitivity: "base" });
+                })
+                .map((cleaner) => {
+                  const isSelected = cleanerIdsToRemove.includes(cleaner.id);
+                  return (
+                    <div
+                      key={cleaner.id}
+                      className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer ${
+                        isSelected
+                          ? "bg-accent border-custom-blue"
+                          : "hover:bg-accent"
+                      }`}
+                      onClick={() => {
+                        setCleanerIdsToRemove((prev) =>
+                          prev.includes(cleaner.id)
+                            ? prev.filter((id) => id !== cleaner.id)
+                            : [...prev, cleaner.id]
+                        );
+                      }}
+                      data-testid={`remove-cleaner-option-${cleaner.id}`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => {
+                            setCleanerIdsToRemove((prev) =>
+                              prev.includes(cleaner.id)
+                                ? prev.filter((id) => id !== cleaner.id)
+                                : [...prev, cleaner.id]
+                            );
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div className="min-w-0">
+                          <p className="font-semibold">
+                            {cleaner.name} {cleaner.lastname}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {cleaner.role} • Contratto: {cleaner.contract_type} • {Number(cleaner.counter_hours || 0).toFixed(2)}h
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {cleaner.role === "Formatore" && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-200 border-orange-300 dark:border-orange-700">
+                            Formatore
+                          </span>
+                        )}
+                        {cleaner.role === "Standard" && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-200 border-green-300 dark:border-green-700">
+                            Standard
+                          </span>
+                        )}
+                        {cleaner.role === "Straordinario" && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 border-red-300 dark:border-red-700">
+                            Straordinario
+                          </span>
+                        )}
+                        {cleaner.role === "Premium" && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
+                            Premium
+                          </span>
+                        )}
+                        {cleaner.role === "Ufficio" && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
+                            Ufficio
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+            )}
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRemoveCleanersDialog(false);
+                setCleanerIdsToRemove([]);
+              }}
+              disabled={removeSelectedCleanersMutation.isPending}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => removeSelectedCleanersMutation.mutate(cleanerIdsToRemove)}
+              disabled={cleanerIdsToRemove.length === 0 || removeSelectedCleanersMutation.isPending}
+              className="border-2 border-custom-blue hover:bg-accent hover:text-accent-foreground"
+            >
+              {removeSelectedCleanersMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Rimozione...
+                </>
+              ) : cleanerIdsToRemove.length === 0 ? (
+                "Rimuovi selezionati"
+              ) : (
+                `Rimuovi selezionati (${cleanerIdsToRemove.length})`
+              )}
             </Button>
           </div>
         </DialogContent>
@@ -4413,44 +4438,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
             >
               Ho capito
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Dialog di conferma per rimuovere tutti i cleaners convocati */}
-      <AlertDialog open={showClearAllSelectedCleanersDialog} onOpenChange={setShowClearAllSelectedCleanersDialog}>
-        <AlertDialogContent className="sm:max-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
-              <UserMinus className="w-5 h-5" />
-              Rimuovere tutti i cleaners convocati?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              <p className="text-base text-foreground font-semibold mb-3">
-              Questa azione svuota la selezione dei cleaners convocati per questa data.
-              </p>
-              <p className="text-sm text-muted-foreground">
-              Sei sicuro di voler procedere? Questa azione è irreversibile.
-              </p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              onClick={() => setShowClearAllSelectedCleanersDialog(false)}
-              className="border-2 border-custom-blue"
-            >
-              Annulla
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setShowClearAllSelectedCleanersDialog(false);
-                clearAllSelectedCleanersMutation.mutate();
-              }}
-              disabled={clearAllSelectedCleanersMutation.isPending}
-              className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-            >
-              Conferma rimozione
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

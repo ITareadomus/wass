@@ -1489,7 +1489,15 @@ export default function GenerateAssignments() {
       const sync = result.assignmentSync;
       const description =
         opts.mode === "assignments"
-          ? `Dati apt aggiornati. Assegnazioni: ${sync?.moved ?? 0} spostate, ${sync?.unassigned ?? 0} tolte, orari ricalcolati su ${sync?.recalculatedCleaners ?? 0} cleaner.`
+          ? `Dati apt aggiornati. Assegnazioni: ${sync?.assigned ?? 0} aggiunte, ${sync?.moved ?? 0} spostate, ${sync?.unassigned ?? 0} tolte${
+              sync?.removedUnhandled
+                ? `, ${sync.removedUnhandled} rimosse (tipologia non gestita da WASS)`
+                : ""
+            }${
+              sync?.skippedReadonly
+                ? `, ${sync.skippedReadonly} ignorate (tipologia non gestita, cleaner non convocato)`
+                : ""
+            }. Orari ricalcolati su ${sync?.recalculatedCleaners ?? 0} cleaner.`
           : "I dati dei task (appartamento) sono stati aggiornati da ADAM";
 
       toast({
@@ -2168,7 +2176,8 @@ export default function GenerateAssignments() {
                 size="sm"
                 onClick={() => setShowAdamRefreshDialog(true)}
                 disabled={isRefreshingContainers || isTimelineReadOnly}
-                className="flex items-center rounded-none text-black dark:text-white hover:bg-custom-blue/80 px-3"
+                className="flex items-center gap-2 rounded-none text-black dark:text-white hover:bg-custom-blue/80 px-3"
+                title="Sync from ADAM"
               >
                 {isRefreshingContainers ? (
                   <span className="relative inline-flex">
@@ -2185,6 +2194,7 @@ export default function GenerateAssignments() {
                     )}
                   </span>
                 )}
+                Sync from ADAM
               </Button>
               <div className="w-px h-6 bg-black/20 dark:bg-white/20" />
               <Button
@@ -2364,9 +2374,6 @@ export default function GenerateAssignments() {
                       ? "Aggiornamento da ADAM in corso…"
                       : undefined
                   }
-                  onAdamRefreshClick={() => setShowAdamRefreshDialog(true)}
-                  isRefreshingFromAdam={isRefreshingContainers}
-                  hasAdamUpdates={hasAdamUpdates}
                   lastValidDragIndex={lastValidDragIndex}
                   draggingOverCleanerId={draggingOverCleanerId}
                   activeDragCleanerId={activeDragCleanerId}
@@ -2452,12 +2459,13 @@ export default function GenerateAssignments() {
       <AlertDialog open={showAdamRefreshDialog} onOpenChange={setShowAdamRefreshDialog}>
         <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Aggiorna da ADAM</AlertDialogTitle>
+            <AlertDialogTitle>Sync from ADAM</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-sm text-muted-foreground">
                 <p>
-                  Sei sicuro? Le modifiche fatte in WASS e non ancora trasferite su ADAM
-                  verranno sovrascritte.
+                  I containers vengono sempre rigenerati da ADAM e i nuovi task aggiunti nei containers (oltre che aggiornare i dati dei task esistenti come check-in/out, pax,
+                  indirizzo, operazione, nuove task, task sparite). Le modifiche WASS
+                  non ancora trasferite su ADAM verranno sovrascritte.
                 </p>
                 <div className="space-y-2 pt-1">
                   <Label className="text-foreground">Cosa sincronizzare</Label>
@@ -2471,7 +2479,7 @@ export default function GenerateAssignments() {
                     <div className="flex items-start space-x-2">
                       <RadioGroupItem value="apt" id="refresh-mode-apt" className="mt-1" />
                       <Label htmlFor="refresh-mode-apt" className="font-normal leading-snug">
-                        Solo dati appartamento (check-in/out, pax, indirizzo, operazione…)
+                        Solo containers e dati appartamento
                       </Label>
                     </div>
                     <div className="flex items-start space-x-2">
