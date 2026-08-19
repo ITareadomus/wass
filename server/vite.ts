@@ -68,7 +68,10 @@ export async function setupVite(app: Express, server: Server) {
         `src="/src/main.tsx?v=${nanoid()}"`,
       );
       const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      res.status(200).set({
+        "Content-Type": "text/html",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+      }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
@@ -76,16 +79,41 @@ export async function setupVite(app: Express, server: Server) {
   });
 }
 
-export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
-
-  if (!fs.existsSync(distPath)) {
+function resolveClientDistPath(): string {
+  const candidates = [
+    path.resolve(import.meta.dirname, "public"),
+    path.resolve(import.meta.dirname, "..", "dist", "public"),
+    path.resolve(process.cwd(), "dist", "public"),
+  ];
+  const found = candidates.find((dir) =>
+    fs.existsSync(path.join(dir, "index.html")),
+  );
+  if (!found) {
     throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
+      `Could not find the build directory (looked in: ${candidates.join(", ")}), make sure to build the client first`,
     );
   }
+  return found;
+}
 
-  app.use(express.static(distPath));
+export function serveStatic(app: Express) {
+  const distPath = resolveClientDistPath();
+  log(`serving static files from ${distPath}`);
+
+  app.use(
+    express.static(distPath, {
+      index: false,
+      setHeaders(res, filePath) {
+        if (filePath.endsWith(`${path.sep}index.html`) || filePath.endsWith("/index.html")) {
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+          return;
+        }
+        if (filePath.includes(`${path.sep}assets${path.sep}`) || filePath.includes("/assets/")) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
+      },
+    }),
+  );
 
   // Fall through to index.html only for browser navigations.
   // Missing JS/CSS/assets should return 404 instead of HTML.
@@ -99,6 +127,7 @@ export function serveStatic(app: Express) {
       return res.status(404).type("text/plain").send("Not found");
     }
 
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

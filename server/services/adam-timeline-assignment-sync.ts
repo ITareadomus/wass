@@ -58,10 +58,37 @@ interface AdamAssignmentRow {
   primaryCleanerId: number | null;
   sequence: number;
   secondaryCleanerIds: number[];
+  enableWassReadonly: boolean;
 }
+
+const PREASSIGNED_REASON_NORMAL = "preassigned_enable_wass";
+const PREASSIGNED_REASON_READONLY = "preassigned_enable_wass_readonly";
 
 function isTrue(value: any): boolean {
   return value === true || value === 1 || value === "1";
+}
+
+function applyReadonlyPreassignedMode(task: any): any {
+  const reasons = Array.isArray(task?.reasons) ? task.reasons : [];
+  const nextReasons: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of reasons) {
+    const reason = String(entry ?? "").trim();
+    if (
+      !reason ||
+      seen.has(reason) ||
+      reason === PREASSIGNED_REASON_NORMAL ||
+      reason === PREASSIGNED_REASON_READONLY
+    ) {
+      continue;
+    }
+    seen.add(reason);
+    nextReasons.push(reason);
+  }
+  nextReasons.push(PREASSIGNED_REASON_READONLY);
+  task.reasons = nextReasons;
+  task.preAssignedMode = "readonly";
+  return task;
 }
 
 function mapStructureTypeToLetter(structureTypeId: number): string {
@@ -146,7 +173,8 @@ async function fetchAdamAssignmentsForDate(
           c.name AS customer_name,
           s.customer_structure_reference AS customer_reference,
           h.cleaned_by_us AS primary_cleaner_id,
-          h.sequence AS adam_sequence
+          h.sequence AS adam_sequence,
+          COALESCE(o.enable_wass_readonly, 0) AS enable_wass_readonly
         FROM app_housekeeping h
         JOIN app_structures s ON h.structure_id = s.id
         LEFT JOIN app_customers c ON s.customer_id = c.id
@@ -245,6 +273,7 @@ async function fetchAdamAssignmentsForDate(
           primaryCleanerId,
           sequence,
           secondaryCleanerIds: secondaries,
+          enableWassReadonly: isTrue(r?.enable_wass_readonly),
         } as AdamAssignmentRow;
       })
       .filter((row: AdamAssignmentRow | null): row is AdamAssignmentRow => row !== null);
@@ -291,6 +320,7 @@ function cloneTaskPayload(source: any, overrides: Record<string, any> = {}): any
     customer_note: source.customer_note ?? null,
     customer_note_history: source.customer_note_history ?? null,
     reasons: Array.isArray(source.reasons) ? [...source.reasons] : [],
+    preAssignedMode: source.preAssignedMode ?? undefined,
     priority: source.priority || "low_priority",
     start_time: null,
     end_time: null,
@@ -311,10 +341,15 @@ function buildTaskFromAdam(row: AdamAssignmentRow, existing?: any): any {
         customer_note: existing.customer_note,
         customer_note_history: existing.customer_note_history,
         reasons: existing.reasons,
+        preAssignedMode: existing.preAssignedMode,
         priority: existing.priority || "low_priority",
       }
     : row;
-  return cloneTaskPayload(source);
+  const payload = cloneTaskPayload(source);
+  if (row.enableWassReadonly) {
+    applyReadonlyPreassignedMode(payload);
+  }
+  return payload;
 }
 
 function assignmentDiffers(

@@ -1207,7 +1207,15 @@ export class PgDailyAssignmentsService {
         if (Array.isArray(row.customer_note_history) && row.customer_note_history.length > 0) {
           task.customer_note_history = row.customer_note_history;
         }
-        if (row.reasons && row.reasons.length > 0) task.reasons = row.reasons;
+        if (row.reasons && row.reasons.length > 0) {
+          task.reasons = row.reasons;
+          const reasons = row.reasons.map((reason: unknown) => String(reason ?? "").trim());
+          if (reasons.includes("preassigned_enable_wass_readonly")) {
+            task.preAssignedMode = "readonly";
+          } else if (reasons.includes("preassigned_enable_wass")) {
+            task.preAssignedMode = "normal";
+          }
+        }
         task.manually_moved = row.manually_moved === true;
         if (row.priority) task.priority = row.priority;
         if (row.start_time) task.start_time = row.start_time;

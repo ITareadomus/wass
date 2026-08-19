@@ -1083,6 +1083,7 @@ export default function GenerateAssignments() {
       type_apt: (rawTask as any).type_apt,
       locked: (rawTask as any).locked,
       locked_reason: (rawTask as any).locked_reason,
+      reasons: Array.isArray(rawTask.reasons) ? rawTask.reasons : undefined,
       preAssignedMode: rawTask.preAssignedMode ?? resolvePreAssignedModeFromTask(rawTask) ?? undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -1384,6 +1385,11 @@ export default function GenerateAssignments() {
             pax_out: timelineAssignment.pax_out,
             operation_id: timelineAssignment.operation_id,
             alias: timelineAssignment.alias,
+            reasons: Array.isArray((timelineAssignment as any).reasons)
+              ? (timelineAssignment as any).reasons
+              : Array.isArray((baseTask as any).reasons)
+                ? (baseTask as any).reasons
+                : undefined,
             preAssignedMode:
               (timelineAssignment as any).preAssignedMode ??
               resolvePreAssignedModeFromTask(timelineAssignment) ??

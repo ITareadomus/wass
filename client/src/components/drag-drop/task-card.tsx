@@ -1281,13 +1281,14 @@ const displayClickableInputClass =
 
   // Nei container: sfondo pagina per contrasto con la colonna; in timeline resta custom-blue-light.
   // Logistica in timeline: colori da stato Adam (lg_real_*), senza opacity che riduce leggibilità.
-  // Task finished / bloccati (locked o pre-assegnati readonly): grigio.
-  const isBlockedTask = isLocked || isPreAssignedReadonly;
+  // Task finished / locked (blocco manuale): grigio. I pre-assegnati ADAM readonly NON sono locked:
+  // restano sulla superficie normale e si distinguono dal lucchetto arancione.
+  const isLockedTask = isLocked && !isPreAssignedReadonly;
   const cardSurfaceClass = logisticsExecutionSurfaceClass
     ? logisticsExecutionSurfaceClass
     : isFinished
       ? "bg-gray-200 dark:bg-gray-800 border-gray-400 dark:border-gray-600 opacity-70"
-      : isBlockedTask
+      : isLockedTask
         ? "bg-gray-300 dark:bg-gray-700 border-gray-500 dark:border-gray-500 opacity-80 text-muted-foreground"
         : !isInTimeline
           ? "bg-background border-border shadow-sm"
@@ -3109,7 +3110,7 @@ const displayClickableInputClass =
                         !isInTimeline &&
                         cardLogisticsTaskKind == null &&
                         !isFinished &&
-                        !isBlockedTask &&
+                        !isLockedTask &&
                         "animate-blink-yellow",
                       !isDragging && isMapFiltered && "task-border-map-filtered",
                       !isDragging && !isMapFiltered && isHighlighted && "task-border-search-highlighted",
@@ -3200,12 +3201,21 @@ const displayClickableInputClass =
                         <div
                           className={[
                             "w-4 h-4 rounded-full flex items-center justify-center text-white border-2 shadow-md",
-                            isBlockedTask
-                              ? "bg-gray-600 border-gray-700 dark:bg-gray-500 dark:border-gray-400"
-                              : "bg-sky-500 border-sky-600",
+                            isPreAssignedReadonly
+                              ? "bg-amber-600 border-amber-700"
+                              : isLocked
+                                ? "bg-gray-600 border-gray-700 dark:bg-gray-500 dark:border-gray-400"
+                                : "bg-sky-500 border-sky-600",
                           ].join(" ")}
+                          title={
+                            isPreAssignedReadonly
+                              ? "Task pre-assegnata da ADAM (tipologia non gestita da WASS)"
+                              : isLocked
+                                ? "Task bloccata"
+                                : "Task pre-assegnata da ADAM"
+                          }
                         >
-                          {isBlockedTask ? (
+                          {isPreAssignedReadonly || isLocked ? (
                             <Lock className="w-2.5 h-2.5" strokeWidth={2.5} />
                           ) : (
                             <LockOpen className="w-2.5 h-2.5" strokeWidth={2.5} />

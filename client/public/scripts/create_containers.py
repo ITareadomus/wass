@@ -32,7 +32,6 @@ def init_api_client(workflow="housekeeping"):
 
 # Script paths
 EXTRACT_CLEANERS_SCRIPT = Path(__file__).parent / "extract_cleaners_optimized.py"
-EXTRACT_ACTIVE_CLIENTS_SCRIPT = Path(__file__).parent / "extract_active_clients.py"
 
 
 # Crea le directory se non esistono
@@ -505,14 +504,13 @@ def main():
     else:
         raise RuntimeError("❌ Errore: --use-api è obbligatorio. Lo script usa solo API, non filesystem.")
 
-    # Esegui script clienti attivi per la data
-    print("Eseguo extract_active_clients per la data...")
-    subprocess.run(["python3", str(EXTRACT_ACTIVE_CLIENTS_SCRIPT), "--date", target_date], check=True)
-
     # Estrai i cleaners per la data target SOLO se non usiamo dati salvati
     if not args.skip_extract:
         print("Estraggo i cleaners dal database...")
-        subprocess.run(["python3", str(EXTRACT_CLEANERS_SCRIPT), "--date", target_date], check=True)
+        subprocess.run(
+            [sys.executable, str(EXTRACT_CLEANERS_SCRIPT), "--date", target_date],
+            check=True,
+        )
     else:
         print("⏭️ Salto estrazione cleaners (--skip-extract attivo), uso selected_cleaners.json esistente")
 
