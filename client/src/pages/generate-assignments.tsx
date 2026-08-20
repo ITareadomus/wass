@@ -2502,7 +2502,12 @@ export default function GenerateAssignments() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isRefreshingContainers}>Annulla</AlertDialogCancel>
+            <AlertDialogCancel
+              disabled={isRefreshingContainers}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </AlertDialogCancel>
             <AlertDialogAction
               disabled={isRefreshingContainers}
               onClick={(e) => {
@@ -2510,6 +2515,7 @@ export default function GenerateAssignments() {
                 setShowAdamRefreshDialog(false);
                 void runAdamContainersRefresh({ mode: adamRefreshMode });
               }}
+              className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
             >
               Conferma refresh
             </AlertDialogAction>

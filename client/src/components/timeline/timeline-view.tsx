@@ -497,6 +497,8 @@ export default function TimelineView({
   const timelineRowRef = useRef<HTMLDivElement | null>(null);
   const timelineScrollRefs = useRef<HTMLDivElement[]>([]);
   const isSyncingTimelineScrollRef = useRef(false);
+  // Evita di riaprire "Aggiungi Cleaner" quando Start Time si chiude dopo una conferma
+  const skipReopenAddCleanerOnStartTimeCloseRef = useRef(false);
   const timelineScrollDragRef = useRef<{
     scrollContainer: HTMLDivElement;
     pointerId: number;
@@ -1730,59 +1732,58 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     } else {
       addCleanerMutation.mutate(cleanerId);
     }
+    skipReopenAddCleanerOnStartTimeCloseRef.current = true;
     setIsAddCleanerDialogOpen(false);
-    setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true }); // Chiudi il dialog dello start time
-    setPendingCleaner(null); // Clear pending cleaner
+    setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true });
+    setPendingCleaner(null);
   };
 
 
   // Handler per confermare l'aggiunta di un cleaner non disponibile
   const handleConfirmAddUnavailableCleaner = async () => {
-    if (confirmUnavailableDialog.cleanerId !== null) {
-      // Prima salva lo start time aggiornato
-      try {
-        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-        await fetch('/api/update-cleaner-start-time', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            cleanerId: confirmUnavailableDialog.cleanerId,
-            startTime: pendingStartTime,
-            date: workDate,
-            scope: scopeValue,
-            modified_by: currentUser.username || 'unknown',
-          }),
-        });
-        console.log(`✅ Start time aggiornato per cleaner ${confirmUnavailableDialog.cleanerId}: ${pendingStartTime}`);
-      } catch (error) {
-        console.error("Errore nel salvataggio dello start time e disponibilità:", error);
-      }
+    const cleanerId = confirmUnavailableDialog.cleanerId;
+    if (cleanerId === null) return;
 
-      // Aggiorna lo stato locale per riflettere la modifica
-      setAvailableCleaners(prev => prev.map(c =>
-        c.id === confirmUnavailableDialog.cleanerId ? { ...c, start_time: pendingStartTime, available: true } : c
-      ));
+    skipReopenAddCleanerOnStartTimeCloseRef.current = true;
+    setConfirmUnavailableDialog({ open: false, cleanerId: null });
+    setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true });
+    setIsAddCleanerDialogOpen(false);
+    setPendingCleaner(null);
 
+    try {
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      await fetch('/api/update-cleaner-start-time', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cleanerId,
+          startTime: pendingStartTime,
+          date: workDate,
+          scope: scopeValue,
+          modified_by: currentUser.username || 'unknown',
+        }),
+      });
+      console.log(`✅ Start time aggiornato per cleaner ${cleanerId}: ${pendingStartTime}`);
+    } catch (error) {
+      console.error("Errore nel salvataggio dello start time e disponibilità:", error);
+    }
 
-      // Chiudi il dialog di conferma e procedi con l'aggiunta
-      setConfirmUnavailableDialog({ open: false, cleanerId: null });
+    setAvailableCleaners(prev => prev.map(c =>
+      c.id === cleanerId ? { ...c, start_time: pendingStartTime, available: true } : c
+    ));
 
-      // Procedi con l'aggiunta/sostituzione come al solito
-      if ((window as any).setHasUnsavedChanges) {
-        (window as any).setHasUnsavedChanges(true);
-      }
-      if (cleanerToReplace !== null) {
-        removeCleanerMutation.mutate(cleanerToReplace, {
-          onSuccess: () => {
-            addCleanerMutation.mutate(confirmUnavailableDialog.cleanerId!);
-            setCleanerToReplace(null);
-          }
-        });
-      } else {
-        addCleanerMutation.mutate(confirmUnavailableDialog.cleanerId!);
-      }
-      setIsAddCleanerDialogOpen(false); // Chiudi anche il dialog di aggiunta
-      setPendingCleaner(null); // Clear pending cleaner
+    if ((window as any).setHasUnsavedChanges) {
+      (window as any).setHasUnsavedChanges(true);
+    }
+    if (cleanerToReplace !== null) {
+      removeCleanerMutation.mutate(cleanerToReplace, {
+        onSuccess: () => {
+          addCleanerMutation.mutate(cleanerId);
+          setCleanerToReplace(null);
+        }
+      });
+    } else {
+      addCleanerMutation.mutate(cleanerId);
     }
   };
 
@@ -3938,7 +3939,10 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       <Dialog open={startTimeDialog.open} onOpenChange={(open) => {
         if (!open) {
           setStartTimeDialog({ open: false, cleanerId: null, cleanerName: '', isAvailable: true });
-          // Riapri il dialog di selezione cleaner se l'utente annulla
+          if (skipReopenAddCleanerOnStartTimeCloseRef.current) {
+            skipReopenAddCleanerOnStartTimeCloseRef.current = false;
+            return;
+          }
           setIsAddCleanerDialogOpen(true);
         }
       }}>
@@ -4034,17 +4038,20 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               })() : ''}" non è attualmente disponibile. Vuoi comunque aggiungerlo?
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end gap-2 mt-4">
+          <div className="flex justify-end gap-2 mt-6">
             <Button
               variant="outline"
+              size="sm"
               onClick={() => setConfirmUnavailableDialog({ open: false, cleanerId: null })}
               className="border-2 border-custom-blue"
             >
               Annulla
             </Button>
             <Button
+              variant="outline"
+              size="sm"
               onClick={handleConfirmAddUnavailableCleaner}
-              className="bg-custom-blue hover:bg-custom-blue/90 text-white"
+              className="border-2 border-custom-blue"
             >
               Conferma e Aggiungi
             </Button>
