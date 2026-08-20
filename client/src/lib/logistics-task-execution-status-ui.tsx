@@ -9,31 +9,26 @@ export function hasLogisticsExecutionStatusColor(
   return status === "in_progress" || status === "completed" || status === "paused";
 }
 
-/** Pastel surface colors — keep card text readable. Timeline uses a stronger tint. */
+/** Stesso verde di sfondo HK (resto del riempimento) e stesso grigio completato. */
+export const EXECUTION_IN_PROGRESS_SURFACE_CLASS =
+  "border-green-500 bg-[#116832] text-white dark:border-green-400 dark:bg-[#114f28] dark:text-white";
+export const EXECUTION_COMPLETED_SURFACE_CLASS =
+  "border-gray-400 bg-gray-700 text-white dark:border-gray-400 dark:bg-gray-700 dark:text-white";
+export const EXECUTION_PAUSED_SURFACE_CLASS =
+  "border-blue-400 bg-blue-950 text-white dark:border-blue-400 dark:bg-blue-950 dark:text-white";
+
+/** Superfici stato esecuzione — stessi colori per timeline, summary e HK. */
 export function logisticsExecutionStatusSurfaceClass(
   status?: LogisticsTaskExecutionStatus | null,
-  intensity: "soft" | "strong" = "soft"
+  _intensity: "soft" | "strong" = "soft"
 ): string | undefined {
-  if (intensity === "strong") {
-    switch (status) {
-      case "in_progress":
-        return "border-blue-500 bg-blue-300/85 dark:border-blue-400 dark:bg-blue-800/70";
-      case "completed":
-        return "border-green-600 bg-green-300/85 dark:border-green-400 dark:bg-green-800/65";
-      case "paused":
-        return "border-gray-500 bg-gray-300 dark:border-gray-400 dark:bg-gray-700/85";
-      default:
-        return undefined;
-    }
-  }
-
   switch (status) {
     case "in_progress":
-      return "border-blue-400 bg-blue-100/90 dark:border-blue-500 dark:bg-blue-950/50";
+      return EXECUTION_IN_PROGRESS_SURFACE_CLASS;
     case "completed":
-      return "border-green-500 bg-green-100/90 dark:border-green-500 dark:bg-green-950/45";
+      return EXECUTION_COMPLETED_SURFACE_CLASS;
     case "paused":
-      return "border-gray-400 bg-gray-200/95 dark:border-gray-500 dark:bg-gray-800/70";
+      return EXECUTION_PAUSED_SURFACE_CLASS;
     default:
       return undefined;
   }
@@ -48,13 +43,13 @@ export function LogisticsExecutionPausedIcon({
 }) {
   const iconClass =
     size === "timeline"
-      ? "h-3 w-3 fill-gray-700 text-gray-700 dark:fill-gray-200 dark:text-gray-200"
-      : "h-3.5 w-3.5 fill-gray-700 text-gray-700 dark:fill-gray-200 dark:text-gray-200";
+      ? "h-3 w-3 fill-white text-white"
+      : "h-3.5 w-3.5 fill-white text-white";
 
   return (
     <span
       className={cn(
-        "pointer-events-none inline-flex items-center justify-center rounded-full bg-gray-500/25 dark:bg-gray-200/15",
+        "pointer-events-none inline-flex items-center justify-center rounded-full bg-black/25",
         size === "timeline" ? "p-0.5" : "p-1",
         className
       )}

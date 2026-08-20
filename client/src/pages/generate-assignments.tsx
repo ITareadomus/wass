@@ -55,6 +55,11 @@ import {
   type DndDropOperation,
   type DndInsertTarget,
 } from "@/lib/dnd";
+import {
+  mergeHousekeepingExecutionStatusIntoTasks,
+  pickHousekeepingExecutionStatusFields,
+} from "@shared/housekeeping-task-execution-status";
+import { useHousekeepingExecutionStatusPoll } from "@/hooks/use-housekeeping-execution-status-poll";
 
 type AdamRefreshMode = "apt" | "assignments";
 type LockedConflictTask = {
@@ -620,6 +625,29 @@ export default function GenerateAssignments() {
       clearInterval(timer);
     };
   }, [selectedDate, fetchAdamFingerprint]);
+
+  const hasTimelineAssignments = allTasksWithAssignments.some((task) => {
+    const assigned = Number((task as any).assignedCleaner ?? (task as any).cleanerId);
+    return Number.isFinite(assigned);
+  });
+
+  useHousekeepingExecutionStatusPoll({
+    workDate: format(selectedDate, "yyyy-MM-dd"),
+    enabled: !isExtracting && !isOfficeScope && hasTimelineAssignments,
+    isPaused: () =>
+      isDraggingRef.current || isLoadingDragDrop || isRefreshingContainers,
+    buildUrl: (workDate) =>
+      withScope(`/api/timeline/execution-status?date=${encodeURIComponent(workDate)}`),
+    onStatuses: (statuses) => {
+      setAllTasksWithAssignments((prev) => {
+        const { tasks, changed } = mergeHousekeepingExecutionStatusIntoTasks(
+          prev,
+          statuses
+        );
+        return changed ? tasks : prev;
+      });
+    },
+  });
 
   // Callback per notificare modifiche dopo movimenti task
   const handleTaskMoved = useCallback(() => {
@@ -1395,6 +1423,7 @@ export default function GenerateAssignments() {
               resolvePreAssignedModeFromTask(timelineAssignment) ??
               resolvePreAssignedModeFromTask(baseTask) ??
               undefined,
+            ...pickHousekeepingExecutionStatusFields(timelineAssignment),
           } as any;
 
           // Usa chiave composita per evitare dedup tra collaboratori

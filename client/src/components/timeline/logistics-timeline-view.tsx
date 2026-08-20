@@ -62,6 +62,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -94,6 +95,7 @@ interface AddDriverToTimelinePayload {
   vehicleId: number;
   vehicleName: string;
   vehiclePmsCode: string | null;
+  replaceDriverId?: number | null;
 }
 
 export interface LogisticsDriverRow {
@@ -374,7 +376,8 @@ export default function LogisticsTimelineView({
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [showResetDialog, setShowResetDialog] = useState(false);
-  const [showClearDriversDialog, setShowClearDriversDialog] = useState(false);
+  const [showRemoveDriversDialog, setShowRemoveDriversDialog] = useState(false);
+  const [driverIdsToRemove, setDriverIdsToRemove] = useState<number[]>([]);
   const [addDriverOpen, setAddDriverOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
@@ -716,6 +719,7 @@ export default function LogisticsTimelineView({
   }
 
   const hasTasksInTimeline = driversAssignments.some((r) => (r.tasks?.length || 0) > 0);
+  const convocatiDrivers = drivers.filter((d) => !d.isRemoved);
 
   const getDriverRowDisplayLabel = (driver: LogisticsDriverRow) => {
     const label =
@@ -1036,6 +1040,7 @@ export default function LogisticsTimelineView({
       vehicleId,
       vehicleName: vehicle.name,
       vehiclePmsCode: vehicle.pms_code,
+      replaceDriverId: driverToReplace,
     };
   };
 
@@ -1109,6 +1114,7 @@ export default function LogisticsTimelineView({
         assigned_vehicle_id: payload.vehicleId,
         assigned_vehicle_name: payload.vehicleName,
         assigned_vehicle_pms_code: payload.vehiclePmsCode,
+        replaceDriverId: payload.replaceDriverId ?? null,
       });
 
       const selRes = await fetch(`/api/selected-logistics-drivers?date=${encodeURIComponent(workDate)}`, {
@@ -1281,22 +1287,82 @@ export default function LogisticsTimelineView({
     addDriverMutation.mutate(payload);
   };
 
-  const clearDriversMutation = useMutation({
-    mutationFn: async () => {
+  const removeSelectedDriversMutation = useMutation({
+    mutationFn: async (driverIds: number[]) => {
       const user = JSON.parse(localStorage.getItem("user") || "{}");
-      await apiRequest("POST", "/api/save-selected-logistics-drivers", {
-        drivers: [],
-        date: workDate,
-        action_type: "clear",
-        modified_by: user.username || "unknown",
-      });
+      const results: Array<{
+        driverId: number;
+        success: boolean;
+        removedFromTimeline?: boolean;
+        error?: string;
+      }> = [];
+      for (const driverId of driverIds) {
+        try {
+          const response = await apiRequest("POST", "/api/remove-driver-from-selected", {
+            driverId,
+            date: workDate,
+            modified_by: user.username || "unknown",
+          });
+          const data = await response.json();
+          results.push({
+            driverId,
+            success: Boolean(data?.success),
+            removedFromTimeline: data?.removedFromTimeline,
+            error: data?.error || data?.message,
+          });
+        } catch (error: any) {
+          results.push({
+            driverId,
+            success: false,
+            error: error?.message || "Impossibile rimuovere il driver",
+          });
+        }
+      }
+      return results;
     },
-    onSuccess: async () => {
-      toast({ title: "Convocazioni svuotate", variant: "success" });
+    onSuccess: async (results) => {
+      if ((window as any).setHasUnsavedChanges) {
+        (window as any).setHasUnsavedChanges(true);
+      }
+
       await onRefresh();
+
+      const ok = results.filter((r) => r.success);
+      const failed = results.filter((r) => !r.success);
+      const keptOnTimeline = ok.filter((r) => !r.removedFromTimeline).length;
+      const fullyRemoved = ok.filter((r) => r.removedFromTimeline).length;
+
+      if (ok.length > 0) {
+        toast({
+          title: ok.length === 1 ? "Driver rimosso" : "Driver rimossi",
+          description:
+            `${ok.length} ${ok.length === 1 ? "driver rimosso" : "driver rimossi"} dalla convocazione.` +
+            (keptOnTimeline > 0
+              ? ` ${keptOnTimeline} ${keptOnTimeline === 1 ? "resta" : "restano"} in timeline con le task assegnate.`
+              : "") +
+            (fullyRemoved > 0
+              ? ` ${fullyRemoved} ${fullyRemoved === 1 ? "è stato rimosso" : "sono stati rimossi"} completamente (nessuna task).`
+              : ""),
+          variant: "success",
+        });
+      }
+      if (failed.length > 0) {
+        toast({
+          title: "Errore",
+          description: `Impossibile rimuovere ${failed.length} driver.`,
+          variant: "destructive",
+        });
+      }
+
+      setShowRemoveDriversDialog(false);
+      setDriverIdsToRemove([]);
     },
-    onError: () => {
-      toast({ title: "Errore", description: "Impossibile svuotare i convocati", variant: "destructive" });
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile rimuovere i driver convocati",
+        variant: "destructive",
+      });
     },
   });
 
@@ -1377,6 +1443,13 @@ export default function LogisticsTimelineView({
 
   const handleDriverHeaderClick = (driver: LogisticsDriverRow, e: any) => {
     e.preventDefault();
+
+    if (driver.isRemoved) {
+      if (!isReadOnly) {
+        void handleOpenAddDriverDialog(driver.id);
+      }
+      return;
+    }
 
     if (driverClickTimer) {
       clearTimeout(driverClickTimer);
@@ -1612,7 +1685,7 @@ export default function LogisticsTimelineView({
           className
         )}
       >
-        {(isLoadingOverlay || clearDriversMutation.isPending || isAddingDriverToTimeline) && (
+        {(isLoadingOverlay || removeSelectedDriversMutation.isPending || isAddingDriverToTimeline) && (
           <div className="absolute inset-0 bg-black/20 dark:bg-black/40 rounded-lg flex items-center justify-center z-40 backdrop-blur-sm pointer-events-none">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
@@ -1757,23 +1830,24 @@ export default function LogisticsTimelineView({
                 size="sm"
                 disabled={
                   isReadOnly ||
-                  drivers.length === 0 ||
-                  hasTasksInTimeline ||
-                  clearDriversMutation.isPending
+                  convocatiDrivers.length === 0 ||
+                  removeSelectedDriversMutation.isPending
                 }
-                onClick={() => setShowClearDriversDialog(true)}
+                onClick={() => {
+                  setDriverIdsToRemove([]);
+                  setShowRemoveDriversDialog(true);
+                }}
                 className={cn(
                   "absolute inset-x-0 bottom-0 z-10 h-[38px] w-full rounded-none border-0 bg-transparent p-0",
                   "text-red-700 dark:text-red-400 hover:bg-transparent hover:text-red-700 dark:hover:text-red-400"
                 )}
+                aria-label="Rimuovi driver convocati"
                 title={
                   isReadOnly
                     ? "Non disponibile in modalità storico (data passata)"
-                    : drivers.length === 0
-                      ? "Nessun convocato"
-                      : hasTasksInTimeline
-                        ? "Svuota solo se timeline senza task"
-                        : "Rimuovi tutti i convocati"
+                    : convocatiDrivers.length === 0
+                      ? "Nessun driver convocato da rimuovere"
+                      : `Rimuovi convocati (${convocatiDrivers.length})`
                 }
               >
                 <UserMinus className="w-4 h-4" />
@@ -1902,7 +1976,7 @@ export default function LogisticsTimelineView({
                       onClick={(e) => handleDriverHeaderClick(driver, e)}
                       title={
                         driver.isRemoved
-                          ? "Dettagli — driver rimosso dai convocati (sostituisci dal pannello)"
+                          ? "Driver rimosso - Click per sostituire"
                           : "Dettagli driver (doppio click: filtro mappa)"
                       }
                     >
@@ -2283,10 +2357,10 @@ export default function LogisticsTimelineView({
                     disabled={isReadOnly || !hasTasksInTimeline || isTransferringToAdam}
                     title={
                       isReadOnly
-                        ? "Non puoi trasferire in modalità storico"
+                        ? "Non puoi inviare in modalità storico"
                         : !hasTasksInTimeline
                           ? "Nessuna task assegnata nella timeline"
-                          : "Trasferisci le assegnazioni logistica sul database ADAM"
+                          : "Invia le assegnazioni logistica ai driver"
                     }
                     data-testid="button-transfer-logistics-adam"
                   >
@@ -2297,7 +2371,7 @@ export default function LogisticsTimelineView({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                       </svg>
                     )}
-                    {isTransferringToAdam ? "Trasferimento..." : "Trasferisci su ADAM"}
+                    {isTransferringToAdam ? "Invio..." : "Invia a drivers"}
                   </Button>
                 </div>
                 <div
@@ -2385,42 +2459,168 @@ export default function LogisticsTimelineView({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={showClearDriversDialog} onOpenChange={setShowClearDriversDialog}>
-        <AlertDialogContent className="sm:max-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
-              <UserMinus className="w-5 h-5" />
-              Rimuovere tutti i driver convocati?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              <p className="text-base text-foreground font-semibold mb-3">
-                Questa azione svuota la selezione convocati per questa data.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Non disponibile se ci sono task in timeline.
-              </p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              onClick={() => setShowClearDriversDialog(false)}
+      <Dialog
+        open={showRemoveDriversDialog}
+        onOpenChange={(open) => {
+          setShowRemoveDriversDialog(open);
+          if (!open) setDriverIdsToRemove([]);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Rimuovi Driver dalla Timeline</DialogTitle>
+            <DialogDescription>
+              Seleziona uno o più driver convocati da rimuovere. Le task assegnate restano in timeline finché non vengono riassegnate; se un driver non ha task, sparisce insieme a lui.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-between mt-4 mb-2">
+            <p className="text-sm text-muted-foreground">
+              {driverIdsToRemove.length} selezionat{driverIdsToRemove.length === 1 ? "o" : "i"} su {convocatiDrivers.length}
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-custom-blue"
+              disabled={convocatiDrivers.length === 0 || removeSelectedDriversMutation.isPending}
+              onClick={() => {
+                if (driverIdsToRemove.length === convocatiDrivers.length) {
+                  setDriverIdsToRemove([]);
+                } else {
+                  setDriverIdsToRemove(
+                    convocatiDrivers.map((d) => Number(d.id)).filter((id) => Number.isFinite(id))
+                  );
+                }
+              }}
+            >
+              {driverIdsToRemove.length === convocatiDrivers.length && convocatiDrivers.length > 0
+                ? "Deseleziona tutti"
+                : "Seleziona tutti"}
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {convocatiDrivers.length === 0 ? (
+              <div className="flex min-h-[min(50vh,280px)] flex-col items-center justify-center py-8 px-2">
+                <p className="text-muted-foreground text-center">Nessun driver convocato da rimuovere.</p>
+              </div>
+            ) : (
+              [...convocatiDrivers]
+                .sort((a, b) => {
+                  const labelA = `${a.lastname || ""} ${a.name || ""}`.trim();
+                  const labelB = `${b.lastname || ""} ${b.name || ""}`.trim();
+                  return labelA.localeCompare(labelB, "it", { sensitivity: "base" });
+                })
+                .map((driver) => {
+                  const isSelected = driverIdsToRemove.includes(driver.id);
+                  return (
+                    <div
+                      key={driver.id}
+                      className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer ${
+                        isSelected
+                          ? "bg-accent border-custom-blue"
+                          : "hover:bg-accent"
+                      }`}
+                      onClick={() => {
+                        setDriverIdsToRemove((prev) =>
+                          prev.includes(driver.id)
+                            ? prev.filter((id) => id !== driver.id)
+                            : [...prev, driver.id]
+                        );
+                      }}
+                      data-testid={`remove-driver-option-${driver.id}`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => {
+                            setDriverIdsToRemove((prev) =>
+                              prev.includes(driver.id)
+                                ? prev.filter((id) => id !== driver.id)
+                                : [...prev, driver.id]
+                            );
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div className="min-w-0">
+                          <p className="font-semibold">
+                            {driver.name} {driver.lastname}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {driver.role ?? "Driver"}
+                            {driver.contract_type != null && driver.contract_type !== ""
+                              ? ` • Contratto: ${driver.contract_type}`
+                              : ""}
+                            {" • "}
+                            {Number(driver.counter_hours ?? 0).toFixed(2)}h
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {driver.role === "Formatore" && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-200 border-orange-300 dark:border-orange-700">
+                            Formatore
+                          </span>
+                        )}
+                        {driver.role === "Standard" && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-200 border-green-300 dark:border-green-700">
+                            Standard
+                          </span>
+                        )}
+                        {driver.role === "Straordinario" && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 border-red-300 dark:border-red-700">
+                            Straordinario
+                          </span>
+                        )}
+                        {driver.role === "Premium" && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
+                            Premium
+                          </span>
+                        )}
+                        {!["Formatore", "Straordinario", "Premium", "Standard"].includes(
+                          String(driver.role || "")
+                        ) && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-500/30 text-sky-900 dark:bg-sky-500/40 dark:text-sky-100 border-sky-600 dark:border-sky-400">
+                            Driver
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+            )}
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRemoveDriversDialog(false);
+                setDriverIdsToRemove([]);
+              }}
+              disabled={removeSelectedDriversMutation.isPending}
               className="border-2 border-custom-blue"
             >
               Annulla
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setShowClearDriversDialog(false);
-                clearDriversMutation.mutate();
-              }}
-              disabled={clearDriversMutation.isPending}
-              className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => removeSelectedDriversMutation.mutate(driverIdsToRemove)}
+              disabled={driverIdsToRemove.length === 0 || removeSelectedDriversMutation.isPending}
+              className="border-2 border-custom-blue hover:bg-accent hover:text-accent-foreground"
             >
-              Conferma rimozione
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              {removeSelectedDriversMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Rimozione...
+                </>
+              ) : driverIdsToRemove.length === 0 ? (
+                "Rimuovi selezionati"
+              ) : (
+                `Rimuovi selezionati (${driverIdsToRemove.length})`
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={addDriverOpen}
@@ -2683,24 +2883,31 @@ export default function LogisticsTimelineView({
       >
         <DialogContent className="sm:max-md">
           <DialogHeader>
-            <DialogTitle>Conferma aggiunta driver</DialogTitle>
+            <DialogTitle>Conferma Aggiunta Driver</DialogTitle>
             <DialogDescription>
-              Il driver selezionato non risulta disponibile. Vuoi comunque aggiungerlo e segnarlo come
-              disponibile?
+              Il driver selezionato "{confirmUnavailableDialog.driverId ? (() => {
+                const driver = availableDrivers.find((d) => d.id === confirmUnavailableDialog.driverId);
+                return driver
+                  ? `${driver.name ?? ""} ${driver.lastname ?? ""}`.trim() || "Unknown"
+                  : "Unknown";
+              })() : ""}" non è attualmente disponibile. Vuoi comunque aggiungerlo?
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end gap-2 mt-4">
+          <div className="flex justify-end gap-2 mt-6">
             <Button
               variant="outline"
+              size="sm"
               onClick={() => setConfirmUnavailableDialog({ open: false, driverId: null })}
               className="border-2 border-custom-blue"
             >
               Annulla
             </Button>
             <Button
+              variant="outline"
+              size="sm"
               onClick={() => void handleConfirmAddUnavailableDriver()}
               disabled={isAddingDriverToTimeline}
-              className="bg-custom-blue hover:bg-custom-blue/90 text-white"
+              className="border-2 border-custom-blue"
             >
               {isAddingDriverToTimeline ? (
                 <>
@@ -2708,7 +2915,7 @@ export default function LogisticsTimelineView({
                   Aggiunta in corso...
                 </>
               ) : (
-                "Conferma e aggiungi"
+                "Conferma e Aggiungi"
               )}
             </Button>
           </div>
@@ -2784,12 +2991,6 @@ export default function LogisticsTimelineView({
 
           {selectedDriverForDetails && (
             <div className="space-y-4 text-gray-900 dark:text-foreground">
-              {selectedDriverForDetails.isRemoved && (
-                <p className="text-sm font-medium text-red-600 dark:text-red-400">
-                  Driver non più nei convocati per questa data — le task restano in timeline fino a sostituzione.
-                </p>
-              )}
-
               <div className="grid grid-cols-4 gap-x-6 gap-y-4">
                 <div className="col-span-2">
                   <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1 flex items-center gap-1">
@@ -2972,29 +3173,6 @@ export default function LogisticsTimelineView({
                       )}
                     </Button>
                   </div>
-                </div>
-              )}
-
-              {selectedDriverForDetails.isRemoved && !isReadOnly && (
-                <div className="border-t pt-4 mt-4">
-                  <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-3">
-                    Sostituisci driver
-                  </p>
-                  <p className="text-xs text-gray-700 dark:text-muted-foreground mb-3">
-                    Scegli un nuovo driver: le task della riga verranno riassegnate.
-                  </p>
-                  <Button
-                    className="w-full border-2 border-custom-blue"
-                    variant="default"
-                    onClick={() => {
-                      const id = selectedDriverForDetails.id;
-                      setDriverDetailsOpen(false);
-                      setSelectedDriverForDetails(null);
-                      void handleOpenAddDriverDialog(id);
-                    }}
-                  >
-                    Sostituisci…
-                  </Button>
                 </div>
               )}
 

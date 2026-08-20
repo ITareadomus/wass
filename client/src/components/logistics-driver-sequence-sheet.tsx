@@ -18,6 +18,11 @@ import {
 } from "@/lib/logistics-task-kind-ui";
 import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
 import { SequenceSummaryGroupHeading } from "@/components/sequence-summary-group-heading";
+import {
+  hasLogisticsExecutionStatusColor,
+  LogisticsExecutionPausedIcon,
+  logisticsExecutionStatusSurfaceClass,
+} from "@/lib/logistics-task-execution-status-ui";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -366,15 +371,20 @@ export default function LogisticsDriverSequenceSheet({
               {displayedTasks.map((entry: SequenceSummaryEntry, rowIndex) => {
                 const isTimelineViolated = entry.timelineViolated === true;
                 const violationMessages = entry.violationMessages ?? [];
+                const executionSurfaceClass = logisticsExecutionStatusSurfaceClass(entry.executionStatus);
+                const statusColored = hasLogisticsExecutionStatusColor(entry.executionStatus);
+                const isPaused = entry.executionStatus === "paused";
 
                 return (
                   <tr
                     key={`${group.id}-${entry.taskId}`}
                     className={cn(
                       "border-b border-border/60 transition-colors",
-                      !isTimelineViolated && "hover:bg-muted/50",
-                      rowIndex % 2 === 1 && "bg-muted/20",
-                      isTimelineViolated && "driver-sheet-row--violated"
+                      !isTimelineViolated && !statusColored && "hover:bg-muted/50",
+                      rowIndex % 2 === 1 && !statusColored && "bg-muted/20",
+                      isTimelineViolated && "driver-sheet-row--violated",
+                      executionSurfaceClass,
+                      statusColored && "text-white"
                     )}
                     role={isTimelineViolated ? "button" : undefined}
                     tabIndex={isTimelineViolated ? 0 : undefined}
@@ -407,6 +417,11 @@ export default function LogisticsDriverSequenceSheet({
                       {isTimelineViolated && (
                         <span className="print:hidden">
                           <SequenceSummaryViolationIndicator />
+                        </span>
+                      )}
+                      {isPaused && (
+                        <span className="absolute right-0.5 top-1/2 -translate-y-1/2 print:hidden">
+                          <LogisticsExecutionPausedIcon size="summary" />
                         </span>
                       )}
                       <div className="flex items-center justify-center print:hidden">

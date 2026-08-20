@@ -47,9 +47,11 @@ function SequenceSummaryCheckInOut({
 function SequenceSummaryCleanerAssignment({
   cleanerLabel,
   cleanerSequence,
+  lightOnColor,
 }: {
   cleanerLabel?: string | null;
   cleanerSequence?: number | null;
+  lightOnColor?: boolean;
 }) {
   const label = String(cleanerLabel ?? "").trim();
   const sequence =
@@ -61,7 +63,11 @@ function SequenceSummaryCleanerAssignment({
 
   return (
     <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
-      {label && <span className="font-medium text-foreground/90">{label}</span>}
+      {label && (
+        <span className={cn("font-medium", lightOnColor ? "text-white" : "text-foreground/90")}>
+          {label}
+        </span>
+      )}
       {sequence != null && (
         <LogisticsSequenceBadge
           sequence={sequence}
@@ -77,10 +83,12 @@ function SequenceSummaryCustomerNoteIndicator({
   note,
   logisticCode,
   onOpen,
+  lightOnColor,
 }: {
   note: string;
   logisticCode: string;
   onOpen?: (note: string, logisticCode: string) => void;
+  lightOnColor?: boolean;
 }) {
   const text = String(note ?? "").trim();
   if (!text) return null;
@@ -97,7 +105,10 @@ function SequenceSummaryCustomerNoteIndicator({
           }}
           aria-label="Note del cliente da leggere"
         >
-          <MessageCircle className="h-[11px] w-[11px] text-muted-foreground" aria-hidden />
+          <MessageCircle
+            className={cn("h-[11px] w-[11px]", lightOnColor ? "text-white" : "text-muted-foreground")}
+            aria-hidden
+          />
           <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-red-500 ring-1 ring-background" />
         </button>
       </TooltipTrigger>
@@ -160,57 +171,63 @@ export function SequenceSummaryTaskContent({
 }) {
   const isTimelineViolated = entry.timelineViolated === true;
   const isPaused = entry.executionStatus === "paused";
+  const lightOnColor = hasLogisticsExecutionStatusColor(entry.executionStatus);
+  const primary = lightOnColor ? "text-white" : "text-foreground";
+  const muted = lightOnColor ? "text-white/85" : "text-muted-foreground";
+  const divider = lightOnColor ? "text-white/50" : "text-muted-foreground/60";
+  const hkLabel = lightOnColor ? "text-white" : "text-foreground/80";
 
   return (
     <>
       {isTimelineViolated && <SequenceSummaryViolationIndicator />}
       {isPaused && <SequenceSummaryPausedOverlay />}
-      <div className="min-w-max">
+      <div className={cn("relative z-[1] min-w-max", lightOnColor && "isolate")}>
         <div className="flex flex-nowrap items-center gap-x-1 whitespace-nowrap text-[11px]">
           <span className={logisticsKindSequenceDotClass(entry.logisticsTaskKind)}>
             {entry.sequence}
           </span>
-          <span className="shrink-0 text-muted-foreground/60">|</span>
-          <span className="shrink-0 font-semibold text-foreground">
+          <span className={cn("shrink-0", divider)}>|</span>
+          <span className={cn("shrink-0 font-semibold", primary)}>
             {entry.logisticCode || "N/D"}
           </span>
           {entry.customerAlias && (
             <>
-              <span className="shrink-0 text-muted-foreground/60">|</span>
-              <span className="shrink-0 text-muted-foreground">{entry.customerAlias}</span>
+              <span className={cn("shrink-0", divider)}>|</span>
+              <span className={cn("shrink-0", muted)}>{entry.customerAlias}</span>
             </>
           )}
           {entry.address && (
             <>
-              <span className="shrink-0 text-muted-foreground/60">|</span>
-              <span className="shrink-0 text-muted-foreground">{entry.address}</span>
+              <span className={cn("shrink-0", divider)}>|</span>
+              <span className={cn("shrink-0", muted)}>{entry.address}</span>
             </>
           )}
           {entry.sofabedLabel && (
             <>
-              <span className="shrink-0 text-muted-foreground/60">|</span>
-              <span className="shrink-0 whitespace-nowrap text-muted-foreground">
+              <span className={cn("shrink-0", divider)}>|</span>
+              <span className={cn("shrink-0 whitespace-nowrap", muted)}>
                 {entry.sofabedLabel}
               </span>
             </>
           )}
         </div>
-        <div className="mt-1 flex flex-nowrap items-center gap-x-1 whitespace-nowrap text-[11px] text-muted-foreground">
+        <div className={cn("mt-1 flex flex-nowrap items-center gap-x-1 whitespace-nowrap text-[11px]", muted)}>
           {(entry.cleanerLabel || entry.cleanerSequence) && (
             <>
               <SequenceSummaryCleanerAssignment
                 cleanerLabel={entry.cleanerLabel}
                 cleanerSequence={entry.cleanerSequence}
+                lightOnColor={lightOnColor}
               />
-              <span className="shrink-0 text-muted-foreground/60">|</span>
+              <span className={cn("shrink-0", divider)}>|</span>
             </>
           )}
           <span className="shrink-0 whitespace-nowrap">
-            <span className="font-medium text-foreground/80">HK window:</span> {entry.hkWindow}
+            <span className={cn("font-medium", hkLabel)}>HK window:</span> {entry.hkWindow}
           </span>
           {(entry.checkoutTime || entry.checkinTime) && (
             <>
-              <span className="shrink-0 text-muted-foreground/60">|</span>
+              <span className={cn("shrink-0", divider)}>|</span>
               <SequenceSummaryCheckInOut
                 checkoutTime={entry.checkoutTime}
                 checkinTime={entry.checkinTime}
@@ -219,11 +236,12 @@ export function SequenceSummaryTaskContent({
           )}
           {entry.customerNote && (
             <>
-              <span className="shrink-0 text-muted-foreground/60">|</span>
+              <span className={cn("shrink-0", divider)}>|</span>
               <SequenceSummaryCustomerNoteIndicator
                 note={entry.customerNote}
                 logisticCode={entry.logisticCode || "N/D"}
                 onOpen={onCustomerNoteOpen}
+                lightOnColor={lightOnColor}
               />
             </>
           )}
