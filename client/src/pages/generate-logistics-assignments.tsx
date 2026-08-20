@@ -8,7 +8,11 @@ import AssignedTasksSequenceSummary from "@/components/assigned-tasks-sequence-s
 import LogisticsTimelineView from "@/components/timeline/logistics-timeline-view";
 import MapSection from "@/components/map/map-section";
 import type { TaskType } from "@shared/schema";
-import { pickLogisticsExecutionStatusFields } from "@shared/logistics-task-execution-status";
+import {
+  mergeLogisticsExecutionStatusIntoAssignments,
+  pickLogisticsExecutionStatusFields,
+} from "@shared/logistics-task-execution-status";
+import { useLogisticsExecutionStatusPoll } from "@/hooks/use-logistics-execution-status-poll";
 import { isWorkDateHistoricallyLocked } from "@shared/work-date-access";
 import {
   CalendarIcon,
@@ -621,6 +625,25 @@ export default function GenerateLogisticsAssignments() {
     await loadLogisticsContainers(selectedDate);
     await loadLogisticsTimelineState(selectedDate);
   }, [selectedDate, loadLogisticsContainers, loadLogisticsTimelineState]);
+
+  const hasTimelineAssignments = logisticsDriversAssignments.some(
+    (row) => (row.tasks?.length || 0) > 0
+  );
+
+  useLogisticsExecutionStatusPoll({
+    workDate: format(selectedDate, "yyyy-MM-dd"),
+    enabled: !isExtractingLogistics && hasTimelineAssignments,
+    isPaused: () => isDraggingRef.current || isLoadingDragDrop,
+    onStatuses: (statuses) => {
+      setLogisticsDriversAssignments((prev) => {
+        const { assignments, changed } = mergeLogisticsExecutionStatusIntoAssignments(
+          prev,
+          statuses
+        );
+        return changed ? assignments : prev;
+      });
+    },
+  });
 
   // TaskCard chiama window.reloadAllTasks dopo lock/unlock: senza questo hook
   // i metadati duplicate_* restano stale e la grafica dei doppi non si spegne.

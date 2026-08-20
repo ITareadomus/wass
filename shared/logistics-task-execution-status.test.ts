@@ -5,6 +5,7 @@ import {
   parseLogisticsPaused,
   isLogisticsExecutionFieldSet,
   pickLogisticsExecutionStatusFields,
+  mergeLogisticsExecutionStatusIntoAssignments,
 } from "./logistics-task-execution-status";
 
 describe("resolveLogisticsTaskExecutionStatus", () => {
@@ -78,5 +79,86 @@ describe("pickLogisticsExecutionStatusFields", () => {
     assert.equal(picked.logistics_execution_status, "paused");
     assert.equal(picked.lg_real_start, "10:22:55");
     assert.equal(picked.lg_paused, true);
+  });
+});
+
+describe("mergeLogisticsExecutionStatusIntoAssignments", () => {
+  it("patches only changed execution fields and keeps other task data", () => {
+    const assignments = [
+      {
+        driver: { id: 7 },
+        tasks: [
+          {
+            task_id: 101,
+            start_time: "10:00",
+            lg_real_start: null,
+            lg_real_end: null,
+            lg_paused: false,
+            logistics_execution_status: "not_started",
+          },
+          {
+            task_id: 102,
+            start_time: "10:30",
+            lg_real_start: "10:22:55",
+            lg_real_end: null,
+            lg_paused: false,
+            logistics_execution_status: "in_progress",
+          },
+        ],
+      },
+    ];
+
+    const { assignments: next, changed } = mergeLogisticsExecutionStatusIntoAssignments(
+      assignments,
+      {
+        "101": {
+          lg_real_start: "10:05:01",
+          lg_real_end: null,
+          lg_paused: false,
+          logistics_execution_status: "in_progress",
+        },
+        "102": {
+          lg_real_start: "10:22:55",
+          lg_real_end: null,
+          lg_paused: false,
+          logistics_execution_status: "in_progress",
+        },
+      }
+    );
+
+    assert.equal(changed, true);
+    assert.equal(next[0].tasks[0].logistics_execution_status, "in_progress");
+    assert.equal(next[0].tasks[0].lg_real_start, "10:05:01");
+    assert.equal(next[0].tasks[0].start_time, "10:00");
+    assert.equal(next[0].tasks[1], assignments[0].tasks[1]);
+  });
+
+  it("returns the same array when nothing changed", () => {
+    const assignments = [
+      {
+        tasks: [
+          {
+            task_id: 101,
+            lg_real_start: "10:05:01",
+            lg_real_end: null,
+            lg_paused: false,
+            logistics_execution_status: "in_progress",
+          },
+        ],
+      },
+    ];
+    const { assignments: next, changed } = mergeLogisticsExecutionStatusIntoAssignments(
+      assignments,
+      {
+        "101": {
+          lg_real_start: "10:05:01",
+          lg_real_end: null,
+          lg_paused: false,
+          logistics_execution_status: "in_progress",
+        },
+      }
+    );
+    assert.equal(changed, false);
+    assert.equal(next, assignments);
   });
 });

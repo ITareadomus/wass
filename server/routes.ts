@@ -2724,6 +2724,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/logistics-timeline/execution-status?date=YYYY-MM-DD
+  // Polling UI: solo lg_real_* / lg_paused da ADAM, senza ricalcolo timeline.
+  app.get("/api/logistics-timeline/execution-status", async (req, res) => {
+    try {
+      const workDate = (req.query.date as string) || "";
+      if (!workDate || !isValidWorkDate(workDate)) {
+        return res.status(400).json({
+          success: false,
+          error: "date parameter required (YYYY-MM-DD)",
+        });
+      }
+
+      const { loadLogisticsTimelineExecutionStatusByDate } = await import(
+        "./services/adam-logistics-execution-status-enrichment"
+      );
+      const statuses = await loadLogisticsTimelineExecutionStatusByDate(workDate);
+      res.json({ success: true, date: workDate, statuses });
+    } catch (error: any) {
+      console.error("GET /api/logistics-timeline/execution-status:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   app.post("/api/logistics-timeline", async (req, res) => {
     try {
       const { date, timeline } = req.body;

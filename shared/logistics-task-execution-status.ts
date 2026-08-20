@@ -84,3 +84,50 @@ export function pickLogisticsExecutionStatusFields(task: any): {
     logistics_execution_status,
   };
 }
+
+export type LogisticsTaskExecutionStatusFields = ReturnType<
+  typeof pickLogisticsExecutionStatusFields
+>;
+
+export function logisticsExecutionStatusFieldsEqual(
+  task: any,
+  fields: LogisticsTaskExecutionStatusFields
+): boolean {
+  const current = pickLogisticsExecutionStatusFields(task);
+  return (
+    current.lg_real_start === fields.lg_real_start &&
+    current.lg_real_end === fields.lg_real_end &&
+    current.lg_paused === fields.lg_paused &&
+    current.logistics_execution_status === fields.logistics_execution_status
+  );
+}
+
+/** Applica gli stati Adam alle assegnazioni timeline senza toccare orari/sequenza. */
+export function mergeLogisticsExecutionStatusIntoAssignments<
+  T extends { tasks?: any[] },
+>(
+  assignments: T[],
+  statuses: Record<string, LogisticsTaskExecutionStatusFields>
+): { assignments: T[]; changed: boolean } {
+  let changed = false;
+  const next = assignments.map((row) => {
+    const tasks = row.tasks;
+    if (!Array.isArray(tasks) || tasks.length === 0) return row;
+
+    let rowChanged = false;
+    const nextTasks = tasks.map((task) => {
+      const id = String(task?.task_id ?? task?.id ?? "").trim();
+      if (!id) return task;
+      const fields = statuses[id];
+      if (!fields || logisticsExecutionStatusFieldsEqual(task, fields)) return task;
+      rowChanged = true;
+      changed = true;
+      return { ...task, ...fields };
+    });
+
+    if (!rowChanged) return row;
+    return { ...row, tasks: nextTasks };
+  });
+
+  return { assignments: changed ? next : assignments, changed };
+}
