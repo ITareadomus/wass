@@ -138,10 +138,11 @@ def streak_ending_at(uid, last_day):
     return cnt
 
 # 4) Assenze (ferie/malattia/permesso) nella data target – UNA query
+# Qualsiasi riga in app_attendance nel periodo start_date–stop_date rende il cleaner non disponibile,
+# indipendentemente da status (0 o 1).
 cur.execute("""        SELECT user_id
     FROM app_attendance
-    WHERE status = 1
-      AND %s BETWEEN start_date AND stop_date
+    WHERE %s BETWEEN start_date AND stop_date
     GROUP BY user_id
 """, (target_date,))
 leave_set = {r["user_id"] for r in cur.fetchall()}

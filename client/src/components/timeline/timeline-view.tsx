@@ -2475,7 +2475,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     align="end"
                     className="w-80 text-sm leading-relaxed"
                   >
-                    Sulle task sotto l&apos;ora, check-out/in e codice cliente restano
+                    Sui task sotto l&apos;ora, check-out/in e codice cliente restano
                     nascosti: passa il mouse sulla card per vederli.
                   </PopoverContent>
                 </Popover>

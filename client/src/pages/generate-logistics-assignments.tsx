@@ -18,7 +18,6 @@ import {
   BarChart3,
   ChevronUp,
   ChevronDown,
-  Zap,
 } from "lucide-react";
 import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
 import {
@@ -426,7 +425,6 @@ export default function GenerateLogisticsAssignments() {
   /** Solo sul pulsante refresh (come generate-assignments), nessun overlay pagina */
   const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
   const [isRunningLogisticsOptimizer, setIsRunningLogisticsOptimizer] = useState(false);
-  const [isRecalculatingOperations, setIsRecalculatingOperations] = useState(false);
   const [showMissingLogisticsKindWarningDialog, setShowMissingLogisticsKindWarningDialog] = useState(false);
   const [missingLogisticsKindTaskCount, setMissingLogisticsKindTaskCount] = useState(0);
   const [missingLogisticsKindTaskCodes, setMissingLogisticsKindTaskCodes] = useState<string[]>([]);
@@ -788,42 +786,6 @@ export default function GenerateLogisticsAssignments() {
       setIsRefreshingContainers(false);
     }
   }, [selectedDate, toast, fetchAdamLogisticsFingerprint, reloadLogisticsPage]);
-
-  const recalculateLogisticsOperations = useCallback(async () => {
-    const dateStr = format(selectedDate, "yyyy-MM-dd");
-    setIsRecalculatingOperations(true);
-    try {
-      toast({
-        title: "Ricalcolo operazioni…",
-        description: "Aggiorno tipologie e lg_operation su ADAM",
-        variant: "default",
-      });
-      const response = await fetch("/api/sync-logistics-operations-to-adam", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: dateStr }),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.message || `Server error: ${response.status}`);
-      }
-      toast({
-        variant: "success",
-        title: "Operazioni ricalcolate",
-        description: result.message || "lg_operation aggiornate su ADAM",
-      });
-      await reloadLogisticsPage();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Errore sconosciuto";
-      toast({
-        variant: "destructive",
-        title: "Errore ricalcolo operazioni",
-        description: msg,
-      });
-    } finally {
-      setIsRecalculatingOperations(false);
-    }
-  }, [selectedDate, toast, reloadLogisticsPage]);
 
   const executeLogisticsOptimizer = useCallback(async () => {
     const dateStr = format(selectedDate, "yyyy-MM-dd");
@@ -1414,29 +1376,7 @@ export default function GenerateLogisticsAssignments() {
               <Button
                 variant="ghost"
                 size="sm"
-                disabled={isRunningLogisticsOptimizer || isRecalculatingOperations || isRefreshingContainers}
-                onClick={() => void recalculateLogisticsOperations()}
-                className="flex items-center gap-2 rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
-                title="Ricalcola pick-up/delivery e scrive lg_operation su ADAM"
-                data-testid="button-recalculate-logistics-operations"
-              >
-                {isRecalculatingOperations ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    Ricalcolo…
-                  </>
-                ) : (
-                  <>
-                    <Zap className="h-4 w-4" />
-                    Ricalcola operazioni
-                  </>
-                )}
-              </Button>
-              <div className="h-6 w-px bg-black/20 dark:bg-white/20" />
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={isRunningLogisticsOptimizer || isRecalculatingOperations}
+                disabled={isRunningLogisticsOptimizer}
                 onClick={() => void handleRunLogisticsOptimizer()}
                 className="flex items-center gap-2 rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
                 data-testid="button-run-logistics-optimizer"
