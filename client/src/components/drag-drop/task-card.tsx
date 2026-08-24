@@ -1215,7 +1215,7 @@ const displayClickableInputClass =
     const measure = () => {
       const viewportW = window.innerWidth;
       const viewportH = window.innerHeight;
-      const margin = 32;
+      const margin = 80;
       const availW = Math.max(1, viewportW - margin);
       const availH = Math.max(1, viewportH - margin);
       const designWidth = isTimelineDetailsDialog
