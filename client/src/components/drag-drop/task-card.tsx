@@ -651,6 +651,13 @@ const displayClickableInputClass =
   const lastHousekeepingDetailsFetchTaskKeyRef = useRef<string>("");
   const lastCollaboratorsTaskIdRef = useRef<number | null>(null);
   const initializedEditFieldsTaskKeyRef = useRef<string>("");
+  const taskDetailsInnerRef = useRef<HTMLDivElement>(null);
+  const [taskDetailsFit, setTaskDetailsFit] = useState({
+    scale: 1,
+    width: undefined as number | undefined,
+    height: undefined as number | undefined,
+    designWidth: undefined as number | undefined,
+  });
   const isLogisticsTimelineDetails = operationsScope === "logistics" && isInTimeline;
   /** Timeline logistica (sempre) o HK in DnD: card 15' + solo codice ADAM */
   const showCompactAdamTimelineUi =
@@ -1158,6 +1165,58 @@ const displayClickableInputClass =
     return () => window.cancelAnimationFrame(rafId);
   }, [isModalOpen]);
 
+  // Dialog dettagli: niente scroll — rimpicciolisce l'intero contenuto per stare nella viewport.
+  useLayoutEffect(() => {
+    if (!isModalOpen) {
+      setTaskDetailsFit({
+        scale: 1,
+        width: undefined,
+        height: undefined,
+        designWidth: undefined,
+      });
+      return;
+    }
+
+    const inner = taskDetailsInnerRef.current;
+    if (!inner) return;
+
+    const measure = () => {
+      const viewportW = window.innerWidth;
+      const viewportH = window.innerHeight;
+      const margin = 32;
+      const availW = Math.max(1, viewportW - margin);
+      const availH = Math.max(1, viewportH - margin);
+      const designWidth = isTimelineDetailsDialog
+        ? Math.min(viewportW * 0.96, 1280)
+        : Math.min(viewportW * 0.96, 576);
+      const contentH = Math.max(inner.scrollHeight, 1);
+      const scale = Math.min(1, availW / designWidth, availH / contentH);
+      setTaskDetailsFit((prev) => {
+        const width = Math.round(designWidth * scale);
+        const height = Math.round(contentH * scale);
+        const nextScale = Math.round(scale * 1000) / 1000;
+        if (
+          prev.scale === nextScale &&
+          prev.width === width &&
+          prev.height === height &&
+          prev.designWidth === designWidth
+        ) {
+          return prev;
+        }
+        return { scale: nextScale, width, height, designWidth };
+      });
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(inner);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [isModalOpen, isTimelineDetailsDialog]);
+
   // Normalizza confirmed_operation da boolean/number/string a boolean sicuro
   // CRITICAL: Se l'utente ha modificato operation_id tramite pending edits, considera confermato
   // Questo distingue tra operation_id=2 di default (sistema) e operation_id=2 scelto manualmente
@@ -1240,7 +1299,7 @@ const displayClickableInputClass =
       : null;
 
   const categoryStripeClass = isFinished
-    ? "bg-gray-400"
+    ? "bg-gray-300 dark:bg-gray-500"
     : operationsScope === "logistics"
       ? logisticsKindStripeClass(cardLogisticsTaskKind)
       : HOUSEKEEPING_STRIPE_CLASS[cardHousekeepingTier];
@@ -1287,7 +1346,7 @@ const displayClickableInputClass =
   const cardSurfaceClass = logisticsExecutionSurfaceClass
     ? logisticsExecutionSurfaceClass
     : isFinished
-      ? "bg-gray-200 dark:bg-gray-800 border-gray-400 dark:border-gray-600 opacity-70"
+      ? "bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 opacity-70"
       : isLockedTask
         ? "bg-gray-300 dark:bg-gray-700 border-gray-500 dark:border-gray-500 opacity-80 text-muted-foreground"
         : !isInTimeline
@@ -2704,7 +2763,7 @@ const displayClickableInputClass =
   const housekeepingTimelineDetailRows = () => (
     <>
             {/* Prima riga: Codice ADAM | Cliente */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+            <div className="grid grid-cols-2 gap-3 items-start">
               <div className="self-start">
                 <p className="text-sm font-semibold text-muted-foreground">Codice ADAM</p>
                 <Input
@@ -2728,7 +2787,7 @@ const displayClickableInputClass =
             </div>
 
             {/* Seconda riga: Indirizzo | Durata pulizia */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+            <div className="grid grid-cols-2 gap-3 items-start">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Indirizzo</p>
                 <Input
@@ -2752,7 +2811,7 @@ const displayClickableInputClass =
             </div>
 
             {/* Terza riga: Check-out - Check-in (click apre dialog come Pax-In) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className={cn("text-sm font-semibold text-muted-foreground flex items-center gap-1", !isLogisticsTimelineDetails && "mb-1")}>
                   Check-out
@@ -2833,7 +2892,7 @@ const displayClickableInputClass =
             </div>
 
             {/* Quarta riga: Tipologia appartamento - Tipologia intervento */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Tipologia appartamento</p>
                 <Input value={String((displayTask as any).type_apt ?? "non migrato")} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
@@ -2878,7 +2937,7 @@ const displayClickableInputClass =
             </div>
 
             {/* Quinta riga: Pax-In - Pax-Out */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Pax-In
@@ -2913,7 +2972,7 @@ const displayClickableInputClass =
             </div>
 
             {/* Sesta riga: Travel Time - Start Time - End Time (Start/End nella colonna destra) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Travel Time</p>
                 <Input
@@ -2925,7 +2984,7 @@ const displayClickableInputClass =
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground">Start Time</p>
                   <Input value={housekeepingStartDisplayValue} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
@@ -2957,7 +3016,7 @@ const displayClickableInputClass =
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-h-[56px]">
+      <div className="grid grid-cols-3 gap-3 min-h-[56px]">
         <div className="text-center">
           <p className="text-sm font-semibold text-muted-foreground">Travel Time</p>
           <Input
@@ -3390,13 +3449,30 @@ const displayClickableInputClass =
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent
           className={cn(
-            "overflow-y-auto overflow-x-hidden",
-            isTimelineDetailsDialog
-              ? "w-[min(96vw,1280px)] max-w-[1280px] max-h-[85vh]"
-              : "sm:max-w-xl max-h-[75vh]"
+            "block overflow-hidden overscroll-none p-0 gap-0 max-h-none",
+            "animate-none data-[state=open]:animate-none data-[state=closed]:animate-none",
+            taskDetailsFit.width != null ? "w-auto max-w-none" : isTimelineDetailsDialog
+              ? "w-[min(96vw,1280px)] max-w-[1280px]"
+              : "sm:max-w-xl"
           )}
+          style={
+            taskDetailsFit.width != null && taskDetailsFit.height != null
+              ? { width: taskDetailsFit.width, height: taskDetailsFit.height }
+              : undefined
+          }
           onOpenAutoFocus={(e) => e.preventDefault()}
+          onWheel={(e) => e.stopPropagation()}
         >
+          <div
+            ref={taskDetailsInnerRef}
+            className="grid max-w-none shrink-0 gap-4 p-6 origin-top-left"
+            style={{
+              width: taskDetailsFit.designWidth ?? (isTimelineDetailsDialog ? "min(96vw, 1280px)" : undefined),
+              minWidth: taskDetailsFit.designWidth,
+              transform: `scale(${taskDetailsFit.scale})`,
+              transformOrigin: "top left",
+            }}
+          >
           <DialogHeader>
             <div className="flex items-center justify-between w-full">
               <Button
@@ -3451,9 +3527,7 @@ const displayClickableInputClass =
             className={cn(
               "mt-3",
               isTimelineDetailsDialog &&
-                cn(
-                  "grid grid-cols-1 xl:grid-cols-[3fr_minmax(0,5fr)] gap-4 items-stretch"
-                )
+                "grid grid-cols-[minmax(0,3fr)_minmax(0,5fr)] gap-4 items-stretch"
             )}
           >
             {isTimelineDetailsDialog && (
@@ -3479,7 +3553,7 @@ const displayClickableInputClass =
                     <User className="h-3.5 w-3.5 shrink-0" />
                     <span>Dettagli Cleaner</span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <div className="grid grid-cols-2 gap-3 pt-2">
                     <div>
                       <p className="text-sm font-semibold text-muted-foreground">Task assegnato a</p>
                       <Input
@@ -3682,6 +3756,7 @@ const displayClickableInputClass =
 
             </div>
 
+          </div>
           </div>
         </DialogContent>
       </Dialog>
