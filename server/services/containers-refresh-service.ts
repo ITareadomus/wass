@@ -14,9 +14,9 @@ export interface RefreshContainersResult {
   error?: string;
   mode?: RefreshSyncMode;
   assignmentSync?: AssignmentSyncResult;
-  needsUnlockConfirm?: boolean;
-  lockedTasks?: AssignmentSyncResult['lockedTasks'];
 }
+
+const inflightAdamRefresh = new Map<string, Promise<RefreshContainersResult>>();
 
 const CREATE_CONTAINERS_TIMEOUT_MS = 120000;
 
@@ -132,15 +132,42 @@ export async function refreshContainersFromAdam(
   workflow: 'housekeeping' | 'office' = 'housekeeping',
   options: {
     mode?: RefreshSyncMode;
-    confirmUnlockLocked?: boolean;
-    /** Skip create_containers (e.g. unlock retry after apt already refreshed). */
+    /** Skip create_containers (e.g. retry after apt already refreshed). */
     skipContainersRefresh?: boolean;
   } = {}
 ): Promise<RefreshContainersResult> {
+  const lockKey = `${workflow}:${workDate}`;
+  const existing = inflightAdamRefresh.get(lockKey);
+  if (existing) {
+    console.log(`⏳ refreshContainersFromAdam: attendo refresh già in corso (${lockKey})`);
+    return existing;
+  }
+
+  const pending = runRefreshContainersFromAdam(
+    workDate,
+    modifiedBy,
+    workflow,
+    options
+  ).finally(() => {
+    if (inflightAdamRefresh.get(lockKey) === pending) {
+      inflightAdamRefresh.delete(lockKey);
+    }
+  });
+  inflightAdamRefresh.set(lockKey, pending);
+  return pending;
+}
+
+async function runRefreshContainersFromAdam(
+  workDate: string,
+  modifiedBy: string,
+  workflow: 'housekeeping' | 'office',
+  options: {
+    mode?: RefreshSyncMode;
+    skipContainersRefresh?: boolean;
+  }
+): Promise<RefreshContainersResult> {
   const mode: RefreshSyncMode = options.mode === 'assignments' ? 'assignments' : 'apt';
-  console.log(
-    `🔄 refreshContainersFromAdam: ${workDate} mode=${mode} unlock=${Boolean(options.confirmUnlockLocked)}`
-  );
+  console.log(`🔄 refreshContainersFromAdam: ${workDate} mode=${mode}`);
 
   try {
     let containersData: any = null;
@@ -246,8 +273,7 @@ export async function refreshContainersFromAdam(
       const assignmentSync = await syncTimelineAssignmentsFromAdam(
         workDate,
         modifiedBy,
-        workflow,
-        { confirmUnlockLocked: options.confirmUnlockLocked }
+        workflow
       );
 
       if (!assignmentSync.success) {
@@ -258,18 +284,6 @@ export async function refreshContainersFromAdam(
           mode,
           assignmentSync,
           error: assignmentSync.error || 'Errore sync assegnazioni da ADAM',
-        };
-      }
-
-      if (assignmentSync.needsUnlockConfirm) {
-        return {
-          success: true,
-          containersData,
-          removedCount,
-          mode,
-          assignmentSync,
-          needsUnlockConfirm: true,
-          lockedTasks: assignmentSync.lockedTasks,
         };
       }
 

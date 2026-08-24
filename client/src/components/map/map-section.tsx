@@ -139,6 +139,43 @@ export default function MapSection({
     return () => clearInterval(checkFilterUpdates);
   }, [filteredCleanerId, filteredTaskId]);
 
+  useEffect(() => {
+    const reloadMapCleaners = async () => {
+      try {
+        const dateStr = localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
+        const [cleanersResponse, aliasesResponse] = await Promise.all([
+          fetch(withScope(`/api/selected-cleaners?date=${dateStr}`), {
+            cache: "no-store",
+            headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+          }),
+          fetch(withScope(`/api/cleaners-aliases?date=${dateStr}`), {
+            cache: "no-store",
+            headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+          }),
+        ]);
+        if (cleanersResponse.ok) {
+          const data = await cleanersResponse.json();
+          setCleaners(data.cleaners || []);
+        }
+        if (aliasesResponse.ok) {
+          const data = await aliasesResponse.json();
+          setCleanerAliases(data.aliases || {});
+        }
+      } catch (error) {
+        console.error("Errore ricaricamento cleaners mappa:", error);
+      }
+    };
+    const onRosterRefresh = () => {
+      void reloadMapCleaners();
+    };
+    window.addEventListener("refresh-assignments", onRosterRefresh);
+    window.addEventListener("refresh-selected-cleaners", onRosterRefresh);
+    return () => {
+      window.removeEventListener("refresh-assignments", onRosterRefresh);
+      window.removeEventListener("refresh-selected-cleaners", onRosterRefresh);
+    };
+  }, []);
+
   // Funzione per ottenere il colore del cleaner (sincronizzato con timeline)
   const getCleanerColor = (cleanerId: number) => {
     return getPersonnelHexColor(cleanerId, personnelColorScope);

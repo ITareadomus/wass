@@ -46,6 +46,32 @@ function resolveScopeFromReq(req: any): "housekeeping" | "office" {
     : "housekeeping";
 }
 
+async function rejectIfOperationalDayStarted(
+  req: any,
+  res: any,
+  workDate?: string
+): Promise<boolean> {
+  try {
+    const date = String(workDate || req?.body?.date || req?.query?.date || "");
+    if (!date || !isValidWorkDate(date)) return false;
+    const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+    const started = await pgDailyAssignmentsService.isOperationalDayStarted(
+      date,
+      resolveScopeFromReq(req)
+    );
+    if (!started) return false;
+    res.status(423).json({
+      success: false,
+      error: "OPERATIONAL_DAY_STARTED",
+      message: "Giornata operativa iniziata: le modifiche manuali da WASS sono disabilitate.",
+    });
+    return true;
+  } catch (error) {
+    console.warn("⚠️ operational-day guard:", error);
+    return false;
+  }
+}
+
 const OFFICE_OPERATION_IDS = new Set([15, 38]);
 const CONTINUAZIONE_PS_OPERATION_ID = 37;
 const CONTINUAZIONE_PS_OPERATION_NAME = "continuazione ps";
@@ -1050,6 +1076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await pgDailyAssignmentsService.ensureLockedColumns();
     await pgDailyAssignmentsService.ensureCustomerNoteColumns();
     await pgDailyAssignmentsService.ensureTaskLocksTable();
+    await pgDailyAssignmentsService.ensureOperationalDayTable();
     await pgDailyAssignmentsService.ensureDailyAssignmentsRevisionsScopeUnique();
     await pgDailyAssignmentsService.ensureDailyContainersScopeUnique();
     await pgDailyAssignmentsService.ensureSelectedCleanersScopeStructure();
@@ -1141,7 +1168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
 
-      console.log(`🔄 Reset assegnazioni per ${workDate}...`);
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
 
       const { refreshContainersFromAdam } = await import("./services/containers-refresh-service");
 
@@ -1218,7 +1245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const resolvedScope = resolveScopeFromReq(req);
 
-      // Verifica se la task è bloccata (enforcement)
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
       
@@ -1533,6 +1560,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
+
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
 
       // ENFORCEMENT: swap implica assegnazione reciproca, quindi blocca se uno dei due è locked
       const [sourceLocked, destLocked] = await Promise.all([
@@ -2494,7 +2523,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         modified_by,
         scope,
         mode,
-        confirmUnlockLocked,
         skipContainersRefresh,
       } = req.body || {};
       const workDate = date || format(new Date(), "yyyy-MM-dd");
@@ -2513,7 +2541,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         officeScope ? "office" : "housekeeping",
         {
           mode: refreshMode,
-          confirmUnlockLocked: Boolean(confirmUnlockLocked),
           skipContainersRefresh: Boolean(skipContainersRefresh),
         }
       );
@@ -2524,17 +2551,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error: refreshResult.error || "Errore nel refresh containers",
           mode: refreshResult.mode,
           assignmentSync: refreshResult.assignmentSync,
-        });
-      }
-
-      if (refreshResult.needsUnlockConfirm) {
-        return res.status(200).json({
-          success: true,
-          needsUnlockConfirm: true,
-          lockedTasks: refreshResult.lockedTasks || [],
-          mode: refreshResult.mode,
-          message: `Containers aggiornati; confermare sblocco di ${(refreshResult.lockedTasks || []).length} task locked`,
-          removedDuplicates: refreshResult.removedCount,
         });
       }
 
@@ -4628,7 +4644,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const modificationType = modification_type || 'task_assigned_manually';
       const resolvedScope = resolveScopeFromReq(req);
 
-      // ENFORCEMENT: blocca assegnazioni manuali verso cleaner locked
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       console.log(`🔍 CHECKING: save-timeline-assignment for cleanerId=${cleanerId}, workDate=${workDate}`);
       if (cleanerId && Number.isFinite(Number(cleanerId))) {
         const locked = await isCleanerLocked(workDate, Number(cleanerId));
@@ -5484,6 +5500,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
 
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+
       // Carica i cleaners selezionati da PostgreSQL
       let selectedData: any = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
       if (!selectedData) {
@@ -5691,7 +5709,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || created_by || getCurrentUsername(req);
 
-      console.log(`Aggiunta cleaner ${cleanerId} alla timeline per data ${workDate}`);
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
 
       // Carica dati del cleaner da PostgreSQL
       const { pgDailyAssignmentsService } = await import('./services/pg-daily-assignments-service');
@@ -6141,7 +6159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date;
       const currentUsername = modified_by || getCurrentUsername(req);
 
-      // Carica selected_cleaners da PostgreSQL
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const selectedCleanersResult = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
       let selectedCleanersData = selectedCleanersResult || {
@@ -6249,6 +6267,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date;
       const currentUsername = modified_by || getCurrentUsername(req);
 
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const selectedCleanersResult = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
       let selectedCleanersData = selectedCleanersResult || {
@@ -6339,6 +6359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const workDate = date || format(new Date(), "yyyy-MM-dd");
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
 
       // Aggiorna alias direttamente in PostgreSQL
@@ -6373,7 +6394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, error: "task_id richiesto" });
       }
 
-      console.log(`🔒 Lock task request: task_id=${task_id}, locked=${locked}, reason="${locked_reason}", by="${currentUser}"`);
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
 
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       
@@ -6408,7 +6429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, error: "task_ids array richiesto" });
       }
 
-      console.log(`🔒 Bulk lock request: ${task_ids.length} tasks, locked=${locked}`);
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
 
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       
@@ -6472,7 +6493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, error: "isLocked richiesto e deve essere boolean" });
       }
 
-      const { query } = await import("../shared/pg-db");
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
 
       await query(
         `
@@ -6594,7 +6615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, error: "cleanerId richiesto e deve essere un numero" });
       }
 
-      const { query } = await import("../shared/pg-db");
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       const pool = (await import("../shared/pg-db")).default;
       const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
       const { recomputeSchedule, validateOverlap } = await import("./schedule/recompute");
@@ -6864,7 +6885,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, error: "cleanerIds array richiesto" });
       }
 
-      const pool = (await import("../shared/pg-db")).default;
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       const { recomputeSchedule, validateOverlap } = await import("./schedule/recompute");
 
       const client = await pool.connect();
@@ -7114,9 +7135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, error: "cleanerId richiesto" });
       }
 
-      const pool = (await import("../shared/pg-db")).default;
-      const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
-      const { recomputeSchedule, validateOverlap } = await import("./schedule/recompute");
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
 
       const client = await pool.connect();
 
@@ -7298,6 +7317,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, error: "taskId deve essere un numero" });
       }
 
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+
       const pool = (await import("../shared/pg-db")).default;
       const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
       const { recomputeSchedule } = await import("./schedule/recompute");
@@ -7462,6 +7483,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Supporta sia aggiornamenti singoli che batch (array di updates)
   app.post("/api/update-task-details", async (req, res) => {
     try {
+      const guardDate =
+        req.body?.date ||
+        req.body?.updates?.[0]?.date ||
+        format(new Date(), "yyyy-MM-dd");
+      if (await rejectIfOperationalDayStarted(req, res, guardDate)) return;
+
       // Supporto per batch updates (array di updates)
       if (req.body.updates && Array.isArray(req.body.updates)) {
         const updates = req.body.updates;
@@ -8096,7 +8123,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     const workDate = date || format(new Date(), "yyyy-MM-dd");
     const username = reqUsername || "system";
 
-    console.log(`🔄 Trasferimento assegnazioni a ADAM per ${workDate}...`);
+    if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
 
     if (Object.keys(pendingTaskEdits).length > 0) {
       console.log(
@@ -8846,8 +8873,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       const activeOps = officeScope ? [15, 38] : await getCachedActiveAdamOperationIds(connection);
       const opPlaceholders = activeOps.length > 0 ? activeOps.map(() => "?").join(",") : "";
 
-      // Firma basata SOLO sui campi che impattano containers (checkin/checkout/time/op/pax)
-      // Normalizzazione: date -> YYYY-MM-DD, time -> TRIM(varchar5), numeri -> COALESCE
+      // Firma: dati apt + assegnazione ADAM (cleaner, sequenza). Collaborazioni in query separata.
       const signatureExpr = `
         CRC32(CONCAT_WS('|',
           h.id,
@@ -8857,20 +8883,14 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           COALESCE(TRIM(h.checkout_time), ''),
           COALESCE(h.operation_id, 0),
           COALESCE(h.checkin_pax, 0),
-          COALESCE(h.checkout_pax, 0)
+          COALESCE(h.checkout_pax, 0),
+          COALESCE(h.cleaned_by_us, 0),
+          COALESCE(h.sequence, 0)
         ))
       `;
 
-      const sql = `
-        SELECT
-          COUNT(*) AS cnt,
-          MAX(h.updated_at) AS max_upd,
-          UNIX_TIMESTAMP(MAX(h.updated_at)) AS max_upd_unix,
-          BIT_XOR(${signatureExpr}) AS sig_xor,
-          SUM(${signatureExpr}) AS sig_sum
-        FROM app_housekeeping h
-        JOIN app_structures s ON h.structure_id = s.id
-        WHERE h.checkout = ?
+      const hkWhere = `
+        h.checkout = ?
           AND h.deleted_at IS NULL
           AND h.deleted_at_client IS NULL
           AND s.lat IS NOT NULL AND s.lng IS NOT NULL
@@ -8883,9 +8903,37 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           }
       `;
 
+      const sql = `
+        SELECT
+          COUNT(*) AS cnt,
+          MAX(h.updated_at) AS max_upd,
+          UNIX_TIMESTAMP(MAX(h.updated_at)) AS max_upd_unix,
+          BIT_XOR(${signatureExpr}) AS sig_xor,
+          SUM(${signatureExpr}) AS sig_sum
+        FROM app_housekeeping h
+        JOIN app_structures s ON h.structure_id = s.id
+        WHERE ${hkWhere}
+      `;
+
+      const collabSql = `
+        SELECT
+          COUNT(*) AS cnt,
+          BIT_XOR(CRC32(CONCAT_WS('|', c.housekeeping_id, COALESCE(c.user_id, 0)))) AS sig_xor,
+          SUM(CRC32(CONCAT_WS('|', c.housekeeping_id, COALESCE(c.user_id, 0)))) AS sig_sum
+        FROM app_housekeeping_collaborations c
+        JOIN app_housekeeping h ON h.id = c.housekeeping_id
+        JOIN app_structures s ON h.structure_id = s.id
+        WHERE ${hkWhere}
+          AND c.deleted_at IS NULL
+          AND c.user_id IS NOT NULL
+          AND c.user_id > 0
+      `;
+
       const params: any[] = [date, ...activeOps];
       const [rows]: any = await connection.execute(sql, params);
+      const [collabRows]: any = await connection.execute(collabSql, params);
       const row = Array.isArray(rows) ? rows[0] : rows;
+      const collabRow = Array.isArray(collabRows) ? collabRows[0] : collabRows;
 
       res.json({
         success: true,
@@ -8896,6 +8944,9 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         signature_xor: row?.sig_xor !== null && row?.sig_xor !== undefined ? Number(row.sig_xor) : null,
         // SUM può arrivare come string (bigint) a seconda del driver
         signature_sum: row?.sig_sum ?? null,
+        collab_count: Number(collabRow?.cnt ?? 0),
+        collab_signature_xor: collabRow?.sig_xor !== null && collabRow?.sig_xor !== undefined ? Number(collabRow.sig_xor) : null,
+        collab_signature_sum: collabRow?.sig_sum ?? null,
         active_operations_count: activeOps.length,
       });
     } catch (error: any) {
@@ -8909,6 +8960,81 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           // ignore
         }
       }
+    }
+  });
+
+  app.get("/api/operational-day", async (req, res) => {
+    try {
+      const date = String(req.query.date || "");
+      if (!date || !isValidWorkDate(date)) {
+        return res.status(400).json({
+          success: false,
+          error: "date parameter required (YYYY-MM-DD)",
+        });
+      }
+      const scope = resolveScopeFromReq(req);
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const day = await pgDailyAssignmentsService.getOperationalDay(date, scope);
+      res.json({
+        success: true,
+        date,
+        scope,
+        started: day.started,
+        started_at: day.startedAt,
+        started_by: day.startedBy,
+      });
+    } catch (error: any) {
+      console.error("GET /api/operational-day:", error);
+      res.status(500).json({ success: false, error: error.message || "Server error" });
+    }
+  });
+
+  app.put("/api/operational-day", async (req, res) => {
+    try {
+      const date = String(req.body?.date || "");
+      if (!date || !isValidWorkDate(date)) {
+        return res.status(400).json({
+          success: false,
+          error: "date parameter required (YYYY-MM-DD)",
+        });
+      }
+      if (typeof req.body?.started !== "boolean") {
+        return res.status(400).json({
+          success: false,
+          error: "started (boolean) required",
+        });
+      }
+      const scope = resolveScopeFromReq(req);
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const day = await pgDailyAssignmentsService.setOperationalDayStarted(
+        date,
+        scope,
+        req.body.started,
+        getCurrentUsername(req)
+      );
+      let prunedEmptyCleaners = 0;
+      if (day.started) {
+        const { pruneEmptyTimelineCleaners } = await import(
+          "./services/adam-timeline-assignment-sync"
+        );
+        prunedEmptyCleaners = await pruneEmptyTimelineCleaners(
+          date,
+          scope,
+          getCurrentUsername(req)
+        );
+      }
+      res.json({
+        success: true,
+        date,
+        scope,
+        started: day.started,
+        started_at: day.startedAt,
+        started_by: day.startedBy,
+        pruned_empty_cleaners: prunedEmptyCleaners,
+      });
+    } catch (error: any) {
+      console.error("PUT /api/operational-day:", error);
+      res.status(500).json({ success: false, error: error.message || "Server error" });
     }
   });
 
@@ -9826,7 +9952,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       const workDate = req.body.date || format(new Date(), 'yyyy-MM-dd');
       const resolvedScope = resolveScopeFromReq(req);
 
-      // Verifica se la task è bloccata (enforcement) - specialmente se viene da container
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       if (fromContainer && taskId) {
         const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
         const isLocked = await pgDailyAssignmentsService.isTaskLocked(workDate, Number(taskId));
@@ -10969,8 +11095,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     try {
       const { date, skipPhase4 = false, applyToProduction = false } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
-      
-      console.log(`🚀 POST /api/optimizer/run-all - Avvio OPTIMIZER COMPLETO per ${workDate}`);
+
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       console.log(`   skipPhase4=${skipPhase4}, applyToProduction=${applyToProduction}`);
       
       const { runAllPhases } = await import('./services/optimizer/runAllPhases');
@@ -11007,6 +11133,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       }
 
       const workDate = date || format(new Date(), "yyyy-MM-dd");
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       console.log(`POST /api/optimizer/run-wave - Wave ${priority} for ${workDate}`);
 
       const { query } = await import("../shared/pg-db");

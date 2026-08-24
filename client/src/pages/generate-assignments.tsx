@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext, us
 const DEBUG = false;
 const dlog = (...args: any[]) => DEBUG && console.log(...args);
 import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
-import { CalendarIcon, Users, RefreshCw, Settings, Search, Map as MapIcon, BarChart3 } from "lucide-react";
+import { CalendarIcon, Users, RefreshCw, Settings, Search, Map as MapIcon, BarChart3, Loader2 } from "lucide-react";
 import TaskCardDragOverlay from "@/components/drag-drop/task-card-drag-overlay";
 import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
 import {
@@ -33,18 +33,6 @@ import { it } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { useToast } from "@/hooks/use-toast";
@@ -61,14 +49,28 @@ import {
 } from "@shared/housekeeping-task-execution-status";
 import { useHousekeepingExecutionStatusPoll } from "@/hooks/use-housekeeping-execution-status-poll";
 
-type AdamRefreshMode = "apt" | "assignments";
-type LockedConflictTask = {
-  task_id: number;
-  logistic_code: number | null;
-  locked_reason: string | null;
-  currentCleanerId: number | null;
-  adamCleanerId: number | null;
+type AdamFingerprint = {
+  count: number;
+  max_updated_at_unix: number | null;
+  signature_xor: number | null;
+  signature_sum: string | number | null;
+  collab_count: number;
+  collab_signature_xor: number | null;
+  collab_signature_sum: string | number | null;
 };
+
+function fingerprintsDiffer(a: AdamFingerprint, b: AdamFingerprint): boolean {
+  return (
+    a.count !== b.count ||
+    a.max_updated_at_unix !== b.max_updated_at_unix ||
+    a.signature_xor !== b.signature_xor ||
+    String(a.signature_sum ?? "") !== String(b.signature_sum ?? "") ||
+    a.collab_count !== b.collab_count ||
+    a.collab_signature_xor !== b.collab_signature_xor ||
+    String(a.collab_signature_sum ?? "") !== String(b.collab_signature_sum ?? "")
+  );
+}
+
 const OFFICE_SCOPE_ENABLED = false;
 const getDefaultTimelineMapPanel = () => getDefaultTimelineFloatingPanel("right");
 const getDefaultTimelineStatsPanel = () =>
@@ -280,6 +282,12 @@ export default function GenerateAssignments() {
 
   // Stato per tracciare se la timeline è in modalità di sola visualizzazione
   const [isTimelineReadOnly, setIsTimelineReadOnly] = useState<boolean>(false);
+  const [isOperationalDayStarted, setIsOperationalDayStarted] = useState(false);
+  const [isSavingOperationalDay, setIsSavingOperationalDay] = useState(false);
+  const isOperationalDayStartedRef = useRef(false);
+  const operationalDayToggleInFlightRef = useRef(false);
+  isOperationalDayStartedRef.current = isOperationalDayStarted;
+  const isWassManualLocked = isTimelineReadOnly || isOperationalDayStarted;
 
   // Ref per tracciare se è in corso un'operazione di drag-and-drop (useRef per sincronizzazione immediata)
   const isDraggingRef = useRef<boolean>(false);
@@ -537,11 +545,7 @@ export default function GenerateAssignments() {
   // Stati per pulsanti Assegna e Refresh Containers
   const [isAssigning, setIsAssigning] = useState(false);
   const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
-  const [showAdamRefreshDialog, setShowAdamRefreshDialog] = useState(false);
-  const [adamRefreshMode, setAdamRefreshMode] = useState<AdamRefreshMode>("apt");
-  const [showUnlockConfirmDialog, setShowUnlockConfirmDialog] = useState(false);
-  const [pendingLockedTasks, setPendingLockedTasks] = useState<LockedConflictTask[]>([]);
-  const [pendingRefreshMode, setPendingRefreshMode] = useState<AdamRefreshMode>("assignments");
+  const isRefreshingContainersRef = useRef(false);
   // Disabilitazione pulsanti Assegna solo dopo aver premuto il pulsante (non per D&D)
   const [hasRunAssignEo, setHasRunAssignEo] = useState(false);
   const [hasRunAssignHp, setHasRunAssignHp] = useState(false);
@@ -554,16 +558,26 @@ export default function GenerateAssignments() {
     setHasRunAssignLp(false);
   }, [selectedDate]);
 
-  // Polling ADAM: fingerprint su campi "di interesse" per segnalare aggiornamenti disponibili
-  type AdamFingerprint = {
-    count: number;
-    max_updated_at_unix: number | null;
-    signature_xor: number | null;
-    signature_sum: string | number | null;
-  };
-
+  // Polling ADAM: fingerprint (apt + assegnazioni). Auto-sync solo con giornata operativa ON.
   const adamBaselineRef = useRef<AdamFingerprint | null>(null);
   const [hasAdamUpdates, setHasAdamUpdates] = useState(false);
+  const hasAdamUpdatesRef = useRef(false);
+  const autoAdamSyncBlockedRef = useRef(false);
+  const pendingForcedAdamSyncRef = useRef(false);
+  const runAdamContainersRefreshRef = useRef<(opts?: { source?: "auto" | "manual" }) => Promise<void>>(
+    async () => {}
+  );
+
+  autoAdamSyncBlockedRef.current =
+    isAssigning ||
+    isExtracting ||
+    isLoadingTasks ||
+    isLoading ||
+    isLoadingDragDrop ||
+    isTimelineReadOnly ||
+    isTransferringToAdam ||
+    isConfirming ||
+    isDraggingTimelineTask;
 
   const fetchAdamFingerprint = useCallback(async (workDate: string): Promise<AdamFingerprint | null> => {
     try {
@@ -579,52 +593,184 @@ export default function GenerateAssignments() {
         max_updated_at_unix: data.max_updated_at_unix !== null && data.max_updated_at_unix !== undefined ? Number(data.max_updated_at_unix) : null,
         signature_xor: data.signature_xor !== null && data.signature_xor !== undefined ? Number(data.signature_xor) : null,
         signature_sum: data.signature_sum ?? null,
+        collab_count: Number(data.collab_count ?? 0),
+        collab_signature_xor: data.collab_signature_xor !== null && data.collab_signature_xor !== undefined ? Number(data.collab_signature_xor) : null,
+        collab_signature_sum: data.collab_signature_sum ?? null,
       };
     } catch {
       return null;
     }
+  }, [withScope]);
+
+  const fetchOperationalDay = useCallback(async (workDate: string): Promise<boolean | null> => {
+    try {
+      const r = await fetch(withScope(`/api/operational-day?date=${encodeURIComponent(workDate)}`), {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+      });
+      if (!r.ok) return null;
+      const data = await r.json();
+      if (!data?.success) return null;
+      return Boolean(data.started);
+    } catch {
+      return null;
+    }
+  }, [withScope]);
+
+  const tryAutoAdamSync = useCallback(() => {
+    const forced = pendingForcedAdamSyncRef.current;
+    if (!forced && !isOperationalDayStartedRef.current) return;
+    if (!forced && !hasAdamUpdatesRef.current) return;
+    if (isRefreshingContainersRef.current || isDraggingRef.current) return;
+    if (autoAdamSyncBlockedRef.current) return;
+    pendingForcedAdamSyncRef.current = false;
+    void runAdamContainersRefreshRef.current({ source: "auto" });
   }, []);
+
+  const handleOperationalDayToggle = useCallback(
+    async (started: boolean) => {
+      if (isTimelineReadOnly || isSavingOperationalDay) return;
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const previous = isOperationalDayStarted;
+      operationalDayToggleInFlightRef.current = true;
+      isOperationalDayStartedRef.current = started;
+      setIsOperationalDayStarted(started);
+      setIsSavingOperationalDay(true);
+      try {
+        const response = await fetch(withScope("/api/operational-day"), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: dateStr, scope: scopeValue, started }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.success) {
+          throw new Error(data?.error || "Impossibile aggiornare la giornata operativa");
+        }
+        const confirmed = Boolean(data.started);
+        isOperationalDayStartedRef.current = confirmed;
+        setIsOperationalDayStarted(confirmed);
+        if (confirmed) {
+          pendingForcedAdamSyncRef.current = true;
+          tryAutoAdamSync();
+        } else {
+          pendingForcedAdamSyncRef.current = false;
+        }
+        if (typeof (window as any).reloadTimelineRoster === "function") {
+          await (window as any).reloadTimelineRoster();
+        }
+        window.dispatchEvent(new CustomEvent("refresh-selected-cleaners"));
+      } catch (error: any) {
+        isOperationalDayStartedRef.current = previous;
+        setIsOperationalDayStarted(previous);
+        toast({
+          variant: "destructive",
+          title: "Errore",
+          description: error?.message || "Impossibile aggiornare la giornata operativa",
+        });
+      } finally {
+        operationalDayToggleInFlightRef.current = false;
+        setIsSavingOperationalDay(false);
+      }
+    },
+    [
+      isTimelineReadOnly,
+      isSavingOperationalDay,
+      selectedDate,
+      isOperationalDayStarted,
+      withScope,
+      scopeValue,
+      toast,
+      tryAutoAdamSync,
+    ]
+  );
 
   // Polling fingerprint ADAM (pausato quando tab non visibile)
   useEffect(() => {
     adamBaselineRef.current = null;
+    hasAdamUpdatesRef.current = false;
     setHasAdamUpdates(false);
+    pendingForcedAdamSyncRef.current = false;
+    isOperationalDayStartedRef.current = false;
+    setIsOperationalDayStarted(false);
 
     let stopped = false;
+    let inFlight = false;
     const workDate = format(selectedDate, "yyyy-MM-dd");
 
     const poll = async () => {
-      if (stopped) return;
+      if (stopped || inFlight) return;
       if (document.visibilityState !== "visible") return;
 
-      const fp = await fetchAdamFingerprint(workDate);
-      if (!fp) return;
+      inFlight = true;
+      try {
+        const [fp, started] = await Promise.all([
+          fetchAdamFingerprint(workDate),
+          operationalDayToggleInFlightRef.current
+            ? Promise.resolve<boolean | null>(null)
+            : fetchOperationalDay(workDate),
+        ]);
+        if (stopped) return;
 
-      // Prima lettura: baseline senza segnale
-      if (!adamBaselineRef.current) {
-        adamBaselineRef.current = fp;
-        setHasAdamUpdates(false);
-        return;
+        if (started !== null && started !== isOperationalDayStartedRef.current) {
+          isOperationalDayStartedRef.current = started;
+          setIsOperationalDayStarted(started);
+        }
+
+        if (!fp) return;
+
+        // Prima lettura: baseline senza sync
+        if (!adamBaselineRef.current) {
+          adamBaselineRef.current = fp;
+          hasAdamUpdatesRef.current = false;
+          setHasAdamUpdates(false);
+          return;
+        }
+
+        if (fingerprintsDiffer(fp, adamBaselineRef.current)) {
+          hasAdamUpdatesRef.current = true;
+          setHasAdamUpdates(true);
+        }
+        if (hasAdamUpdatesRef.current) {
+          tryAutoAdamSync();
+        }
+      } finally {
+        inFlight = false;
       }
-
-      const base = adamBaselineRef.current;
-      const changed =
-        fp.count !== base.count ||
-        fp.max_updated_at_unix !== base.max_updated_at_unix ||
-        fp.signature_xor !== base.signature_xor ||
-        String(fp.signature_sum ?? "") !== String(base.signature_sum ?? "");
-
-      if (changed) setHasAdamUpdates(true);
     };
 
-    const timer = setInterval(poll, 15000);
-    poll();
+    const timer = setInterval(() => {
+      void poll();
+    }, 15000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void poll();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    void poll();
 
     return () => {
       stopped = true;
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [selectedDate, fetchAdamFingerprint]);
+  }, [selectedDate, fetchAdamFingerprint, fetchOperationalDay, tryAutoAdamSync]);
+
+  useEffect(() => {
+    tryAutoAdamSync();
+  }, [
+    hasAdamUpdates,
+    isOperationalDayStarted,
+    isAssigning,
+    isExtracting,
+    isLoadingTasks,
+    isLoading,
+    isLoadingDragDrop,
+    isRefreshingContainers,
+    isTimelineReadOnly,
+    isTransferringToAdam,
+    isConfirming,
+    isDraggingTimelineTask,
+    tryAutoAdamSync,
+  ]);
 
   const hasTimelineAssignments = allTasksWithAssignments.some((task) => {
     const assigned = Number((task as any).assignedCleaner ?? (task as any).cleanerId);
@@ -1469,18 +1615,16 @@ export default function GenerateAssignments() {
     await refreshAssignments("manual");
   };
 
-  const runAdamContainersRefresh = async (opts: {
-    mode: AdamRefreshMode;
-    confirmUnlockLocked?: boolean;
-    skipContainersRefresh?: boolean;
-  }) => {
+  const runAdamContainersRefresh = async (opts?: { source?: "auto" | "manual" }) => {
+    if (isRefreshingContainersRef.current) return;
+    const source = opts?.source ?? "manual";
     const year = selectedDate.getFullYear();
     const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
     const day = String(selectedDate.getDate()).padStart(2, "0");
     const dateStr = `${year}-${month}-${day}`;
 
+    isRefreshingContainersRef.current = true;
     setIsRefreshingContainers(true);
-    let keepFrozenForUnlockDialog = false;
     try {
       const response = await fetch("/api/containers/refresh", {
         method: "POST",
@@ -1488,9 +1632,7 @@ export default function GenerateAssignments() {
         body: JSON.stringify({
           date: dateStr,
           scope: scopeValue,
-          mode: opts.mode,
-          confirmUnlockLocked: Boolean(opts.confirmUnlockLocked),
-          skipContainersRefresh: Boolean(opts.skipContainersRefresh),
+          mode: "assignments",
         }),
       });
 
@@ -1499,63 +1641,51 @@ export default function GenerateAssignments() {
         throw new Error(result?.error || "Errore durante il refresh");
       }
 
-      if (result.needsUnlockConfirm) {
-        keepFrozenForUnlockDialog = true;
-        setPendingRefreshMode(opts.mode);
-        setPendingLockedTasks(
-          Array.isArray(result.lockedTasks) ? result.lockedTasks : []
-        );
-        setShowUnlockConfirmDialog(true);
-        return;
-      }
-
       const fp = await fetchAdamFingerprint(dateStr);
       if (fp) {
         adamBaselineRef.current = fp;
-        setHasAdamUpdates(false);
       }
+      hasAdamUpdatesRef.current = false;
+      setHasAdamUpdates(false);
 
-      const sync = result.assignmentSync;
-      const description =
-        opts.mode === "assignments"
-          ? `Dati apt aggiornati. Assegnazioni: ${sync?.assigned ?? 0} aggiunte, ${sync?.moved ?? 0} spostate, ${sync?.unassigned ?? 0} tolte${
-              sync?.removedUnhandled
-                ? `, ${sync.removedUnhandled} rimosse (tipologia non gestita da WASS)`
-                : ""
-            }${
-              sync?.skippedReadonly
-                ? `, ${sync.skippedReadonly} ignorate (tipologia non gestita, cleaner non convocato)`
-                : ""
-            }. Orari ricalcolati su ${sync?.recalculatedCleaners ?? 0} cleaner.`
-          : "I dati dei task (appartamento) sono stati aggiornati da ADAM";
-
-      toast({
-        variant: "success",
-        title:
-          opts.mode === "assignments"
-            ? "Sincronizzazione ADAM completata"
-            : "Containers aggiornati",
-        description,
-      });
       await reloadAllTasks();
+      if (typeof (window as any).reloadTimelineRoster === "function") {
+        await (window as any).reloadTimelineRoster();
+      } else {
+        await Promise.all([
+          typeof (window as any).loadSelectedCleaners === "function"
+            ? (window as any).loadSelectedCleaners()
+            : Promise.resolve(),
+          typeof (window as any).loadTimelineCleaners === "function"
+            ? (window as any).loadTimelineCleaners()
+            : Promise.resolve(),
+        ]);
+      }
+      window.dispatchEvent(new CustomEvent("refresh-selected-cleaners"));
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Errore",
+        title: source === "auto" ? "Errore sync ADAM automatica" : "Errore",
         description: error?.message || "Errore durante il refresh dei containers",
       });
     } finally {
-      if (!keepFrozenForUnlockDialog) {
-        setIsRefreshingContainers(false);
-      }
+      isRefreshingContainersRef.current = false;
+      setIsRefreshingContainers(false);
     }
   };
-
-
-
-
+  runAdamContainersRefreshRef.current = runAdamContainersRefresh;
 
   const runWaveAssignment = async (priority: 'early_out' | 'high_priority' | 'low_priority', label: string) => {
+    if (isWassManualLocked) {
+      toast({
+        title: "Operazione non permessa",
+        description: isOperationalDayStarted
+          ? "Giornata operativa iniziata: da WASS puoi solo visualizzare."
+          : "La timeline è in sola visualizzazione per questa data.",
+        variant: "warning",
+      });
+      return;
+    }
     try {
       const year = selectedDate.getFullYear();
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
@@ -1813,10 +1943,12 @@ export default function GenerateAssignments() {
       if (operation.type === "noop") return;
       if (isDraggingRef.current || isLoadingDragDrop || isRefreshingContainers) return;
 
-      if (isTimelineReadOnly) {
+      if (isWassManualLocked) {
         toast({
           title: "Operazione non permessa",
-          description: "La timeline è in sola visualizzazione per questa data.",
+          description: isOperationalDayStarted
+            ? "Giornata operativa iniziata: da WASS puoi solo visualizzare."
+            : "La timeline è in sola visualizzazione per questa data.",
           variant: "warning",
         });
         return;
@@ -1983,7 +2115,8 @@ export default function GenerateAssignments() {
       allTasksWithAssignments,
       selectedDate,
       scopeValue,
-      isTimelineReadOnly,
+      isWassManualLocked,
+      isOperationalDayStarted,
       isLoadingDragDrop,
       isRefreshingContainers,
       reorderTimelineAssignment,
@@ -2203,10 +2336,14 @@ export default function GenerateAssignments() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowAdamRefreshDialog(true)}
+                onClick={() => void runAdamContainersRefresh({ source: "manual" })}
                 disabled={isRefreshingContainers || isTimelineReadOnly}
                 className="flex items-center gap-2 rounded-none text-black dark:text-white hover:bg-custom-blue/80 px-3"
-                title="Sync from ADAM"
+                title={
+                  isOperationalDayStarted
+                    ? "Sync totale da ADAM (automatica sui cambiamenti; clicca per forzare)"
+                    : "Sync totale da ADAM (giornata non iniziata: solo manuale)"
+                }
               >
                 {isRefreshingContainers ? (
                   <span className="relative inline-flex">
@@ -2268,7 +2405,7 @@ export default function GenerateAssignments() {
                     setIsAssigning(false);
                   }
                 }}
-                disabled={isAssigning || isTimelineReadOnly || isRefreshingContainers}
+                disabled={isAssigning || isWassManualLocked || isRefreshingContainers}
                 className="flex items-center gap-2 rounded-none text-black dark:text-white hover:bg-custom-blue/80 px-3"
               >
                 {isAssigning ? (
@@ -2326,20 +2463,7 @@ export default function GenerateAssignments() {
               const highlightedLowPriority = getHighlightedTaskIds(lowPriorityTasks);
 
               return (
-                <div className="relative mb-4 w-full">
-                  {isRefreshingContainers && (
-                    <div className="absolute inset-0 z-40 flex items-center justify-center rounded-lg bg-black/20 backdrop-blur-sm dark:bg-black/40">
-                      <div className="flex flex-col items-center gap-3">
-                        <RefreshCw className="h-8 w-8 animate-spin text-custom-blue" />
-                        <p className="text-sm font-medium text-foreground">
-                          Aggiornamento da ADAM in corso…
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Non spostare task finché non termina
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                <div className="mb-4 w-full">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 w-full">
                   <PriorityColumn
                     title="EARLY OUT"
@@ -2348,10 +2472,11 @@ export default function GenerateAssignments() {
                     droppableId="early-out"
                     icon="clock"
                     assignAction={assignEarlyOutToTimeline}
-                    assignButtonDisabled={hasRunAssignEo || isRefreshingContainers}
-                    isDragDisabled={isTimelineReadOnly || isLoadingDragDrop || isRefreshingContainers}
+                    assignButtonDisabled={hasRunAssignEo || isRefreshingContainers || isWassManualLocked}
+                    isDragDisabled={isWassManualLocked || isLoadingDragDrop || isRefreshingContainers}
                     containerMultiSelectState={getContainerMultiSelectState('early_out')}
                     highlightedTaskIds={highlightedEarlyOut}
+                    isContentLoading={isRefreshingContainers}
                   />
                   <PriorityColumn
                     title="HIGH PRIORITY"
@@ -2360,10 +2485,12 @@ export default function GenerateAssignments() {
                     droppableId="high"
                     icon="alert-circle"
                     assignAction={assignHighPriorityToTimeline}
-                    assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || hasRunAssignHp || isRefreshingContainers}
-                    isDragDisabled={isTimelineReadOnly || isLoadingDragDrop || isRefreshingContainers}
+                    assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || hasRunAssignHp || isRefreshingContainers || isWassManualLocked}
+                    isDragDisabled={isWassManualLocked || isLoadingDragDrop || isRefreshingContainers}
                     containerMultiSelectState={getContainerMultiSelectState('high_priority')}
                     highlightedTaskIds={highlightedHighPriority}
+                    isContentLoading={isRefreshingContainers}
+                    loadingMessage={isRefreshingContainers ? "Sincronizzazione dati da ADAM" : undefined}
                   />
                   <PriorityColumn
                     title="LOW PRIORITY"
@@ -2372,10 +2499,11 @@ export default function GenerateAssignments() {
                     droppableId="low"
                     icon="arrow-down"
                     assignAction={assignLowPriorityToTimeline}
-                    assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || !timelinePriorityState.hasHpOnTimeline || hasRunAssignLp || isRefreshingContainers}
-                    isDragDisabled={isTimelineReadOnly || isLoadingDragDrop || isRefreshingContainers}
+                    assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || !timelinePriorityState.hasHpOnTimeline || hasRunAssignLp || isRefreshingContainers || isWassManualLocked}
+                    isDragDisabled={isWassManualLocked || isLoadingDragDrop || isRefreshingContainers}
                     containerMultiSelectState={getContainerMultiSelectState('low_priority')}
                     highlightedTaskIds={highlightedLowPriority}
+                    isContentLoading={isRefreshingContainers}
                   />
                 </div>
                 </div>
@@ -2396,11 +2524,11 @@ export default function GenerateAssignments() {
                     setHasRunAssignHp(false);
                     setHasRunAssignLp(false);
                   }}
-                  isReadOnly={isTimelineReadOnly}
+                  isReadOnly={isWassManualLocked}
                   isLoadingDragDrop={isLoadingDragDrop || isRefreshingContainers}
                   loadingMessage={
                     isRefreshingContainers
-                      ? "Aggiornamento da ADAM in corso…"
+                      ? "Sincronizzazione dati da ADAM"
                       : undefined
                   }
                   lastValidDragIndex={lastValidDragIndex}
@@ -2408,6 +2536,9 @@ export default function GenerateAssignments() {
                   activeDragCleanerId={activeDragCleanerId}
                   searchTask={searchTask}
                   preassignedAnimatedTaskIds={preassignedAnimatedTaskIds}
+                  isOperationalDayStarted={isOperationalDayStarted}
+                  onOperationalDayToggle={(started) => void handleOperationalDayToggle(started)}
+                  isOperationalDaySwitchDisabled={isTimelineReadOnly || isSavingOperationalDay}
                 />
                 <TimelineFloatingPanel
                   side="right"
@@ -2471,8 +2602,8 @@ export default function GenerateAssignments() {
           )}
           <DndRemoveZone
             scope="housekeeping"
-            visible={isDraggingTimelineTask && !isTimelineReadOnly && !isLoadingDragDrop && !isRefreshingContainers}
-            disabled={isTimelineReadOnly || isLoadingDragDrop || isRefreshingContainers}
+            visible={isDraggingTimelineTask && !isWassManualLocked && !isLoadingDragDrop && !isRefreshingContainers}
+            disabled={isWassManualLocked || isLoadingDragDrop || isRefreshingContainers}
           />
           <TaskCardDragOverlay
             activeItem={assignmentDnd.activeItem}
@@ -2485,123 +2616,6 @@ export default function GenerateAssignments() {
         </MultiSelectContext.Provider>
         )}
 
-      <AlertDialog open={showAdamRefreshDialog} onOpenChange={setShowAdamRefreshDialog}>
-        <AlertDialogContent className="sm:max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Sync from ADAM</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3 text-sm text-muted-foreground">
-                <p>
-                  I containers vengono sempre rigenerati da ADAM e i nuovi task aggiunti nei containers (oltre che aggiornare i dati dei task esistenti come check-in/out, pax,
-                  indirizzo, operazione, nuove task, task sparite). Le modifiche WASS
-                  non ancora trasferite su ADAM verranno sovrascritte.
-                </p>
-                <div className="space-y-2 pt-1">
-                  <Label className="text-foreground">Cosa sincronizzare</Label>
-                  <RadioGroup
-                    value={adamRefreshMode}
-                    onValueChange={(value) =>
-                      setAdamRefreshMode(value as AdamRefreshMode)
-                    }
-                    className="gap-3"
-                  >
-                    <div className="flex items-start space-x-2">
-                      <RadioGroupItem value="apt" id="refresh-mode-apt" className="mt-1" />
-                      <Label htmlFor="refresh-mode-apt" className="font-normal leading-snug">
-                        Solo containers e dati appartamento
-                      </Label>
-                    </div>
-                    <div className="flex items-start space-x-2">
-                      <RadioGroupItem
-                        value="assignments"
-                        id="refresh-mode-assignments"
-                        className="mt-1"
-                      />
-                      <Label
-                        htmlFor="refresh-mode-assignments"
-                        className="font-normal leading-snug"
-                      >
-                        Anche assegnazioni (cleaner, sequenza, collaborazioni) e ricalcolo
-                        orari / travel time
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              disabled={isRefreshingContainers}
-              className="border-2 border-custom-blue"
-            >
-              Annulla
-            </AlertDialogCancel>
-            <AlertDialogAction
-              disabled={isRefreshingContainers}
-              onClick={(e) => {
-                e.preventDefault();
-                setShowAdamRefreshDialog(false);
-                void runAdamContainersRefresh({ mode: adamRefreshMode });
-              }}
-              className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-            >
-              Conferma refresh
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={showUnlockConfirmDialog}
-        onOpenChange={(open) => {
-          setShowUnlockConfirmDialog(open);
-          if (!open) setPendingLockedTasks([]);
-        }}
-      >
-        <AlertDialogContent className="sm:max-w-lg">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Task bloccate in WASS</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3 text-sm text-muted-foreground">
-                <p>
-                  ADAM richiede di spostare o riassegnare {pendingLockedTasks.length} task
-                  attualmente locked. Confermi lo sblocco e l&apos;allineamento?
-                </p>
-                <ul className="max-h-40 overflow-y-auto rounded border p-2 text-xs text-foreground space-y-1">
-                  {pendingLockedTasks.map((task) => (
-                    <li key={task.task_id}>
-                      #{task.logistic_code ?? task.task_id}
-                      {task.locked_reason ? ` — ${task.locked_reason}` : ""}
-                      {task.currentCleanerId || task.adamCleanerId
-                        ? ` (cleaner ${task.currentCleanerId ?? "—"} → ${task.adamCleanerId ?? "—"})`
-                        : ""}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setIsRefreshingContainers(false)}>
-              Annulla
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                setShowUnlockConfirmDialog(false);
-                void runAdamContainersRefresh({
-                  mode: pendingRefreshMode,
-                  confirmUnlockLocked: true,
-                  skipContainersRefresh: true,
-                });
-              }}
-            >
-              Sblocca e sincronizza
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       </div>
     </div>
   );

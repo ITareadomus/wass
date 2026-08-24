@@ -338,6 +338,107 @@ export class PgDailyAssignmentsService {
     }
   }
 
+  async ensureOperationalDayTable(): Promise<void> {
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS daily_operational_day (
+          work_date DATE NOT NULL,
+          scope VARCHAR(32) NOT NULL DEFAULT 'housekeeping',
+          started BOOLEAN NOT NULL DEFAULT FALSE,
+          started_at TIMESTAMPTZ,
+          started_by TEXT,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (work_date, scope)
+        )
+      `);
+      console.log('✅ PG: Tabella daily_operational_day verificata');
+    } catch (error) {
+      console.warn('⚠️ PG: Errore (ignorabile) nella creazione daily_operational_day:', error);
+    }
+  }
+
+  async isOperationalDayStarted(
+    workDate: string,
+    scope: string = 'housekeeping'
+  ): Promise<boolean> {
+    const day = await this.getOperationalDay(workDate, scope);
+    return day.started;
+  }
+
+  async getOperationalDay(
+    workDate: string,
+    scope: string = 'housekeeping'
+  ): Promise<{
+    started: boolean;
+    startedAt: string | null;
+    startedBy: string | null;
+  }> {
+    await this.ensureOperationalDayTable();
+    const date = normalizeDateToYmd(workDate);
+    const resolvedScope = scope === 'office' ? 'office' : 'housekeeping';
+    if (!date) {
+      return { started: false, startedAt: null, startedBy: null };
+    }
+    const result = await query(
+      `SELECT started, started_at, started_by
+       FROM daily_operational_day
+       WHERE work_date = $1 AND scope = $2`,
+      [date, resolvedScope]
+    );
+    const row = result.rows[0];
+    const started = row?.started === true;
+    const todayRome = formatInTimeZone(new Date(), ROME_TZ, 'yyyy-MM-dd');
+    if (started && date < todayRome) {
+      await query(
+        `UPDATE daily_operational_day
+         SET started = FALSE, started_at = NULL, started_by = NULL, updated_at = NOW()
+         WHERE work_date = $1 AND scope = $2 AND started = TRUE`,
+        [date, resolvedScope]
+      );
+      return { started: false, startedAt: null, startedBy: null };
+    }
+    return {
+      started,
+      startedAt: row?.started_at ? String(row.started_at) : null,
+      startedBy: row?.started_by != null ? String(row.started_by) : null,
+    };
+  }
+
+  async setOperationalDayStarted(
+    workDate: string,
+    scope: string,
+    started: boolean,
+    username: string = 'unknown'
+  ): Promise<{
+    started: boolean;
+    startedAt: string | null;
+    startedBy: string | null;
+  }> {
+    await this.ensureOperationalDayTable();
+    const date = normalizeDateToYmd(workDate);
+    if (!date) {
+      throw new Error('work_date non valida');
+    }
+    const resolvedScope = scope === 'office' ? 'office' : 'housekeeping';
+    await query(
+      `INSERT INTO daily_operational_day (work_date, scope, started, started_at, started_by, updated_at)
+       VALUES ($1, $2, $3, CASE WHEN $3 THEN NOW() ELSE NULL END, CASE WHEN $3 THEN $4 ELSE NULL END, NOW())
+       ON CONFLICT (work_date, scope) DO UPDATE SET
+         started = EXCLUDED.started,
+         started_at = CASE
+           WHEN EXCLUDED.started THEN COALESCE(daily_operational_day.started_at, NOW())
+           ELSE NULL
+         END,
+         started_by = CASE
+           WHEN EXCLUDED.started THEN COALESCE(daily_operational_day.started_by, EXCLUDED.started_by)
+           ELSE NULL
+         END,
+         updated_at = NOW()`,
+      [date, resolvedScope, started, username]
+    );
+    return this.getOperationalDay(date, resolvedScope);
+  }
+
   /**
    * Dopo l'aggiunta di `scope` su daily_assignments_revisions, il vecchio UNIQUE(work_date, revision)
    * fa collidere housekeeping e office (stesso revision per stessa data).

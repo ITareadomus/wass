@@ -1,4 +1,4 @@
-import type { ReactNode, UIEventHandler } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode, type UIEventHandler } from "react";
 
 type TimelineHorizontalScrollbarProps = {
   labelColumnWidth: number;
@@ -17,10 +17,45 @@ export function TimelineHorizontalScrollbar({
   onScroll,
   labelContent,
 }: TimelineHorizontalScrollbarProps) {
+  const scrollNodeRef = useRef<HTMLDivElement | null>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+
+  const assignRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      scrollNodeRef.current = node;
+      registerRef(node);
+    },
+    [registerRef]
+  );
+
+  useEffect(() => {
+    const el = scrollNodeRef.current;
+    if (!el) return;
+
+    const update = () => {
+      if (el.clientWidth === 0) return;
+      setIsOverflowing(el.scrollWidth > el.clientWidth + 1);
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    const inner = el.firstElementChild;
+    if (inner) observer.observe(inner);
+    window.addEventListener("resize", update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [contentWidth, labelColumnWidth]);
+
+  const collapseRow = !labelContent && !isOverflowing;
+  const showTrack = isOverflowing;
+
   return (
     <div
       className={`flex shrink-0 items-center leading-none px-1 ${
-        labelContent ? "h-[38px]" : "h-[12px]"
+        labelContent ? "h-[38px]" : showTrack ? "h-[12px]" : "h-0 overflow-hidden"
       }`}
     >
       <div
@@ -30,10 +65,15 @@ export function TimelineHorizontalScrollbar({
         {labelContent}
       </div>
       <div
-        ref={registerRef}
+        ref={assignRef}
         onScroll={onScroll}
-        className="timeline-h-scrollbar h-[12px] min-w-0 flex-1 self-center"
-        aria-label="Scorri timeline orizzontalmente"
+        className="timeline-h-scrollbar min-w-0 flex-1 self-center"
+        style={{
+          height: 12,
+          overflowX: showTrack ? "auto" : "hidden",
+        }}
+        aria-hidden={!showTrack}
+        aria-label={showTrack ? "Scorri timeline orizzontalmente" : undefined}
       >
         <div
           style={{ width: contentWidth, minWidth: "100%", height: 1 }}
