@@ -5,6 +5,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import LogisticsDriverSequenceSheet from "@/components/logistics-driver-sequence-sheet";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { Button } from "@/components/ui/button";
+import { useLogisticsExecutionStatusPoll } from "@/hooks/use-logistics-execution-status-poll";
 import {
   buildSequenceSummaryGroupsFromDriverAssignments,
   type SequenceSummaryGroup,
@@ -106,6 +107,26 @@ export default function LogisticsDriverSheet() {
   useEffect(() => {
     void loadGroup();
   }, [loadGroup]);
+
+  useLogisticsExecutionStatusPoll({
+    workDate,
+    enabled: Number.isFinite(driverId) && group != null && group.tasks.length > 0,
+    onStatuses: (statuses) => {
+      setGroup((prev) => {
+        if (!prev) return prev;
+        let changed = false;
+        const tasks = prev.tasks.map((task) => {
+          const fields = statuses[task.taskId];
+          if (!fields || task.executionStatus === fields.logistics_execution_status) {
+            return task;
+          }
+          changed = true;
+          return { ...task, executionStatus: fields.logistics_execution_status };
+        });
+        return changed ? { ...prev, tasks } : prev;
+      });
+    },
+  });
 
   if (!Number.isFinite(driverId)) {
     return (

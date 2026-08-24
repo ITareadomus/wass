@@ -12,8 +12,8 @@ const log = (...args: unknown[]) => {
 };
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: false, limit: "10mb" }));
 
 app.use((req, res, next) => {
   if (req.path.includes('%3F') || req.path.includes('%3f')) {

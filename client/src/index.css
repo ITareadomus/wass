@@ -49,6 +49,41 @@
   animation: blink-border-yellow 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* Housekeeping: tempo cleaning_time scaduto (startwork=1, cleaned=0) */
+@keyframes blink-border-green {
+  0%, 100% {
+    border-color: rgb(22, 163, 74);
+    box-shadow: 0 0 10px 2px rgba(34, 197, 94, 0.9);
+  }
+  25% {
+    border-color: rgb(34, 197, 94);
+    box-shadow: 0 0 16px 4px rgba(74, 222, 128, 0.95);
+  }
+  50% {
+    border-color: rgb(187, 247, 208);
+    box-shadow: 0 0 24px 7px rgba(34, 197, 94, 1);
+  }
+  75% {
+    border-color: rgb(34, 197, 94);
+    box-shadow: 0 0 16px 4px rgba(74, 222, 128, 0.95);
+  }
+}
+
+.animate-blink-green {
+  animation: blink-border-green 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Testo su card colorate (in corso / completato / pausa): resta bianco, non prende il fill sotto. */
+.task-execution-fg {
+  isolation: isolate;
+  mix-blend-mode: normal;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  text-shadow:
+    0 0 2px rgba(0, 0, 0, 0.85),
+    0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
 /* Summary tasks: inset glow avoids expanding horizontal scroll area */
 @keyframes blink-border-inset {
   0%, 100% {

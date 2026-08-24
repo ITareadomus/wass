@@ -14,6 +14,12 @@ import {
   type LogisticsTaskExecutionStatus,
 } from "@shared/logistics-task-execution-status";
 import {
+  resolveHousekeepingCleaningMinutes,
+  resolveHousekeepingTaskExecutionStatus,
+  resolveHousekeepingWorkProgress,
+  type HousekeepingTaskExecutionStatus,
+} from "@shared/housekeeping-task-execution-status";
+import {
   DIALOG_SECTION_CORNER_BADGE_WRAP_CLASS,
   LOGISTICS_KIND_BADGE_LABEL,
   LogisticsKindAddBadge,
@@ -27,6 +33,13 @@ import {
   LogisticsExecutionPausedIcon,
   logisticsExecutionStatusSurfaceClass,
 } from "@/lib/logistics-task-execution-status-ui";
+import {
+  hasHousekeepingExecutionStatusColor,
+  HousekeepingWorkProgressLine,
+  HOUSEKEEPING_PROGRESS_ADVANCED_CLASS,
+  HOUSEKEEPING_PROGRESS_SURFACE_CLASS,
+  housekeepingExecutionStatusSurfaceClass,
+} from "@/lib/housekeeping-task-execution-status-ui";
 import { format, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
 import { fetchWithOperation } from '@/lib/operationManager';
@@ -290,7 +303,13 @@ const LOGISTICS_ADAM_MIN_SCALE = 0.58;
 const LOGISTICS_ADAM_HEIGHT_BOOST = 1.12;
 const LOGISTICS_ADAM_FIT_SAFETY_PX = 3;
 
-function LogisticsAdamCodeLabel({ code }: { code: string }) {
+function LogisticsAdamCodeLabel({
+  code,
+  lightOnColor = false,
+}: {
+  code: string;
+  lightOnColor?: boolean;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
   const [labelStyle, setLabelStyle] = useState<{ fontSize: number; scaleX: number }>({
@@ -355,15 +374,27 @@ function LogisticsAdamCodeLabel({ code }: { code: string }) {
   return (
     <div
       ref={containerRef}
-      className="absolute inset-y-0 left-[8px] right-[1px] z-30 flex items-center justify-center overflow-hidden"
+      className="absolute inset-y-0 left-[8px] right-[1px] z-30 flex items-center justify-center overflow-hidden isolate"
     >
       <span
         ref={textRef}
-        className="inline-block max-w-full whitespace-nowrap text-center font-extrabold leading-none tracking-[-0.04em] text-foreground drop-shadow-[0_1px_1px_rgba(255,255,255,0.85)] dark:drop-shadow-[0_1px_1px_rgba(0,0,0,0.85)]"
+        className={cn(
+          "inline-block max-w-full whitespace-nowrap text-center font-extrabold leading-none tracking-[-0.04em]",
+          lightOnColor
+            ? "task-execution-fg"
+            : "text-foreground drop-shadow-[0_1px_1px_rgba(255,255,255,0.85)] dark:drop-shadow-[0_1px_1px_rgba(0,0,0,0.85)]"
+        )}
         style={{
           fontSize: `${labelStyle.fontSize}px`,
           transform: `scale(${labelStyle.scaleX}, ${labelStyle.scaleX * LOGISTICS_ADAM_HEIGHT_BOOST})`,
           transformOrigin: "center",
+          ...(lightOnColor
+            ? {
+                color: "#ffffff",
+                WebkitTextFillColor: "#ffffff",
+                mixBlendMode: "normal",
+              }
+            : null),
         }}
       >
         {code}
@@ -402,6 +433,7 @@ export default function TaskCard({
 }: TaskCardProps) {
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [housekeepingNowMs, setHousekeepingNowMs] = useState(() => Date.now());
   const [showDissolveDialog, setShowDissolveDialog] = useState(false);
   const [isCollaborationDetailsOpen, setIsCollaborationDetailsOpen] = useState(false);
   const [isDissolvingCollaboration, setIsDissolvingCollaboration] = useState(false);
@@ -1338,20 +1370,70 @@ const displayClickableInputClass =
       ? logisticsExecutionStatusSurfaceClass(logisticsExecutionStatus, "strong")
       : undefined;
 
+  const housekeepingExecutionStatus: HousekeepingTaskExecutionStatus | null =
+    operationsScope !== "logistics"
+      ? ((cardTaskAny.housekeeping_execution_status as
+          | HousekeepingTaskExecutionStatus
+          | undefined) ??
+        resolveHousekeepingTaskExecutionStatus({
+          startwork: cardTaskAny.startwork ?? cardTaskAny.startWork,
+          cleaned: cardTaskAny.cleaned,
+        }))
+      : null;
+  const housekeepingCleaningMinutes = resolveHousekeepingCleaningMinutes(cardTaskAny);
+  const housekeepingWorkProgress = resolveHousekeepingWorkProgress({
+    status: housekeepingExecutionStatus,
+    startworkAt: cardTaskAny.startwork_at ?? cardTaskAny.startworkAt,
+    cleaningMinutes: housekeepingCleaningMinutes,
+    nowMs: housekeepingNowMs,
+  });
+  const housekeepingExecutionSurfaceClassName = (() => {
+    if (operationsScope === "logistics" || !isInTimeline) return undefined;
+    if (housekeepingExecutionStatus === "completed") {
+      return housekeepingExecutionStatusSurfaceClass("completed", "strong");
+    }
+    if (housekeepingExecutionStatus !== "in_progress") return undefined;
+    if (housekeepingWorkProgress && !housekeepingWorkProgress.overdue) {
+      return HOUSEKEEPING_PROGRESS_SURFACE_CLASS;
+    }
+    return housekeepingExecutionStatusSurfaceClass("in_progress", "strong");
+  })();
+
   // Nei container: sfondo pagina per contrasto con la colonna; in timeline resta custom-blue-light.
   // Logistica in timeline: colori da stato Adam (lg_real_*), senza opacity che riduce leggibilità.
+  // Housekeeping in timeline: colori da startwork / cleaned ADAM.
   // Task finished / locked (blocco manuale): grigio. I pre-assegnati ADAM readonly NON sono locked:
   // restano sulla superficie normale e si distinguono dal lucchetto arancione.
   const isLockedTask = isLocked && !isPreAssignedReadonly;
   const cardSurfaceClass = logisticsExecutionSurfaceClass
     ? logisticsExecutionSurfaceClass
-    : isFinished
-      ? "bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 opacity-70"
-      : isLockedTask
-        ? "bg-gray-300 dark:bg-gray-700 border-gray-500 dark:border-gray-500 opacity-80 text-muted-foreground"
-        : !isInTimeline
-          ? "bg-background border-border shadow-sm"
-          : "bg-custom-blue-light border-border/60";
+    : housekeepingExecutionSurfaceClassName
+      ? housekeepingExecutionSurfaceClassName
+      : isFinished
+        ? "bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 opacity-70"
+        : isLockedTask
+          ? "bg-gray-300 dark:bg-gray-700 border-gray-500 dark:border-gray-500 opacity-80 text-muted-foreground"
+          : !isInTimeline
+            ? "bg-background border-border shadow-sm"
+            : "bg-custom-blue-light border-border/60";
+
+  useEffect(() => {
+    const shouldTick =
+      operationsScope !== "logistics" &&
+      housekeepingExecutionStatus === "in_progress" &&
+      housekeepingCleaningMinutes > 0 &&
+      (isInTimeline || isModalOpen);
+    if (!shouldTick) return;
+    setHousekeepingNowMs(Date.now());
+    const id = window.setInterval(() => setHousekeepingNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [
+    operationsScope,
+    housekeepingExecutionStatus,
+    housekeepingCleaningMinutes,
+    isInTimeline,
+    isModalOpen,
+  ]);
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -2810,6 +2892,10 @@ const displayClickableInputClass =
               </div>
             </div>
 
+            {operationsScope !== "logistics" && housekeepingWorkProgress && (
+              <HousekeepingWorkProgressLine progress={housekeepingWorkProgress} />
+            )}
+
             {/* Terza riga: Check-out - Check-in (click apre dialog come Pax-In) */}
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -3160,11 +3246,19 @@ const displayClickableInputClass =
                       isSelected && isMultiSelectMode && !isInTimeline && "z-[1] ring-2 ring-sky-500 ring-inset",
                       isOverdue &&
                         isInTimeline &&
+                        !hasHousekeepingExecutionStatusColor(housekeepingExecutionStatus) &&
                         !(
                           operationsScope === "logistics" &&
                           hasLogisticsExecutionStatusColor(logisticsExecutionStatus)
                         ) &&
                         "animate-blink",
+                      isInTimeline &&
+                        housekeepingWorkProgress &&
+                        !housekeepingWorkProgress.overdue &&
+                        "isolation-isolate",
+                      isInTimeline &&
+                        housekeepingWorkProgress?.overdue &&
+                        "animate-blink-green",
                       operationsScope === "logistics" &&
                         !isInTimeline &&
                         cardLogisticsTaskKind == null &&
@@ -3200,8 +3294,21 @@ const displayClickableInputClass =
                       }
                     }}
                   >
+                    {isInTimeline &&
+                      housekeepingWorkProgress &&
+                      !housekeepingWorkProgress.overdue && (
+                        <div
+                          className="pointer-events-none absolute inset-0 z-0 isolate overflow-hidden rounded-[inherit]"
+                          aria-hidden="true"
+                        >
+                          <div
+                            className={cn("h-full", HOUSEKEEPING_PROGRESS_ADVANCED_CLASS)}
+                            style={{ width: `${housekeepingWorkProgress.percent}%` }}
+                          />
+                        </div>
+                      )}
                     <div
-                      className={`absolute left-[2px] top-[2px] bottom-[2px] w-1.5 rounded-sm ${categoryStripeClass}`}
+                      className={`absolute left-[2px] top-[2px] bottom-[2px] z-[1] w-1.5 rounded-sm ${categoryStripeClass}`}
                       aria-hidden="true"
                     />
                     {operationsScope === "logistics" && cardLogisticsSequenceLabel && (
@@ -3219,7 +3326,14 @@ const displayClickableInputClass =
                         />
                       )}
                     {showCompactAdamTimelineUi ? (
-                      <LogisticsAdamCodeLabel code={logisticsAdamCode} />
+                      <div className="relative z-[2] isolate flex h-full w-full items-center justify-center mix-blend-normal">
+                        <LogisticsAdamCodeLabel
+                          code={logisticsAdamCode}
+                          lightOnColor={Boolean(
+                            logisticsExecutionSurfaceClass || housekeepingExecutionSurfaceClassName
+                          )}
+                        />
+                      </div>
                     ) : (
                       <>
                     {/* Selection indicator (top-left) */}
@@ -3363,10 +3477,19 @@ const displayClickableInputClass =
                         );
                       })()}
 
-                    <div className={cn("flex flex-col items-start justify-center flex-1 min-w-0 gap-0.5 pl-2 overflow-visible", reserveTimesSpace ? "pr-[52px]" : "pr-1")}>
+                    <div className={cn(
+                      "flex flex-col items-start justify-center flex-1 min-w-0 gap-0.5 pl-2 overflow-visible",
+                      (logisticsExecutionSurfaceClass || housekeepingExecutionSurfaceClassName) && "relative z-[2] isolate mix-blend-normal",
+                      reserveTimesSpace ? "pr-[52px]" : "pr-1"
+                    )}>
                       <div className="flex items-center gap-1 w-full min-w-0 overflow-visible">
                         <span
-                          className="text-foreground font-extrabold text-[13px] leading-none shrink-0"
+                          className={cn(
+                            "font-extrabold text-[13px] leading-none shrink-0",
+                            logisticsExecutionSurfaceClass || housekeepingExecutionSurfaceClassName
+                              ? "task-execution-fg"
+                              : "text-foreground"
+                          )}
                           data-testid={`task-name-${getTaskKey(task)}`}
                         >
                           {task.name}
@@ -3383,7 +3506,14 @@ const displayClickableInputClass =
                         )}
                       </div>
                       {task.alias && (
-                        <span className="opacity-80 leading-none text-foreground font-semibold text-[9px] whitespace-nowrap">
+                        <span
+                          className={cn(
+                            "leading-none font-semibold text-[9px] whitespace-nowrap",
+                            logisticsExecutionSurfaceClass || housekeepingExecutionSurfaceClassName
+                              ? "task-execution-fg opacity-90"
+                              : "text-foreground opacity-80"
+                          )}
+                        >
                           {task.alias}{(task as any).type_apt ? ` (${(task as any).type_apt})` : ''}
                         </span>
                       )}

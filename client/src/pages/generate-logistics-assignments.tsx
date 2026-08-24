@@ -8,7 +8,11 @@ import AssignedTasksSequenceSummary from "@/components/assigned-tasks-sequence-s
 import LogisticsTimelineView from "@/components/timeline/logistics-timeline-view";
 import MapSection from "@/components/map/map-section";
 import type { TaskType } from "@shared/schema";
-import { pickLogisticsExecutionStatusFields } from "@shared/logistics-task-execution-status";
+import {
+  mergeLogisticsExecutionStatusIntoAssignments,
+  pickLogisticsExecutionStatusFields,
+} from "@shared/logistics-task-execution-status";
+import { useLogisticsExecutionStatusPoll } from "@/hooks/use-logistics-execution-status-poll";
 import { isWorkDateHistoricallyLocked } from "@shared/work-date-access";
 import {
   CalendarIcon,
@@ -399,13 +403,6 @@ function timelineRowToTaskType(t: any, fallbackPriority: TaskType["priority"]): 
   };
 }
 
-type AdamFingerprint = {
-  count: number;
-  max_updated_at_unix: number | null;
-  signature_xor: number | null;
-  signature_sum: string | number | null;
-};
-
 export default function GenerateLogisticsAssignments() {
   const { toast } = useToast();
   // Logistics: all'apertura sempre la data odierna (non condivide la data salvata di housekeeping)
@@ -422,8 +419,6 @@ export default function GenerateLogisticsAssignments() {
   const [containerHighlightTaskId, setContainerHighlightTaskId] = useState<string | null>(null);
   const containerHighlightRef = useRef<string | null>(null);
 
-  /** Solo sul pulsante refresh (come generate-assignments), nessun overlay pagina */
-  const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
   const [isRunningLogisticsOptimizer, setIsRunningLogisticsOptimizer] = useState(false);
   const [showMissingLogisticsKindWarningDialog, setShowMissingLogisticsKindWarningDialog] = useState(false);
   const [missingLogisticsKindTaskCount, setMissingLogisticsKindTaskCount] = useState(0);
@@ -454,9 +449,6 @@ export default function GenerateLogisticsAssignments() {
   const isDraggingRef = useRef(false);
   const dragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const adamBaselineRef = useRef<AdamFingerprint | null>(null);
-  const [hasAdamUpdates, setHasAdamUpdates] = useState(false);
-
   const isTimelineReadOnly = isWorkDateHistoricallyLocked(selectedDate);
 
   useEffect(() => {
@@ -481,70 +473,6 @@ export default function GenerateLogisticsAssignments() {
       setSelectedDate(date);
     }
   };
-
-  const fetchAdamLogisticsFingerprint = useCallback(async (workDate: string): Promise<AdamFingerprint | null> => {
-    try {
-      const r = await fetch(`/api/adam/logistics/fingerprint?date=${encodeURIComponent(workDate)}`, {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
-      });
-      if (!r.ok) return null;
-      const data = await r.json();
-      if (!data?.success) return null;
-      return {
-        count: Number(data.count ?? 0),
-        max_updated_at_unix:
-          data.max_updated_at_unix !== null && data.max_updated_at_unix !== undefined
-            ? Number(data.max_updated_at_unix)
-            : null,
-        signature_xor:
-          data.signature_xor !== null && data.signature_xor !== undefined ? Number(data.signature_xor) : null,
-        signature_sum: data.signature_sum ?? null,
-      };
-    } catch {
-      return null;
-    }
-  }, []);
-
-  // Polling fingerprint ADAM logistics (come housekeeping: 15s, pausa tab nascosta)
-  useEffect(() => {
-    adamBaselineRef.current = null;
-    setHasAdamUpdates(false);
-
-    let stopped = false;
-    const workDate = format(selectedDate, "yyyy-MM-dd");
-
-    const poll = async () => {
-      if (stopped) return;
-      if (document.visibilityState !== "visible") return;
-
-      const fp = await fetchAdamLogisticsFingerprint(workDate);
-      if (!fp) return;
-
-      if (!adamBaselineRef.current) {
-        adamBaselineRef.current = fp;
-        setHasAdamUpdates(false);
-        return;
-      }
-
-      const base = adamBaselineRef.current;
-      const changed =
-        fp.count !== base.count ||
-        fp.max_updated_at_unix !== base.max_updated_at_unix ||
-        fp.signature_xor !== base.signature_xor ||
-        String(fp.signature_sum ?? "") !== String(base.signature_sum ?? "");
-
-      if (changed) setHasAdamUpdates(true);
-    };
-
-    const timer = setInterval(poll, 15_000);
-    poll();
-
-    return () => {
-      stopped = true;
-      clearInterval(timer);
-    };
-  }, [selectedDate, fetchAdamLogisticsFingerprint]);
 
   /** Carica solo da PostgreSQL (GET), senza rigenerare da ADAM — come loadTasks dopo mount su HK */
   const loadLogisticsContainers = useCallback(async (date: Date) => {
@@ -621,6 +549,25 @@ export default function GenerateLogisticsAssignments() {
     await loadLogisticsContainers(selectedDate);
     await loadLogisticsTimelineState(selectedDate);
   }, [selectedDate, loadLogisticsContainers, loadLogisticsTimelineState]);
+
+  const hasTimelineAssignments = logisticsDriversAssignments.some(
+    (row) => (row.tasks?.length || 0) > 0
+  );
+
+  useLogisticsExecutionStatusPoll({
+    workDate: format(selectedDate, "yyyy-MM-dd"),
+    enabled: !isExtractingLogistics && hasTimelineAssignments,
+    isPaused: () => isDraggingRef.current || isLoadingDragDrop,
+    onStatuses: (statuses) => {
+      setLogisticsDriversAssignments((prev) => {
+        const { assignments, changed } = mergeLogisticsExecutionStatusIntoAssignments(
+          prev,
+          statuses
+        );
+        return changed ? assignments : prev;
+      });
+    },
+  });
 
   // TaskCard chiama window.reloadAllTasks dopo lock/unlock: senza questo hook
   // i metadati duplicate_* restano stale e la grafica dei doppi non si spegne.
@@ -703,12 +650,6 @@ export default function GenerateLogisticsAssignments() {
 
         if (cancelled) return;
 
-        const fp = await fetchAdamLogisticsFingerprint(dateStr);
-        if (fp) {
-          adamBaselineRef.current = fp;
-          setHasAdamUpdates(false);
-        }
-
         setLogisticsLoaderKind("load-tasks");
         setExtractionStep("Caricamento task nei contenitori...");
         await loadLogisticsContainers(date);
@@ -744,48 +685,8 @@ export default function GenerateLogisticsAssignments() {
     selectedDate,
     loadLogisticsContainers,
     loadLogisticsTimelineState,
-    fetchAdamLogisticsFingerprint,
     toast,
   ]);
-
-  /** Refresh pesante da ADAM (script create_containers logistics) + reload — come pulsante su generate-assignments */
-  const refreshLogisticsContainersFromAdam = useCallback(async () => {
-    const dateStr = format(selectedDate, "yyyy-MM-dd");
-    setIsRefreshingContainers(true);
-    try {
-      const refreshRes = await fetch("/api/logistics-containers/refresh", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: dateStr, modified_by: getCurrentUsername() }),
-      });
-      if (!refreshRes.ok) {
-        const j = await refreshRes.json().catch(() => ({}));
-        throw new Error((j as { error?: string }).error || "Errore durante il refresh");
-      }
-
-      const fp = await fetchAdamLogisticsFingerprint(dateStr);
-      if (fp) {
-        adamBaselineRef.current = fp;
-        setHasAdamUpdates(false);
-      }
-
-      toast({
-        variant: "success",
-        title: "Containers aggiornati",
-        description: "I dati dei task sono stati aggiornati da ADAM",
-      });
-      await reloadLogisticsPage();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Errore sconosciuto";
-      toast({
-        variant: "destructive",
-        title: "Errore",
-        description: msg.includes("refresh") ? msg : "Errore durante il refresh dei containers",
-      });
-    } finally {
-      setIsRefreshingContainers(false);
-    }
-  }, [selectedDate, toast, fetchAdamLogisticsFingerprint, reloadLogisticsPage]);
 
   const executeLogisticsOptimizer = useCallback(async () => {
     const dateStr = format(selectedDate, "yyyy-MM-dd");
@@ -1347,32 +1248,6 @@ export default function GenerateLogisticsAssignments() {
               />
             </div>
             <div className="flex shrink-0 items-center overflow-hidden rounded-md border-2 border-custom-blue bg-custom-blue">
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={isRefreshingContainers}
-                title="Aggiorna containers da ADAM"
-                onClick={() => void refreshLogisticsContainersFromAdam()}
-                className="flex items-center rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
-                data-testid="button-logistics-refresh-adam"
-              >
-                {isRefreshingContainers ? (
-                  <span className="relative inline-flex">
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                  </span>
-                ) : (
-                  <span className="relative inline-flex">
-                    <RefreshCw className="h-4 w-4" />
-                    {hasAdamUpdates && (
-                      <span
-                        className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-red-500"
-                        title="Aggiornamenti disponibili da ADAM"
-                      />
-                    )}
-                  </span>
-                )}
-              </Button>
-              <div className="h-6 w-px bg-black/20 dark:bg-white/20" />
               <Button
                 variant="ghost"
                 size="sm"

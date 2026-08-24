@@ -1797,6 +1797,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const { enrichHousekeepingTimelineExecutionStatus } = await import(
+        "./services/adam-housekeeping-execution-status-enrichment"
+      );
+      await enrichHousekeepingTimelineExecutionStatus(timeline);
+
       console.log(`✅ Timeline caricata per ${workDate}: ${timeline.cleaners_assignments?.length || 0} cleaners`);
       res.json(timeline);
     } catch (error: any) {
@@ -1805,6 +1810,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false,
         error: error.message,
       });
+    }
+  });
+
+  // GET /api/timeline/execution-status?date=YYYY-MM-DD
+  // Polling UI: solo startwork / cleaned da ADAM, senza ricalcolo timeline.
+  app.get("/api/timeline/execution-status", async (req, res) => {
+    try {
+      const workDate = (req.query.date as string) || "";
+      if (!workDate || !isValidWorkDate(workDate)) {
+        return res.status(400).json({
+          success: false,
+          error: "date parameter required (YYYY-MM-DD)",
+        });
+      }
+
+      const { loadHousekeepingTimelineExecutionStatusByDate } = await import(
+        "./services/adam-housekeeping-execution-status-enrichment"
+      );
+      const statuses = await loadHousekeepingTimelineExecutionStatusByDate(
+        workDate,
+        resolveScopeFromReq(req)
+      );
+      res.json({ success: true, date: workDate, statuses });
+    } catch (error: any) {
+      console.error("GET /api/timeline/execution-status:", error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -2720,6 +2751,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(timeline);
     } catch (error: any) {
       console.error("GET /api/logistics-timeline:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/logistics-timeline/execution-status?date=YYYY-MM-DD
+  // Polling UI: solo lg_real_* / lg_paused da ADAM, senza ricalcolo timeline.
+  app.get("/api/logistics-timeline/execution-status", async (req, res) => {
+    try {
+      const workDate = (req.query.date as string) || "";
+      if (!workDate || !isValidWorkDate(workDate)) {
+        return res.status(400).json({
+          success: false,
+          error: "date parameter required (YYYY-MM-DD)",
+        });
+      }
+
+      const { loadLogisticsTimelineExecutionStatusByDate } = await import(
+        "./services/adam-logistics-execution-status-enrichment"
+      );
+      const statuses = await loadLogisticsTimelineExecutionStatusByDate(workDate);
+      res.json({ success: true, date: workDate, statuses });
+    } catch (error: any) {
+      console.error("GET /api/logistics-timeline/execution-status:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -3984,6 +4038,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assigned_vehicle_id,
         assigned_vehicle_name,
         assigned_vehicle_pms_code,
+        replaceDriverId,
       } = req.body;
       if (driverId == null) {
         return res.status(400).json({ success: false, error: "driverId richiesto" });
@@ -4031,9 +4086,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const driverToReplace = timelineData.drivers_assignments.find(
-        (da: any) => !selectedDriverIds.has(da.driver?.id)
-      );
+      const requestedReplaceId =
+        replaceDriverId != null && Number.isFinite(Number(replaceDriverId))
+          ? Number(replaceDriverId)
+          : null;
+      const driverToReplace = requestedReplaceId != null
+        ? timelineData.drivers_assignments.find(
+            (da: any) => da.driver?.id === requestedReplaceId
+          )
+        : timelineData.drivers_assignments.find(
+            (da: any) => !selectedDriverIds.has(da.driver?.id)
+          );
 
       let replacedDriverId: number | null = null;
       const driverPayload = {

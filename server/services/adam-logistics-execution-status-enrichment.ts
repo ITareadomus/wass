@@ -89,7 +89,7 @@ export async function loadAdamLogisticsExecutionStatusByTaskIds(
   return out;
 }
 
-function collectTimelineTaskIds(timeline: any): number[] {
+export function collectTimelineTaskIds(timeline: any): number[] {
   const taskIds: number[] = [];
   for (const entry of timeline?.drivers_assignments || []) {
     for (const task of entry?.tasks || []) {
@@ -98,6 +98,28 @@ function collectTimelineTaskIds(timeline: any): number[] {
     }
   }
   return taskIds;
+}
+
+export function serializeLogisticsExecutionStatusMap(
+  byTaskId: Map<number, AdamLogisticsExecutionFields>
+): Record<string, AdamLogisticsExecutionFields> {
+  const statuses: Record<string, AdamLogisticsExecutionFields> = {};
+  for (const [taskId, fields] of byTaskId) {
+    statuses[String(taskId)] = fields;
+  }
+  return statuses;
+}
+
+/** Carica solo gli stati esecuzione Adam per i task già in timeline (niente ricalcolo). */
+export async function loadLogisticsTimelineExecutionStatusByDate(
+  workDate: string
+): Promise<Record<string, AdamLogisticsExecutionFields>> {
+  const { loadLogisticsTimeline } = await import("./workspace-files");
+  const timeline = await loadLogisticsTimeline(workDate);
+  const taskIds = collectTimelineTaskIds(timeline);
+  if (taskIds.length === 0) return {};
+  const byTaskId = await loadAdamLogisticsExecutionStatusByTaskIds(taskIds);
+  return serializeLogisticsExecutionStatusMap(byTaskId);
 }
 
 export function attachLogisticsExecutionStatusFields(
