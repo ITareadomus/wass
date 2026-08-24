@@ -1209,23 +1209,51 @@ const displayClickableInputClass =
       return;
     }
 
-    const inner = taskDetailsInnerRef.current;
-    if (!inner) return;
+    let cancelled = false;
+    let rafId = 0;
+    const ro = new ResizeObserver(() => {
+      measure();
+    });
+    let observedEl: HTMLElement | null = null;
+
+    const viewportSize = () => {
+      const vv = window.visualViewport;
+      return {
+        width: vv?.width ?? window.innerWidth,
+        height: vv?.height ?? window.innerHeight,
+      };
+    };
+
+    let measuring = false;
 
     const measure = () => {
-      const viewportW = window.innerWidth;
-      const viewportH = window.innerHeight;
-      const margin = 80;
+      if (cancelled || measuring) return;
+      const inner = taskDetailsInnerRef.current;
+      if (!inner) return;
+      if (observedEl !== inner) {
+        if (observedEl) ro.unobserve(observedEl);
+        ro.observe(inner);
+        observedEl = inner;
+      }
+
+      measuring = true;
+      const prevTransform = inner.style.transform;
+      inner.style.transform = "none";
+      const contentH = Math.max(inner.scrollHeight, inner.offsetHeight, 1);
+      inner.style.transform = prevTransform;
+      measuring = false;
+
+      const { width: viewportW, height: viewportH } = viewportSize();
+      const margin = 32;
       const availW = Math.max(1, viewportW - margin);
       const availH = Math.max(1, viewportH - margin);
       const designWidth = isTimelineDetailsDialog
         ? Math.min(viewportW * 0.96, 1280)
         : Math.min(viewportW * 0.96, 576);
-      const contentH = Math.max(inner.scrollHeight, 1);
       const scale = Math.min(1, availW / designWidth, availH / contentH);
       setTaskDetailsFit((prev) => {
-        const width = Math.round(designWidth * scale);
-        const height = Math.round(contentH * scale);
+        const width = Math.min(availW, Math.floor(designWidth * scale));
+        const height = Math.min(availH, Math.floor(contentH * scale));
         const nextScale = Math.round(scale * 1000) / 1000;
         if (
           prev.scale === nextScale &&
@@ -1239,15 +1267,33 @@ const displayClickableInputClass =
       });
     };
 
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(inner);
+    const waitForInner = () => {
+      if (cancelled) return;
+      if (!taskDetailsInnerRef.current) {
+        rafId = window.requestAnimationFrame(waitForInner);
+        return;
+      }
+      measure();
+    };
+
+    waitForInner();
     window.addEventListener("resize", measure);
+    window.visualViewport?.addEventListener("resize", measure);
     return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(rafId);
       ro.disconnect();
       window.removeEventListener("resize", measure);
+      window.visualViewport?.removeEventListener("resize", measure);
     };
-  }, [isModalOpen, isTimelineDetailsDialog]);
+  }, [
+    isModalOpen,
+    isTimelineDetailsDialog,
+    dialogTaskKey,
+    logisticsHousekeepingNotes,
+    customerNotesByTaskKey,
+    taskCollaborators,
+  ]);
 
   // Normalizza confirmed_operation da boolean/number/string a boolean sicuro
   // CRITICAL: Se l'utente ha modificato operation_id tramite pending edits, considera confermato
@@ -1387,6 +1433,26 @@ const displayClickableInputClass =
     cleaningMinutes: housekeepingCleaningMinutes,
     nowMs: housekeepingNowMs,
   });
+  // Il dialog naviga con le frecce su displayTask: la barra deve seguire quella, non la card cliccata.
+  const dialogTaskAny = displayTask as any;
+  const dialogHousekeepingExecutionStatus: HousekeepingTaskExecutionStatus | null =
+    operationsScope !== "logistics"
+      ? ((dialogTaskAny.housekeeping_execution_status as
+          | HousekeepingTaskExecutionStatus
+          | undefined) ??
+        resolveHousekeepingTaskExecutionStatus({
+          startwork: dialogTaskAny.startwork ?? dialogTaskAny.startWork,
+          cleaned: dialogTaskAny.cleaned,
+        }))
+      : null;
+  const dialogHousekeepingCleaningMinutes =
+    resolveHousekeepingCleaningMinutes(dialogTaskAny);
+  const dialogHousekeepingWorkProgress = resolveHousekeepingWorkProgress({
+    status: dialogHousekeepingExecutionStatus,
+    startworkAt: dialogTaskAny.startwork_at ?? dialogTaskAny.startworkAt,
+    cleaningMinutes: dialogHousekeepingCleaningMinutes,
+    nowMs: housekeepingNowMs,
+  });
   const housekeepingExecutionSurfaceClassName = (() => {
     if (operationsScope === "logistics" || !isInTimeline) return undefined;
     if (housekeepingExecutionStatus === "completed") {
@@ -1418,11 +1484,16 @@ const displayClickableInputClass =
             : "bg-custom-blue-light border-border/60";
 
   useEffect(() => {
-    const shouldTick =
-      operationsScope !== "logistics" &&
+    const cardNeedsTick =
       housekeepingExecutionStatus === "in_progress" &&
       housekeepingCleaningMinutes > 0 &&
-      (isInTimeline || isModalOpen);
+      isInTimeline;
+    const dialogNeedsTick =
+      isModalOpen &&
+      dialogHousekeepingExecutionStatus === "in_progress" &&
+      dialogHousekeepingCleaningMinutes > 0;
+    const shouldTick =
+      operationsScope !== "logistics" && (cardNeedsTick || dialogNeedsTick);
     if (!shouldTick) return;
     setHousekeepingNowMs(Date.now());
     const id = window.setInterval(() => setHousekeepingNowMs(Date.now()), 1000);
@@ -1431,6 +1502,8 @@ const displayClickableInputClass =
     operationsScope,
     housekeepingExecutionStatus,
     housekeepingCleaningMinutes,
+    dialogHousekeepingExecutionStatus,
+    dialogHousekeepingCleaningMinutes,
     isInTimeline,
     isModalOpen,
   ]);
@@ -2892,8 +2965,8 @@ const displayClickableInputClass =
               </div>
             </div>
 
-            {operationsScope !== "logistics" && housekeepingWorkProgress && (
-              <HousekeepingWorkProgressLine progress={housekeepingWorkProgress} />
+            {operationsScope !== "logistics" && dialogHousekeepingWorkProgress && (
+              <HousekeepingWorkProgressLine progress={dialogHousekeepingWorkProgress} />
             )}
 
             {/* Terza riga: Check-out - Check-in (click apre dialog come Pax-In) */}
@@ -3579,7 +3652,7 @@ const displayClickableInputClass =
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent
           className={cn(
-            "block overflow-hidden overscroll-none p-0 gap-0 max-h-none",
+            "!block min-h-0 overflow-hidden overscroll-none !p-0 !gap-0 max-h-[100dvh] max-w-[100vw]",
             "animate-none data-[state=open]:animate-none data-[state=closed]:animate-none",
             taskDetailsFit.width != null ? "w-auto max-w-none" : isTimelineDetailsDialog
               ? "w-[min(96vw,1280px)] max-w-[1280px]"
@@ -3594,8 +3667,19 @@ const displayClickableInputClass =
           onWheel={(e) => e.stopPropagation()}
         >
           <div
+            className="relative overflow-hidden"
+            style={
+              taskDetailsFit.width != null && taskDetailsFit.height != null
+                ? { width: taskDetailsFit.width, height: taskDetailsFit.height }
+                : undefined
+            }
+          >
+          <div
             ref={taskDetailsInnerRef}
-            className="grid max-w-none shrink-0 gap-4 p-6 origin-top-left"
+            className={cn(
+              "grid max-w-none shrink-0 gap-4 p-6 origin-top-left",
+              taskDetailsFit.width != null && "absolute left-0 top-0"
+            )}
             style={{
               width: taskDetailsFit.designWidth ?? (isTimelineDetailsDialog ? "min(96vw, 1280px)" : undefined),
               minWidth: taskDetailsFit.designWidth,
@@ -3886,6 +3970,7 @@ const displayClickableInputClass =
 
             </div>
 
+          </div>
           </div>
           </div>
         </DialogContent>
