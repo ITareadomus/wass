@@ -45,6 +45,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { AssignmentLoadingDialog } from "@/components/dialogs/assignment-loading-dialog";
 import { cn } from "@/lib/utils";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { useToast } from "@/hooks/use-toast";
@@ -2016,7 +2017,10 @@ export default function GenerateAssignments() {
           pendingRouteSpacerHideRafRef.current = null;
           setActiveDragCleanerId(staffId);
         });
-      } else if (isTimelineOrSummary) {
+      } else if (
+        item.from.type === "timeline" ||
+        item.from.type === "summary"
+      ) {
         setActiveDragCleanerId(item.from.staffId);
       } else {
         setActiveDragCleanerId(null);
@@ -2478,12 +2482,15 @@ export default function GenerateAssignments() {
             activeItem={assignmentDnd.activeItem}
             activeDragTask={assignmentDnd.activeDragTask}
             activeRect={assignmentDnd.activeRect}
+            insertTarget={assignmentDnd.insertTarget}
             tasks={allTasksWithAssignments}
             scope="housekeeping"
           />
         </DndContext>
         </MultiSelectContext.Provider>
         )}
+
+      <AssignmentLoadingDialog open={isAssigning} />
 
       <AlertDialog open={showAdamRefreshDialog} onOpenChange={setShowAdamRefreshDialog}>
         <AlertDialogContent className="sm:max-w-md">

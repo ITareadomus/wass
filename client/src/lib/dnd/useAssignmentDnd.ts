@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import type {
   CollisionDetection,
   DragEndEvent,
+  DragMoveEvent,
   DragOverEvent,
   DragStartEvent,
 } from "@dnd-kit/core";
@@ -35,7 +36,7 @@ type DndEventData = {
   target?: DndInsertTarget;
 };
 
-type DndLayoutEvent = DragOverEvent | DragEndEvent;
+type DndLayoutEvent = DragOverEvent | DragEndEvent | DragMoveEvent;
 
 export type ActiveDndRect = {
   width: number;
@@ -256,6 +257,79 @@ const getLayoutInsertIndex = (
   }
 
   return sortableRects.length;
+};
+
+const resolveTimelineTargetFromPointer = (
+  event: DndLayoutEvent,
+  activeItem: AppDndItem,
+): DndInsertTarget | null => {
+  const pointerX = getPointerClientCoordinate(event, "x");
+  const pointerY = getPointerClientCoordinate(event, "y");
+  if (pointerX === null || pointerY === null) return null;
+  if (typeof document === "undefined") return null;
+
+  const nodes = document.querySelectorAll<HTMLElement>(
+    `[${DND_CONTAINER_ID_ATTRIBUTE}]`,
+  );
+
+  let best: {
+    containerId: string;
+    container: Extract<AppDndContainer, { type: "timeline" }>;
+    score: number;
+  } | null = null;
+
+  for (const node of nodes) {
+    const id = node.getAttribute(DND_CONTAINER_ID_ATTRIBUTE);
+    if (!id) continue;
+    const parsed = parseDndId(id);
+    if (!parsed || parsed.kind !== "container") continue;
+    if (parsed.type !== "timeline") continue;
+    if (parsed.scope !== activeItem.scope) continue;
+    if (typeof parsed.staffId !== "number") continue;
+
+    const rect = node.getBoundingClientRect();
+    if (rect.height <= 0 || rect.width <= 0) continue;
+
+    const slackY = 10;
+    if (pointerY < rect.top - slackY || pointerY > rect.bottom + slackY) {
+      continue;
+    }
+
+    const inX = pointerX >= rect.left - 32 && pointerX <= rect.right + 32;
+    const distY = Math.abs(pointerY - (rect.top + rect.height / 2));
+    const score = inX ? distY : distY + 1000;
+    if (!best || score < best.score) {
+      best = {
+        containerId: id,
+        score,
+        container: {
+          kind: "container",
+          scope: parsed.scope,
+          type: "timeline",
+          staffId: parsed.staffId,
+          accepts: ["priority", "timeline", "summary"],
+        },
+      };
+    }
+  }
+
+  if (!best) return null;
+
+  const target: DndInsertTarget = {
+    containerId: best.containerId,
+    container: best.container,
+    index: 0,
+    isValid: true,
+  };
+  const layoutIndex = getLayoutInsertIndex(event, target);
+  if (layoutIndex === null) {
+    return { ...target, isValid: false };
+  }
+
+  return {
+    ...target,
+    index: layoutIndex,
+  };
 };
 
 const getInsertIndexFromOverItem = (
@@ -492,12 +566,25 @@ export function useAssignmentDnd({
 
   const handleDragOver = useCallback(
     (event: DragOverEvent) => {
-      const currentTarget = getTargetFromEvent(event);
       const activeData = event.active.data.current;
       const isAssignedDrag =
         isAppDndItem(activeData) &&
         (activeData.from.type === "timeline" ||
           activeData.from.type === "summary");
+      const isPriorityDrag =
+        isAppDndItem(activeData) && activeData.from.type === "priority";
+
+      if (isPriorityDrag) {
+        // Non dipendere da event.over: da container dnd-kit spesso resta sul
+        // droppable sorgente e onDragOver non rifires mentre ti muovi sulla timeline.
+        const pointerTarget = resolveTimelineTargetFromPointer(event, activeData);
+        lastPreviewTargetRef.current = pointerTarget;
+        setInsertTarget(pointerTarget);
+        onDragOver?.(pointerTarget);
+        return;
+      }
+
+      const currentTarget = getTargetFromEvent(event);
 
       if (currentTarget) {
         lastPreviewTargetRef.current = currentTarget;
@@ -517,6 +604,29 @@ export function useAssignmentDnd({
       const previewTarget = lastPreviewTargetRef.current;
       setInsertTarget(previewTarget);
       onDragOver?.(previewTarget);
+    },
+    [onDragOver],
+  );
+
+  const handleDragMove = useCallback(
+    (event: DragMoveEvent) => {
+      const activeData = event.active.data.current;
+      if (!isAppDndItem(activeData) || activeData.from.type !== "priority") {
+        return;
+      }
+
+      const pointerTarget = resolveTimelineTargetFromPointer(event, activeData);
+      const previous = lastPreviewTargetRef.current;
+      const sameTarget =
+        previous?.containerId === pointerTarget?.containerId &&
+        previous?.index === pointerTarget?.index &&
+        previous?.isValid === pointerTarget?.isValid;
+
+      if (sameTarget) return;
+
+      lastPreviewTargetRef.current = pointerTarget;
+      setInsertTarget(pointerTarget);
+      onDragOver?.(pointerTarget);
     },
     [onDragOver],
   );
@@ -544,7 +654,11 @@ export function useAssignmentDnd({
         return;
       }
 
-      const target = getTargetFromEvent(event);
+      const target =
+        item.from.type === "priority"
+          ? resolveTimelineTargetFromPointer(event, item) ??
+            getTargetFromEvent(event)
+          : getTargetFromEvent(event);
       resetDragState();
       // Clear page UI (remove zone, route spacers) immediately — don't wait for API.
       onDragEnd?.();
@@ -582,6 +696,7 @@ export function useAssignmentDnd({
       insertTarget,
       handlers: {
         onDragStart: handleDragStart,
+        onDragMove: handleDragMove,
         onDragOver: handleDragOver,
         onDragCancel: handleDragCancel,
         onDragEnd: handleDragEnd,
@@ -594,6 +709,7 @@ export function useAssignmentDnd({
       collisionDetection,
       handleDragCancel,
       handleDragEnd,
+      handleDragMove,
       handleDragOver,
       handleDragStart,
       insertTarget,

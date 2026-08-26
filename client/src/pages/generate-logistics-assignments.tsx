@@ -54,6 +54,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AssignmentLoadingDialog } from "@/components/dialogs/assignment-loading-dialog";
 import {
   DndRemoveZone,
   useLogisticsDnd,
@@ -1448,11 +1449,14 @@ export default function GenerateLogisticsAssignments() {
             activeItem={logisticsDnd.activeItem}
             activeDragTask={logisticsDnd.activeDragTask}
             activeRect={logisticsDnd.activeRect}
+            insertTarget={logisticsDnd.insertTarget}
             tasks={allTasksWithAssignments}
             scope="logistics"
             onLogisticsTimelineMutated={reloadLogisticsPage}
           />
         </DndContext>
+
+        <AssignmentLoadingDialog open={isRunningLogisticsOptimizer} />
 
         <Dialog
           open={showMissingLogisticsKindWarningDialog}

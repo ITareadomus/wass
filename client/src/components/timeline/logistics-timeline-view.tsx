@@ -2090,14 +2090,20 @@ export default function LogisticsTimelineView({
                                 timelineWidth
                               );
 
-                              // Optimistic cross-driver: spacer invisibile sulla riga target
-                              // (il SortableContext non anima item di un altro container).
-                              const isCrossDriverTargetRow =
+                              // Optimistic insert gap sulla riga target quando l'item
+                              // non è nel SortableContext (cross-driver o assign da container).
+                              const isExternalAssignTargetRow =
                                 hideRouteSpacers &&
                                 draggingOverDriverId === driver.id &&
-                                activeDragDriverId != null &&
-                                activeDragDriverId !== driver.id &&
+                                activeDragDriverId == null &&
                                 lastValidDragIndex != null;
+                              const isCrossDriverTargetRow =
+                                (hideRouteSpacers &&
+                                  draggingOverDriverId === driver.id &&
+                                  activeDragDriverId != null &&
+                                  activeDragDriverId !== driver.id &&
+                                  lastValidDragIndex != null) ||
+                                isExternalAssignTargetRow;
                               const isCrossDriverSourceRow =
                                 hideRouteSpacers &&
                                 activeDragDriverId === driver.id &&
