@@ -274,6 +274,11 @@ export interface TaskCardProps {
   timelineRowStaffDisplayLabel?: string | null;
   /** Dopo mutazione timeline logistica (es. tipologia manuale). */
   onLogisticsTimelineMutated?: () => void;
+  /**
+   * Timeline housekeeping: se false, le card restano col colore normale
+   * anche se il task è in corso o completato.
+   */
+  showExecutionStatusColors?: boolean;
 }
 
 function getTaskMapMarkerId(task: Task): string {
@@ -430,6 +435,7 @@ export default function TaskCard({
   compactAdamTimelineUi = false,
   timelineRowStaffDisplayLabel = null,
   onLogisticsTimelineMutated,
+  showExecutionStatusColors,
 }: TaskCardProps) {
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1427,6 +1433,11 @@ const displayClickableInputClass =
         }))
       : null;
   const housekeepingCleaningMinutes = resolveHousekeepingCleaningMinutes(cardTaskAny);
+  const executionColorsEnabled =
+    showExecutionStatusColors ??
+    (typeof window !== "undefined" && "showHkExecutionStatusColors" in window
+      ? Boolean((window as any).showHkExecutionStatusColors)
+      : true);
   const housekeepingWorkProgress = resolveHousekeepingWorkProgress({
     status: housekeepingExecutionStatus,
     startworkAt: cardTaskAny.startwork_at ?? cardTaskAny.startworkAt,
@@ -1454,6 +1465,7 @@ const displayClickableInputClass =
     nowMs: housekeepingNowMs,
   });
   const housekeepingExecutionSurfaceClassName = (() => {
+    if (!executionColorsEnabled) return undefined;
     if (operationsScope === "logistics" || !isInTimeline) return undefined;
     if (housekeepingExecutionStatus === "completed") {
       return housekeepingExecutionStatusSurfaceClass("completed", "strong");
@@ -3329,10 +3341,12 @@ const displayClickableInputClass =
                         ) &&
                         "animate-blink",
                       isInTimeline &&
+                        executionColorsEnabled &&
                         housekeepingWorkProgress &&
                         !housekeepingWorkProgress.overdue &&
                         "isolation-isolate",
                       isInTimeline &&
+                        executionColorsEnabled &&
                         housekeepingWorkProgress?.overdue &&
                         "animate-blink-green",
                       operationsScope === "logistics" &&
@@ -3371,6 +3385,7 @@ const displayClickableInputClass =
                     }}
                   >
                     {isInTimeline &&
+                      executionColorsEnabled &&
                       housekeepingWorkProgress &&
                       !housekeepingWorkProgress.overdue && (
                         <div

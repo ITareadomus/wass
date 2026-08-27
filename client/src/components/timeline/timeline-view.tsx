@@ -24,6 +24,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import {
   Select,
@@ -273,6 +275,16 @@ export default function TimelineView({
   const [availableCleaners, setAvailableCleaners] = useState<Cleaner[]>([]);
   const [cleanerToReplace, setCleanerToReplace] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showExecutionStatusColors, setShowExecutionStatusColors] = useState(() => {
+    try {
+      const raw = localStorage.getItem("wass.hk.showExecutionStatusColors");
+      if (raw === "0" || raw === "false") return false;
+      if (raw === "1" || raw === "true") return true;
+    } catch {
+      /* ignore */
+    }
+    return true;
+  });
   const timelineRef = useRef<HTMLDivElement>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const [confirmUnavailableDialog, setConfirmUnavailableDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
@@ -1433,6 +1445,21 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
   }, []);
 
   useEffect(() => {
+    try {
+      localStorage.setItem(
+        "wass.hk.showExecutionStatusColors",
+        showExecutionStatusColors ? "1" : "0"
+      );
+    } catch {
+      /* ignore */
+    }
+    (window as any).showHkExecutionStatusColors = showExecutionStatusColors;
+    return () => {
+      delete (window as any).showHkExecutionStatusColors;
+    };
+  }, [showExecutionStatusColors]);
+
+  useEffect(() => {
     loadCleanersDirectory(cleanerDirectoryIds);
   }, [selectedDate, cleanerDirectoryIdsKey]);
 
@@ -2460,6 +2487,27 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             </div>
             <div className="flex items-center gap-3 print:hidden">
               {!isOfficeScope && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Label
+                      htmlFor="execution-status-colors-switch"
+                      className="cursor-pointer whitespace-nowrap text-sm font-medium leading-none text-custom-blue"
+                    >
+                      Colori stato
+                    </Label>
+                    <Switch
+                      id="execution-status-colors-switch"
+                      checked={showExecutionStatusColors}
+                      onCheckedChange={(checked) => setShowExecutionStatusColors(Boolean(checked))}
+                      className="h-6 w-11 border-2 border-custom-blue data-[state=unchecked]:bg-sky-200 data-[state=checked]:bg-[hsl(199,89%,48%)] dark:data-[state=unchecked]:bg-sky-900/50 dark:data-[state=checked]:bg-[hsl(217,91%,53%)]"
+                      title={
+                        showExecutionStatusColors
+                          ? "Mostra i task colorati in base a in corso / completato"
+                          : "Mostra i task con il colore normale"
+                      }
+                      data-testid="switch-execution-status-colors"
+                    />
+                  </div>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -2480,6 +2528,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     nascosti: passa il mouse sulla card per vederli.
                   </PopoverContent>
                 </Popover>
+                </>
               )}
               <Button
                 onClick={() => setLocation(isOfficeScope ? '/convocazioni?kind=office' : '/convocazioni')}
@@ -3190,6 +3239,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           compactAdamTimelineUi={hideRouteSpacers}
                                           isHighlighted={highlightedTaskIds.has(String(task.id))}
                                           cleanerId={cleaner.id}
+                                          showExecutionStatusColors={showExecutionStatusColors}
                                         />
                                       </React.Fragment>
                                     );
