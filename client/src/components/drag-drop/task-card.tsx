@@ -2966,7 +2966,10 @@ const displayClickableInputClass =
             </div>
 
             {operationsScope !== "logistics" && dialogHousekeepingWorkProgress && (
-              <HousekeepingWorkProgressLine progress={dialogHousekeepingWorkProgress} />
+              <HousekeepingWorkProgressLine
+                progress={dialogHousekeepingWorkProgress}
+                startworkAt={dialogTaskAny.startwork_at ?? dialogTaskAny.startworkAt}
+              />
             )}
 
             {/* Terza riga: Check-out - Check-in (click apre dialog come Pax-In) */}
