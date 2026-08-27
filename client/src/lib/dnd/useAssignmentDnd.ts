@@ -8,7 +8,10 @@ import type {
 } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { buildDndDropOperation } from "./operations";
-import { timelineFirstCollisionDetection } from "./collision";
+import {
+  getCompactTimelineTaskWidthPx,
+  timelineFirstCollisionDetection,
+} from "./collision";
 import { constrainAssignedTimelineDragModifier } from "./modifiers";
 import {
   DND_CONTAINER_ID_ATTRIBUTE,
@@ -93,7 +96,7 @@ export type UseAssignmentDndOptions = AssignmentDndHandlers & {
   collisionDetection?: CollisionDetection;
 };
 
-const getContainerFromEvent = (event: DragOverEvent | DragEndEvent) => {
+const getContainerFromEvent = (event: DndLayoutEvent) => {
   const overData = event.over?.data.current;
   if (isAppDndContainer(overData)) return overData;
   if (isAppDndItem(overData)) {
@@ -155,19 +158,63 @@ const getPointerClientCoordinate = (
   return base + (axis === "x" ? event.delta.x : event.delta.y);
 };
 
+type CompactActiveCardRect = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  width: number;
+  height: number;
+  centerX: number;
+  centerY: number;
+};
+
+const getActiveCardLayoutRect = (
+  event: DndLayoutEvent,
+): CompactActiveCardRect | null => {
+  const base = getActiveLayoutRect(event);
+  if (!base) return null;
+
+  const activeData = event.active.data.current;
+  const isPriorityDrag =
+    isAppDndItem(activeData) && activeData.from.type === "priority";
+  const isCompactTimelineDrag =
+    isAppDndItem(activeData) &&
+    (activeData.scope === "housekeeping" || activeData.scope === "logistics") &&
+    (activeData.from.type === "timeline" || isPriorityDrag);
+
+  const compactWidth = getCompactTimelineTaskWidthPx();
+  const compactHeight = 40;
+  const width = isCompactTimelineDrag
+    ? Math.min(base.width, compactWidth)
+    : base.width;
+  const height = isPriorityDrag && isCompactTimelineDrag
+    ? Math.min(base.height, compactHeight)
+    : base.height;
+
+  return {
+    left: base.left,
+    right: base.left + width,
+    top: base.top,
+    bottom: base.top + height,
+    width,
+    height,
+    centerX: base.left + width / 2,
+    centerY: base.top + height / 2,
+  };
+};
+
 const getActiveInsertCoordinate = (
   event: DndLayoutEvent,
   axis: "x" | "y",
 ) => {
+  const card = getActiveCardLayoutRect(event);
+  if (card) {
+    return axis === "x" ? card.centerX : card.centerY;
+  }
+
   const pointer = getPointerClientCoordinate(event, axis);
-  if (pointer !== null) return pointer;
-
-  const activeRect = getActiveLayoutRect(event);
-  if (!activeRect) return null;
-
-  return axis === "x"
-    ? activeRect.left + activeRect.width / 2
-    : activeRect.top + activeRect.height / 2;
+  return pointer;
 };
 
 const isAssignedSource = (
@@ -248,10 +295,11 @@ const getLayoutInsertIndex = (
 
   for (let index = 0; index < sortableRects.length; index += 1) {
     const rect = sortableRects[index];
+    const compactWidth = getCompactTimelineTaskWidthPx();
     const midpoint =
       target.container.type === "summary"
         ? rect.top + rect.height / 2
-        : rect.left + rect.width / 2;
+        : rect.left + Math.min(rect.width, compactWidth) / 2;
 
     if (activeEdge < midpoint) return index;
   }
@@ -259,13 +307,12 @@ const getLayoutInsertIndex = (
   return sortableRects.length;
 };
 
-const resolveTimelineTargetFromPointer = (
+const resolveTimelineTargetFromCard = (
   event: DndLayoutEvent,
   activeItem: AppDndItem,
 ): DndInsertTarget | null => {
-  const pointerX = getPointerClientCoordinate(event, "x");
-  const pointerY = getPointerClientCoordinate(event, "y");
-  if (pointerX === null || pointerY === null) return null;
+  const card = getActiveCardLayoutRect(event);
+  if (!card) return null;
   if (typeof document === "undefined") return null;
 
   const nodes = document.querySelectorAll<HTMLElement>(
@@ -290,14 +337,23 @@ const resolveTimelineTargetFromPointer = (
     const rect = node.getBoundingClientRect();
     if (rect.height <= 0 || rect.width <= 0) continue;
 
-    const slackY = 10;
-    if (pointerY < rect.top - slackY || pointerY > rect.bottom + slackY) {
+    const overlapX = Math.max(
+      0,
+      Math.min(card.right, rect.right) - Math.max(card.left, rect.left),
+    );
+    if (overlapX <= 0) continue;
+
+    const overlapY = Math.max(
+      0,
+      Math.min(card.bottom, rect.bottom) - Math.max(card.top, rect.top),
+    );
+    const rowCenterY = rect.top + rect.height / 2;
+    const centerDistanceY = Math.abs(card.centerY - rowCenterY);
+    if (overlapY <= 0 && centerDistanceY > Math.max(rect.height, card.height)) {
       continue;
     }
 
-    const inX = pointerX >= rect.left - 32 && pointerX <= rect.right + 32;
-    const distY = Math.abs(pointerY - (rect.top + rect.height / 2));
-    const score = inX ? distY : distY + 1000;
+    const score = overlapY > 0 ? -overlapY : centerDistanceY;
     if (!best || score < best.score) {
       best = {
         containerId: id,
@@ -349,9 +405,10 @@ const getInsertIndexFromOverItem = (
     return overItem.index;
   }
 
+  const compactWidth = getCompactTimelineTaskWidthPx();
   const midpoint =
     axis === "x"
-      ? rect.left + rect.width / 2
+      ? rect.left + Math.min(rect.width, compactWidth) / 2
       : rect.top + rect.height / 2;
 
   let insertionSlot =
@@ -407,7 +464,7 @@ const buildTargetFromLayout = (
 };
 
 const getCollisionInsertTarget = (
-  event: DragOverEvent | DragEndEvent,
+  event: DndLayoutEvent,
 ): DndInsertTarget | null => {
   const collisions = event.collisions;
   if (!collisions?.length) return null;
@@ -577,10 +634,12 @@ export function useAssignmentDnd({
       if (isPriorityDrag) {
         // Non dipendere da event.over: da container dnd-kit spesso resta sul
         // droppable sorgente e onDragOver non rifires mentre ti muovi sulla timeline.
-        const pointerTarget = resolveTimelineTargetFromPointer(event, activeData);
-        lastPreviewTargetRef.current = pointerTarget;
-        setInsertTarget(pointerTarget);
-        onDragOver?.(pointerTarget);
+        const cardTarget =
+          getCollisionInsertTarget(event) ??
+          resolveTimelineTargetFromCard(event, activeData);
+        lastPreviewTargetRef.current = cardTarget;
+        setInsertTarget(cardTarget);
+        onDragOver?.(cardTarget);
         return;
       }
 
@@ -615,18 +674,20 @@ export function useAssignmentDnd({
         return;
       }
 
-      const pointerTarget = resolveTimelineTargetFromPointer(event, activeData);
+      const cardTarget =
+        getCollisionInsertTarget(event) ??
+        resolveTimelineTargetFromCard(event, activeData);
       const previous = lastPreviewTargetRef.current;
       const sameTarget =
-        previous?.containerId === pointerTarget?.containerId &&
-        previous?.index === pointerTarget?.index &&
-        previous?.isValid === pointerTarget?.isValid;
+        previous?.containerId === cardTarget?.containerId &&
+        previous?.index === cardTarget?.index &&
+        previous?.isValid === cardTarget?.isValid;
 
       if (sameTarget) return;
 
-      lastPreviewTargetRef.current = pointerTarget;
-      setInsertTarget(pointerTarget);
-      onDragOver?.(pointerTarget);
+      lastPreviewTargetRef.current = cardTarget;
+      setInsertTarget(cardTarget);
+      onDragOver?.(cardTarget);
     },
     [onDragOver],
   );
@@ -656,7 +717,8 @@ export function useAssignmentDnd({
 
       const target =
         item.from.type === "priority"
-          ? resolveTimelineTargetFromPointer(event, item) ??
+          ? getCollisionInsertTarget(event) ??
+            resolveTimelineTargetFromCard(event, item) ??
             getTargetFromEvent(event)
           : getTargetFromEvent(event);
       resetDragState();

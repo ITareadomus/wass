@@ -67,7 +67,7 @@ export function TaskCardDragOverlay({
     return Number.isFinite(value) && value > 0 ? value : null;
   })();
 
-  // Overlay a 15' in timeline (drag interno) e appena il puntatore entra
+  // Overlay a 15' in timeline (drag interno) e appena la card entra
   // su una riga timeline durante un assign da container.
   const isOverTimeline = insertTarget?.container.type === "timeline";
   const useCompactTimelineOverlay =
@@ -88,15 +88,6 @@ export function TaskCardDragOverlay({
     : overlayHeight;
 
   const treatAsTimelineCard = isTimelineDrag || useCompactTimelineOverlay;
-  const compactCursorShiftX =
-    isPriorityDrag && useCompactTimelineOverlay && overlayWidth
-      ? (activeRect?.grabOffsetX ?? overlayWidth / 2) - overlayWidth / 2
-      : 0;
-  const compactCursorShiftY =
-    isPriorityDrag && useCompactTimelineOverlay && renderedOverlayHeight
-      ? (activeRect?.grabOffsetY ?? renderedOverlayHeight / 2) -
-        renderedOverlayHeight / 2
-      : 0;
 
   return (
     <DragOverlay adjustScale={false} dropAnimation={null} modifiers={modifiers}>
@@ -126,10 +117,6 @@ export function TaskCardDragOverlay({
                 ? 56
                 : undefined,
             minHeight: treatAsTimelineCard ? 40 : undefined,
-            transform:
-              compactCursorShiftX || compactCursorShiftY
-                ? `translate(${compactCursorShiftX}px, ${compactCursorShiftY}px)`
-                : undefined,
           }}
         >
           <TaskCard

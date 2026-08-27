@@ -73,6 +73,7 @@ interface TimelineViewProps {
   activeDragCleanerId?: number | null; // ID del cleaner sorgente durante il drag
   searchTask?: string; // Ricerca task per ID, logistic code, address o customer reference
   preassignedAnimatedTaskIds?: Set<string>;
+  className?: string;
 }
 
 interface Cleaner {
@@ -243,6 +244,7 @@ export default function TimelineView({
   activeDragCleanerId = null,
   searchTask = "",
   preassignedAnimatedTaskIds = new Set<string>(),
+  className,
 }: TimelineViewProps) {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
@@ -2460,7 +2462,11 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     <>
       <div
         ref={timelineRef}
-        className={`bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm relative overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 overflow-auto' : ''}`}
+        className={cn(
+          "bg-custom-blue-light rounded-lg border-2 border-custom-blue shadow-sm relative overflow-hidden",
+          isFullscreen && "fixed inset-0 z-50 overflow-auto",
+          className
+        )}
       >
         {/* Loading overlay durante drag&drop, rimozione cleaner, refresh ADAM, ecc. */}
         {(isLoadingDragDrop || removeCleanerMutation.isPending || removeSelectedCleanersMutation.isPending) && (
@@ -2525,7 +2531,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     className="w-80 text-sm leading-relaxed"
                   >
                     Sui task sotto l&apos;ora, check-out/in e codice cliente restano
-                    nascosti: passa il mouse sulla card per vederli.
+                    nascosti: passa il cursore sulla card per vederli.
                   </PopoverContent>
                 </Popover>
                 </>
@@ -3211,7 +3217,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
                                         {renderCrossCleanerInsertSlot(idx)}
 
-                                        {/* TaskCard: in DnD tutti a 15'; l'overlay resta incollato al cursore */}
+                                        {/* TaskCard: in DnD tutti a 15'; lo slot di insert segue la card */}
                                         <SortableTaskCard
                                           key={uniqueKey}
                                           dndId={dndId}

@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext, us
 const DEBUG = false;
 const dlog = (...args: any[]) => DEBUG && console.log(...args);
 import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
-import { CalendarIcon, Users, RefreshCw, Settings, Search, Map as MapIcon, BarChart3 } from "lucide-react";
+import { CalendarIcon, Users, RefreshCw, Settings, Search, Map as MapIcon, BarChart3, ChevronUp, ChevronDown } from "lucide-react";
 import TaskCardDragOverlay from "@/components/drag-drop/task-card-drag-overlay";
 import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
 import {
@@ -49,7 +49,7 @@ import { AssignmentLoadingDialog } from "@/components/dialogs/assignment-loading
 import { cn } from "@/lib/utils";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { useToast } from "@/hooks/use-toast";
-import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
+import { isContinuazioneStraordinariaTask, isTaskLocked } from "@/lib/taskValidation";
 import {
   DndRemoveZone,
   useAssignmentDnd,
@@ -305,6 +305,8 @@ export default function GenerateAssignments() {
   // Traccia il cleaner su cui si sta trascinando per posizionare il placeholder
   const [draggingOverCleanerId, setDraggingOverCleanerId] = useState<number | null>(null);
   const [activeDragCleanerId, setActiveDragCleanerId] = useState<number | null>(null);
+  /** Nasconde i containers e mostra il sommario anche se restano task non locked. */
+  const [containersManuallyCollapsed, setContainersManuallyCollapsed] = useState(false);
 
   // Stati per selezione multipla INDIPENDENTE per container (ma selezione CROSS-CONTAINER)
   const [multiSelectModes, setMultiSelectModes] = useState<{
@@ -2103,6 +2105,26 @@ export default function GenerateAssignments() {
     return { hasEoOnTimeline, hasHpOnTimeline, hasLpOnTimeline };
   }, [allTasksWithAssignments]);
 
+  const hasUnlockedContainerTasks = useMemo(
+    () =>
+      earlyOutTasks.some((task) => !isTaskLocked(task)) ||
+      highPriorityTasks.some((task) => !isTaskLocked(task)) ||
+      lowPriorityTasks.some((task) => !isTaskLocked(task)),
+    [earlyOutTasks, highPriorityTasks, lowPriorityTasks]
+  );
+
+  useEffect(() => {
+    setContainersManuallyCollapsed(false);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (!hasUnlockedContainerTasks) {
+      setContainersManuallyCollapsed(false);
+    }
+  }, [hasUnlockedContainerTasks]);
+
+  const showContainers = hasUnlockedContainerTasks && !containersManuallyCollapsed;
+
   // Definisci la funzione handleDateSelect qui, se non è già definita
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
@@ -2192,7 +2214,7 @@ export default function GenerateAssignments() {
             measuring={{ droppable: { strategy: MeasuringStrategy.WhileDragging } }}
             {...assignmentDnd.handlers}
           >
-            <div className="mb-4 flex items-center gap-3">
+            <div className={cn("flex items-center gap-3", hasUnlockedContainerTasks ? "mb-0" : "mb-4")}>
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-custom-blue" />
                 <Input
@@ -2330,7 +2352,20 @@ export default function GenerateAssignments() {
               const highlightedLowPriority = getHighlightedTaskIds(lowPriorityTasks);
 
               return (
-                <div className="relative mb-4 w-full">
+                hasUnlockedContainerTasks && showContainers ? (
+                <div className="mb-4 w-full">
+                  <div className="mt-[17px] flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setContainersManuallyCollapsed(true)}
+                      className="relative z-10 -mb-[2px] inline-flex max-w-full items-center gap-1.5 rounded-t-lg border-2 border-b-0 border-custom-blue bg-custom-blue-light px-2.5 py-1 text-[12px] font-medium leading-tight text-custom-blue after:pointer-events-none after:absolute after:-bottom-[2px] after:left-0 after:right-0 after:h-[2px] after:bg-custom-blue-light"
+                      aria-label="Nascondi containers"
+                    >
+                      <ChevronUp className="h-4 w-4 shrink-0" />
+                      <span>Nascondi containers</span>
+                    </button>
+                  </div>
+                <div className="relative w-full">
                   {isRefreshingContainers && (
                     <div className="absolute inset-0 z-40 flex items-center justify-center rounded-lg bg-black/20 backdrop-blur-sm dark:bg-black/40">
                       <div className="flex flex-col items-center gap-3">
@@ -2380,14 +2415,30 @@ export default function GenerateAssignments() {
                     isDragDisabled={isTimelineReadOnly || isLoadingDragDrop || isRefreshingContainers}
                     containerMultiSelectState={getContainerMultiSelectState('low_priority')}
                     highlightedTaskIds={highlightedLowPriority}
+                    className="rounded-tr-none"
                   />
                 </div>
                 </div>
+                </div>
+                ) : null
               );
             })()}
 
           <div className="mt-0 grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-3">
+              {hasUnlockedContainerTasks && !showContainers && (
+                <div className="mt-[17px] flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setContainersManuallyCollapsed(false)}
+                    className="relative z-10 -mb-[2px] inline-flex items-center gap-1 rounded-t-lg border-2 border-b-0 border-custom-blue bg-custom-blue-light px-2.5 py-1 text-custom-blue after:pointer-events-none after:absolute after:-bottom-[2px] after:left-0 after:right-0 after:h-[2px] after:bg-custom-blue-light"
+                    aria-label="Mostra containers"
+                    title="Mostra containers"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
               {/* Timeline View */}
               <div data-print-timeline className="relative">
                 <TimelineView
@@ -2412,6 +2463,11 @@ export default function GenerateAssignments() {
                   activeDragCleanerId={activeDragCleanerId}
                   searchTask={searchTask}
                   preassignedAnimatedTaskIds={preassignedAnimatedTaskIds}
+                  className={
+                    hasUnlockedContainerTasks && !showContainers
+                      ? "rounded-tr-none"
+                      : undefined
+                  }
                 />
                 <TimelineFloatingPanel
                   side="right"

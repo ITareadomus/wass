@@ -1286,11 +1286,11 @@ export default function GenerateLogisticsAssignments() {
                   <button
                     type="button"
                     onClick={() => setContainersManuallyCollapsed(true)}
-                    className="relative z-10 -mb-[2px] inline-flex items-center gap-1 rounded-t-lg border-2 border-b-0 border-custom-blue bg-background px-2.5 py-1 text-custom-blue shadow-sm transition-colors hover:bg-accent"
-                    aria-label="Nascondi containers"
-                    title="Nascondi containers"
+                    className="relative z-10 -mb-[2px] inline-flex max-w-full items-center gap-1.5 rounded-t-lg border-2 border-b-0 border-custom-blue bg-custom-blue-light px-2.5 py-1 text-[12px] font-medium leading-tight text-custom-blue after:pointer-events-none after:absolute after:-bottom-[2px] after:left-0 after:right-0 after:h-[2px] after:bg-custom-blue-light"
+                    aria-label="Nascondi containers per mostrare il sommario dei task assegnati"
                   >
-                    <ChevronUp className="h-4 w-4" />
+                    <ChevronUp className="h-4 w-4 shrink-0" />
+                    <span>Nascondi containers per mostrare il sommario dei task assegnati</span>
                   </button>
                 </div>
                 <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-3">
@@ -1345,7 +1345,7 @@ export default function GenerateLogisticsAssignments() {
                   <button
                     type="button"
                     onClick={() => setContainersManuallyCollapsed(false)}
-                    className="relative z-10 -mb-[2px] inline-flex items-center gap-1 rounded-t-lg border-2 border-b-0 border-custom-blue bg-background px-2.5 py-1 text-custom-blue shadow-sm transition-colors hover:bg-accent"
+                    className="relative z-10 -mb-[2px] inline-flex items-center gap-1 rounded-t-lg border-2 border-b-0 border-custom-blue bg-custom-blue-light px-2.5 py-1 text-custom-blue after:pointer-events-none after:absolute after:-bottom-[2px] after:left-0 after:right-0 after:h-[2px] after:bg-custom-blue-light"
                     aria-label="Mostra containers"
                     title="Mostra containers"
                   >
