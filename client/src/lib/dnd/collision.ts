@@ -112,7 +112,7 @@ export const getContainerData = (
 
 const COMPACT_TIMELINE_TASK_MIN_WIDTH_PX = 56;
 
-const getCompactTimelineTaskWidthPx = () => {
+export const getCompactTimelineTaskWidthPx = () => {
   if (typeof window === "undefined") return COMPACT_TIMELINE_TASK_MIN_WIDTH_PX;
   const ppm = Number((window as { timelinePxPerMinute?: number }).timelinePxPerMinute);
   if (Number.isFinite(ppm) && ppm > 0) {
@@ -134,9 +134,8 @@ type ActiveCardRect = {
 
 /**
  * Rect della card trascinata (non il cursore).
- * In HK/logistics timeline l'overlay è 15' allineato a sinistra del rect misurato.
- * Da container la card sorgente è larga: collision 15' segue il cursore, altrimenti
- * resta sul bordo sinistro e non interseca la riga timeline.
+ * Overlay 15' allineato a sinistra del rect misurato (HK e logistica, timeline
+ * o assign da container). Lo slot di insert segue questo rect.
  * Se c'è uno snap riga (saltello), la Y segue la riga snappata — così dopo un
  * hop puoi riordinare in X sulla nuova riga nella stessa gesture.
  */
@@ -169,20 +168,8 @@ const getActiveCardRect = (args: CollisionArgs): ActiveCardRect | null => {
     ? Math.min(measuredHeight, compactHeight)
     : measuredHeight;
 
-  let left = base.left;
+  const left = base.left;
   let top = base.top;
-
-  // Assign da container: tieni la card compatta sotto il puntatore
-  // (o al centro del rect originale se il pointer non è disponibile).
-  if (isPriorityDrag && isCompactTimelineDrag) {
-    const pointer = args.pointerCoordinates;
-    const sourceWidth = initial?.width ?? measuredWidth;
-    const sourceHeight = initial?.height ?? measuredHeight;
-    const anchorX = pointer?.x ?? base.left + sourceWidth / 2;
-    const anchorY = pointer?.y ?? base.top + sourceHeight / 2;
-    left = anchorX - width / 2;
-    top = anchorY - height / 2;
-  }
 
   let centerY = top + height / 2;
 
@@ -482,41 +469,6 @@ const getAssignedDragSource = (
 const findSortContainerUnderPointer = (
   args: CollisionArgs,
 ): SortContainerHit | null => {
-  const activeData = args.active.data.current;
-  const isPriorityDrag =
-    isAppDndItem(activeData) && activeData.from.type === "priority";
-  const pointer = args.pointerCoordinates;
-
-  // Da container: hit-test sulla riga con il puntatore, non col rect largo della card.
-  if (isPriorityDrag && pointer) {
-    const candidates: { hit: SortContainerHit; score: number }[] = [];
-    for (const droppableContainer of args.droppableContainers) {
-      const data = droppableContainer.data.current;
-      if (!isAppDndContainer(data) || data.type !== "timeline") continue;
-      if (data.scope !== activeData.scope) continue;
-      const rect = args.droppableRects.get(droppableContainer.id);
-      if (!rect) continue;
-      const slackY = 10;
-      if (pointer.y < rect.top - slackY || pointer.y > rect.bottom + slackY) {
-        continue;
-      }
-      const inX =
-        pointer.x >= rect.left - 32 && pointer.x <= rect.right + 32;
-      const distY = Math.abs(pointer.y - (rect.top + rect.height / 2));
-      candidates.push({
-        hit: {
-          id: droppableContainer.id,
-          container: data,
-          droppableContainer,
-        },
-        score: inX ? distY : distY + 1000,
-      });
-    }
-    if (candidates.length === 0) return null;
-    candidates.sort((a, b) => a.score - b.score);
-    return candidates[0]?.hit ?? null;
-  }
-
   const card = getActiveCardRect(args);
   if (!card) return null;
 
@@ -628,7 +580,7 @@ const sortDroppablesByItemIndex = (
   });
 
 /**
- * Pick the sortable `over` item from pointer vs item midpoints.
+ * Pick the sortable `over` item from card center vs item midpoints.
  * Crossing an item's center moves the insert slot (and sortable transforms)
  * left or right — unlike closestCenter, which sticks until the next center.
  */
@@ -804,7 +756,7 @@ export const timelineFirstCollisionDetection: CollisionDetection = (args) => {
     isAppDndItem(activeData) && activeData.from.type === "priority";
 
   // Assign da container: la timeline ha priorità sul container sorgente,
-  // così shrink + gap di insert si attivano appena il puntatore è sulla riga.
+  // così shrink + gap di insert si attivano appena la card è sulla riga.
   if (isPrioritySource) {
     const sortContainer = findSortContainerUnderPointer(args);
     if (sortContainer) {

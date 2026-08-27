@@ -1686,7 +1686,7 @@ export default function LogisticsTimelineView({
         )}
       >
         {(isLoadingOverlay || removeSelectedDriversMutation.isPending || isAddingDriverToTimeline) && (
-          <div className="absolute inset-0 bg-black/20 dark:bg-black/40 rounded-lg flex items-center justify-center z-40 backdrop-blur-sm pointer-events-none">
+          <div className="absolute inset-0 z-50 rounded-lg bg-black/20 backdrop-blur-sm pointer-events-none dark:bg-black/40 flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
               <p className="text-sm font-medium text-foreground">
