@@ -7,6 +7,7 @@ import {
   type PointerSensorOptions,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { FIRST_APT_TIME_SHIFT_ATTRIBUTE } from "@/lib/first-apartment-time-shift";
 
 export const DND_DRAG_HANDLE_ATTRIBUTE = "data-app-dnd-drag-handle";
 export const DND_DRAG_HANDLE_SELECTOR = `[${DND_DRAG_HANDLE_ATTRIBUTE}]`;
@@ -36,6 +37,7 @@ export const shouldStartTimelinePan = (target: EventTarget | null) => {
     [
       DND_DRAG_HANDLE_SELECTOR,
       DND_DRAGGABLE_SELECTOR,
+      `[${FIRST_APT_TIME_SHIFT_ATTRIBUTE}]`,
       "button",
       "input",
       "textarea",

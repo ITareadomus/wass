@@ -1520,27 +1520,29 @@ const displayClickableInputClass =
     isModalOpen,
   ]);
 
+  const displayAssignmentStart =
+    (displayTask as any).start_time ?? (displayTask as any).startTime;
+  const displayAssignmentEnd =
+    (displayTask as any).end_time ?? (displayTask as any).endTime;
+  const displayAssignmentTravel =
+    (displayTask as any).travel_time ?? (displayTask as any).travelTime;
+
   useEffect(() => {
-    if (!isModalOpen) return;
-    const taskObj = displayTask as any;
-    const nextStart = taskObj.start_time ?? taskObj.startTime;
-    const nextEnd = taskObj.end_time ?? taskObj.endTime;
-    const nextTravel = taskObj.travel_time ?? taskObj.travelTime;
     setAssignmentTimes((prev) => {
       if (
-        prev.start_time === nextStart &&
-        prev.end_time === nextEnd &&
-        prev.travel_time === nextTravel
+        prev.start_time === displayAssignmentStart &&
+        prev.end_time === displayAssignmentEnd &&
+        prev.travel_time === displayAssignmentTravel
       ) {
         return prev;
       }
       return {
-        start_time: nextStart,
-        end_time: nextEnd,
-        travel_time: nextTravel,
+        start_time: displayAssignmentStart,
+        end_time: displayAssignmentEnd,
+        travel_time: displayAssignmentTravel,
       };
     });
-  }, [isModalOpen, dialogTaskKey]);
+  }, [dialogTaskKey, displayAssignmentStart, displayAssignmentEnd, displayAssignmentTravel]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2911,19 +2913,21 @@ const displayClickableInputClass =
         : assignmentTimes.travel_time !== undefined && assignmentTimes.travel_time !== null
           ? `${assignmentTimes.travel_time} minuti`
           : "non assegnato"
-      : assignmentTimes.travel_time !== undefined
-        ? `${assignmentTimes.travel_time} minuti`
-        : "non assegnato";
+      : displayAssignmentTravel !== undefined && displayAssignmentTravel !== null
+        ? `${displayAssignmentTravel} minuti`
+        : assignmentTimes.travel_time !== undefined
+          ? `${assignmentTimes.travel_time} minuti`
+          : "non assegnato";
   const housekeepingStartDisplayValue =
     isLogisticsScope
       ? String(effectiveHousekeepingStartTime ?? "").trim() ||
         "non assegnato"
-      : String(assignmentTimes.start_time ?? "non assegnato");
+      : String(displayAssignmentStart ?? assignmentTimes.start_time ?? "non assegnato");
   const housekeepingEndDisplayValue =
     isLogisticsScope
       ? String(effectiveHousekeepingEndTime ?? "").trim() ||
         "non assegnato"
-      : String(assignmentTimes.end_time ?? "non assegnato");
+      : String(displayAssignmentEnd ?? assignmentTimes.end_time ?? "non assegnato");
 
   const alignLogisticsHousekeepingRows = false;
 

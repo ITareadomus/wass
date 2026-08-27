@@ -223,8 +223,22 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
         checkout_time_str = task.get("checkout_time")
         checkin_time_str = task.get("checkin_time")
 
+        # Optional override: first apartment dragged on the timeline (30-min snaps).
+        # Only sequence 1 keeps it; leftover values on later tasks are dropped.
+        manual_start_min = None
+        if i == 0:
+            manual_start_str = task.get("manual_start_time")
+            if manual_start_str:
+                try:
+                    manual_start_min = time_to_minutes(str(manual_start_str).strip())
+                except (ValueError, AttributeError, TypeError):
+                    manual_start_min = None
+        elif task.get("manual_start_time"):
+            task["manual_start_time"] = None
+
         # CRITICAL: Start time NON può MAI essere prima del checkout_time
         # Il cleaner può iniziare solo DOPO che la proprietà sia libera
+        # (salvo override manuale del primo appartamento)
         
         if i == 0:
             # Prima task: calcola arrivo base (work_start + travel_time già aggiunto a current_time_min)
@@ -264,6 +278,11 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
         priority_min = get_priority_min_start(task.get("priority"), priority_windows)
         if priority_min is not None and start_time_min < priority_min:
             start_time_min = priority_min
+            current_time_min = start_time_min
+
+        # First-apartment drag override wins over checkout/priority, not over shift start.
+        if i == 0 and manual_start_min is not None:
+            start_time_min = max(work_start_min, manual_start_min)
             current_time_min = start_time_min
 
         # End time: start + cleaning_time

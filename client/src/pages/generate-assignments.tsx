@@ -1396,6 +1396,7 @@ export default function GenerateAssignments() {
             startTime: timelineAssignment.start_time || (baseTask as any).startTime,
             endTime: timelineAssignment.end_time || (baseTask as any).endTime,
             travelTime: timelineAssignment.travel_time || 0,
+            manual_start_time: (timelineAssignment as any).manual_start_time ?? null,
             address: timelineAssignment.address || baseTask.address,
             lat: timelineAssignment.lat || baseTask.lat,
             lng: timelineAssignment.lng || baseTask.lng,

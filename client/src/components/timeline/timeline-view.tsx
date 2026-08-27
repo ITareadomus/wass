@@ -7,6 +7,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { fetchWithOperation } from "@/lib/operationManager";
 import { useToast } from "@/hooks/use-toast";
 import SortableTaskCard from "@/components/drag-drop/sortable-task-card";
+import { FirstApartmentTimeShift } from "@/components/timeline/first-apartment-time-shift-handle";
 import { TimelineHorizontalScrollbar } from "@/components/timeline/timeline-horizontal-scrollbar";
 import {
   DndDroppableSortableContainer,
@@ -397,6 +398,11 @@ export default function TimelineView({
   const [editingEndTime, setEditingEndTime] = useState<string>("20:00");
   const [endTimeEditDialog, setEndTimeEditDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string }>({ open: false, cleanerId: null, cleanerName: '' });
   const [isSavingEndTime, setIsSavingEndTime] = useState(false);
+  const [firstAptTimeShiftPreview, setFirstAptTimeShiftPreview] = useState<{
+    cleanerId: number;
+    startMinutes: number;
+  } | null>(null);
+  const [isSavingFirstAptTime, setIsSavingFirstAptTime] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isTransferringToAdam, setIsTransferringToAdam] = useState(false);
   const [showOptimizerDialog, setShowOptimizerDialog] = useState(false);
@@ -552,7 +558,7 @@ export default function TimelineView({
     if (!element) return false;
 
     return !element.closest(
-      '[data-rbd-draggable-id], [data-rbd-drag-handle-draggable-id], button, input, textarea, select, a, [role="button"]'
+      '[data-rbd-draggable-id], [data-rbd-drag-handle-draggable-id], button, input, textarea, select, a, [role="button"], [data-first-apt-time-shift]'
     );
   }, []);
 
@@ -1968,6 +1974,45 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     }
   };
 
+  const persistFirstApartmentStart = async (
+    cleanerId: number,
+    taskId: string | number,
+    startTime: string | null,
+  ) => {
+    setIsSavingFirstAptTime(true);
+    try {
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const response = await fetch("/api/reschedule-first-task", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cleanerId,
+          taskId,
+          startTime,
+          date: workDate,
+          scope: scopeValue,
+          modified_by: currentUser.username || "unknown",
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || result.message || "Errore nello spostamento dell'orario");
+      }
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile spostare l'inizio del primo appartamento",
+        variant: "destructive",
+      });
+    } finally {
+      setFirstAptTimeShiftPreview(null);
+      setIsSavingFirstAptTime(false);
+    }
+  };
+
   const handleSaveEndTime = async () => {
     if (!endTimeEditDialog.cleanerId) return;
 
@@ -3084,7 +3129,11 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     let timeOffset = 0;
                                     if (seq === 1) {
                                       const gridStartMinutes = timeToMinutes(globalTimeSlots[0] || "10:00");
-                                      const taskStartMinutes = parseClockToMinutes(
+                                      const previewMinutes =
+                                        firstAptTimeShiftPreview?.cleanerId === cleaner.id
+                                          ? firstAptTimeShiftPreview.startMinutes
+                                          : null;
+                                      const taskStartMinutes = previewMinutes ?? parseClockToMinutes(
                                         taskObj.start_time || taskObj.fw_start_time || taskObj.startTime
                                       );
                                       const cleanerStartMinutes = parseClockToMinutes(cleanerStartTime);
@@ -3218,6 +3267,46 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                         {renderCrossCleanerInsertSlot(idx)}
 
                                         {/* TaskCard: in DnD tutti a 15'; lo slot di insert segue la card */}
+                                        <FirstApartmentTimeShift
+                                          enabled={
+                                            seq === 1 &&
+                                            !hideRouteSpacers &&
+                                            !isTimelineInteractionDisabled &&
+                                            !isReadonlyPreassignedTask(task)
+                                          }
+                                          isPinned={Boolean(taskObj.manual_start_time)}
+                                          startTime={
+                                            taskObj.start_time ||
+                                            taskObj.fw_start_time ||
+                                            taskObj.startTime
+                                          }
+                                          cleanerStartTime={cleanerStartTime}
+                                          cleanerEndTime={cleaner.end_time || "20:00"}
+                                          pxPerMinute={timelinePxPerMinute}
+                                          leftSpacePx={initialOffsetWidthPx}
+                                          disabled={isSavingFirstAptTime}
+                                          onPreview={(startMinutes) =>
+                                            setFirstAptTimeShiftPreview({
+                                              cleanerId: cleaner.id,
+                                              startMinutes,
+                                            })
+                                          }
+                                          onCommit={(nextStart) =>
+                                            persistFirstApartmentStart(
+                                              cleaner.id,
+                                              taskObj.task_id || taskObj.id,
+                                              nextStart,
+                                            )
+                                          }
+                                          onReset={() =>
+                                            persistFirstApartmentStart(
+                                              cleaner.id,
+                                              taskObj.task_id || taskObj.id,
+                                              null,
+                                            )
+                                          }
+                                          onCancel={() => setFirstAptTimeShiftPreview(null)}
+                                        >
                                         <SortableTaskCard
                                           key={uniqueKey}
                                           dndId={dndId}
@@ -3247,6 +3336,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           cleanerId={cleaner.id}
                                           showExecutionStatusColors={showExecutionStatusColors}
                                         />
+                                        </FirstApartmentTimeShift>
                                       </React.Fragment>
                                     );
                                   })}
