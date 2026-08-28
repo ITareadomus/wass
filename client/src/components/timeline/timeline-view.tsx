@@ -681,8 +681,14 @@ export default function TimelineView({
       const id = Number(entry?.cleaner?.id);
       if (Number.isFinite(id) && id > 0) assignedIds.add(id);
     }
+    // Parent `tasks` is the live source after silent ADAM sync: include it so
+    // cleaner rows appear/disappear immediately without a page reload.
+    for (const task of tasks || []) {
+      const id = Number((task as any)?.assignedCleaner ?? (task as any)?.cleanerId);
+      if (Number.isFinite(id) && id > 0) assignedIds.add(id);
+    }
     return combined.filter((cleaner) => assignedIds.has(Number(cleaner.id)));
-  }, [cleaners, timelineCleaners, isOperationalDayStarted]);
+  }, [cleaners, timelineCleaners, isOperationalDayStarted, tasks]);
 
   const visibleCleanerIds = React.useMemo(
     () => new Set(allCleanersToShow.map(cleaner => Number(cleaner.id))),

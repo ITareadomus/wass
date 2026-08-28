@@ -1627,7 +1627,25 @@ export default function GenerateAssignments() {
       dlog(`   - Task assegnate: ${dedupedTasks.filter(t => (t as any).assignedCleaner).length}`);
       dlog(`   - Task nei containers: ${dedupedTasks.filter(t => !(t as any).assignedCleaner).length}`);
 
-      setAllTasksWithAssignments(dedupedTasks);
+      setAllTasksWithAssignments((prev) => {
+        const prevByTaskId = new Map<string, Task>();
+        for (const task of prev) {
+          const id = String((task as any)?.task_id ?? (task as any)?.id ?? "").trim();
+          if (id && !prevByTaskId.has(id)) prevByTaskId.set(id, task);
+        }
+        return dedupedTasks.map((task) => {
+          const id = String((task as any)?.task_id ?? (task as any)?.id ?? "").trim();
+          const prevTask = id ? prevByTaskId.get(id) : undefined;
+          if (!prevTask) return task;
+          const incoming = pickHousekeepingExecutionStatusFields(task);
+          if (incoming.startwork || incoming.cleaned || incoming.startwork_at) {
+            return task;
+          }
+          const previous = pickHousekeepingExecutionStatusFields(prevTask);
+          if (previous.housekeeping_execution_status === "not_started") return task;
+          return { ...task, ...previous };
+        });
+      });
       if (!silent) {
         replayPreassignedTasks(dateStr, dedupedTasks);
       }
@@ -1652,6 +1670,30 @@ export default function GenerateAssignments() {
     await refreshAssignments("manual");
   };
 
+  const applyLatestHousekeepingExecutionStatus = async (workDate: string) => {
+    try {
+      const r = await fetch(
+        withScope(`/api/timeline/execution-status?date=${encodeURIComponent(workDate)}`),
+        {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+        }
+      );
+      if (!r.ok) return;
+      const data = await r.json();
+      if (!data?.success || !data.statuses || typeof data.statuses !== "object") return;
+      setAllTasksWithAssignments((prev) => {
+        const { tasks, changed } = mergeHousekeepingExecutionStatusIntoTasks(
+          prev,
+          data.statuses
+        );
+        return changed ? tasks : prev;
+      });
+    } catch {
+      /* the 8s poll will retry */
+    }
+  };
+
   const runAdamContainersRefresh = async (opts?: AdamRefreshOpts) => {
     if (isRefreshingContainersRef.current) return;
     const source = opts?.source ?? "manual";
@@ -1661,8 +1703,14 @@ export default function GenerateAssignments() {
     const day = String(selectedDate.getDate()).padStart(2, "0");
     const dateStr = `${year}-${month}-${day}`;
 
+    // Overlay solo per sync manuale a giornata OFF: con switch ON non si può
+    // modificare comunque, e l'auto-sync non deve coprire la timeline.
+    const showBlockingOverlay =
+      source !== "auto" && !isOperationalDayStartedRef.current;
     isRefreshingContainersRef.current = true;
-    setIsRefreshingContainers(true);
+    if (showBlockingOverlay) {
+      setIsRefreshingContainers(true);
+    }
     let keepFrozenForUnlockDialog = false;
     try {
       const response = await fetch("/api/containers/refresh", {
@@ -1738,6 +1786,7 @@ export default function GenerateAssignments() {
         ]);
       }
       window.dispatchEvent(new CustomEvent("refresh-selected-cleaners"));
+      await applyLatestHousekeepingExecutionStatus(dateStr);
     } catch (error: any) {
       toast({
         variant: "destructive",
