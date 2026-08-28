@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isHousekeepingTaskCleaned,
   mergeHousekeepingExecutionStatusIntoTasks,
   parseHousekeepingFlag,
   parseHousekeepingStartworkAtMs,
@@ -40,6 +41,25 @@ describe("parseHousekeepingFlag", () => {
     expect(parseHousekeepingFlag(1)).toBe(true);
     expect(parseHousekeepingFlag("true")).toBe(true);
     expect(parseHousekeepingFlag(0)).toBe(false);
+  });
+});
+
+describe("isHousekeepingTaskCleaned", () => {
+  it("locks cleaned=1 even without execution status", () => {
+    expect(isHousekeepingTaskCleaned({ cleaned: 1, startwork: 0 })).toBe(true);
+  });
+
+  it("locks completed execution status", () => {
+    expect(
+      isHousekeepingTaskCleaned({ housekeeping_execution_status: "completed" })
+    ).toBe(true);
+  });
+
+  it("allows in-progress and not started tasks", () => {
+    expect(isHousekeepingTaskCleaned({ cleaned: 0, startwork: 1 })).toBe(false);
+    expect(
+      isHousekeepingTaskCleaned({ housekeeping_execution_status: "in_progress" })
+    ).toBe(false);
   });
 });
 

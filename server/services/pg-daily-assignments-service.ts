@@ -2,6 +2,7 @@ import pool, { query } from '../../shared/pg-db';
 import { taskCollaborationService } from './pg-task-collaboration-service';
 import { formatInTimeZone } from 'date-fns-tz';
 import { databaseConfig } from '../../config/database';
+import { isDevelopmentEnvironment } from '../../shared/work-date-access';
 
 const ROME_TZ = 'Europe/Rome';
 
@@ -388,7 +389,9 @@ export class PgDailyAssignmentsService {
     const row = result.rows[0];
     const started = row?.started === true;
     const todayRome = formatInTimeZone(new Date(), ROME_TZ, 'yyyy-MM-dd');
-    if (started && date < todayRome) {
+    // In produzione una giornata passata non può restare "operativa".
+    // In development si lascia accesa per test su date storiche.
+    if (started && date < todayRome && !isDevelopmentEnvironment()) {
       await query(
         `UPDATE daily_operational_day
          SET started = FALSE, started_at = NULL, started_by = NULL, updated_at = NOW()
@@ -420,6 +423,10 @@ export class PgDailyAssignmentsService {
       throw new Error('work_date non valida');
     }
     const resolvedScope = scope === 'office' ? 'office' : 'housekeeping';
+    const todayRome = formatInTimeZone(new Date(), ROME_TZ, 'yyyy-MM-dd');
+    if (started && date < todayRome && !isDevelopmentEnvironment()) {
+      throw new Error('Non puoi avviare la giornata operativa su una data passata.');
+    }
     await query(
       `INSERT INTO daily_operational_day (work_date, scope, started, started_at, started_by, updated_at)
        VALUES ($1, $2, $3, CASE WHEN $3 THEN NOW() ELSE NULL END, CASE WHEN $3 THEN $4 ELSE NULL END, NOW())

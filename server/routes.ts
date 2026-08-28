@@ -72,6 +72,47 @@ async function rejectIfOperationalDayStarted(
   }
 }
 
+const TASK_CLEANED_MESSAGE = "Task già pulita: impossibile spostare";
+
+async function rejectIfHousekeepingTasksCleaned(
+  res: any,
+  taskIds: Array<{ task_id?: unknown; id?: unknown; cleaned?: unknown; housekeeping_execution_status?: unknown } | string | number | null | undefined>
+): Promise<boolean> {
+  try {
+    const { isHousekeepingTaskCleaned } = await import(
+      "../shared/housekeeping-task-execution-status"
+    );
+    const payloadCleaned = taskIds.some(
+      (value) => value != null && typeof value === "object" && isHousekeepingTaskCleaned(value)
+    );
+    if (payloadCleaned) {
+      console.log("🔒 BLOCKED: Task cleaned=1 (payload), move refused");
+      res.status(423).json({
+        success: false,
+        error: "TASK_CLEANED",
+        message: TASK_CLEANED_MESSAGE,
+      });
+      return true;
+    }
+
+    const { findFirstCleanedHousekeepingTaskId } = await import(
+      "./services/adam-housekeeping-execution-status-enrichment"
+    );
+    const cleanedId = await findFirstCleanedHousekeepingTaskId(taskIds);
+    if (cleanedId == null) return false;
+    console.log(`🔒 BLOCKED: Task ${cleanedId} cleaned=1, move refused`);
+    res.status(423).json({
+      success: false,
+      error: "TASK_CLEANED",
+      message: TASK_CLEANED_MESSAGE,
+    });
+    return true;
+  } catch (error) {
+    console.warn("⚠️ housekeeping cleaned guard:", error);
+    return false;
+  }
+}
+
 const OFFICE_OPERATION_IDS = new Set([15, 38]);
 const CONTINUAZIONE_PS_OPERATION_ID = 37;
 const CONTINUAZIONE_PS_OPERATION_NAME = "continuazione ps";
@@ -1246,6 +1287,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const resolvedScope = resolveScopeFromReq(req);
 
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+      if (await rejectIfHousekeepingTasksCleaned(res, [taskId])) return;
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
       
@@ -1655,6 +1697,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...sourceTasks.map((t: any) => Number(t.task_id ?? t.id)).filter((x: any) => Number.isFinite(x)),
         ...destTasks.map((t: any) => Number(t.task_id ?? t.id)).filter((x: any) => Number.isFinite(x)),
       ]));
+
+      if (await rejectIfHousekeepingTasksCleaned(res, [
+        ...sourceTasks,
+        ...destTasks,
+        ...swappedTaskIds,
+      ])) return;
 
       const primaryBeforeSwap = new Map<number, number>();
       if (swappedTaskIds.length > 0) {
@@ -4645,6 +4693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const resolvedScope = resolveScopeFromReq(req);
 
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+      if (await rejectIfHousekeepingTasksCleaned(res, [taskId, taskData])) return;
       console.log(`🔍 CHECKING: save-timeline-assignment for cleanerId=${cleanerId}, workDate=${workDate}`);
       if (cleanerId && Number.isFinite(Number(cleanerId))) {
         const locked = await isCleanerLocked(workDate, Number(cleanerId));
@@ -5086,6 +5135,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentUsername = modified_by || getCurrentUsername(req);
       const resolvedScope = resolveScopeFromReq(req);
 
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+
       console.log(`Rimozione assegnazione timeline - taskId: ${taskId}, logisticCode: ${logisticCode}, date: ${workDate}`);
 
       // Carica timeline usando workspace helper
@@ -5101,6 +5152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const readonlyTask = findTaskInTimelineByIdentity(assignmentsData, taskId, logisticCode);
+      if (await rejectIfHousekeepingTasksCleaned(res, [taskId, readonlyTask])) return;
       if (isReadonlyPreassignedTask(readonlyTask)) {
         return res.status(423).json({
           success: false,
@@ -9953,6 +10005,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       const resolvedScope = resolveScopeFromReq(req);
 
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+      if (await rejectIfHousekeepingTasksCleaned(res, [taskId])) return;
       if (fromContainer && taskId) {
         const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
         const isLocked = await pgDailyAssignmentsService.isTaskLocked(workDate, Number(taskId));
@@ -10069,6 +10122,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       if (!moved) {
         return res.status(404).json({ success: false, message: 'Task non trovata in nessuna fonte' });
       }
+
+      if (await rejectIfHousekeepingTasksCleaned(res, [taskId, moved])) return;
 
       // Trova o crea l'entry del cleaner di destinazione
       let dstEntry = getCleanerEntry(toCleanerId);
@@ -10193,6 +10248,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       const { date, cleanerId, taskId, logisticCode, fromIndex, toIndex } = req.body;
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
 
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+
       // Carica timeline da PostgreSQL
       let timelineData: any = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
       if (!timelineData) {
@@ -10230,6 +10287,11 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           success: false,
           message: "Task non trovata nel cleaner specificato"
         });
+      }
+
+      const reorderTask = cleanerEntry.tasks[actualFromIndex];
+      if (await rejectIfHousekeepingTasksCleaned(res, [taskId, reorderTask])) {
+        return;
       }
 
       // Verifica che toIndex sia valido

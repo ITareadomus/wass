@@ -44,6 +44,7 @@ import {
   type DndInsertTarget,
 } from "@/lib/dnd";
 import {
+  isHousekeepingTaskCleaned,
   mergeHousekeepingExecutionStatusIntoTasks,
   pickHousekeepingExecutionStatusFields,
 } from "@shared/housekeeping-task-execution-status";
@@ -1827,6 +1828,9 @@ export default function GenerateAssignments() {
           if (errData.error === 'PREASSIGNED_READONLY') {
             throw new Error('Task pre-assegnata readonly: operazione non consentita');
           }
+          if (errData.error === 'TASK_CLEANED') {
+            throw new Error(errData.message || 'Task già pulita: impossibile spostare');
+          }
           if (errData.error === 'CLEANER_LOCKED') {
             throw new Error('Cleaner bloccato: impossibile assegnare');
           }
@@ -1864,6 +1868,10 @@ export default function GenerateAssignments() {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Errore nel reorder della timeline:', errorData);
+
+        if (response.status === 423 && errorData.error === "TASK_CLEANED") {
+          throw new Error(errorData.message || "Task già pulita: impossibile spostare");
+        }
 
         if (response.status === 400) {
           toast({
@@ -1904,6 +1912,9 @@ export default function GenerateAssignments() {
             variant: "warning",
           });
           return;
+        }
+        if (response.status === 423 && errorData.error === "TASK_CLEANED") {
+          throw new Error(errorData.message || "Task già pulita: impossibile spostare");
         }
         console.error('Errore nella rimozione dell\'assegnazione dalla timeline', errorData);
         toast({
@@ -1949,6 +1960,21 @@ export default function GenerateAssignments() {
           description: isOperationalDayStarted
             ? "Giornata operativa iniziata: da WASS puoi solo visualizzare."
             : "La timeline è in sola visualizzazione per questa data.",
+          variant: "warning",
+        });
+        return;
+      }
+
+      const movedTaskIds = "taskIds" in operation ? operation.taskIds : [];
+      const cleanedTask = movedTaskIds
+        .map((taskId) =>
+          allTasksWithAssignments.find((t) => String(t.id) === String(taskId)),
+        )
+        .find((task) => isHousekeepingTaskCleaned(task));
+      if (cleanedTask) {
+        toast({
+          title: "Operazione non permessa",
+          description: "Task già pulita: impossibile spostare",
           variant: "warning",
         });
         return;
@@ -2052,6 +2078,11 @@ export default function GenerateAssignments() {
                   if (errorData.error === "PREASSIGNED_READONLY") {
                     throw new Error(
                       "Task pre-assegnata readonly: non puoi cambiare cleaner",
+                    );
+                  }
+                  if (errorData.error === "TASK_CLEANED") {
+                    throw new Error(
+                      errorData.message || "Task già pulita: impossibile spostare",
                     );
                   }
                   if (errorData.error === "CLEANER_LOCKED") {
