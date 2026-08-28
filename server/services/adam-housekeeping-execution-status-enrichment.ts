@@ -14,6 +14,32 @@ export type AdamHousekeepingExecutionFields = {
   housekeeping_execution_status: HousekeepingTaskExecutionStatus;
 };
 
+export function collectNumericHousekeepingTaskIds(
+  values: Array<{ task_id?: unknown; id?: unknown } | string | number | null | undefined>
+): number[] {
+  const ids: number[] = [];
+  for (const value of values) {
+    if (value == null) continue;
+    const raw =
+      typeof value === "object" ? (value.task_id ?? value.id) : value;
+    const id = Number(raw);
+    if (Number.isFinite(id) && id > 0) ids.push(id);
+  }
+  return [...new Set(ids)];
+}
+
+export async function findFirstCleanedHousekeepingTaskId(
+  taskIds: Array<{ task_id?: unknown; id?: unknown } | string | number | null | undefined>
+): Promise<number | null> {
+  const ids = collectNumericHousekeepingTaskIds(taskIds);
+  if (ids.length === 0) return null;
+  const byId = await loadAdamHousekeepingExecutionStatusByTaskIds(ids);
+  for (const id of ids) {
+    if (byId.get(id)?.cleaned) return id;
+  }
+  return null;
+}
+
 export async function loadAdamHousekeepingExecutionStatusByTaskIds(
   taskIds: number[]
 ): Promise<Map<number, AdamHousekeepingExecutionFields>> {

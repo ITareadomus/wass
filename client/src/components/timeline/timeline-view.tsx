@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -74,6 +76,9 @@ interface TimelineViewProps {
   activeDragCleanerId?: number | null; // ID del cleaner sorgente durante il drag
   searchTask?: string; // Ricerca task per ID, logistic code, address o customer reference
   preassignedAnimatedTaskIds?: Set<string>;
+  isOperationalDayStarted?: boolean;
+  onOperationalDayToggle?: (started: boolean) => void;
+  isOperationalDaySwitchDisabled?: boolean;
   className?: string;
 }
 
@@ -245,6 +250,9 @@ export default function TimelineView({
   activeDragCleanerId = null,
   searchTask = "",
   preassignedAnimatedTaskIds = new Set<string>(),
+  isOperationalDayStarted = false,
+  onOperationalDayToggle,
+  isOperationalDaySwitchDisabled = false,
   className,
 }: TimelineViewProps) {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
@@ -665,8 +673,16 @@ export default function TimelineView({
       return timeA.localeCompare(timeB);
     });
 
-    return combined;
-  }, [cleaners, timelineCleaners]);
+    if (!isOperationalDayStarted) return combined;
+
+    const assignedIds = new Set<number>();
+    for (const entry of timelineCleaners || []) {
+      if (!Array.isArray(entry?.tasks) || entry.tasks.length === 0) continue;
+      const id = Number(entry?.cleaner?.id);
+      if (Number.isFinite(id) && id > 0) assignedIds.add(id);
+    }
+    return combined.filter((cleaner) => assignedIds.has(Number(cleaner.id)));
+  }, [cleaners, timelineCleaners, isOperationalDayStarted]);
 
   const visibleCleanerIds = React.useMemo(
     () => new Set(allCleanersToShow.map(cleaner => Number(cleaner.id))),
@@ -1444,13 +1460,32 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     loadCleaners();
     loadAliases();
     loadTimelineCleaners();
-    loadTimelineData(); // Carica i dati della timeline anche qui
+    loadTimelineData();
     loadCleanerLocks();
+  }, []);
 
-    // Esponi le funzioni per ricaricare i cleaners
+  useEffect(() => {
+    const reloadTimelineRoster = async () => {
+      await Promise.all([
+        loadCleaners(),
+        loadAliases(),
+        loadTimelineCleaners(),
+        loadTimelineData(),
+        loadCleanerLocks(),
+      ]);
+    };
     (window as any).loadTimelineCleaners = loadTimelineCleaners;
     (window as any).loadSelectedCleaners = loadCleaners;
-  }, []);
+    (window as any).reloadTimelineRoster = reloadTimelineRoster;
+
+    const onRefreshAssignments = () => {
+      void reloadTimelineRoster();
+    };
+    window.addEventListener("refresh-assignments", onRefreshAssignments);
+    return () => {
+      window.removeEventListener("refresh-assignments", onRefreshAssignments);
+    };
+  });
 
   useEffect(() => {
     try {
@@ -2203,7 +2238,10 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
   const loadTimelineCleaners = async (onLoadComplete?: () => void) => {
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const response = await fetch(withScope(`/api/timeline?date=${dateStr}`));
+      const response = await fetch(withScope(`/api/timeline?date=${dateStr}`), {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+      });
       if (!response.ok) {
         console.warn(`Timeline not found (${response.status}), using empty timeline`);
         setTimelineCleaners([]);
@@ -2533,7 +2571,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             <div>
               <h2 className="text-xl font-bold text-foreground flex items-center">
                 <CalendarIcon className="w-5 h-5 mr-2 text-custom-blue" />
-                {isOfficeScope ? "Timeline Ufficio" : "Timeline Housekeeping"} - {cleaners.length} Cleaners
+                {isOfficeScope ? "Timeline Ufficio" : "Timeline Housekeeping"} - {allCleanersToShow.length} Cleaners
               </h2>
             </div>
             <div className="flex items-center gap-3 print:hidden">
@@ -3419,11 +3457,30 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   aria-hidden
                 />
                 <div className="grid h-full flex-1 grid-cols-[1fr_auto] items-center pl-2 pr-0">
+                  <div className="col-start-2 flex items-center gap-3 justify-self-end print:hidden">
+                    {onOperationalDayToggle && (
+                      <div className="flex items-center gap-2">
+                        <Label
+                          htmlFor="operational-day-switch"
+                          className="cursor-pointer whitespace-nowrap text-sm font-medium leading-none text-custom-blue"
+                        >
+                          Inizio giornata operativa
+                        </Label>
+                        <Switch
+                          id="operational-day-switch"
+                          checked={isOperationalDayStarted}
+                          onCheckedChange={(checked) => onOperationalDayToggle(Boolean(checked))}
+                          disabled={isOperationalDaySwitchDisabled}
+                          className="h-6 w-11 border-2 border-custom-blue data-[state=unchecked]:bg-sky-200 data-[state=checked]:bg-[hsl(199,89%,48%)] dark:data-[state=unchecked]:bg-sky-900/50 dark:data-[state=checked]:bg-[hsl(217,91%,53%)]"
+                          data-testid="switch-operational-day"
+                        />
+                      </div>
+                    )}
                   <Button
                     onClick={() => setShowAdamTransferDialog(true)}
                     size="sm"
                     variant="outline"
-                    className="col-start-2 h-[38px] justify-self-end border-2 border-custom-blue px-3"
+                    className="h-[38px] border-2 border-custom-blue px-3"
                     disabled={isReadOnly || !hasTasksInTimeline || isTransferringToAdam}
                     title={
                       isReadOnly
@@ -3443,6 +3500,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     )}
                     {isTransferringToAdam ? "Trasferimento..." : "Trasferisci su ADAM"}
                   </Button>
+                  </div>
                 </div>
                 <div
                   className="pointer-events-none absolute inset-y-0 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap text-sm font-medium leading-none text-slate-600 dark:text-slate-300"

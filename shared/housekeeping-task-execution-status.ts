@@ -32,6 +32,18 @@ export function resolveHousekeepingTaskExecutionStatus(input: {
   return "not_started";
 }
 
+/** ADAM cleaned=1 (o stato completed già risolto): la task non è spostabile da WASS. */
+export function isHousekeepingTaskCleaned(task: unknown): boolean {
+  if (task == null) return false;
+  if (typeof task !== "object") return parseHousekeepingFlag(task);
+  const record = task as {
+    cleaned?: unknown;
+    housekeeping_execution_status?: unknown;
+  };
+  if (record.housekeeping_execution_status === "completed") return true;
+  return parseHousekeepingFlag(record.cleaned);
+}
+
 export function normalizeHousekeepingStartworkAt(value: unknown): string | null {
   if (value == null) return null;
   if (value instanceof Date) {

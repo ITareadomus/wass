@@ -3,6 +3,14 @@ import type { UniqueIdentifier } from "@dnd-kit/core";
 import { SortableItem } from "@/lib/dnd";
 import TaskCard, { type TaskCardProps } from "./task-card";
 import type { AppDndItem } from "@/lib/dnd";
+import { isHousekeepingTaskCleaned } from "@shared/housekeeping-task-execution-status";
+
+function isHousekeepingMoveLocked(
+  task: unknown,
+  operationsScope?: TaskCardProps["operationsScope"],
+): boolean {
+  return operationsScope !== "logistics" && isHousekeepingTaskCleaned(task);
+}
 
 export type SortableTaskCardProps = Omit<
   TaskCardProps,
@@ -29,6 +37,9 @@ export function SortableTaskCard({
   isDragDisabled = false,
   ...taskCardProps
 }: SortableTaskCardProps) {
+  const dragDisabled =
+    isDragDisabled ||
+    isHousekeepingMoveLocked(taskCardProps.task, taskCardProps.operationsScope);
   const sortableData = useMemo(
     () => ({
       ...dndData,
@@ -41,7 +52,7 @@ export function SortableTaskCard({
     <SortableItem
       id={dndId}
       data={sortableData}
-      disabled={isDragDisabled}
+      disabled={dragDisabled}
       disableTransform={disableSortableTransform}
       draggingOpacity={draggingOpacity}
       hideWhileDragging={hideWhileDragging}
@@ -50,7 +61,7 @@ export function SortableTaskCard({
       {({ attributes, listeners, isDragging, setActivatorNodeRef, handleAttributes }) => (
         <TaskCard
           {...taskCardProps}
-          isDragDisabled={isDragDisabled}
+          isDragDisabled={dragDisabled}
           dragWrapper="none"
           externalIsDragging={isDragging}
           externalDragHandleProps={{

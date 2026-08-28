@@ -20,8 +20,6 @@ export interface LockedConflictTask {
 
 export interface AssignmentSyncResult {
   success: boolean;
-  needsUnlockConfirm?: boolean;
-  lockedTasks?: LockedConflictTask[];
   moved?: number;
   assigned?: number;
   /** Tolte dalla timeline (ADAM senza cleaner) e rimesse nei containers. */
@@ -34,6 +32,7 @@ export interface AssignmentSyncResult {
   recalculatedCleaners?: number;
   unlockedTaskIds?: number[];
   autoConvokedCleaners?: number;
+  prunedEmptyCleaners?: number;
   error?: string;
 }
 
@@ -388,6 +387,86 @@ function assignmentDiffers(
   return false;
 }
 
+function countAssignedTasks(entry: any): number {
+  return Array.isArray(entry?.tasks) ? entry.tasks.length : 0;
+}
+
+/**
+ * Rimuove da timeline e convocati i cleaner senza task.
+ * Usato a inizio giornata operativa e dopo ogni sync ADAM con giornata ON.
+ */
+export async function pruneEmptyTimelineCleaners(
+  workDate: string,
+  scope: "housekeeping" | "office" = "housekeeping",
+  modifiedBy: string = "system"
+): Promise<number> {
+  const timelineData =
+    (await workspaceFiles.loadTimeline(workDate, scope)) || {
+      metadata: { date: workDate },
+      cleaners_assignments: [],
+      meta: {},
+    };
+  const selectedData =
+    (await workspaceFiles.loadSelectedCleaners(workDate, scope)) || { cleaners: [] };
+
+  const assignments = Array.isArray(timelineData.cleaners_assignments)
+    ? timelineData.cleaners_assignments
+    : [];
+  const keptAssignments = assignments.filter((entry: any) => countAssignedTasks(entry) > 0);
+  const keepIds = new Set(
+    keptAssignments
+      .map((entry: any) => Number(entry?.cleaner?.id))
+      .filter((id: number) => Number.isFinite(id) && id > 0)
+  );
+  const previousSelected = Array.isArray(selectedData.cleaners) ? selectedData.cleaners : [];
+  const keptSelected = previousSelected.filter((cleaner: any) => keepIds.has(Number(cleaner?.id)));
+  const removed = previousSelected.length - keptSelected.length;
+  const assignmentsChanged = keptAssignments.length !== assignments.length;
+
+  if (removed === 0 && !assignmentsChanged) return 0;
+
+  timelineData.cleaners_assignments = keptAssignments;
+  timelineData.metadata = {
+    ...(timelineData.metadata || {}),
+    date: workDate,
+    last_updated: getRomeTimestamp(),
+  };
+  const assignedTasks = keptAssignments.reduce(
+    (sum: number, entry: any) => sum + countAssignedTasks(entry),
+    0
+  );
+  timelineData.meta = {
+    ...(timelineData.meta || {}),
+    total_cleaners: keptAssignments.length,
+    used_cleaners: keptAssignments.length,
+    assigned_tasks: assignedTasks,
+    total_tasks: assignedTasks,
+  };
+
+  await workspaceFiles.saveTimeline(
+    workDate,
+    timelineData,
+    false,
+    modifiedBy,
+    "prune_empty_operational_day",
+    undefined,
+    scope
+  );
+  await workspaceFiles.saveSelectedCleaners(
+    workDate,
+    {
+      cleaners: keptSelected,
+      total_selected: keptSelected.length,
+      metadata: { date: workDate },
+    },
+    false,
+    modifiedBy,
+    "PRUNE_EMPTY_OPERATIONAL_DAY",
+    scope
+  );
+  return removed;
+}
+
 /**
  * Porta la timeline WASS allo stato corrente di ADAM (cleaner, sequenza, collaborazioni).
  *
@@ -399,13 +478,12 @@ function assignmentDiffers(
  *   (i containers coprono solo le operazioni enable_wass, vedi create_containers.py).
  *
  * Fuori dal perimetro ADAM della giornata la timeline non viene toccata.
- * ADAM wins. Locked WASS tasks that would move need confirmUnlockLocked.
+ * ADAM wins: locked WASS tasks that would move are unlocked automatically.
  */
 export async function syncTimelineAssignmentsFromAdam(
   workDate: string,
   modifiedBy: string = "system",
-  scope: "housekeeping" | "office" = "housekeeping",
-  options: { confirmUnlockLocked?: boolean } = {}
+  scope: "housekeeping" | "office" = "housekeeping"
 ): Promise<AssignmentSyncResult> {
   try {
     const allAdamRows = await fetchAdamAssignmentsForDate(workDate, scope);
@@ -496,7 +574,7 @@ export async function syncTimelineAssignmentsFromAdam(
 
     const lockedConflicts: LockedConflictTask[] = [];
     // Conflitto solo dentro il perimetro ADAM: una task locked che ADAM ha spostato o
-    // sbiancato va confermata, le altre restano ferme e non richiedono unlock.
+    // sbiancato viene sbloccata automaticamente (comanda ADAM).
     for (const [taskId, desired] of adamById.entries()) {
       const lock = locksMap.get(taskId);
       if (!lock?.locked) continue;
@@ -523,17 +601,12 @@ export async function syncTimelineAssignmentsFromAdam(
       });
     }
 
-    if (lockedConflicts.length > 0 && !options.confirmUnlockLocked) {
-      return {
-        success: true,
-        needsUnlockConfirm: true,
-        lockedTasks: lockedConflicts,
-      };
-    }
-
     const unlockedTaskIds: number[] = [];
-    if (lockedConflicts.length > 0 && options.confirmUnlockLocked) {
+    if (lockedConflicts.length > 0) {
       const ids = lockedConflicts.map((t) => t.task_id);
+      console.log(
+        `🔓 Sync ADAM ${workDate}: sblocco automatico ${ids.length} task locked (comanda ADAM)`
+      );
       await pgDailyAssignmentsService.bulkUpdateTaskLockStatus(
         workDate,
         ids,
@@ -814,6 +887,26 @@ export async function syncTimelineAssignmentsFromAdam(
       });
     }
 
+    const operationalDayStarted = await pgDailyAssignmentsService.isOperationalDayStarted(
+      workDate,
+      scope
+    );
+    let prunedEmptyCleaners = 0;
+    if (operationalDayStarted) {
+      for (const [cleanerId, entry] of Array.from(cleanerEntryById.entries())) {
+        if (countAssignedTasks(entry) > 0) continue;
+        cleanerEntryById.delete(cleanerId);
+        if (selectedById.delete(cleanerId) || initiallySelected.has(cleanerId)) {
+          prunedEmptyCleaners += 1;
+        }
+      }
+      for (const cleanerId of Array.from(selectedById.keys())) {
+        if (cleanerEntryById.has(cleanerId)) continue;
+        selectedById.delete(cleanerId);
+        prunedEmptyCleaners += 1;
+      }
+    }
+
     timelineData.cleaners_assignments = Array.from(cleanerEntryById.values());
     timelineData.metadata = {
       ...(timelineData.metadata || {}),
@@ -941,7 +1034,12 @@ export async function syncTimelineAssignmentsFromAdam(
     const autoConvokedCleaners = mergedCleaners.filter(
       (c: any) => !initiallySelected.has(Number(c.id))
     ).length;
-    if (autoConvokedCleaners > 0) {
+    const selectedChanged =
+      autoConvokedCleaners > 0 ||
+      prunedEmptyCleaners > 0 ||
+      mergedCleaners.length !== initiallySelected.size ||
+      mergedCleaners.some((c: any) => !initiallySelected.has(Number(c.id)));
+    if (selectedChanged) {
       await workspaceFiles.saveSelectedCleaners(
         workDate,
         {
@@ -957,7 +1055,7 @@ export async function syncTimelineAssignmentsFromAdam(
     }
 
     console.log(
-      `✅ Sync assegnazioni ADAM→WASS ${workDate}: moved=${moved}, assigned=${assigned}, unassigned=${unassigned}, removedUnhandled=${removedUnhandled}, skipped=${skippedReadonlyTaskIds.length}, recalc=${recalculatedCleaners}`
+      `✅ Sync assegnazioni ADAM→WASS ${workDate}: moved=${moved}, assigned=${assigned}, unassigned=${unassigned}, removedUnhandled=${removedUnhandled}, skipped=${skippedReadonlyTaskIds.length}, recalc=${recalculatedCleaners}, prunedEmpty=${prunedEmptyCleaners}`
     );
 
     return {
@@ -971,6 +1069,7 @@ export async function syncTimelineAssignmentsFromAdam(
       recalculatedCleaners,
       unlockedTaskIds,
       autoConvokedCleaners,
+      prunedEmptyCleaners,
     };
   } catch (error: any) {
     console.error("❌ syncTimelineAssignmentsFromAdam:", error);

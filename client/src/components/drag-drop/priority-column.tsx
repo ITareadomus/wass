@@ -2,7 +2,7 @@ import { TaskType as Task } from "@shared/schema";
 import { isWorkDateHistoricallyLocked } from "@shared/work-date-access";
 import DraggableTaskCard from "./draggable-task-card";
 import { ContainerTaskClip } from "./container-task-clip";
-import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare } from "lucide-react";
+import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -50,6 +50,9 @@ interface PriorityColumnProps {
   /** Dopo mutazione tipologia logistica (container o timeline). */
   onLogisticsTimelineMutated?: () => void;
   className?: string;
+  /** Overlay blur contenuto (il bordo blu resta visibile, come in timeline). */
+  isContentLoading?: boolean;
+  loadingMessage?: string;
 }
 
 export default function PriorityColumn({
@@ -68,6 +71,8 @@ export default function PriorityColumn({
   operationsScope = "housekeeping",
   onLogisticsTimelineMutated,
   className,
+  isContentLoading = false,
+  loadingMessage,
 }: PriorityColumnProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isHistoricalDateLocked, setIsHistoricalDateLocked] = useState(false);
@@ -409,10 +414,20 @@ export default function PriorityColumn({
     <div
       className={cn(
         getColumnClass(priority, tasks),
-        "min-w-0 overflow-visible rounded-lg border-2 p-4",
+        "relative min-w-0 overflow-visible rounded-lg border-2 p-4",
         className
       )}
     >
+      {isContentLoading && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center rounded-lg bg-black/20 backdrop-blur-sm dark:bg-black/40">
+          {loadingMessage ? (
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
+              <p className="text-sm font-medium text-foreground">{loadingMessage}</p>
+            </div>
+          ) : null}
+        </div>
+      )}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-semibold flex items-center text-custom-blue">

@@ -352,7 +352,7 @@
     overflow-x: auto;
     overflow-y: hidden;
     overscroll-behavior-x: contain;
-    scrollbar-gutter: stable;
+    scrollbar-gutter: auto;
     scrollbar-width: thin;
     scrollbar-color: hsl(215 20% 65%) hsl(210 40% 96%);
   }

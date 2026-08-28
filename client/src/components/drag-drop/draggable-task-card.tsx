@@ -7,6 +7,7 @@ import {
   appDndDraggableAttributes,
   appDndHandleAttributes,
 } from "@/lib/dnd";
+import { isHousekeepingTaskCleaned } from "@shared/housekeeping-task-execution-status";
 
 const getTaskSurfaceRect = (node: HTMLElement | null) => {
   const surface = node?.querySelector<HTMLElement>('[data-dnd-task-card-surface="true"]');
@@ -38,6 +39,10 @@ export function DraggableTaskCard({
   ...taskCardProps
 }: DraggableTaskCardProps) {
   const nodeRef = useRef<HTMLDivElement | null>(null);
+  const dragDisabled =
+    isDragDisabled ||
+    (taskCardProps.operationsScope !== "logistics" &&
+      isHousekeepingTaskCleaned(taskCardProps.task));
   const data = useMemo<AppDndItem>(
     () => ({
       ...dndData,
@@ -49,7 +54,7 @@ export function DraggableTaskCard({
   const draggable = useDraggable({
     id: dndId,
     data,
-    disabled: isDragDisabled,
+    disabled: dragDisabled,
   });
 
   return (
@@ -67,7 +72,7 @@ export function DraggableTaskCard({
     >
       <TaskCard
         {...taskCardProps}
-        isDragDisabled={isDragDisabled}
+        isDragDisabled={dragDisabled}
         dragWrapper="none"
         externalIsDragging={draggable.isDragging}
         externalDragHandleProps={{
