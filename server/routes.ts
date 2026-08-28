@@ -784,6 +784,17 @@ function toMinutesHHmm(value: string): number {
   return hh * 60 + mm;
 }
 
+function minutesToHHmm(totalMinutes: number): string {
+  const clamped = Math.max(0, Math.min(23 * 60 + 30, Math.round(totalMinutes)));
+  const hh = Math.floor(clamped / 60);
+  const mm = clamped % 60;
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
+function snapToHalfHourMinutes(totalMinutes: number): number {
+  return Math.round(totalMinutes / 30) * 30;
+}
+
 /**
  * Helper: Load cleaner start_time from PostgreSQL (selected cleaners)
  * Falls back to filesystem if PostgreSQL fails
@@ -1116,6 +1127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await pgDailyAssignmentsService.ensureCleanerAliasesAndRevisionsTables();
     await pgDailyAssignmentsService.ensureLockedColumns();
     await pgDailyAssignmentsService.ensureCustomerNoteColumns();
+    await pgDailyAssignmentsService.ensureManualStartTimeColumn();
     await pgDailyAssignmentsService.ensureTaskLocksTable();
     await pgDailyAssignmentsService.ensureOperationalDayTable();
     await pgDailyAssignmentsService.ensureDailyAssignmentsRevisionsScopeUnique();
@@ -7967,6 +7979,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ success: false, error: "Task non trovata" });
       }
 
+      // Checkout/checkin/durata cambiano i vincoli di scheduling. Le task assegnate
+      // vivono solo in timeline (non nei containers): senza ricalcolo restano gli
+      // start_time vecchi, e senza reclassify HP/LP restano bloccate alla finestra
+      // delle 11:00 anche se il checkout è stato anticipato (es. 11 → 9).
+      const scheduleAffectingFields = new Set([
+        "checkout_time",
+        "checkout_date",
+        "checkin_time",
+        "checkin_date",
+        "cleaning_time",
+      ]);
+      const needsScheduleRecalc = editedFields.some((field) => scheduleAffectingFields.has(field));
+
+      if (needsScheduleRecalc && Array.isArray(timelineData.cleaners_assignments)) {
+        for (const cleanerEntry of timelineData.cleaners_assignments) {
+          for (const task of cleanerEntry.tasks || []) {
+            if (!taskMatchesEditTarget(task)) continue;
+            try {
+              task.priority = classifyContainerPriority(task, prioritySettings);
+            } catch (classifyError: any) {
+              console.warn(
+                `⚠️ Reclassify priorità fallita per task ${task?.task_id}: ${classifyError?.message || classifyError}`
+              );
+            }
+          }
+        }
+
+        for (const cleanerEntry of timelineData.cleaners_assignments) {
+          const tasks = cleanerEntry.tasks;
+          if (!Array.isArray(tasks) || tasks.length === 0) continue;
+          if (!tasks.some((task: any) => taskMatchesEditTarget(task))) continue;
+          try {
+            await hydrateTasksFromContainers(cleanerEntry, workDate);
+            const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate);
+            cleanerEntry.tasks = updatedCleanerData.tasks || cleanerEntry.tasks;
+            normalizeTaskSequence(cleanerEntry.tasks);
+            console.log(
+              `✅ Tempi ricalcolati dopo edit dettagli per cleaner ${cleanerEntry?.cleaner?.id}`
+            );
+          } catch (pythonError: any) {
+            console.error(
+              `⚠️ Errore nel ricalcolo tempi dopo edit dettagli task, continuo senza ricalcolare:`,
+              pythonError.message
+            );
+            normalizeTaskSequence(cleanerEntry.tasks);
+          }
+        }
+      }
+
       // Prepara opzioni di tracking per history
       const editOptions = editedFields.length > 0 ? {
         editedField: editedFields.join(', '),
@@ -10362,6 +10423,129 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       res.json({ success: true, message: "Task riordinata con successo" });
     } catch (error: any) {
       console.error("Errore nel reorder della timeline:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Sposta l'inizio del primo appartamento (scatti da 30 min) senza toccare checkin/checkout.
+  app.post("/api/reschedule-first-task", async (req, res) => {
+    try {
+      const { date, cleanerId, taskId, startTime } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const cleanerIdNum = Number(cleanerId);
+      const clearOverride = startTime === null || startTime === "";
+
+      if (!Number.isFinite(cleanerIdNum) || !taskId) {
+        return res.status(400).json({
+          success: false,
+          error: "cleanerId e taskId sono richiesti",
+        });
+      }
+      if (!clearOverride && (typeof startTime !== "string" || !isValidHHmm(startTime))) {
+        return res.status(400).json({
+          success: false,
+          error: "startTime deve essere HH:mm oppure null per resettare",
+        });
+      }
+
+      const scopeValue = resolveScopeFromReq(req);
+      const timelineData = await workspaceFiles.loadTimeline(workDate, scopeValue);
+      if (!timelineData?.cleaners_assignments) {
+        return res.status(404).json({ success: false, error: "Timeline non trovata" });
+      }
+
+      const cleanerEntry = timelineData.cleaners_assignments.find(
+        (entry: any) => Number(entry?.cleaner?.id) === cleanerIdNum
+      );
+      if (!cleanerEntry || !Array.isArray(cleanerEntry.tasks) || cleanerEntry.tasks.length === 0) {
+        return res.status(404).json({ success: false, error: "Cleaner non trovato" });
+      }
+
+      const firstTask = cleanerEntry.tasks[0];
+      if (String(firstTask?.task_id ?? firstTask?.id ?? "") !== String(taskId)) {
+        return res.status(400).json({
+          success: false,
+          error: "Si può spostare solo il primo appartamento del cleaner",
+        });
+      }
+      if (isReadonlyPreassignedTask(firstTask)) {
+        return res.status(423).json({
+          success: false,
+          error: "PREASSIGNED_READONLY",
+          message: "Task pre-assegnata readonly: operazione non consentita",
+        });
+      }
+
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const isLocked = await pgDailyAssignmentsService.isTaskLocked(workDate, Number(taskId));
+      if (isLocked) {
+        return res.status(423).json({
+          success: false,
+          error: "TASK_LOCKED",
+          message: "Task bloccata: impossibile spostare l'orario",
+        });
+      }
+
+      const previousStart = firstTask.start_time ?? null;
+      const previousManual = firstTask.manual_start_time ?? null;
+
+      if (clearOverride) {
+        firstTask.manual_start_time = null;
+      } else {
+        const cleanerStartMin = toMinutesHHmm(cleanerEntry.cleaner?.start_time || "10:00");
+        const cleanerEndMin = toMinutesHHmm(cleanerEntry.cleaner?.end_time || "20:00");
+        const maxStart = Math.max(cleanerStartMin, cleanerEndMin - 30);
+        let minutes = toMinutesHHmm(startTime);
+        if (minutes !== cleanerStartMin) {
+          minutes = snapToHalfHourMinutes(minutes);
+        }
+        const clamped = Math.max(cleanerStartMin, Math.min(maxStart, minutes));
+        firstTask.manual_start_time = minutesToHHmm(clamped);
+      }
+
+      try {
+        await hydrateTasksFromContainers(cleanerEntry, workDate);
+        const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate);
+        cleanerEntry.tasks = updatedCleanerData.tasks || cleanerEntry.tasks;
+        normalizeTaskSequence(cleanerEntry.tasks);
+      } catch (pythonError: any) {
+        console.error(
+          "⚠️ Errore nel ricalcolo tempi dopo reschedule primo apt:",
+          pythonError.message
+        );
+        normalizeTaskSequence(cleanerEntry.tasks);
+      }
+
+      const modifyingUser = req.body.modified_by || getCurrentUsername(req);
+      timelineData.metadata = timelineData.metadata || {};
+      timelineData.metadata.last_updated = getRomeTimestamp();
+      timelineData.metadata.date = workDate;
+      if (!timelineData.metadata.created_by) {
+        timelineData.metadata.created_by = modifyingUser;
+      }
+
+      await workspaceFiles.saveTimeline(
+        workDate,
+        timelineData,
+        false,
+        modifyingUser,
+        clearOverride ? "first_task_start_reset" : "first_task_reschedule",
+        {
+          editedField: "manual_start_time",
+          oldValue: String(previousManual ?? previousStart ?? ""),
+          newValue: clearOverride ? "auto" : String(firstTask.manual_start_time ?? startTime),
+        },
+        scopeValue
+      );
+
+      const updatedFirst = cleanerEntry.tasks?.[0];
+      res.json({
+        success: true,
+        start_time: updatedFirst?.start_time ?? firstTask.manual_start_time,
+        manual_start_time: updatedFirst?.manual_start_time ?? firstTask.manual_start_time,
+      });
+    } catch (error: any) {
+      console.error("Errore nel reschedule del primo appartamento:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });

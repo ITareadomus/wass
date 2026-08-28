@@ -112,7 +112,7 @@ export const getContainerData = (
 
 const COMPACT_TIMELINE_TASK_MIN_WIDTH_PX = 56;
 
-const getCompactTimelineTaskWidthPx = () => {
+export const getCompactTimelineTaskWidthPx = () => {
   if (typeof window === "undefined") return COMPACT_TIMELINE_TASK_MIN_WIDTH_PX;
   const ppm = Number((window as { timelinePxPerMinute?: number }).timelinePxPerMinute);
   if (Number.isFinite(ppm) && ppm > 0) {
@@ -134,7 +134,8 @@ type ActiveCardRect = {
 
 /**
  * Rect della card trascinata (non il cursore).
- * In HK timeline l'overlay è 15' allineato a sinistra del rect misurato.
+ * Overlay 15' allineato a sinistra del rect misurato (HK e logistica, timeline
+ * o assign da container). Lo slot di insert segue questo rect.
  * Se c'è uno snap riga (saltello), la Y segue la riga snappata — così dopo un
  * hop puoi riordinare in X sulla nuova riga nella stessa gesture.
  */
@@ -145,24 +146,32 @@ const getActiveCardRect = (args: CollisionArgs): ActiveCardRect | null => {
   if (!base) return null;
 
   const activeData = args.active.data.current;
+  const isPriorityDrag =
+    isAppDndItem(activeData) && activeData.from.type === "priority";
   // Timeline source o assign da priority: overlay/collision usano la card a 15'.
   const isCompactTimelineDrag =
     isAppDndItem(activeData) &&
     (activeData.scope === "housekeeping" || activeData.scope === "logistics") &&
-    (activeData.from.type === "timeline" ||
-      activeData.from.type === "priority");
+    (activeData.from.type === "timeline" || isPriorityDrag);
 
+  const compactWidth = getCompactTimelineTaskWidthPx();
+  const compactHeight = 40;
   // Se il node sorgente è stato alterato, preferisci la larghezza iniziale.
   const measuredWidth =
     base.width > 1 ? base.width : (initial?.width ?? base.width);
+  const measuredHeight =
+    base.height > 1 ? base.height : (initial?.height ?? compactHeight);
   const width = isCompactTimelineDrag
-    ? Math.min(measuredWidth, getCompactTimelineTaskWidthPx())
+    ? Math.min(measuredWidth, compactWidth)
     : measuredWidth;
-  const height =
-    base.height > 1 ? base.height : (initial?.height ?? 40);
+  const height = isPriorityDrag && isCompactTimelineDrag
+    ? Math.min(measuredHeight, compactHeight)
+    : measuredHeight;
 
+  const left = base.left;
   let top = base.top;
-  let centerY = base.top + height / 2;
+
+  let centerY = top + height / 2;
 
   // Solo timeline: allinea Y al centro riga dopo un hop (insert è sull'asse X).
   // Sul summary l'insert è verticale — non sovrascrivere centerY o l'indice resta
@@ -182,13 +191,13 @@ const getActiveCardRect = (args: CollisionArgs): ActiveCardRect | null => {
   }
 
   return {
-    left: base.left,
-    right: base.left + width,
+    left,
+    right: left + width,
     top,
     bottom: top + height,
     width,
     height,
-    centerX: base.left + width / 2,
+    centerX: left + width / 2,
     centerY,
   };
 };
@@ -571,7 +580,7 @@ const sortDroppablesByItemIndex = (
   });
 
 /**
- * Pick the sortable `over` item from pointer vs item midpoints.
+ * Pick the sortable `over` item from card center vs item midpoints.
  * Crossing an item's center moves the insert slot (and sortable transforms)
  * left or right — unlike closestCenter, which sticks until the next center.
  */
@@ -740,6 +749,26 @@ export const timelineFirstCollisionDetection: CollisionDetection = (args) => {
   const removeZone = findContainerUnderPointer(args, "remove-zone");
   if (removeZone) {
     return [removeZone];
+  }
+
+  const activeData = args.active.data.current;
+  const isPrioritySource =
+    isAppDndItem(activeData) && activeData.from.type === "priority";
+
+  // Assign da container: la timeline ha priorità sul container sorgente,
+  // così shrink + gap di insert si attivano appena la card è sulla riga.
+  if (isPrioritySource) {
+    const sortContainer = findSortContainerUnderPointer(args);
+    if (sortContainer) {
+      const midpointCollision = findMidpointSortableCollision(
+        args,
+        sortContainer,
+      );
+      if (midpointCollision) {
+        return [midpointCollision];
+      }
+      return [sortContainerCollision(sortContainer)];
+    }
   }
 
   const priorityContainer = findContainerUnderPointer(args, "priority");

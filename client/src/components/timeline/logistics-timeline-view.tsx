@@ -1686,7 +1686,7 @@ export default function LogisticsTimelineView({
         )}
       >
         {(isLoadingOverlay || removeSelectedDriversMutation.isPending || isAddingDriverToTimeline) && (
-          <div className="absolute inset-0 bg-black/20 dark:bg-black/40 rounded-lg flex items-center justify-center z-40 backdrop-blur-sm pointer-events-none">
+          <div className="absolute inset-0 z-50 rounded-lg bg-black/20 backdrop-blur-sm pointer-events-none dark:bg-black/40 flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
               <p className="text-sm font-medium text-foreground">
@@ -2090,14 +2090,20 @@ export default function LogisticsTimelineView({
                                 timelineWidth
                               );
 
-                              // Optimistic cross-driver: spacer invisibile sulla riga target
-                              // (il SortableContext non anima item di un altro container).
-                              const isCrossDriverTargetRow =
+                              // Optimistic insert gap sulla riga target quando l'item
+                              // non è nel SortableContext (cross-driver o assign da container).
+                              const isExternalAssignTargetRow =
                                 hideRouteSpacers &&
                                 draggingOverDriverId === driver.id &&
-                                activeDragDriverId != null &&
-                                activeDragDriverId !== driver.id &&
+                                activeDragDriverId == null &&
                                 lastValidDragIndex != null;
+                              const isCrossDriverTargetRow =
+                                (hideRouteSpacers &&
+                                  draggingOverDriverId === driver.id &&
+                                  activeDragDriverId != null &&
+                                  activeDragDriverId !== driver.id &&
+                                  lastValidDragIndex != null) ||
+                                isExternalAssignTargetRow;
                               const isCrossDriverSourceRow =
                                 hideRouteSpacers &&
                                 activeDragDriverId === driver.id &&
@@ -2307,47 +2313,43 @@ export default function LogisticsTimelineView({
               })
             )}
 
-            {/* Scrollbar + pulsante +: stessa riga */}
+            {/* Scrollbar (solo se serve) + riga + / Salvato / Invia */}
             <div className="relative z-20 -mx-1 flex shrink-0 flex-col bg-custom-blue-light">
               <TimelineHorizontalScrollbar
                 labelColumnWidth={driverColumnWidth}
                 contentWidth={timelineScaledWidth}
                 registerRef={registerTimelineScrollRef}
                 onScroll={handleTimelineScroll}
-                labelContent={
-                  <>
-                    <div
-                      aria-hidden
-                      className="pointer-events-none absolute inset-0 z-0"
-                    >
-                      <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
-                        <path
-                          d="M0,0 C16,0 30,4 44,12 C54,18 60,24 68,28 C72,30 76,31 80,31 C84,31 88,30 92,28 C100,24 106,18 116,12 C130,4 144,0 160,0 Z"
-                          fill="rgba(59,130,246,0.12)"
-                        />
-                      </svg>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={isReadOnly}
-                      className="absolute inset-0 z-10 h-full w-full rounded-none border-0 bg-transparent p-0 text-custom-blue hover:bg-transparent hover:text-custom-blue dark:hover:text-custom-blue"
-                      aria-label="Aggiungi driver"
-                      title="Aggiungi driver"
-                      onClick={() => void handleOpenAddDriverDialog(null)}
-                    >
-                      <UserPlus className="w-4 h-4" />
-                    </Button>
-                  </>
-                }
               />
               <div className="relative flex h-[40px] shrink-0 items-stretch px-1">
                 <div
-                  className="flex-shrink-0 print:hidden"
+                  className="relative flex-shrink-0 overflow-visible print:hidden"
                   style={{ width: `${driverColumnWidth}px` }}
-                  aria-hidden
-                />
+                >
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 z-0"
+                  >
+                    <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
+                      <path
+                        d="M0,0 C16,0 30,4 44,12 C54,18 60,24 68,28 C72,30 76,31 80,31 C84,31 88,30 92,28 C100,24 106,18 116,12 C130,4 144,0 160,0 Z"
+                        fill="rgba(59,130,246,0.12)"
+                      />
+                    </svg>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={isReadOnly}
+                    className="absolute inset-0 z-10 h-full w-full rounded-none border-0 bg-transparent p-0 text-custom-blue hover:bg-transparent hover:text-custom-blue dark:hover:text-custom-blue"
+                    aria-label="Aggiungi driver"
+                    title="Aggiungi driver"
+                    onClick={() => void handleOpenAddDriverDialog(null)}
+                  >
+                    <UserPlus className="w-4 h-4" />
+                  </Button>
+                </div>
                 <div className="grid h-full flex-1 grid-cols-[1fr_auto] items-center pl-2 pr-0">
                   <Button
                     onClick={() => setShowAdamTransferDialog(true)}

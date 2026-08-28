@@ -1,6 +1,7 @@
-import type {
-  HousekeepingTaskExecutionStatus,
-  HousekeepingWorkProgress,
+import {
+  parseHousekeepingStartworkAtMs,
+  type HousekeepingTaskExecutionStatus,
+  type HousekeepingWorkProgress,
 } from "@shared/housekeeping-task-execution-status";
 import {
   EXECUTION_IN_PROGRESS_SURFACE_CLASS,
@@ -30,10 +31,23 @@ export const HOUSEKEEPING_PROGRESS_ADVANCED_CLASS =
 
 export const HOUSEKEEPING_PROGRESS_SURFACE_CLASS = EXECUTION_IN_PROGRESS_SURFACE_CLASS;
 
+function formatHousekeepingStartworkAt(value: unknown): string | null {
+  const ms = parseHousekeepingStartworkAtMs(value);
+  if (ms == null) return null;
+  return new Intl.DateTimeFormat("it-IT", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Europe/Rome",
+  }).format(new Date(ms));
+}
+
 export function HousekeepingWorkProgressLine({
   progress,
+  startworkAt,
 }: {
   progress: HousekeepingWorkProgress;
+  startworkAt?: unknown;
 }) {
   const percentLabel = `${Math.round(progress.percent)}%`;
   const remainingLabel = progress.overdue
@@ -41,6 +55,7 @@ export function HousekeepingWorkProgressLine({
     : progress.remainingMinutes === 1
       ? "Resta 1 min"
       : `Restano ${progress.remainingMinutes} min`;
+  const startedAtLabel = formatHousekeepingStartworkAt(startworkAt);
 
   return (
     <div className="space-y-1.5" data-testid="housekeeping-work-progress">
@@ -72,14 +87,24 @@ export function HousekeepingWorkProgressLine({
             style={{ width: `${progress.percent}%` }}
           />
         </div>
-        <p
-          className={cn(
-            "text-sm tabular-nums",
-            progress.overdue ? "font-semibold text-green-700 dark:text-green-300" : "text-muted-foreground"
+        <div className="flex items-start justify-between gap-3">
+          <p
+            className={cn(
+              "text-sm tabular-nums",
+              progress.overdue ? "font-semibold text-green-700 dark:text-green-300" : "text-muted-foreground"
+            )}
+          >
+            {remainingLabel}
+          </p>
+          {startedAtLabel && (
+            <p
+              className="text-right text-sm tabular-nums text-muted-foreground"
+              data-testid="housekeeping-started-at"
+            >
+              Started at: {startedAtLabel}
+            </p>
           )}
-        >
-        {remainingLabel}
-      </p>
+        </div>
     </div>
   );
 }

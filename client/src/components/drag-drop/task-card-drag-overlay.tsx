@@ -6,6 +6,7 @@ import {
   getTaskDndKey,
   type ActiveDndRect,
   type AppDndItem,
+  type DndInsertTarget,
   type DndScope,
 } from "@/lib/dnd";
 import TaskCard from "./task-card";
@@ -24,6 +25,7 @@ type TaskCardDragOverlayProps = {
   activeItem: AppDndItem | null;
   activeDragTask?: unknown;
   activeRect?: ActiveDndRect | null;
+  insertTarget?: DndInsertTarget | null;
   tasks: readonly Task[];
   scope: DndScope;
   modifiers?: Modifier[];
@@ -34,6 +36,7 @@ export function TaskCardDragOverlay({
   activeItem,
   activeDragTask,
   activeRect,
+  insertTarget = null,
   tasks,
   scope,
   modifiers,
@@ -64,10 +67,11 @@ export function TaskCardDragOverlay({
     return Number.isFinite(value) && value > 0 ? value : null;
   })();
 
-  // HK: overlay a 15' per drag da timeline e da container (assign),
-  // allineato al rect della card — niente snap al cursore.
-  const useCompactHkTimelineOverlay =
-    scope === "housekeeping" && (isTimelineDrag || isPriorityDrag);
+  // Overlay a 15' in timeline (drag interno) e appena la card entra
+  // su una riga timeline durante un assign da container.
+  const isOverTimeline = insertTarget?.container.type === "timeline";
+  const useCompactTimelineOverlay =
+    isTimelineDrag || (isPriorityDrag && isOverTimeline);
   const compactTimelinePxPerMinute =
     liveTimelinePxPerMinute ?? (scope === "logistics" ? 4 : 2.5);
   const compactOverlayWidthPx = Math.max(
@@ -76,14 +80,14 @@ export function TaskCardDragOverlay({
   );
   const compactOverlayHeightPx = 40;
 
-  const overlayWidth = useCompactHkTimelineOverlay
+  const overlayWidth = useCompactTimelineOverlay
     ? compactOverlayWidthPx
     : measuredOverlayWidth;
-  const renderedOverlayHeight = useCompactHkTimelineOverlay
+  const renderedOverlayHeight = useCompactTimelineOverlay
     ? compactOverlayHeightPx
     : overlayHeight;
 
-  const treatAsTimelineCard = isTimelineDrag || useCompactHkTimelineOverlay;
+  const treatAsTimelineCard = isTimelineDrag || useCompactTimelineOverlay;
 
   return (
     <DragOverlay adjustScale={false} dropAnimation={null} modifiers={modifiers}>
@@ -109,7 +113,7 @@ export function TaskCardDragOverlay({
             height: renderedOverlayHeight,
             minWidth:
               treatAsTimelineCard &&
-              (scope === "logistics" || useCompactHkTimelineOverlay)
+              (scope === "logistics" || useCompactTimelineOverlay)
                 ? 56
                 : undefined,
             minHeight: treatAsTimelineCard ? 40 : undefined,
@@ -130,15 +134,15 @@ export function TaskCardDragOverlay({
             dragWrapper="none"
             externalIsDragging
             operationsScope={scope}
-            compactAdamTimelineUi={useCompactHkTimelineOverlay}
+            compactAdamTimelineUi={useCompactTimelineOverlay}
             dragOverlayWidthPx={overlayWidth}
             timelinePxPerMinute={
-              useCompactHkTimelineOverlay || scope === "logistics"
+              useCompactTimelineOverlay || scope === "logistics"
                 ? compactTimelinePxPerMinute
                 : 2.5
             }
             minTimelineTaskWidthPx={
-              useCompactHkTimelineOverlay || scope === "logistics" ? 56 : 72
+              useCompactTimelineOverlay || scope === "logistics" ? 56 : 72
             }
             onLogisticsTimelineMutated={onLogisticsTimelineMutated}
           />

@@ -339,6 +339,7 @@ function cloneTaskPayload(source: any, overrides: Record<string, any> = {}): any
     sequence: 0,
     travel_time: 0,
     manually_moved: false,
+    manual_start_time: source.manual_start_time ?? null,
     ...overrides,
   };
 }

@@ -109,6 +109,7 @@ export interface PgDailyAssignmentRow {
   followup?: boolean | null;
   sequence: number;
   travel_time: number;
+  manual_start_time?: string | null;
   manually_moved?: boolean;
   created_at?: Date;
   updated_at?: Date;
@@ -309,6 +310,23 @@ export class PgDailyAssignmentsService {
       console.log('✅ PG: Colonna customer_note verificata su current/history HK+LG');
     } catch (error) {
       console.warn('⚠️ PG: ensureCustomerNoteColumns:', error);
+    }
+  }
+
+  /**
+   * Manual first-apartment start override (timeline 30-min drag).
+   */
+  async ensureManualStartTimeColumn(): Promise<void> {
+    try {
+      await query(
+        `ALTER TABLE IF EXISTS daily_assignments_current ADD COLUMN IF NOT EXISTS manual_start_time VARCHAR(10)`
+      );
+      await query(
+        `ALTER TABLE IF EXISTS daily_assignments_history ADD COLUMN IF NOT EXISTS manual_start_time VARCHAR(10)`
+      );
+      console.log('✅ PG: Colonna manual_start_time verificata su assignments current/history');
+    } catch (error) {
+      console.warn('⚠️ PG: ensureManualStartTimeColumn:', error);
     }
   }
 
@@ -1045,6 +1063,7 @@ export class PgDailyAssignmentsService {
           followup: task.followup != null ? Boolean(task.followup) : null,
           sequence: Number(task.sequence || 0),
           travel_time: Number(task.travel_time || 0),
+          manual_start_time: task.manual_start_time ? String(task.manual_start_time).substring(0, 5) : null,
           manually_moved: Boolean(task.manually_moved),
         };
 
@@ -1099,7 +1118,7 @@ export class PgDailyAssignmentsService {
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
             type_apt, alias, customer_name, customer_reference, customer_note, customer_note_history, reasons, manually_moved, priority,
-            start_time, end_time, followup, sequence, travel_time
+            start_time, end_time, followup, sequence, travel_time, manual_start_time
           ) VALUES (
             $1,
             $2, $3, $4, $5, $6, $7, $8, $9,
@@ -1108,7 +1127,7 @@ export class PgDailyAssignmentsService {
             $19, $20, $21, $22,
             $23, $24, $25, $26, $27, $28,
             $29, $30, $31, $32, $33, $34, $35, $36, $37,
-            $38, $39, $40, $41, $42
+            $38, $39, $40, $41, $42, $43
           )
         `, [
           normalizedScope,
@@ -1153,6 +1172,7 @@ export class PgDailyAssignmentsService {
           row.followup,
           row.sequence,
           row.travel_time,
+          row.manual_start_time || null,
         ]);
       }
 
@@ -1331,6 +1351,7 @@ export class PgDailyAssignmentsService {
         if (row.followup !== null) task.followup = row.followup;
         if (row.sequence !== null) task.sequence = row.sequence;
         if (row.travel_time !== null) task.travel_time = row.travel_time;
+        if (row.manual_start_time) task.manual_start_time = String(row.manual_start_time).substring(0, 5);
 
         cleanerMap.get(row.cleaner_id)!.tasks.push(task);
       }
@@ -1483,7 +1504,7 @@ export class PgDailyAssignmentsService {
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
             type_apt, alias, customer_name, customer_reference, customer_note, customer_note_history, reasons, manually_moved, priority,
-            start_time, end_time, followup, sequence, travel_time, created_by
+            start_time, end_time, followup, sequence, travel_time, manual_start_time, created_by
           ) VALUES (
             $1,
             $2, $3, $4, $5, $6, $7, $8, $9, $10,
@@ -1492,7 +1513,7 @@ export class PgDailyAssignmentsService {
             $20, $21, $22, $23,
             $24, $25, $26, $27, $28, $29,
             $30, $31, $32, $33, $34, $35, $36, $37, $38,
-            $39, $40, $41, $42, $43, $44
+            $39, $40, $41, $42, $43, $44, $45
           )
         `, [
           normalizedScope,
@@ -1538,6 +1559,7 @@ export class PgDailyAssignmentsService {
           row.followup,
           row.sequence,
           row.travel_time,
+          row.manual_start_time || null,
           createdBy,
         ]);
       }

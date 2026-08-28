@@ -76,6 +76,7 @@ function getNormalizedTask(task: any): any {
   if (task.followup !== undefined) normalizedTask.followup = task.followup;
   if (task.sequence !== undefined) normalizedTask.sequence = task.sequence;
   if (task.travel_time !== undefined) normalizedTask.travel_time = task.travel_time;
+  if (task.manual_start_time !== undefined) normalizedTask.manual_start_time = task.manual_start_time;
   if (task.checkout_wait_minutes !== undefined) {
     normalizedTask.checkout_wait_minutes = task.checkout_wait_minutes;
   }

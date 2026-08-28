@@ -12,7 +12,7 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext, us
 const DEBUG = false;
 const dlog = (...args: any[]) => DEBUG && console.log(...args);
 import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
-import { CalendarIcon, Users, RefreshCw, Settings, Search, Map as MapIcon, BarChart3, Loader2 } from "lucide-react";
+import { CalendarIcon, Users, RefreshCw, Settings, Search, Map as MapIcon, BarChart3, ChevronUp, ChevronDown } from "lucide-react";
 import TaskCardDragOverlay from "@/components/drag-drop/task-card-drag-overlay";
 import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
 import {
@@ -33,10 +33,23 @@ import { it } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { AssignmentLoadingDialog } from "@/components/dialogs/assignment-loading-dialog";
 import { cn } from "@/lib/utils";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { useToast } from "@/hooks/use-toast";
-import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
+import { isContinuazioneStraordinariaTask, isTaskLocked } from "@/lib/taskValidation";
 import {
   DndRemoveZone,
   useAssignmentDnd,
@@ -58,6 +71,21 @@ type AdamFingerprint = {
   collab_count: number;
   collab_signature_xor: number | null;
   collab_signature_sum: string | number | null;
+};
+
+type AdamRefreshMode = "apt" | "assignments";
+type LockedConflictTask = {
+  task_id: number;
+  logistic_code: number | null;
+  locked_reason: string | null;
+  currentCleanerId: number | null;
+  adamCleanerId: number | null;
+};
+type AdamRefreshOpts = {
+  source?: "auto" | "manual";
+  mode?: AdamRefreshMode;
+  confirmUnlockLocked?: boolean;
+  skipContainersRefresh?: boolean;
 };
 
 function fingerprintsDiffer(a: AdamFingerprint, b: AdamFingerprint): boolean {
@@ -313,6 +341,8 @@ export default function GenerateAssignments() {
   // Traccia il cleaner su cui si sta trascinando per posizionare il placeholder
   const [draggingOverCleanerId, setDraggingOverCleanerId] = useState<number | null>(null);
   const [activeDragCleanerId, setActiveDragCleanerId] = useState<number | null>(null);
+  /** Nasconde i containers e mostra il sommario anche se restano task non locked. */
+  const [containersManuallyCollapsed, setContainersManuallyCollapsed] = useState(false);
 
   // Stati per selezione multipla INDIPENDENTE per container (ma selezione CROSS-CONTAINER)
   const [multiSelectModes, setMultiSelectModes] = useState<{
@@ -547,6 +577,11 @@ export default function GenerateAssignments() {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
   const isRefreshingContainersRef = useRef(false);
+  const [showAdamRefreshDialog, setShowAdamRefreshDialog] = useState(false);
+  const [adamRefreshMode, setAdamRefreshMode] = useState<AdamRefreshMode>("apt");
+  const [showUnlockConfirmDialog, setShowUnlockConfirmDialog] = useState(false);
+  const [pendingLockedTasks, setPendingLockedTasks] = useState<LockedConflictTask[]>([]);
+  const [pendingRefreshMode, setPendingRefreshMode] = useState<AdamRefreshMode>("assignments");
   // Disabilitazione pulsanti Assegna solo dopo aver premuto il pulsante (non per D&D)
   const [hasRunAssignEo, setHasRunAssignEo] = useState(false);
   const [hasRunAssignHp, setHasRunAssignHp] = useState(false);
@@ -565,7 +600,7 @@ export default function GenerateAssignments() {
   const hasAdamUpdatesRef = useRef(false);
   const autoAdamSyncBlockedRef = useRef(false);
   const pendingForcedAdamSyncRef = useRef(false);
-  const runAdamContainersRefreshRef = useRef<(opts?: { source?: "auto" | "manual" }) => Promise<void>>(
+  const runAdamContainersRefreshRef = useRef<(opts?: AdamRefreshOpts) => Promise<void>>(
     async () => {}
   );
 
@@ -625,7 +660,7 @@ export default function GenerateAssignments() {
     if (isRefreshingContainersRef.current || isDraggingRef.current) return;
     if (autoAdamSyncBlockedRef.current) return;
     pendingForcedAdamSyncRef.current = false;
-    void runAdamContainersRefreshRef.current({ source: "auto" });
+    void runAdamContainersRefreshRef.current({ source: "auto", mode: "assignments" });
   }, []);
 
   const handleOperationalDayToggle = useCallback(
@@ -1540,6 +1575,7 @@ export default function GenerateAssignments() {
             startTime: timelineAssignment.start_time || (baseTask as any).startTime,
             endTime: timelineAssignment.end_time || (baseTask as any).endTime,
             travelTime: timelineAssignment.travel_time || 0,
+            manual_start_time: (timelineAssignment as any).manual_start_time ?? null,
             address: timelineAssignment.address || baseTask.address,
             lat: timelineAssignment.lat || baseTask.lat,
             lng: timelineAssignment.lng || baseTask.lng,
@@ -1616,9 +1652,10 @@ export default function GenerateAssignments() {
     await refreshAssignments("manual");
   };
 
-  const runAdamContainersRefresh = async (opts?: { source?: "auto" | "manual" }) => {
+  const runAdamContainersRefresh = async (opts?: AdamRefreshOpts) => {
     if (isRefreshingContainersRef.current) return;
     const source = opts?.source ?? "manual";
+    const mode: AdamRefreshMode = opts?.mode ?? "assignments";
     const year = selectedDate.getFullYear();
     const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
     const day = String(selectedDate.getDate()).padStart(2, "0");
@@ -1626,6 +1663,7 @@ export default function GenerateAssignments() {
 
     isRefreshingContainersRef.current = true;
     setIsRefreshingContainers(true);
+    let keepFrozenForUnlockDialog = false;
     try {
       const response = await fetch("/api/containers/refresh", {
         method: "POST",
@@ -1633,7 +1671,9 @@ export default function GenerateAssignments() {
         body: JSON.stringify({
           date: dateStr,
           scope: scopeValue,
-          mode: "assignments",
+          mode,
+          confirmUnlockLocked: Boolean(opts?.confirmUnlockLocked),
+          skipContainersRefresh: Boolean(opts?.skipContainersRefresh),
         }),
       });
 
@@ -1642,12 +1682,47 @@ export default function GenerateAssignments() {
         throw new Error(result?.error || "Errore durante il refresh");
       }
 
+      if (result.needsUnlockConfirm) {
+        keepFrozenForUnlockDialog = true;
+        setPendingRefreshMode(mode);
+        setPendingLockedTasks(
+          Array.isArray(result.lockedTasks) ? result.lockedTasks : []
+        );
+        setShowUnlockConfirmDialog(true);
+        return;
+      }
+
       const fp = await fetchAdamFingerprint(dateStr);
       if (fp) {
         adamBaselineRef.current = fp;
       }
       hasAdamUpdatesRef.current = false;
       setHasAdamUpdates(false);
+
+      if (source !== "auto") {
+        const sync = result.assignmentSync;
+        const description =
+          mode === "assignments"
+            ? `Dati apt aggiornati. Assegnazioni: ${sync?.assigned ?? 0} aggiunte, ${sync?.moved ?? 0} spostate, ${sync?.unassigned ?? 0} tolte${
+                sync?.removedUnhandled
+                  ? `, ${sync.removedUnhandled} rimosse (tipologia non gestita da WASS)`
+                  : ""
+              }${
+                sync?.skippedReadonly
+                  ? `, ${sync.skippedReadonly} ignorate (tipologia non gestita, cleaner non convocato)`
+                  : ""
+              }. Orari ricalcolati su ${sync?.recalculatedCleaners ?? 0} cleaner.`
+            : "I dati dei task (appartamento) sono stati aggiornati da ADAM";
+
+        toast({
+          variant: "success",
+          title:
+            mode === "assignments"
+              ? "Sincronizzazione ADAM completata"
+              : "Containers aggiornati",
+          description,
+        });
+      }
 
       await reloadAllTasks();
       if (typeof (window as any).reloadTimelineRoster === "function") {
@@ -1671,7 +1746,9 @@ export default function GenerateAssignments() {
       });
     } finally {
       isRefreshingContainersRef.current = false;
-      setIsRefreshingContainers(false);
+      if (!keepFrozenForUnlockDialog) {
+        setIsRefreshingContainers(false);
+      }
     }
   };
   runAdamContainersRefreshRef.current = runAdamContainersRefresh;
@@ -2180,7 +2257,10 @@ export default function GenerateAssignments() {
           pendingRouteSpacerHideRafRef.current = null;
           setActiveDragCleanerId(staffId);
         });
-      } else if (isTimelineOrSummary) {
+      } else if (
+        item.from.type === "timeline" ||
+        item.from.type === "summary"
+      ) {
         setActiveDragCleanerId(item.from.staffId);
       } else {
         setActiveDragCleanerId(null);
@@ -2262,6 +2342,26 @@ export default function GenerateAssignments() {
 
     return { hasEoOnTimeline, hasHpOnTimeline, hasLpOnTimeline };
   }, [allTasksWithAssignments]);
+
+  const hasUnlockedContainerTasks = useMemo(
+    () =>
+      earlyOutTasks.some((task) => !isTaskLocked(task)) ||
+      highPriorityTasks.some((task) => !isTaskLocked(task)) ||
+      lowPriorityTasks.some((task) => !isTaskLocked(task)),
+    [earlyOutTasks, highPriorityTasks, lowPriorityTasks]
+  );
+
+  useEffect(() => {
+    setContainersManuallyCollapsed(false);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (!hasUnlockedContainerTasks) {
+      setContainersManuallyCollapsed(false);
+    }
+  }, [hasUnlockedContainerTasks]);
+
+  const showContainers = hasUnlockedContainerTasks && !containersManuallyCollapsed;
 
   // Definisci la funzione handleDateSelect qui, se non è già definita
   const handleDateSelect = (date: Date | undefined) => {
@@ -2352,7 +2452,7 @@ export default function GenerateAssignments() {
             measuring={{ droppable: { strategy: MeasuringStrategy.WhileDragging } }}
             {...assignmentDnd.handlers}
           >
-            <div className="mb-4 flex items-center gap-3">
+            <div className={cn("flex items-center gap-3", hasUnlockedContainerTasks ? "mb-0" : "mb-4")}>
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-custom-blue" />
                 <Input
@@ -2367,7 +2467,7 @@ export default function GenerateAssignments() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => void runAdamContainersRefresh({ source: "manual" })}
+                onClick={() => setShowAdamRefreshDialog(true)}
                 disabled={isRefreshingContainers || isTimelineReadOnly}
                 className="flex items-center gap-2 rounded-none text-black dark:text-white hover:bg-custom-blue/80 px-3"
                 title={
@@ -2494,7 +2594,33 @@ export default function GenerateAssignments() {
               const highlightedLowPriority = getHighlightedTaskIds(lowPriorityTasks);
 
               return (
+                hasUnlockedContainerTasks && showContainers ? (
                 <div className="mb-4 w-full">
+                  <div className="mt-[17px] flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setContainersManuallyCollapsed(true)}
+                      className="relative z-10 -mb-[2px] inline-flex max-w-full items-center gap-1.5 rounded-t-lg border-2 border-b-0 border-custom-blue bg-custom-blue-light px-2.5 py-1 text-[12px] font-medium leading-tight text-custom-blue after:pointer-events-none after:absolute after:-bottom-[2px] after:left-0 after:right-0 after:h-[2px] after:bg-custom-blue-light"
+                      aria-label="Nascondi containers"
+                    >
+                      <ChevronUp className="h-4 w-4 shrink-0" />
+                      <span>Nascondi containers</span>
+                    </button>
+                  </div>
+                <div className="relative w-full">
+                  {isRefreshingContainers && (
+                    <div className="absolute inset-0 z-40 flex items-center justify-center rounded-lg bg-black/20 backdrop-blur-sm dark:bg-black/40">
+                      <div className="flex flex-col items-center gap-3">
+                        <RefreshCw className="h-8 w-8 animate-spin text-custom-blue" />
+                        <p className="text-sm font-medium text-foreground">
+                          Aggiornamento da ADAM in corso…
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Non spostare task finché non termina
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 w-full">
                   <PriorityColumn
                     title="EARLY OUT"
@@ -2535,14 +2661,30 @@ export default function GenerateAssignments() {
                     containerMultiSelectState={getContainerMultiSelectState('low_priority')}
                     highlightedTaskIds={highlightedLowPriority}
                     isContentLoading={isRefreshingContainers}
+                    className="rounded-tr-none"
                   />
                 </div>
                 </div>
+                </div>
+                ) : null
               );
             })()}
 
           <div className="mt-0 grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-3">
+              {hasUnlockedContainerTasks && !showContainers && (
+                <div className="mt-[17px] flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setContainersManuallyCollapsed(false)}
+                    className="relative z-10 -mb-[2px] inline-flex items-center gap-1 rounded-t-lg border-2 border-b-0 border-custom-blue bg-custom-blue-light px-2.5 py-1 text-custom-blue after:pointer-events-none after:absolute after:-bottom-[2px] after:left-0 after:right-0 after:h-[2px] after:bg-custom-blue-light"
+                    aria-label="Mostra containers"
+                    title="Mostra containers"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
               {/* Timeline View */}
               <div data-print-timeline className="relative">
                 <TimelineView
@@ -2570,6 +2712,11 @@ export default function GenerateAssignments() {
                   isOperationalDayStarted={isOperationalDayStarted}
                   onOperationalDayToggle={(started) => void handleOperationalDayToggle(started)}
                   isOperationalDaySwitchDisabled={isTimelineReadOnly || isSavingOperationalDay}
+                  className={
+                    hasUnlockedContainerTasks && !showContainers
+                      ? "rounded-tr-none"
+                      : undefined
+                  }
                 />
                 <TimelineFloatingPanel
                   side="right"
@@ -2640,6 +2787,7 @@ export default function GenerateAssignments() {
             activeItem={assignmentDnd.activeItem}
             activeDragTask={assignmentDnd.activeDragTask}
             activeRect={assignmentDnd.activeRect}
+            insertTarget={assignmentDnd.insertTarget}
             tasks={allTasksWithAssignments}
             scope="housekeeping"
           />
@@ -2647,6 +2795,130 @@ export default function GenerateAssignments() {
         </MultiSelectContext.Provider>
         )}
 
+      <AssignmentLoadingDialog open={isAssigning} />
+
+      <AlertDialog open={showAdamRefreshDialog} onOpenChange={setShowAdamRefreshDialog}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sync from ADAM</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  I containers vengono sempre rigenerati da ADAM e i nuovi task aggiunti nei containers (oltre che aggiornare i dati dei task esistenti come check-in/out, pax,
+                  indirizzo, operazione, nuove task, task sparite). Le modifiche WASS
+                  non ancora trasferite su ADAM verranno sovrascritte.
+                </p>
+                <div className="space-y-2 pt-1">
+                  <Label className="text-foreground">Cosa sincronizzare</Label>
+                  <RadioGroup
+                    value={adamRefreshMode}
+                    onValueChange={(value) =>
+                      setAdamRefreshMode(value as AdamRefreshMode)
+                    }
+                    className="gap-3"
+                  >
+                    <div className="flex items-start space-x-2">
+                      <RadioGroupItem value="apt" id="refresh-mode-apt" className="mt-1" />
+                      <Label htmlFor="refresh-mode-apt" className="font-normal leading-snug">
+                        Solo containers e dati appartamento
+                      </Label>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <RadioGroupItem
+                        value="assignments"
+                        id="refresh-mode-assignments"
+                        className="mt-1"
+                      />
+                      <Label
+                        htmlFor="refresh-mode-assignments"
+                        className="font-normal leading-snug"
+                      >
+                        Anche assegnazioni (cleaner, sequenza, collaborazioni) e ricalcolo
+                        orari / travel time
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={isRefreshingContainers}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isRefreshingContainers}
+              onClick={(e) => {
+                e.preventDefault();
+                setShowAdamRefreshDialog(false);
+                void runAdamContainersRefresh({ mode: adamRefreshMode });
+              }}
+              className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+            >
+              Conferma refresh
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={showUnlockConfirmDialog}
+        onOpenChange={(open) => {
+          setShowUnlockConfirmDialog(open);
+          if (!open) setPendingLockedTasks([]);
+        }}
+      >
+        <AlertDialogContent className="sm:max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Task bloccate in WASS</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  ADAM richiede di spostare o riassegnare {pendingLockedTasks.length} task
+                  attualmente locked. Confermi lo sblocco e l&apos;allineamento?
+                </p>
+                <ul className="max-h-40 overflow-y-auto rounded border p-2 text-xs text-foreground space-y-1">
+                  {pendingLockedTasks.map((task) => (
+                    <li key={task.task_id}>
+                      #{task.logistic_code ?? task.task_id}
+                      {task.locked_reason ? ` — ${task.locked_reason}` : ""}
+                      {task.currentCleanerId || task.adamCleanerId
+                        ? ` (cleaner ${task.currentCleanerId ?? "—"} → ${task.adamCleanerId ?? "—"})`
+                        : ""}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                isRefreshingContainersRef.current = false;
+                setIsRefreshingContainers(false);
+              }}
+            >
+              Annulla
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                setShowUnlockConfirmDialog(false);
+                void runAdamContainersRefresh({
+                  mode: pendingRefreshMode,
+                  confirmUnlockLocked: true,
+                  skipContainersRefresh: true,
+                });
+              }}
+            >
+              Sblocca e sincronizza
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       </div>
     </div>
   );

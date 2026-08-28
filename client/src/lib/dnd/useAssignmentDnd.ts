@@ -2,12 +2,16 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import type {
   CollisionDetection,
   DragEndEvent,
+  DragMoveEvent,
   DragOverEvent,
   DragStartEvent,
 } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { buildDndDropOperation } from "./operations";
-import { timelineFirstCollisionDetection } from "./collision";
+import {
+  getCompactTimelineTaskWidthPx,
+  timelineFirstCollisionDetection,
+} from "./collision";
 import { constrainAssignedTimelineDragModifier } from "./modifiers";
 import {
   DND_CONTAINER_ID_ATTRIBUTE,
@@ -35,7 +39,7 @@ type DndEventData = {
   target?: DndInsertTarget;
 };
 
-type DndLayoutEvent = DragOverEvent | DragEndEvent;
+type DndLayoutEvent = DragOverEvent | DragEndEvent | DragMoveEvent;
 
 export type ActiveDndRect = {
   width: number;
@@ -92,7 +96,7 @@ export type UseAssignmentDndOptions = AssignmentDndHandlers & {
   collisionDetection?: CollisionDetection;
 };
 
-const getContainerFromEvent = (event: DragOverEvent | DragEndEvent) => {
+const getContainerFromEvent = (event: DndLayoutEvent) => {
   const overData = event.over?.data.current;
   if (isAppDndContainer(overData)) return overData;
   if (isAppDndItem(overData)) {
@@ -154,19 +158,63 @@ const getPointerClientCoordinate = (
   return base + (axis === "x" ? event.delta.x : event.delta.y);
 };
 
+type CompactActiveCardRect = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  width: number;
+  height: number;
+  centerX: number;
+  centerY: number;
+};
+
+const getActiveCardLayoutRect = (
+  event: DndLayoutEvent,
+): CompactActiveCardRect | null => {
+  const base = getActiveLayoutRect(event);
+  if (!base) return null;
+
+  const activeData = event.active.data.current;
+  const isPriorityDrag =
+    isAppDndItem(activeData) && activeData.from.type === "priority";
+  const isCompactTimelineDrag =
+    isAppDndItem(activeData) &&
+    (activeData.scope === "housekeeping" || activeData.scope === "logistics") &&
+    (activeData.from.type === "timeline" || isPriorityDrag);
+
+  const compactWidth = getCompactTimelineTaskWidthPx();
+  const compactHeight = 40;
+  const width = isCompactTimelineDrag
+    ? Math.min(base.width, compactWidth)
+    : base.width;
+  const height = isPriorityDrag && isCompactTimelineDrag
+    ? Math.min(base.height, compactHeight)
+    : base.height;
+
+  return {
+    left: base.left,
+    right: base.left + width,
+    top: base.top,
+    bottom: base.top + height,
+    width,
+    height,
+    centerX: base.left + width / 2,
+    centerY: base.top + height / 2,
+  };
+};
+
 const getActiveInsertCoordinate = (
   event: DndLayoutEvent,
   axis: "x" | "y",
 ) => {
+  const card = getActiveCardLayoutRect(event);
+  if (card) {
+    return axis === "x" ? card.centerX : card.centerY;
+  }
+
   const pointer = getPointerClientCoordinate(event, axis);
-  if (pointer !== null) return pointer;
-
-  const activeRect = getActiveLayoutRect(event);
-  if (!activeRect) return null;
-
-  return axis === "x"
-    ? activeRect.left + activeRect.width / 2
-    : activeRect.top + activeRect.height / 2;
+  return pointer;
 };
 
 const isAssignedSource = (
@@ -247,15 +295,97 @@ const getLayoutInsertIndex = (
 
   for (let index = 0; index < sortableRects.length; index += 1) {
     const rect = sortableRects[index];
+    const compactWidth = getCompactTimelineTaskWidthPx();
     const midpoint =
       target.container.type === "summary"
         ? rect.top + rect.height / 2
-        : rect.left + rect.width / 2;
+        : rect.left + Math.min(rect.width, compactWidth) / 2;
 
     if (activeEdge < midpoint) return index;
   }
 
   return sortableRects.length;
+};
+
+const resolveTimelineTargetFromCard = (
+  event: DndLayoutEvent,
+  activeItem: AppDndItem,
+): DndInsertTarget | null => {
+  const card = getActiveCardLayoutRect(event);
+  if (!card) return null;
+  if (typeof document === "undefined") return null;
+
+  const nodes = document.querySelectorAll<HTMLElement>(
+    `[${DND_CONTAINER_ID_ATTRIBUTE}]`,
+  );
+
+  let best: {
+    containerId: string;
+    container: Extract<AppDndContainer, { type: "timeline" }>;
+    score: number;
+  } | null = null;
+
+  for (const node of nodes) {
+    const id = node.getAttribute(DND_CONTAINER_ID_ATTRIBUTE);
+    if (!id) continue;
+    const parsed = parseDndId(id);
+    if (!parsed || parsed.kind !== "container") continue;
+    if (parsed.type !== "timeline") continue;
+    if (parsed.scope !== activeItem.scope) continue;
+    if (typeof parsed.staffId !== "number") continue;
+
+    const rect = node.getBoundingClientRect();
+    if (rect.height <= 0 || rect.width <= 0) continue;
+
+    const overlapX = Math.max(
+      0,
+      Math.min(card.right, rect.right) - Math.max(card.left, rect.left),
+    );
+    if (overlapX <= 0) continue;
+
+    const overlapY = Math.max(
+      0,
+      Math.min(card.bottom, rect.bottom) - Math.max(card.top, rect.top),
+    );
+    const rowCenterY = rect.top + rect.height / 2;
+    const centerDistanceY = Math.abs(card.centerY - rowCenterY);
+    if (overlapY <= 0 && centerDistanceY > Math.max(rect.height, card.height)) {
+      continue;
+    }
+
+    const score = overlapY > 0 ? -overlapY : centerDistanceY;
+    if (!best || score < best.score) {
+      best = {
+        containerId: id,
+        score,
+        container: {
+          kind: "container",
+          scope: parsed.scope,
+          type: "timeline",
+          staffId: parsed.staffId,
+          accepts: ["priority", "timeline", "summary"],
+        },
+      };
+    }
+  }
+
+  if (!best) return null;
+
+  const target: DndInsertTarget = {
+    containerId: best.containerId,
+    container: best.container,
+    index: 0,
+    isValid: true,
+  };
+  const layoutIndex = getLayoutInsertIndex(event, target);
+  if (layoutIndex === null) {
+    return { ...target, isValid: false };
+  }
+
+  return {
+    ...target,
+    index: layoutIndex,
+  };
 };
 
 const getInsertIndexFromOverItem = (
@@ -275,9 +405,10 @@ const getInsertIndexFromOverItem = (
     return overItem.index;
   }
 
+  const compactWidth = getCompactTimelineTaskWidthPx();
   const midpoint =
     axis === "x"
-      ? rect.left + rect.width / 2
+      ? rect.left + Math.min(rect.width, compactWidth) / 2
       : rect.top + rect.height / 2;
 
   let insertionSlot =
@@ -333,7 +464,7 @@ const buildTargetFromLayout = (
 };
 
 const getCollisionInsertTarget = (
-  event: DragOverEvent | DragEndEvent,
+  event: DndLayoutEvent,
 ): DndInsertTarget | null => {
   const collisions = event.collisions;
   if (!collisions?.length) return null;
@@ -492,12 +623,27 @@ export function useAssignmentDnd({
 
   const handleDragOver = useCallback(
     (event: DragOverEvent) => {
-      const currentTarget = getTargetFromEvent(event);
       const activeData = event.active.data.current;
       const isAssignedDrag =
         isAppDndItem(activeData) &&
         (activeData.from.type === "timeline" ||
           activeData.from.type === "summary");
+      const isPriorityDrag =
+        isAppDndItem(activeData) && activeData.from.type === "priority";
+
+      if (isPriorityDrag) {
+        // Non dipendere da event.over: da container dnd-kit spesso resta sul
+        // droppable sorgente e onDragOver non rifires mentre ti muovi sulla timeline.
+        const cardTarget =
+          getCollisionInsertTarget(event) ??
+          resolveTimelineTargetFromCard(event, activeData);
+        lastPreviewTargetRef.current = cardTarget;
+        setInsertTarget(cardTarget);
+        onDragOver?.(cardTarget);
+        return;
+      }
+
+      const currentTarget = getTargetFromEvent(event);
 
       if (currentTarget) {
         lastPreviewTargetRef.current = currentTarget;
@@ -517,6 +663,31 @@ export function useAssignmentDnd({
       const previewTarget = lastPreviewTargetRef.current;
       setInsertTarget(previewTarget);
       onDragOver?.(previewTarget);
+    },
+    [onDragOver],
+  );
+
+  const handleDragMove = useCallback(
+    (event: DragMoveEvent) => {
+      const activeData = event.active.data.current;
+      if (!isAppDndItem(activeData) || activeData.from.type !== "priority") {
+        return;
+      }
+
+      const cardTarget =
+        getCollisionInsertTarget(event) ??
+        resolveTimelineTargetFromCard(event, activeData);
+      const previous = lastPreviewTargetRef.current;
+      const sameTarget =
+        previous?.containerId === cardTarget?.containerId &&
+        previous?.index === cardTarget?.index &&
+        previous?.isValid === cardTarget?.isValid;
+
+      if (sameTarget) return;
+
+      lastPreviewTargetRef.current = cardTarget;
+      setInsertTarget(cardTarget);
+      onDragOver?.(cardTarget);
     },
     [onDragOver],
   );
@@ -544,7 +715,12 @@ export function useAssignmentDnd({
         return;
       }
 
-      const target = getTargetFromEvent(event);
+      const target =
+        item.from.type === "priority"
+          ? getCollisionInsertTarget(event) ??
+            resolveTimelineTargetFromCard(event, item) ??
+            getTargetFromEvent(event)
+          : getTargetFromEvent(event);
       resetDragState();
       // Clear page UI (remove zone, route spacers) immediately — don't wait for API.
       onDragEnd?.();
@@ -582,6 +758,7 @@ export function useAssignmentDnd({
       insertTarget,
       handlers: {
         onDragStart: handleDragStart,
+        onDragMove: handleDragMove,
         onDragOver: handleDragOver,
         onDragCancel: handleDragCancel,
         onDragEnd: handleDragEnd,
@@ -594,6 +771,7 @@ export function useAssignmentDnd({
       collisionDetection,
       handleDragCancel,
       handleDragEnd,
+      handleDragMove,
       handleDragOver,
       handleDragStart,
       insertTarget,

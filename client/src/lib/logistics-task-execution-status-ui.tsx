@@ -13,7 +13,7 @@ export function hasLogisticsExecutionStatusColor(
 export const EXECUTION_IN_PROGRESS_SURFACE_CLASS =
   "border-green-500 bg-[#116832] text-white dark:border-green-400 dark:bg-[#114f28] dark:text-white";
 export const EXECUTION_COMPLETED_SURFACE_CLASS =
-  "border-gray-400 bg-gray-700 text-white dark:border-gray-400 dark:bg-gray-700 dark:text-white";
+  "border-gray-600 bg-gray-400 text-gray-800 dark:border-gray-400 dark:bg-gray-700 dark:text-white";
 export const EXECUTION_PAUSED_SURFACE_CLASS =
   "border-blue-400 bg-blue-950 text-white dark:border-blue-400 dark:bg-blue-950 dark:text-white";
 

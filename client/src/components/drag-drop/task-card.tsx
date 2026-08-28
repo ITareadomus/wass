@@ -274,6 +274,11 @@ export interface TaskCardProps {
   timelineRowStaffDisplayLabel?: string | null;
   /** Dopo mutazione timeline logistica (es. tipologia manuale). */
   onLogisticsTimelineMutated?: () => void;
+  /**
+   * Timeline housekeeping: se false, le card restano col colore normale
+   * anche se il task è in corso o completato.
+   */
+  showExecutionStatusColors?: boolean;
 }
 
 function getTaskMapMarkerId(task: Task): string {
@@ -430,6 +435,7 @@ export default function TaskCard({
   compactAdamTimelineUi = false,
   timelineRowStaffDisplayLabel = null,
   onLogisticsTimelineMutated,
+  showExecutionStatusColors,
 }: TaskCardProps) {
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1209,23 +1215,51 @@ const displayClickableInputClass =
       return;
     }
 
-    const inner = taskDetailsInnerRef.current;
-    if (!inner) return;
+    let cancelled = false;
+    let rafId = 0;
+    const ro = new ResizeObserver(() => {
+      measure();
+    });
+    let observedEl: HTMLElement | null = null;
+
+    const viewportSize = () => {
+      const vv = window.visualViewport;
+      return {
+        width: vv?.width ?? window.innerWidth,
+        height: vv?.height ?? window.innerHeight,
+      };
+    };
+
+    let measuring = false;
 
     const measure = () => {
-      const viewportW = window.innerWidth;
-      const viewportH = window.innerHeight;
-      const margin = 80;
+      if (cancelled || measuring) return;
+      const inner = taskDetailsInnerRef.current;
+      if (!inner) return;
+      if (observedEl !== inner) {
+        if (observedEl) ro.unobserve(observedEl);
+        ro.observe(inner);
+        observedEl = inner;
+      }
+
+      measuring = true;
+      const prevTransform = inner.style.transform;
+      inner.style.transform = "none";
+      const contentH = Math.max(inner.scrollHeight, inner.offsetHeight, 1);
+      inner.style.transform = prevTransform;
+      measuring = false;
+
+      const { width: viewportW, height: viewportH } = viewportSize();
+      const margin = 32;
       const availW = Math.max(1, viewportW - margin);
       const availH = Math.max(1, viewportH - margin);
       const designWidth = isTimelineDetailsDialog
         ? Math.min(viewportW * 0.96, 1280)
         : Math.min(viewportW * 0.96, 576);
-      const contentH = Math.max(inner.scrollHeight, 1);
       const scale = Math.min(1, availW / designWidth, availH / contentH);
       setTaskDetailsFit((prev) => {
-        const width = Math.round(designWidth * scale);
-        const height = Math.round(contentH * scale);
+        const width = Math.min(availW, Math.floor(designWidth * scale));
+        const height = Math.min(availH, Math.floor(contentH * scale));
         const nextScale = Math.round(scale * 1000) / 1000;
         if (
           prev.scale === nextScale &&
@@ -1239,15 +1273,33 @@ const displayClickableInputClass =
       });
     };
 
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(inner);
+    const waitForInner = () => {
+      if (cancelled) return;
+      if (!taskDetailsInnerRef.current) {
+        rafId = window.requestAnimationFrame(waitForInner);
+        return;
+      }
+      measure();
+    };
+
+    waitForInner();
     window.addEventListener("resize", measure);
+    window.visualViewport?.addEventListener("resize", measure);
     return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(rafId);
       ro.disconnect();
       window.removeEventListener("resize", measure);
+      window.visualViewport?.removeEventListener("resize", measure);
     };
-  }, [isModalOpen, isTimelineDetailsDialog]);
+  }, [
+    isModalOpen,
+    isTimelineDetailsDialog,
+    dialogTaskKey,
+    logisticsHousekeepingNotes,
+    customerNotesByTaskKey,
+    taskCollaborators,
+  ]);
 
   // Normalizza confirmed_operation da boolean/number/string a boolean sicuro
   // CRITICAL: Se l'utente ha modificato operation_id tramite pending edits, considera confermato
@@ -1381,13 +1433,39 @@ const displayClickableInputClass =
         }))
       : null;
   const housekeepingCleaningMinutes = resolveHousekeepingCleaningMinutes(cardTaskAny);
+  const executionColorsEnabled =
+    showExecutionStatusColors ??
+    (typeof window !== "undefined" && "showHkExecutionStatusColors" in window
+      ? Boolean((window as any).showHkExecutionStatusColors)
+      : true);
   const housekeepingWorkProgress = resolveHousekeepingWorkProgress({
     status: housekeepingExecutionStatus,
     startworkAt: cardTaskAny.startwork_at ?? cardTaskAny.startworkAt,
     cleaningMinutes: housekeepingCleaningMinutes,
     nowMs: housekeepingNowMs,
   });
+  // Il dialog naviga con le frecce su displayTask: la barra deve seguire quella, non la card cliccata.
+  const dialogTaskAny = displayTask as any;
+  const dialogHousekeepingExecutionStatus: HousekeepingTaskExecutionStatus | null =
+    operationsScope !== "logistics"
+      ? ((dialogTaskAny.housekeeping_execution_status as
+          | HousekeepingTaskExecutionStatus
+          | undefined) ??
+        resolveHousekeepingTaskExecutionStatus({
+          startwork: dialogTaskAny.startwork ?? dialogTaskAny.startWork,
+          cleaned: dialogTaskAny.cleaned,
+        }))
+      : null;
+  const dialogHousekeepingCleaningMinutes =
+    resolveHousekeepingCleaningMinutes(dialogTaskAny);
+  const dialogHousekeepingWorkProgress = resolveHousekeepingWorkProgress({
+    status: dialogHousekeepingExecutionStatus,
+    startworkAt: dialogTaskAny.startwork_at ?? dialogTaskAny.startworkAt,
+    cleaningMinutes: dialogHousekeepingCleaningMinutes,
+    nowMs: housekeepingNowMs,
+  });
   const housekeepingExecutionSurfaceClassName = (() => {
+    if (!executionColorsEnabled) return undefined;
     if (operationsScope === "logistics" || !isInTimeline) return undefined;
     if (housekeepingExecutionStatus === "completed") {
       return housekeepingExecutionStatusSurfaceClass("completed", "strong");
@@ -1418,11 +1496,16 @@ const displayClickableInputClass =
             : "bg-custom-blue-light border-border/60";
 
   useEffect(() => {
-    const shouldTick =
-      operationsScope !== "logistics" &&
+    const cardNeedsTick =
       housekeepingExecutionStatus === "in_progress" &&
       housekeepingCleaningMinutes > 0 &&
-      (isInTimeline || isModalOpen);
+      isInTimeline;
+    const dialogNeedsTick =
+      isModalOpen &&
+      dialogHousekeepingExecutionStatus === "in_progress" &&
+      dialogHousekeepingCleaningMinutes > 0;
+    const shouldTick =
+      operationsScope !== "logistics" && (cardNeedsTick || dialogNeedsTick);
     if (!shouldTick) return;
     setHousekeepingNowMs(Date.now());
     const id = window.setInterval(() => setHousekeepingNowMs(Date.now()), 1000);
@@ -1431,31 +1514,35 @@ const displayClickableInputClass =
     operationsScope,
     housekeepingExecutionStatus,
     housekeepingCleaningMinutes,
+    dialogHousekeepingExecutionStatus,
+    dialogHousekeepingCleaningMinutes,
     isInTimeline,
     isModalOpen,
   ]);
 
+  const displayAssignmentStart =
+    (displayTask as any).start_time ?? (displayTask as any).startTime;
+  const displayAssignmentEnd =
+    (displayTask as any).end_time ?? (displayTask as any).endTime;
+  const displayAssignmentTravel =
+    (displayTask as any).travel_time ?? (displayTask as any).travelTime;
+
   useEffect(() => {
-    if (!isModalOpen) return;
-    const taskObj = displayTask as any;
-    const nextStart = taskObj.start_time ?? taskObj.startTime;
-    const nextEnd = taskObj.end_time ?? taskObj.endTime;
-    const nextTravel = taskObj.travel_time ?? taskObj.travelTime;
     setAssignmentTimes((prev) => {
       if (
-        prev.start_time === nextStart &&
-        prev.end_time === nextEnd &&
-        prev.travel_time === nextTravel
+        prev.start_time === displayAssignmentStart &&
+        prev.end_time === displayAssignmentEnd &&
+        prev.travel_time === displayAssignmentTravel
       ) {
         return prev;
       }
       return {
-        start_time: nextStart,
-        end_time: nextEnd,
-        travel_time: nextTravel,
+        start_time: displayAssignmentStart,
+        end_time: displayAssignmentEnd,
+        travel_time: displayAssignmentTravel,
       };
     });
-  }, [isModalOpen, dialogTaskKey]);
+  }, [dialogTaskKey, displayAssignmentStart, displayAssignmentEnd, displayAssignmentTravel]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2826,19 +2913,21 @@ const displayClickableInputClass =
         : assignmentTimes.travel_time !== undefined && assignmentTimes.travel_time !== null
           ? `${assignmentTimes.travel_time} minuti`
           : "non assegnato"
-      : assignmentTimes.travel_time !== undefined
-        ? `${assignmentTimes.travel_time} minuti`
-        : "non assegnato";
+      : displayAssignmentTravel !== undefined && displayAssignmentTravel !== null
+        ? `${displayAssignmentTravel} minuti`
+        : assignmentTimes.travel_time !== undefined
+          ? `${assignmentTimes.travel_time} minuti`
+          : "non assegnato";
   const housekeepingStartDisplayValue =
     isLogisticsScope
       ? String(effectiveHousekeepingStartTime ?? "").trim() ||
         "non assegnato"
-      : String(assignmentTimes.start_time ?? "non assegnato");
+      : String(displayAssignmentStart ?? assignmentTimes.start_time ?? "non assegnato");
   const housekeepingEndDisplayValue =
     isLogisticsScope
       ? String(effectiveHousekeepingEndTime ?? "").trim() ||
         "non assegnato"
-      : String(assignmentTimes.end_time ?? "non assegnato");
+      : String(displayAssignmentEnd ?? assignmentTimes.end_time ?? "non assegnato");
 
   const alignLogisticsHousekeepingRows = false;
 
@@ -2892,8 +2981,11 @@ const displayClickableInputClass =
               </div>
             </div>
 
-            {operationsScope !== "logistics" && housekeepingWorkProgress && (
-              <HousekeepingWorkProgressLine progress={housekeepingWorkProgress} />
+            {operationsScope !== "logistics" && dialogHousekeepingWorkProgress && (
+              <HousekeepingWorkProgressLine
+                progress={dialogHousekeepingWorkProgress}
+                startworkAt={dialogTaskAny.startwork_at ?? dialogTaskAny.startworkAt}
+              />
             )}
 
             {/* Terza riga: Check-out - Check-in (click apre dialog come Pax-In) */}
@@ -3253,10 +3345,12 @@ const displayClickableInputClass =
                         ) &&
                         "animate-blink",
                       isInTimeline &&
+                        executionColorsEnabled &&
                         housekeepingWorkProgress &&
                         !housekeepingWorkProgress.overdue &&
                         "isolation-isolate",
                       isInTimeline &&
+                        executionColorsEnabled &&
                         housekeepingWorkProgress?.overdue &&
                         "animate-blink-green",
                       operationsScope === "logistics" &&
@@ -3295,6 +3389,7 @@ const displayClickableInputClass =
                     }}
                   >
                     {isInTimeline &&
+                      executionColorsEnabled &&
                       housekeepingWorkProgress &&
                       !housekeepingWorkProgress.overdue && (
                         <div
@@ -3579,7 +3674,7 @@ const displayClickableInputClass =
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent
           className={cn(
-            "block overflow-hidden overscroll-none p-0 gap-0 max-h-none",
+            "!block min-h-0 overflow-hidden overscroll-none !p-0 !gap-0 max-h-[100dvh] max-w-[100vw]",
             "animate-none data-[state=open]:animate-none data-[state=closed]:animate-none",
             taskDetailsFit.width != null ? "w-auto max-w-none" : isTimelineDetailsDialog
               ? "w-[min(96vw,1280px)] max-w-[1280px]"
@@ -3594,8 +3689,19 @@ const displayClickableInputClass =
           onWheel={(e) => e.stopPropagation()}
         >
           <div
+            className="relative overflow-hidden"
+            style={
+              taskDetailsFit.width != null && taskDetailsFit.height != null
+                ? { width: taskDetailsFit.width, height: taskDetailsFit.height }
+                : undefined
+            }
+          >
+          <div
             ref={taskDetailsInnerRef}
-            className="grid max-w-none shrink-0 gap-4 p-6 origin-top-left"
+            className={cn(
+              "grid max-w-none shrink-0 gap-4 p-6 origin-top-left",
+              taskDetailsFit.width != null && "absolute left-0 top-0"
+            )}
             style={{
               width: taskDetailsFit.designWidth ?? (isTimelineDetailsDialog ? "min(96vw, 1280px)" : undefined),
               minWidth: taskDetailsFit.designWidth,
@@ -3886,6 +3992,7 @@ const displayClickableInputClass =
 
             </div>
 
+          </div>
           </div>
           </div>
         </DialogContent>
