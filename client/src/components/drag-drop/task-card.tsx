@@ -3477,12 +3477,12 @@ const displayClickableInputClass =
                     )}
 
                     {missingLogisticsKindMessage && effectiveLogisticsTaskKind == null && !isSelected ? (
-                      <div className="absolute -top-1.5 -right-1.5 z-10">
+                      <div className="absolute -top-1 -right-1 z-10">
                         <div
-                          className="w-4 h-4 rounded-full flex items-center justify-center bg-yellow-500 text-white border-2 border-yellow-600 shadow-md backdrop-blur-sm"
+                          className="flex h-[14px] w-[14px] items-center justify-center rounded-full border border-yellow-600 bg-yellow-500 text-white shadow-sm"
                           title="Manca tipologia logistica"
                         >
-                          <HelpCircle className="w-3 h-3" strokeWidth={2.5} />
+                          <HelpCircle className="h-2.5 w-2.5" strokeWidth={2.5} />
                         </div>
                       </div>
                     ) : (
