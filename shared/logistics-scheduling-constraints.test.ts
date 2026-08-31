@@ -194,7 +194,7 @@ describe("getLogisticsTimelineViolationShortLabels", () => {
         },
         "2026-06-18"
       )
-    ).toEqual(["borsone violato"]);
+    ).toEqual(["regola borsone violata"]);
   });
 });
 

@@ -49,42 +49,6 @@
   animation: blink-border-yellow 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-@keyframes blink-missing-kind-badge {
-  0%, 100% {
-    background: rgb(202, 138, 4);
-    box-shadow:
-      0 0 0 2px rgb(253, 224, 71),
-      0 0 10px 2px rgba(234, 179, 8, 0.9);
-  }
-  50% {
-    background: rgb(250, 204, 21);
-    box-shadow:
-      0 0 0 2px rgb(254, 240, 138),
-      0 0 18px 4px rgba(250, 204, 21, 1);
-  }
-}
-
-.missing-logistics-kind-badge {
-  position: absolute;
-  top: -9px;
-  left: -9px;
-  width: 19px;
-  height: 19px;
-  border-radius: 9999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.78rem;
-  font-weight: 800;
-  line-height: 1;
-  color: #fff;
-  z-index: 55;
-  pointer-events: none;
-  border: 0;
-  padding: 0;
-  animation: blink-missing-kind-badge 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
 /* Housekeeping: tempo cleaning_time scaduto (startwork=1, cleaned=0) */
 @keyframes blink-border-green {
   0%, 100% {

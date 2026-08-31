@@ -3407,15 +3407,6 @@ const displayClickableInputClass =
                       }
                     }}
                   >
-                    {missingLogisticsKindMessage && effectiveLogisticsTaskKind == null && (
-                      <span
-                        className="missing-logistics-kind-badge"
-                        title="Manca tipologia"
-                        aria-label="Manca tipologia"
-                      >
-                        !
-                      </span>
-                    )}
                     {isInTimeline &&
                       executionColorsEnabled &&
                       housekeepingWorkProgress &&
@@ -3485,12 +3476,24 @@ const displayClickableInputClass =
                       </div>
                     )}
 
-                    {!isConfirmedOperation && !isSelected && (
+                    {missingLogisticsKindMessage && effectiveLogisticsTaskKind == null && !isSelected ? (
                       <div className="absolute -top-1.5 -right-1.5 z-10">
-                        <div className="w-4 h-4 rounded-full flex items-center justify-center bg-gray-900/75 text-white border-2 border-gray-700/80 shadow-md backdrop-blur-sm">
+                        <div
+                          className="w-4 h-4 rounded-full flex items-center justify-center bg-yellow-500 text-white border-2 border-yellow-600 shadow-md backdrop-blur-sm"
+                          title="Manca tipologia logistica"
+                        >
                           <HelpCircle className="w-3 h-3" strokeWidth={2.5} />
                         </div>
                       </div>
+                    ) : (
+                      !isConfirmedOperation &&
+                      !isSelected && (
+                        <div className="absolute -top-1.5 -right-1.5 z-10">
+                          <div className="w-4 h-4 rounded-full flex items-center justify-center bg-gray-900/75 text-white border-2 border-gray-700/80 shadow-md backdrop-blur-sm">
+                            <HelpCircle className="w-3 h-3" strokeWidth={2.5} />
+                          </div>
+                        </div>
+                      )
                     )}
                     {(isPreAssigned || isLocked) && (
                       <div className="absolute -top-1.5 -right-1.5 z-[70]">

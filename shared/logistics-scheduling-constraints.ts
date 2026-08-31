@@ -427,7 +427,7 @@ export function getLogisticsTimelineViolationShortLabels(
   const violations = getLogisticsTimelineViolations(task, workDate);
 
   if (violations.bagRuleViolated) {
-    labels.push("borsone violato");
+    labels.push("regola borsone violata");
   }
   if (
     violations.checkinViolated ||
