@@ -2254,6 +2254,7 @@ export default function LogisticsTimelineView({
                                     }
                                     task={task}
                                     index={index}
+                                    workDate={workDate}
                                     isInTimeline
                                     allTasks={tasks}
                                     currentContainer=""

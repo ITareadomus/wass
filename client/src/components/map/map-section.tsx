@@ -11,6 +11,7 @@ import {
 
 interface MapSectionProps {
   tasks: Task[];
+  workDate: string;
   className?: string;
   bodyClassName?: string;
   mapClassName?: string;
@@ -28,6 +29,7 @@ declare global {
 
 export default function MapSection({
   tasks,
+  workDate,
   className,
   bodyClassName,
   mapClassName,
@@ -82,8 +84,7 @@ export default function MapSection({
   useEffect(() => {
     const loadCleaners = async () => {
       try {
-        const dateStr = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
-        const response = await fetch(withScope(`/api/selected-cleaners?date=${dateStr}`), {
+        const response = await fetch(withScope(`/api/selected-cleaners?date=${workDate}`), {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         });
@@ -96,8 +97,7 @@ export default function MapSection({
     };
     const loadCleanerAliases = async () => {
       try {
-        const dateStr = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
-        const response = await fetch(withScope(`/api/cleaners-aliases?date=${dateStr}`), {
+        const response = await fetch(withScope(`/api/cleaners-aliases?date=${workDate}`), {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         });
@@ -137,18 +137,17 @@ export default function MapSection({
     }, 300);
 
     return () => clearInterval(checkFilterUpdates);
-  }, [filteredCleanerId, filteredTaskId]);
+  }, [filteredCleanerId, filteredTaskId, workDate]);
 
   useEffect(() => {
     const reloadMapCleaners = async () => {
       try {
-        const dateStr = localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
         const [cleanersResponse, aliasesResponse] = await Promise.all([
-          fetch(withScope(`/api/selected-cleaners?date=${dateStr}`), {
+          fetch(withScope(`/api/selected-cleaners?date=${workDate}`), {
             cache: "no-store",
             headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
           }),
-          fetch(withScope(`/api/cleaners-aliases?date=${dateStr}`), {
+          fetch(withScope(`/api/cleaners-aliases?date=${workDate}`), {
             cache: "no-store",
             headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
           }),
@@ -174,7 +173,7 @@ export default function MapSection({
       window.removeEventListener("refresh-assignments", onRosterRefresh);
       window.removeEventListener("refresh-selected-cleaners", onRosterRefresh);
     };
-  }, []);
+  }, [workDate]);
 
   // Funzione per ottenere il colore del cleaner (sincronizzato con timeline)
   const getCleanerColor = (cleanerId: number) => {

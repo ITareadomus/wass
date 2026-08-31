@@ -1,6 +1,5 @@
 import {
   buildLogisticsTaskKindPayload,
-  normalizeLogisticsTaskKind,
   type LogisticsContainerKindPatch,
 } from "../../shared/logistics-task-kind";
 import pool from "../../shared/pg-db";
@@ -45,13 +44,9 @@ export function enrichLogisticsTimelineTask(
   cleanerId: number | null,
   cleanerSequence: number | null
 ): any {
-  const manualKind = normalizeLogisticsTaskKind(
-    task?.logistics_task_kind,
-    task?.logistics_task_kind_source
-  );
-  if (task?.logistics_task_kind_source === "manual" && manualKind) {
+  if (task?.logistics_task_kind_source === "manual") {
     const kindPayload = buildLogisticsTaskKindPayload({
-      logisticsTaskKind: manualKind,
+      logisticsTaskKind: task?.logistics_task_kind,
       logisticsTaskKindSource: "manual",
     });
     return withoutBagPolicy({ ...task, ...kindPayload });
@@ -156,14 +151,13 @@ export async function enrichDriverTasksWithLogisticsKind(
 
 export async function loadManualLogisticsContainerTaskKinds(
   workDate: string
-): Promise<Map<number, { logistics_task_kind: string; logistics_task_kind_source: "manual" }>> {
+): Promise<Map<number, { logistics_task_kind: string | null; logistics_task_kind_source: "manual" }>> {
   const result = await pool.query(
     `
       SELECT task_id, logistics_task_kind, logistics_task_kind_source
       FROM lg_containers
       WHERE work_date = $1
         AND logistics_task_kind_source = 'manual'
-        AND logistics_task_kind IS NOT NULL
     `,
     [workDate]
   );
@@ -172,7 +166,8 @@ export async function loadManualLogisticsContainerTaskKinds(
     result.rows.map((row: any) => [
       Number(row.task_id),
       {
-        logistics_task_kind: String(row.logistics_task_kind),
+        logistics_task_kind:
+          row.logistics_task_kind != null ? String(row.logistics_task_kind) : null,
         logistics_task_kind_source: "manual" as const,
       },
     ])
@@ -222,14 +217,13 @@ export async function syncLogisticsContainerAutoKinds(
 
 export async function loadManualLogisticsTimelineTaskKinds(
   workDate: string
-): Promise<Map<number, { logistics_task_kind: string; logistics_task_kind_source: "manual" }>> {
+): Promise<Map<number, { logistics_task_kind: string | null; logistics_task_kind_source: "manual" }>> {
   const result = await pool.query(
     `
       SELECT task_id, logistics_task_kind, logistics_task_kind_source
       FROM lg_timeline
       WHERE work_date = $1
         AND logistics_task_kind_source = 'manual'
-        AND logistics_task_kind IS NOT NULL
     `,
     [workDate]
   );
@@ -238,7 +232,8 @@ export async function loadManualLogisticsTimelineTaskKinds(
     result.rows.map((row: any) => [
       Number(row.task_id),
       {
-        logistics_task_kind: String(row.logistics_task_kind),
+        logistics_task_kind:
+          row.logistics_task_kind != null ? String(row.logistics_task_kind) : null,
         logistics_task_kind_source: "manual" as const,
       },
     ])

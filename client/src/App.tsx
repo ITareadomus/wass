@@ -13,7 +13,7 @@ import Login from "@/pages/login";
 import Settings from "@/pages/settings";
 import SystemSettings from "@/pages/system-settings";
 import NotFound from "@/pages/not-found";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { WassSiteHeader } from "@/components/wass-site-header";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -33,8 +33,9 @@ function GlobalHeader() {
   const role = getStoredUserRole();
   const logisticsOnly = isLogisticaRole(role);
   const assignmentsHomeHref = homePathForRole(role);
-  const selectedDate =
-    typeof window !== "undefined" ? localStorage.getItem("selected_work_date") : null;
+  const [selectedDate, setSelectedDate] = useState<string | null>(() =>
+    typeof window !== "undefined" ? localStorage.getItem("selected_work_date") : null
+  );
   const unconfirmedHref = selectedDate
     ? `/unconfirmed-tasks?date=${selectedDate}`
     : "/unconfirmed-tasks";
@@ -46,6 +47,21 @@ function GlobalHeader() {
     isConvocazioniPage || location === "/settings" || location === "/account-settings";
   const showUnconfirmedButton =
     !logisticsOnly && !showHomeButton && !isUnconfirmedTasksPage;
+
+  useEffect(() => {
+    const refreshSelectedDate = () => {
+      setSelectedDate(localStorage.getItem("selected_work_date"));
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === "selected_work_date") refreshSelectedDate();
+    };
+    window.addEventListener("selected-work-date-change", refreshSelectedDate);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("selected-work-date-change", refreshSelectedDate);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || OFFICE_SCOPE_ENABLED) return;

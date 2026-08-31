@@ -5,8 +5,7 @@ import { ContainerTaskClip } from "./container-task-clip";
 import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { fetchWithOperation } from "@/lib/operationManager";
 import { cn } from "@/lib/utils";
@@ -34,6 +33,7 @@ interface PriorityColumnProps {
   title: string;
   priority: string;
   tasks: Task[];
+  workDate: string;
   droppableId: string;
   icon: "clock" | "alert-circle" | "arrow-down";
   assignAction?: () => Promise<void>;
@@ -59,6 +59,7 @@ export default function PriorityColumn({
   title,
   priority,
   tasks,
+  workDate,
   droppableId,
   icon,
   assignAction,
@@ -75,8 +76,11 @@ export default function PriorityColumn({
   loadingMessage,
 }: PriorityColumnProps) {
   const [isAssigning, setIsAssigning] = useState(false);
-  const [isHistoricalDateLocked, setIsHistoricalDateLocked] = useState(false);
   const { toast } = useToast();
+  const [workYear, workMonth, workDay] = workDate.split("-").map(Number);
+  const isHistoricalDateLocked = isWorkDateHistoricallyLocked(
+    new Date(workYear, workMonth - 1, workDay)
+  );
   
   // Usa lo stato passato dal parent
   const isMultiSelectMode = containerMultiSelectState?.isActive ?? false;
@@ -100,27 +104,6 @@ export default function PriorityColumn({
   
   // DEBUG: commentato per performance
   // console.log('[DEBUG PriorityColumn]', priority, 'isMultiSelectMode:', isMultiSelectMode, 'selectedTasks:', selectedTasks.length);
-
-  // Verifica se la data selezionata è nel passato
-  useEffect(() => {
-    const checkIfDateLocked = () => {
-      const savedDate = localStorage.getItem('selected_work_date');
-      if (!savedDate) {
-        setIsHistoricalDateLocked(false);
-        return;
-      }
-
-      const [year, month, day] = savedDate.split('-').map(Number);
-      const selectedDate = new Date(year, month - 1, day);
-      setIsHistoricalDateLocked(isWorkDateHistoricallyLocked(selectedDate));
-    };
-
-    checkIfDateLocked();
-
-    // Ricontrolla quando cambia la data
-    const interval = setInterval(checkIfDateLocked, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const iconMap: Record<string, React.ReactNode> = {
     clock: <Clock className="w-5 h-5 mr-2 text-muted-foreground" />,
@@ -348,17 +331,7 @@ export default function PriorityColumn({
   const handleAssignContainer = async () => {
     try {
       setIsAssigning(true);
-      const savedDate = localStorage.getItem('selected_work_date');
-      if (!savedDate) {
-        toast({
-          variant: "destructive",
-          title: "Errore",
-          description: "Nessuna data selezionata",
-        });
-        setIsAssigning(false);
-        return;
-      }
-      const dateStr = savedDate;
+      const dateStr = workDate;
 
       const endpoint = '/api/optimizer/run-all';
       const successMessage = `✅ ${title} assegnati!`;
@@ -524,12 +497,13 @@ export default function PriorityColumn({
                                 {...dndCardProps}
                                 task={task}
                                 index={currentIndex}
+                                workDate={workDate}
                                 isInTimeline={false}
                                 allTasks={orderedTasks}
                                 currentContainer={droppableId}
                                 isDuplicate={true}
                                 isDragDisabled={isDragDisabled || isHistoricalDateLocked}
-                                isReadOnly={isHistoricalDateLocked}
+                                isReadOnly={isDragDisabled || isHistoricalDateLocked}
                                 multiSelectContext={multiSelectCtx}
                                 isHighlighted={isHighlighted}
                                 operationsScope={operationsScope}
@@ -559,12 +533,13 @@ export default function PriorityColumn({
                           {...dndCardProps}
                           task={task}
                           index={currentIndex}
+                          workDate={workDate}
                           isInTimeline={false}
                           allTasks={orderedTasks}
                           currentContainer={droppableId}
                           isDuplicate={true}
                           isDragDisabled={isDragDisabled || isHistoricalDateLocked}
-                          isReadOnly={isHistoricalDateLocked}
+                          isReadOnly={isDragDisabled || isHistoricalDateLocked}
                           multiSelectContext={multiSelectCtx}
                           isHighlighted={isHighlighted}
                           operationsScope={operationsScope}
@@ -588,12 +563,13 @@ export default function PriorityColumn({
                       {...dndCardProps}
                       task={task}
                       index={currentIndex}
+                      workDate={workDate}
                       isInTimeline={false}
                       allTasks={orderedTasks}
                       currentContainer={droppableId}
                       isDuplicate={false}
                       isDragDisabled={isDragDisabled || isHistoricalDateLocked}
-                      isReadOnly={isHistoricalDateLocked}
+                      isReadOnly={isDragDisabled || isHistoricalDateLocked}
                       multiSelectContext={multiSelectCtx}
                       isHighlighted={isHighlighted}
                       operationsScope={operationsScope}

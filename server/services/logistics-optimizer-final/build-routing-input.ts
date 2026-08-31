@@ -51,12 +51,14 @@ function resolveTaskLogisticsKindWithTrace(taskData: SchedulableLogisticsTaskInp
     logisticsTaskKindSource: taskData.logisticsTaskKindSource as LogisticsTaskKindSource | null,
   });
 
-  if (taskData.logisticsTaskKindSource === "manual" && persistedKind) {
+  if (taskData.logisticsTaskKindSource === "manual") {
     return {
       value: persistedKind,
       trace: [
         {
-          code: "MANUAL_LOGISTICS_TASK_KIND",
+          code: persistedKind
+            ? "MANUAL_LOGISTICS_TASK_KIND"
+            : "MANUAL_LOGISTICS_TASK_KIND_CLEARED",
           value: {
             logisticsTaskKind: persistedKind,
             logisticsTaskKindSource: taskData.logisticsTaskKindSource,

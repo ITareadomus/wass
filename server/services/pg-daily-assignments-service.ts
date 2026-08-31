@@ -894,7 +894,9 @@ export class PgDailyAssignmentsService {
     
     const locksMap = new Map<number, { locked: boolean; lockedReason: string | null; lockedBy: string | null }>();
     for (const row of result.rows) {
-      locksMap.set(row.task_id, {
+      const taskId = Number(row.task_id);
+      if (!Number.isFinite(taskId)) continue;
+      locksMap.set(taskId, {
         locked: row.locked,
         lockedReason: row.locked_reason,
         lockedBy: row.locked_by
@@ -2293,7 +2295,7 @@ export class PgDailyAssignmentsService {
         if (row.customer_reference) task.customer_reference = row.customer_reference;
 
         // Apply lock status from daily_task_locks (source of truth)
-        const lockInfo = locksMap.get(row.task_id);
+        const lockInfo = locksMap.get(Number(row.task_id));
         if (lockInfo) {
           task.locked = lockInfo.locked;
           task.locked_reason = lockInfo.lockedReason;
@@ -2495,7 +2497,7 @@ export class PgDailyAssignmentsService {
         );
         enrichedTasksById.set(Number(row.task_id), enrichedTask);
 
-        const lockInfo = locksMap.get(row.task_id);
+        const lockInfo = locksMap.get(Number(row.task_id));
         if (lockInfo) {
           enrichedTask.locked = lockInfo.locked;
           enrichedTask.locked_reason = lockInfo.lockedReason;
@@ -2879,7 +2881,7 @@ export class PgDailyAssignmentsService {
   async updateLogisticsContainerTaskKind(
     workDate: string,
     taskId: number,
-    kind: string,
+    kind: string | null,
     source: string,
     createdBy: string = "system"
   ): Promise<{ success: boolean; previousKind: string | null }> {
@@ -4393,19 +4395,26 @@ export class PgDailyAssignmentsService {
    */
   async syncLockToContainers(taskId: string | number, workDate: string, locked: boolean, lockedReason?: string): Promise<boolean> {
     try {
+      const params = [locked, locked ? (lockedReason || null) : null, workDate, taskId];
       const result = await query(
         `UPDATE daily_containers 
          SET locked = $1, locked_reason = $2, updated_at = NOW() 
          WHERE work_date = $3 AND task_id = $4`,
-        [locked, locked ? (lockedReason || null) : null, workDate, taskId]
+        params
       );
-      
-      if (result.rowCount === 0) {
-        console.log(`⚠️ PG: Task ${taskId} non trovato in daily_containers per ${workDate}`);
+      const lgResult = await query(
+        `UPDATE lg_containers 
+         SET locked = $1, locked_reason = $2 
+         WHERE work_date = $3 AND task_id = $4`,
+        params
+      );
+
+      if ((result.rowCount ?? 0) === 0 && (lgResult.rowCount ?? 0) === 0) {
+        console.log(`⚠️ PG: Task ${taskId} non trovato in daily_containers né lg_containers per ${workDate}`);
         return false;
       }
-      
-      console.log(`✅ PG: Task ${taskId} ${locked ? 'bloccata' : 'sbloccata'} in daily_containers`);
+
+      console.log(`✅ PG: Task ${taskId} ${locked ? 'bloccata' : 'sbloccata'} nei containers`);
       return true;
     } catch (error) {
       console.error(`❌ PG: Errore nell'aggiornamento lock status task ${taskId}:`, error);

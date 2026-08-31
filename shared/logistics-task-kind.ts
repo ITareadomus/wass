@@ -101,7 +101,8 @@ export function resolveLogisticsTaskKind(
     input.logisticsTaskKind,
     input.logisticsTaskKindSource
   );
-  if (input.logisticsTaskKindSource === "manual" && persistedKind) {
+  // Manuale vince sempre, anche se l'utente ha azzerato la tipologia.
+  if (input.logisticsTaskKindSource === "manual") {
     return persistedKind;
   }
 
@@ -112,8 +113,10 @@ export function resolveLogisticsTaskKind(
   return resolveAutoLogisticsTaskKind(input);
 }
 
-export function buildManualLogisticsTaskKindPayload(kind: LogisticsTaskKind): {
-  logistics_task_kind: LogisticsTaskKind;
+export function buildManualLogisticsTaskKindPayload(
+  kind: LogisticsTaskKind | null
+): {
+  logistics_task_kind: LogisticsTaskKind | null;
   logistics_task_kind_source: "manual";
 } {
   return {
@@ -125,17 +128,13 @@ export function buildManualLogisticsTaskKindPayload(kind: LogisticsTaskKind): {
 export function buildLogisticsTaskKindPayload(
   input: ResolveLogisticsTaskKindInput
 ): Partial<{
-  logistics_task_kind: LogisticsTaskKind;
+  logistics_task_kind: LogisticsTaskKind | null;
   logistics_task_kind_source: LogisticsTaskKindSource;
 }> {
   if (input.logisticsTaskKindSource === "manual") {
-    const manualKind = normalizeLogisticsTaskKind(
-      input.logisticsTaskKind,
-      "manual"
+    return buildManualLogisticsTaskKindPayload(
+      normalizeLogisticsTaskKind(input.logisticsTaskKind, "manual")
     );
-    if (manualKind) {
-      return buildManualLogisticsTaskKindPayload(manualKind);
-    }
   }
 
   const kind = resolveLogisticsTaskKind(input);
