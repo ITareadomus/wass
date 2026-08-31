@@ -2588,7 +2588,7 @@ const displayClickableInputClass =
     cardLogisticsTaskKind == null &&
     !isFinished &&
     !isLockedTask
-      ? "Manca la tipologia logistica (consegna, ritiro o entrambi). Impostala prima di assegnare."
+      ? "Manca la tipologia logistica (delivery, pick-up o entrambi). Impostala prima di assegnare."
       : null;
 
   // Verifica se il check-in è per una data futura (rispetto alla data selezionata)
@@ -2826,11 +2826,11 @@ const displayClickableInputClass =
     logisticsAlertParts.push("Consegnare chiave al cleaner.");
   }
   if (effectiveLogisticsTaskKind === "pick-up") {
-    logisticsAlertParts.push("Solo ritiro dello sporco, no borsone.");
+    logisticsAlertParts.push("Solo pick-up dello sporco, no borsone.");
   } else if (effectiveLogisticsTaskKind === "delivery") {
-    logisticsAlertParts.push("Consegna dotazione o materiale al cleaner.");
+    logisticsAlertParts.push("Delivery di dotazione o materiale al cleaner.");
   } else if (effectiveLogisticsTaskKind === "delivery/pick-up") {
-    logisticsAlertParts.push("Consegna borsone e ritiro sporco al checkout.");
+    logisticsAlertParts.push("Delivery del borsone e pick-up dello sporco al checkout.");
   }
   const alertText = logisticsAlertParts.join(" ");
   const notesText =
@@ -3381,6 +3381,7 @@ const displayClickableInputClass =
                       operationsScope === "logistics" &&
                         !isInTimeline &&
                         cardLogisticsTaskKind == null &&
+                        effectiveLogisticsTaskKind == null &&
                         !isFinished &&
                         !isLockedTask &&
                         "animate-blink-yellow",
@@ -3652,7 +3653,7 @@ const displayClickableInputClass =
                         {timelineViolationShortLabels.join(" · ")}
                       </p>
                     )}
-                    {missingLogisticsKindMessage && (
+                    {missingLogisticsKindMessage && effectiveLogisticsTaskKind == null && (
                       <p className="w-full text-center text-xs font-semibold text-amber-700 dark:text-amber-400">
                         Manca tipologia
                       </p>
@@ -3802,7 +3803,7 @@ const displayClickableInputClass =
               </ul>
             </div>
           )}
-          {missingLogisticsKindMessage && (
+          {missingLogisticsKindMessage && effectiveLogisticsTaskKind == null && (
             <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
               <p className="font-semibold">Attenzione</p>
               <p className="mt-1">{missingLogisticsKindMessage}</p>

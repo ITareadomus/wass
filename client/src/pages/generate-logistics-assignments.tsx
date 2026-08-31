@@ -1483,7 +1483,7 @@ export default function GenerateLogisticsAssignments() {
                 >
                   {missingLogisticsKindTaskCount}
                 </button>{" "}
-                task senza tipologia logistica. La tipologia logistica va inserita per tutti i task prima di avviare l&apos;assegnazione.
+                task senza tipologia logistica (delivery, pick-up o entrambi). La tipologia va inserita per tutti i task prima di avviare l&apos;assegnazione.
               </DialogDescription>
             </DialogHeader>
 

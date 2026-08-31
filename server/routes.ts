@@ -11019,6 +11019,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     taskCodes: string[];
   }> {
     const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+    const { resolveLogisticsTaskKindFromRecord } = await import("../shared/logistics-task-kind");
     const [containersData, timelineData, locksMap] = await Promise.all([
       workspaceFiles.loadLogisticsContainers(workDate),
       workspaceFiles.loadLogisticsTimeline(workDate),
@@ -11042,6 +11043,10 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       const logisticCode = String(task?.logistic_code ?? task?.name ?? "").trim();
       const key = taskId || logisticCode;
       if (!key) continue;
+      const existing = taskById.get(key);
+      if (existing && resolveLogisticsTaskKindFromRecord(existing) && !resolveLogisticsTaskKindFromRecord(task)) {
+        continue;
+      }
       taskById.set(key, task);
     }
 
@@ -11054,8 +11059,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
     const list = Array.from(taskById.values()).filter((task: any) => {
       if (isLockedTask(task)) return false;
-      const kind = String(task?.logistics_task_kind ?? task?.logisticsTaskKind ?? "").trim();
-      return !kind;
+      return resolveLogisticsTaskKindFromRecord(task) == null;
     });
     const taskCodes = Array.from(
       new Set(

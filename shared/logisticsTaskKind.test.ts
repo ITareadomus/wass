@@ -18,6 +18,15 @@ describe("normalizeLogisticsTaskKind", () => {
     expect(normalizeLogisticsTaskKind("pick-up")).toBe("pick-up");
   });
 
+  it("accetta alias e maiuscole", () => {
+    expect(normalizeLogisticsTaskKind("PICK-UP")).toBe("pick-up");
+    expect(normalizeLogisticsTaskKind("pickup")).toBe("pick-up");
+    expect(normalizeLogisticsTaskKind("D&P")).toBe("delivery/pick-up");
+    expect(normalizeLogisticsTaskKind("1")).toBe("delivery");
+    expect(normalizeLogisticsTaskKind("2")).toBe("pick-up");
+    expect(normalizeLogisticsTaskKind("3")).toBe("delivery/pick-up");
+  });
+
   it("keeps manual delivery distinct from D&P", () => {
     expect(normalizeLogisticsTaskKind("delivery", "manual")).toBe("delivery");
     expect(normalizeLogisticsTaskKind("delivery/pick-up", "manual")).toBe("delivery/pick-up");
@@ -87,6 +96,15 @@ describe("resolveLogisticsTaskKind", () => {
         logisticsTaskKindSource: "auto",
       })
     ).toBe("delivery/pick-up");
+  });
+
+  it("riconosce tipologia già impostata anche in maiuscolo", () => {
+    expect(
+      resolveLogisticsTaskKind({
+        logisticsTaskKind: "PICK-UP",
+        logisticsTaskKindSource: "manual",
+      })
+    ).toBe("pick-up");
   });
 
   it("normalizes legacy persisted delivery", () => {

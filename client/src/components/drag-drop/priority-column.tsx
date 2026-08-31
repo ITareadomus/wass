@@ -85,7 +85,6 @@ export default function PriorityColumn({
   const [isAssigning, setIsAssigning] = useState(false);
   const [duplicateDialog, setDuplicateDialog] = useState<{
     logisticCode: string;
-    tasks: Array<{ id: string; operation?: string; checkoutTime?: string }>;
   } | null>(null);
   const { toast } = useToast();
   const [workYear, workMonth, workDay] = workDate.split("-").map(Number);
@@ -397,22 +396,7 @@ export default function PriorityColumn({
   const openDuplicateDialog = (entries: typeof orderedEntries) => {
     const first = entries[0]?.task as any;
     const logisticCode = String(first?.logistic_code ?? first?.name ?? "").trim() || "N/D";
-    setDuplicateDialog({
-      logisticCode,
-      tasks: entries.map((entry) => {
-        const t = entry.task as any;
-        const operation =
-          String(t.operation_name ?? t.operationName ?? "").trim() ||
-          (t.operation_id != null && t.operation_id !== ""
-            ? `operazione ${t.operation_id}`
-            : "");
-        return {
-          id: String(t.task_id ?? t.id ?? ""),
-          operation: operation || undefined,
-          checkoutTime: String(t.checkout_time ?? "").trim() || undefined,
-        };
-      }),
-    });
+    setDuplicateDialog({ logisticCode });
   };
 
   const renderDuplicateInfoBadge = (entries: typeof orderedEntries) => (
@@ -650,18 +634,8 @@ export default function PriorityColumn({
                   Queste task hanno lo stesso codice ADAM{" "}
                   <strong>{duplicateDialog?.logisticCode}</strong>. Controlla che
                   non siano duplicate (stesso appartamento inserito due volte).
+                  Se una delle due è sbagliata, bloccala.
                 </p>
-                {duplicateDialog && duplicateDialog.tasks.length > 0 && (
-                  <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-                    {duplicateDialog.tasks.map((item) => (
-                      <li key={item.id} className="text-foreground">
-                        Task id {item.id}
-                        {item.checkoutTime ? ` — checkout ${item.checkoutTime}` : ""}
-                        {item.operation ? ` — ${item.operation}` : ""}
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </div>
             </DialogDescription>
           </DialogHeader>

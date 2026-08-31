@@ -66,17 +66,17 @@ export const LOGISTICS_KIND_PICKER_OPTIONS: Array<{
   {
     kind: "pick-up",
     title: "PICK-UP",
-    description: "Il cleaner ha già il borsone — solo ritiro dello sporco al checkout.",
+    description: "Il cleaner ha già il borsone — solo pick-up dello sporco al checkout.",
   },
   {
     kind: "delivery",
     title: "DELIVERY",
-    description: "Consegna dotazione, macchinario o materiale al cleaner (solo manuale).",
+    description: "Delivery di dotazione, macchinario o materiale al cleaner (solo manuale).",
   },
   {
     kind: "delivery/pick-up",
     title: "D&P",
-    description: "Il driver consegna il borsone e ritira lo sporco al checkout.",
+    description: "Il driver fa delivery del borsone e pick-up dello sporco al checkout.",
   },
 ];
 
