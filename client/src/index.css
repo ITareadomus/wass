@@ -280,9 +280,13 @@
     contain: paint;
   }
 
-  .sequence-summary-task--violated {
+  .sequence-summary-task--violated,
+  .sequence-summary-task--map-filtered {
     contain: none;
     overflow: visible;
+  }
+
+  .sequence-summary-task--violated {
     cursor: pointer !important;
   }
 

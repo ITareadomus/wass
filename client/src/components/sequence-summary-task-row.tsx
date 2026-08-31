@@ -122,11 +122,13 @@ function SequenceSummaryCustomerNoteIndicator({
 export function getSequenceSummaryTaskRowClassName({
   isTimelineViolated,
   isHighlighted,
+  isMapFiltered,
   isDragging,
   executionStatus,
 }: {
   isTimelineViolated?: boolean;
   isHighlighted?: boolean;
+  isMapFiltered?: boolean;
   isDragging?: boolean;
   executionStatus?: LogisticsTaskExecutionStatus | null;
 } = {}) {
@@ -138,9 +140,10 @@ export function getSequenceSummaryTaskRowClassName({
   return cn(
     "sequence-summary-task relative rounded-md border px-2 py-1.5 text-xs",
     isTimelineViolated && "sequence-summary-task--violated",
+    isMapFiltered && "sequence-summary-task--map-filtered task-border-map-filtered",
     showViolationBlink
       ? "animate-blink-inset border-red-500 bg-red-50 dark:bg-red-950/30"
-      : isHighlighted
+      : !isMapFiltered && isHighlighted
         ? "border-amber-400 bg-amber-50 dark:bg-amber-950/30"
         : statusClass
           ? cn(
@@ -255,12 +258,14 @@ export function SequenceSummaryTaskRow({
   entry,
   className,
   isHighlighted = false,
+  isMapFiltered = false,
   isDragging = false,
   onCustomerNoteOpen,
 }: {
   entry: SequenceSummaryEntry;
   className?: string;
   isHighlighted?: boolean;
+  isMapFiltered?: boolean;
   isDragging?: boolean;
   onCustomerNoteOpen?: (note: string, logisticCode: string) => void;
 }) {
@@ -272,6 +277,7 @@ export function SequenceSummaryTaskRow({
         getSequenceSummaryTaskRowClassName({
           isTimelineViolated,
           isHighlighted,
+          isMapFiltered,
           isDragging,
           executionStatus: entry.executionStatus,
         }),

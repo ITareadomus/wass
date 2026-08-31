@@ -1,11 +1,12 @@
-import { Fragment, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ListOrdered, Loader2, Maximize2 } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
-import type { SequenceSummaryGroup } from "@/lib/sequence-summary";
+import type { SequenceSummaryEntry, SequenceSummaryGroup } from "@/lib/sequence-summary";
+import { openTimelineMapPanel } from "@/lib/timeline-map-panel";
 import {
   Dialog,
   DialogContent,
@@ -55,6 +56,7 @@ function DndSummaryTaskItem({
   role,
   tabIndex,
   ariaLabel,
+  title,
   children,
 }: {
   id: string;
@@ -68,6 +70,7 @@ function DndSummaryTaskItem({
   role?: string;
   tabIndex?: number;
   ariaLabel?: string;
+  title?: string;
   children: (state: { isDragging: boolean }) => ReactNode;
 }) {
   const nodeRef = useRef<HTMLLIElement | null>(null);
@@ -118,6 +121,7 @@ function DndSummaryTaskItem({
       role={role}
       tabIndex={tabIndex}
       aria-label={ariaLabel}
+      title={title}
       onClick={onClick}
       onKeyDown={onKeyDown}
     >
@@ -134,6 +138,31 @@ function matchesSearch(entry: SequenceSummaryGroup["tasks"][number], query: stri
     String(entry.customerAlias ?? "").toLowerCase().includes(lowerSearch) ||
     entry.address.toLowerCase().includes(lowerSearch)
   );
+}
+
+function normalizeMapFilteredTaskId(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  return String(value);
+}
+
+function normalizeMapFilteredCleanerId(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const id = Number(value);
+  return Number.isFinite(id) ? id : null;
+}
+
+function summaryTaskMatchesMapFilter(
+  entry: SequenceSummaryEntry,
+  driverId: number,
+  filteredTaskId: string | null,
+): boolean {
+  if (!filteredTaskId) return false;
+  const markerId = String(entry.taskId);
+  if (filteredTaskId === markerId) return true;
+  if (filteredTaskId === `${markerId}:${driverId}`) return true;
+  const colon = filteredTaskId.lastIndexOf(":");
+  const baseId = colon >= 0 ? filteredTaskId.slice(0, colon) : filteredTaskId;
+  return baseId === markerId || baseId === String(entry.logisticCode);
 }
 
 export default function AssignedTasksSequenceSummary({
@@ -158,6 +187,59 @@ export default function AssignedTasksSequenceSummary({
     messages: string[];
   }>({ open: false, logisticCode: "", messages: [] });
   const [loadOrderDriverIds, setLoadOrderDriverIds] = useState<Set<number>>(() => new Set());
+  const [filteredTaskId, setFilteredTaskId] = useState<string | null>(null);
+  const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
+  const summaryClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const driverClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const sync = setInterval(() => {
+      const nextTaskId = normalizeMapFilteredTaskId((window as any).mapFilteredTaskId);
+      const nextCleanerId = normalizeMapFilteredCleanerId((window as any).mapFilteredCleanerId);
+      setFilteredTaskId((prev) => (prev === nextTaskId ? prev : nextTaskId));
+      setFilteredCleanerId((prev) => (prev === nextCleanerId ? prev : nextCleanerId));
+    }, 250);
+    return () => clearInterval(sync);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (summaryClickTimerRef.current) clearTimeout(summaryClickTimerRef.current);
+      if (driverClickTimerRef.current) clearTimeout(driverClickTimerRef.current);
+    };
+  }, []);
+
+  const toggleSummaryTaskMapFilter = (entry: SequenceSummaryEntry) => {
+    const markerId = String(entry.taskId);
+    const current = normalizeMapFilteredTaskId((window as any).mapFilteredTaskId);
+    const isSame =
+      current === markerId ||
+      (current != null && current.split(":")[0] === markerId);
+    if (isSame) {
+      (window as any).mapFilteredTaskId = null;
+      setFilteredTaskId(null);
+      return;
+    }
+    (window as any).mapFilteredTaskId = markerId;
+    (window as any).mapFilteredCleanerId = null;
+    setFilteredTaskId(markerId);
+    setFilteredCleanerId(null);
+    openTimelineMapPanel();
+  };
+
+  const toggleSummaryDriverMapFilter = (driverId: number) => {
+    const current = normalizeMapFilteredCleanerId((window as any).mapFilteredCleanerId);
+    if (current === driverId) {
+      (window as any).mapFilteredCleanerId = null;
+      setFilteredCleanerId(null);
+      return;
+    }
+    (window as any).mapFilteredCleanerId = driverId;
+    (window as any).mapFilteredTaskId = null;
+    setFilteredCleanerId(driverId);
+    setFilteredTaskId(null);
+    openTimelineMapPanel();
+  };
 
   const toggleDriverLoadOrder = (driverId: number) => {
     setLoadOrderDriverIds((prev) => {
@@ -210,6 +292,7 @@ export default function AssignedTasksSequenceSummary({
               activeDragDriverId === group.id &&
               draggingOverDriverId != null &&
               draggingOverDriverId !== group.id;
+            const isDriverMapFiltered = filteredCleanerId === group.id;
 
             const renderCrossDriverInsertSlot = (atIndex: number) =>
               isCrossDriverTargetCol && lastValidDragIndex === atIndex ? (
@@ -224,7 +307,11 @@ export default function AssignedTasksSequenceSummary({
             return (
             <div
               key={group.id}
-              className="relative flex h-full min-h-[120px] min-w-0 flex-col overflow-hidden rounded-lg border border-custom-blue/40 p-3"
+              className={cn(
+                "relative flex h-full min-h-[120px] min-w-0 flex-col overflow-hidden rounded-lg border border-custom-blue/40 p-3",
+                isDriverMapFiltered &&
+                  "ring-2 ring-amber-400 border-amber-500 dark:ring-amber-500/80 dark:border-amber-500",
+              )}
             >
               {loadingDriverIdSet.has(group.id) && (
                 <div className="absolute inset-0 z-40 flex items-center justify-center rounded-lg bg-black/20 backdrop-blur-sm pointer-events-none dark:bg-black/40">
@@ -235,7 +322,21 @@ export default function AssignedTasksSequenceSummary({
                 </div>
               )}
               <div className="mb-2 flex shrink-0 items-start justify-between gap-2 border-b border-border pb-2">
-                <div className="min-w-0">
+                <div
+                  className="min-w-0 cursor-pointer"
+                  title="Doppio click: filtro mappa"
+                  onClick={() => {
+                    if (driverClickTimerRef.current) {
+                      clearTimeout(driverClickTimerRef.current);
+                      driverClickTimerRef.current = null;
+                      toggleSummaryDriverMapFilter(group.id);
+                      return;
+                    }
+                    driverClickTimerRef.current = setTimeout(() => {
+                      driverClickTimerRef.current = null;
+                    }, 250);
+                  }}
+                >
                   <SequenceSummaryGroupHeading group={group} />
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
@@ -295,6 +396,14 @@ export default function AssignedTasksSequenceSummary({
                         const isHighlighted = searchTask.trim()
                           ? matchesSearch(entry, searchTask.trim())
                           : false;
+                        const isTaskMapFiltered = summaryTaskMatchesMapFilter(
+                          entry,
+                          group.id,
+                          filteredTaskId,
+                        );
+                        const isMapFiltered =
+                          isTaskMapFiltered ||
+                          (filteredTaskId == null && isDriverMapFiltered);
                         const isTimelineViolated = entry.timelineViolated === true;
                         const violationMessages = entry.violationMessages ?? [];
 
@@ -325,12 +434,14 @@ export default function AssignedTasksSequenceSummary({
                                 getSequenceSummaryTaskRowClassName({
                                   isTimelineViolated,
                                   isHighlighted,
+                                  isMapFiltered,
                                   executionStatus: entry.executionStatus,
                                 }),
                                 !isGroupDragDisabled &&
                                   !isTimelineViolated &&
                                   "cursor-grab active:cursor-grabbing",
                               )}
+                              title="Doppio click: filtro mappa"
                               role={isTimelineViolated ? "button" : undefined}
                               tabIndex={isTimelineViolated ? 0 : undefined}
                               ariaLabel={
@@ -339,12 +450,21 @@ export default function AssignedTasksSequenceSummary({
                                   : undefined
                               }
                               onClick={() => {
-                                if (!isTimelineViolated) return;
-                                setViolationDialog({
-                                  open: true,
-                                  messages: violationMessages,
-                                  logisticCode: entry.logisticCode || "N/D",
-                                });
+                                if (summaryClickTimerRef.current) {
+                                  clearTimeout(summaryClickTimerRef.current);
+                                  summaryClickTimerRef.current = null;
+                                  toggleSummaryTaskMapFilter(entry);
+                                  return;
+                                }
+                                summaryClickTimerRef.current = setTimeout(() => {
+                                  summaryClickTimerRef.current = null;
+                                  if (!isTimelineViolated) return;
+                                  setViolationDialog({
+                                    open: true,
+                                    messages: violationMessages,
+                                    logisticCode: entry.logisticCode || "N/D",
+                                  });
+                                }, 250);
                               }}
                               onKeyDown={(event) => {
                                 if (!isTimelineViolated) return;
