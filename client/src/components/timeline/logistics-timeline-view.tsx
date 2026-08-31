@@ -2316,6 +2316,35 @@ export default function LogisticsTimelineView({
 
             {/* Scrollbar (solo se serve) + riga + / Salvato / Invia */}
             <div className="relative z-20 -mx-1 flex shrink-0 flex-col bg-custom-blue-light">
+              {/* Linguetta + attaccata alla timeline (sopra la scrollbar se presente) */}
+              <div
+                className="absolute top-0 left-1 z-30 h-[40px] overflow-visible print:hidden"
+                style={{ width: `${driverColumnWidth}px` }}
+              >
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 z-0"
+                >
+                  <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
+                    <path
+                      d="M0,0 C16,0 30,4 44,12 C54,18 60,24 68,28 C72,30 76,31 80,31 C84,31 88,30 92,28 C100,24 106,18 116,12 C130,4 144,0 160,0 Z"
+                      fill="rgba(59,130,246,0.12)"
+                    />
+                  </svg>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={isReadOnly}
+                  className="absolute inset-0 z-10 h-full w-full rounded-none border-0 bg-transparent p-0 text-custom-blue hover:bg-transparent hover:text-custom-blue dark:hover:text-custom-blue"
+                  aria-label="Aggiungi driver"
+                  title="Aggiungi driver"
+                  onClick={() => void handleOpenAddDriverDialog(null)}
+                >
+                  <UserPlus className="w-4 h-4" />
+                </Button>
+              </div>
               <TimelineHorizontalScrollbar
                 labelColumnWidth={driverColumnWidth}
                 contentWidth={timelineScaledWidth}
@@ -2324,33 +2353,10 @@ export default function LogisticsTimelineView({
               />
               <div className="relative flex h-[40px] shrink-0 items-stretch px-1">
                 <div
-                  className="relative flex-shrink-0 overflow-visible print:hidden"
+                  className="relative flex-shrink-0 print:hidden"
                   style={{ width: `${driverColumnWidth}px` }}
-                >
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 z-0"
-                  >
-                    <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
-                      <path
-                        d="M0,0 C16,0 30,4 44,12 C54,18 60,24 68,28 C72,30 76,31 80,31 C84,31 88,30 92,28 C100,24 106,18 116,12 C130,4 144,0 160,0 Z"
-                        fill="rgba(59,130,246,0.12)"
-                      />
-                    </svg>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={isReadOnly}
-                    className="absolute inset-0 z-10 h-full w-full rounded-none border-0 bg-transparent p-0 text-custom-blue hover:bg-transparent hover:text-custom-blue dark:hover:text-custom-blue"
-                    aria-label="Aggiungi driver"
-                    title="Aggiungi driver"
-                    onClick={() => void handleOpenAddDriverDialog(null)}
-                  >
-                    <UserPlus className="w-4 h-4" />
-                  </Button>
-                </div>
+                  aria-hidden
+                />
                 <div className="grid h-full flex-1 grid-cols-[1fr_auto] items-center pl-2 pr-0">
                   <Button
                     onClick={() => setShowAdamTransferDialog(true)}
