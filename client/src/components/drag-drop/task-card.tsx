@@ -3378,13 +3378,6 @@ const displayClickableInputClass =
                         executionColorsEnabled &&
                         housekeepingWorkProgress?.overdue &&
                         "animate-blink-green",
-                      operationsScope === "logistics" &&
-                        !isInTimeline &&
-                        cardLogisticsTaskKind == null &&
-                        effectiveLogisticsTaskKind == null &&
-                        !isFinished &&
-                        !isLockedTask &&
-                        "animate-blink-yellow",
                       !isDragging && isMapFiltered && "task-border-map-filtered",
                       !isDragging && !isMapFiltered && isHighlighted && "task-border-search-highlighted",
                       "cursor-pointer flex-shrink-0 relative group"
@@ -3414,6 +3407,15 @@ const displayClickableInputClass =
                       }
                     }}
                   >
+                    {missingLogisticsKindMessage && effectiveLogisticsTaskKind == null && (
+                      <span
+                        className="missing-logistics-kind-badge"
+                        title="Manca tipologia"
+                        aria-label="Manca tipologia"
+                      >
+                        !
+                      </span>
+                    )}
                     {isInTimeline &&
                       executionColorsEnabled &&
                       housekeepingWorkProgress &&

@@ -404,7 +404,7 @@ export default function PriorityColumn({
       type="button"
       className="duplicate-info-badge"
       title="Stesso codice ADAM — clicca per i dettagli"
-      aria-label="Perché queste task hanno lo stesso codice ADAM"
+      aria-label="Perché questi task hanno lo stesso codice ADAM"
       onPointerDown={(event) => event.stopPropagation()}
       onMouseDown={(event) => event.stopPropagation()}
       onClick={(event) => {
@@ -631,10 +631,10 @@ export default function PriorityColumn({
             <DialogDescription asChild>
               <div className="space-y-3 text-sm text-foreground">
                 <p>
-                  Queste task hanno lo stesso codice ADAM{" "}
+                  Questi task hanno lo stesso codice ADAM{" "}
                   <strong>{duplicateDialog?.logisticCode}</strong>. Controlla che
-                  non siano duplicate (stesso appartamento inserito due volte).
-                  Se una delle due è sbagliata, bloccala.
+                  non siano duplicati (stesso appartamento inserito due volte).
+                  Se uno dei due è sbagliato, bloccalo.
                 </p>
               </div>
             </DialogDescription>

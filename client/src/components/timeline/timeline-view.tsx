@@ -3471,7 +3471,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   return cleaner ? (
                     <>
                       <p className="font-semibold text-foreground">
-                        Il cleaner <span className="text-black dark:text-white">{cleanerDisplay?.fullName || cleanerDisplay?.primaryLabel}</span> ({cleanerDisplay?.role || cleaner.role}) ha delle task non compatibili con il suo ruolo:
+                        Il cleaner <span className="text-black dark:text-white">{cleanerDisplay?.fullName || cleanerDisplay?.primaryLabel}</span> ({cleanerDisplay?.role || cleaner.role}) ha dei task non compatibili con il suo ruolo:
                       </p>
                       <ul className="space-y-3 pl-0">
                         {incompatibleDialog.tasks.map((task, idx) => (
