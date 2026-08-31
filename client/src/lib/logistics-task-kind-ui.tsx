@@ -250,7 +250,7 @@ export function LogisticsKindPickerDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   taskLabel: string;
-  onSelect: (kind: LogisticsTaskKind) => void;
+  onSelect: (kind: LogisticsTaskKind | null) => void;
   isSaving?: boolean;
   currentKind?: LogisticsTaskKind | null;
 }) {
@@ -299,6 +299,44 @@ export function LogisticsKindPickerDialog({
               </button>
             );
           })}
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={() => onSelect(null)}
+            className={cn(
+              "flex w-full items-center gap-3 rounded-md border bg-background p-3 text-left transition-colors",
+              currentKind == null
+                ? "border-sky-600 bg-sky-50/70 dark:bg-sky-950/40"
+                : "border-dashed border-muted-foreground/45",
+              isSaving
+                ? "cursor-not-allowed opacity-60"
+                : "cursor-pointer hover:border-sky-600 hover:bg-muted/40"
+            )}
+          >
+            <div className="flex w-[5.5rem] shrink-0 items-center justify-start">
+              <span
+                className={cn(
+                  LOGISTICS_KIND_BADGE_BASE_CLASS,
+                  "min-w-[2rem] border-dashed border-muted-foreground/45 text-muted-foreground"
+                )}
+              >
+                —
+              </span>
+            </div>
+            <div className="min-w-0 flex-1 space-y-0.5">
+              <p className="text-sm font-semibold leading-tight text-foreground">
+                Nessuna tipologia
+                {currentKind == null ? (
+                  <span className="ml-2 text-xs font-medium text-sky-700 dark:text-sky-300">
+                    (attuale)
+                  </span>
+                ) : null}
+              </p>
+              <p className="text-xs leading-snug text-muted-foreground">
+                Rimuove PICK-UP, DELIVERY o D&P. Il task resta da classificare.
+              </p>
+            </div>
+          </button>
         </div>
       </DialogContent>
     </Dialog>

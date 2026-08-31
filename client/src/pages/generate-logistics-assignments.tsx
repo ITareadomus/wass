@@ -1298,6 +1298,7 @@ export default function GenerateLogisticsAssignments() {
                     title="EARLY OUT"
                     priority="early-out"
                     tasks={earlyOutTasks}
+                    workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="early-out"
                     icon="clock"
                     isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
@@ -1311,6 +1312,7 @@ export default function GenerateLogisticsAssignments() {
                     title="HIGH PRIORITY"
                     priority="high"
                     tasks={highPriorityTasks}
+                    workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="high"
                     icon="alert-circle"
                     isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
@@ -1324,6 +1326,7 @@ export default function GenerateLogisticsAssignments() {
                     title="LOW PRIORITY"
                     priority="low"
                     tasks={lowPriorityTasks}
+                    workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="low"
                     icon="arrow-down"
                     isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
@@ -1413,6 +1416,7 @@ export default function GenerateLogisticsAssignments() {
                 >
                   <MapSection
                     tasks={mapTasks}
+                    workDate={format(selectedDate, "yyyy-MM-dd")}
                     personnelColorScope="logistics"
                     compact
                     className="h-full"

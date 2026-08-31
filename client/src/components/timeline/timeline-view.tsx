@@ -62,6 +62,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 interface TimelineViewProps {
   personnel: Personnel[];
   tasks: Task[];
+  selectedDate: Date;
   hasUnsavedChanges?: boolean; // Stato delle modifiche non salvate dal parent
   onTaskMoved?: () => void; // Callback quando una task viene spostata
   /** Dopo reset assegnazioni: ripristina stato pulsanti Assegna EO → HP → LP nel parent */
@@ -238,6 +239,7 @@ const PREASSIGNED_REASON_READONLY = "preassigned_enable_wass_readonly";
 export default function TimelineView({
   personnel,
   tasks,
+  selectedDate,
   hasUnsavedChanges = false,
   onTaskMoved,
   onWaveAssignStateReset,
@@ -255,25 +257,6 @@ export default function TimelineView({
   className,
 }: TimelineViewProps) {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
-  const [selectedDate, setSelectedDate] = useState<Date>(() => {
-    // Leggi la data dal parametro URL se presente
-    const urlParams = new URLSearchParams(window.location.search);
-    const dateParam = urlParams.get('date');
-
-    if (dateParam) {
-      const [year, month, day] = dateParam.split('-').map(Number);
-      return new Date(year, month - 1, day);
-    }
-
-    // Altrimenti usa la data salvata in localStorage
-    const savedDate = localStorage.getItem('selected_work_date');
-    if (savedDate) {
-      const [year, month, day] = savedDate.split('-').map(Number);
-      return new Date(year, month - 1, day);
-    }
-
-    return new Date();
-  });
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSwapCleaner, setSelectedSwapCleaner] = useState<string>("");
@@ -425,14 +408,8 @@ export default function TimelineView({
   // Stato per le regole di validazione task-cleaner
   const [validationRules, setValidationRules] = useState<any>(null);
 
-  // Normalizza la data da localStorage per coerenza ovunque
-  const workDate = localStorage.getItem('selected_work_date') || (() => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  })();
+  // Unica fonte della data: lo stato della pagina padre.
+  const workDate = format(selectedDate, 'yyyy-MM-dd');
 
   // Carica le regole di validazione una sola volta all'init
   useEffect(() => {
@@ -687,7 +664,13 @@ export default function TimelineView({
       const id = Number((task as any)?.assignedCleaner ?? (task as any)?.cleanerId);
       if (Number.isFinite(id) && id > 0) assignedIds.add(id);
     }
-    return combined.filter((cleaner) => assignedIds.has(Number(cleaner.id)));
+    // A giornata ON i convocati restano visibili (anche senza task) così si possono
+    // ancora aggiungere/rimuovere cleaner; nascondi solo chi non è più in selezione
+    // e non ha assegnazioni.
+    return combined.filter(
+      (cleaner) =>
+        selectedCleanerIds.has(Number(cleaner.id)) || assignedIds.has(Number(cleaner.id))
+    );
   }, [cleaners, timelineCleaners, isOperationalDayStarted, tasks]);
 
   const visibleCleanerIds = React.useMemo(
@@ -881,6 +864,12 @@ export default function TimelineView({
     isLoadingDragDrop ||
     removeCleanerMutation.isPending ||
     removeSelectedCleanersMutation.isPending;
+
+  // In sola visualizzazione (data storica o giornata operativa iniziata) anche il roster è bloccato.
+  const isRosterEditDisabled = isReadOnly;
+  const rosterEditDisabledTitle = isOperationalDayStarted
+    ? "Giornata operativa iniziata: modalità sola visualizzazione"
+    : "Non disponibile in modalità storico (data passata)";
 
   // Mutation per aggiungere un cleaner alla timeline
   const addCleanerMutation = useMutation({
@@ -1704,12 +1693,15 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
   // Handler per aprire il dialog di aggiunta cleaner
   const handleOpenAddCleanerDialog = async () => {
+    if (isRosterEditDisabled) return;
     setIsAddCleanerDialogOpen(true); // Apri il dialog subito per mostrare loading
     await loadAvailableCleaners(); // Attendi il caricamento
   };
 
   // Handler per aggiungere/sostituire un cleaner
   const handleAddCleaner = (cleanerId: number, isAvailable: boolean) => {
+    if (isRosterEditDisabled) return;
+
     // Trova il nome del cleaner per mostrarlo nel dialog
     const cleaner = availableCleaners.find(c => c.id === cleanerId);
     const cleanerName = cleaner ? `${cleaner.name} ${cleaner.lastname}` : `ID ${cleanerId}`;
@@ -1733,7 +1725,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
   // Handler per confermare start time e aggiungere cleaner
   const handleConfirmStartTimeAndAdd = async () => {
-    if (!startTimeDialog.cleanerId) return; // Ensure we have a cleaner ID
+    if (isRosterEditDisabled || !startTimeDialog.cleanerId) return;
 
     const cleanerId = startTimeDialog.cleanerId;
 
@@ -1802,6 +1794,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
   // Handler per confermare l'aggiunta di un cleaner non disponibile
   const handleConfirmAddUnavailableCleaner = async () => {
+    if (isRosterEditDisabled) return;
+
     const cleanerId = confirmUnavailableDialog.cleanerId;
     if (cleanerId === null) return;
 
@@ -1850,6 +1844,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
   // Handler per confermare la rimozione di un cleaner
   const handleConfirmRemoveCleaner = () => {
+    if (isRosterEditDisabled) return;
+
     if (confirmRemovalDialog.cleanerId !== null) {
       removeCleanerMutation.mutate(confirmRemovalDialog.cleanerId);
       setConfirmRemovalDialog({ open: false, cleanerId: null });
@@ -2555,7 +2551,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2 border-2 border-custom-blue"
-                disabled={isReadOnly}
+                disabled={isRosterEditDisabled}
+                title={isRosterEditDisabled ? rosterEditDisabledTitle : undefined}
               >
                 <Users className="w-4 h-4" />
                 Convocazioni
@@ -2708,7 +2705,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 variant="ghost"
                 size="sm"
                 disabled={
-                  isReadOnly ||
+                  isRosterEditDisabled ||
                   cleaners.length === 0 ||
                   removeSelectedCleanersMutation.isPending
                 }
@@ -2718,8 +2715,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 )}
                 aria-label="Rimuovi cleaners convocati"
                 title={
-                  isReadOnly
-                    ? "Non disponibile in modalità storico (data passata)"
+                  isRosterEditDisabled
+                    ? rosterEditDisabledTitle
                     : cleaners.length === 0
                       ? "Nessun cleaner convocato da rimuovere"
                       : `Rimuovi convocati (${cleaners.length})`
@@ -2792,7 +2789,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
           {/* Righe cleaners + scrollbar/footer attaccati in fondo al contenuto */}
           <div className="timeline-rows-scroll relative z-0 min-h-0 flex-none overflow-x-hidden overflow-y-auto px-1 pb-0 pt-2">
-            {allCleanersToShow.length === 0 && !isReadOnly ? (
+            {allCleanersToShow.length === 0 && !isRosterEditDisabled ? (
               <div className="mb-0.5 flex min-w-0">
                 <div className="flex min-w-0 flex-1 items-center justify-center rounded-lg border-2 border-yellow-300 bg-yellow-100 dark:border-yellow-700 dark:bg-yellow-950/50 h-64">
                   <div className="text-center p-6">
@@ -2807,7 +2804,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 </div>
                 <div className="w-20 flex-shrink-0" aria-hidden />
               </div>
-            ) : allCleanersToShow.length === 0 && isReadOnly ? (
+            ) : allCleanersToShow.length === 0 && isRosterEditDisabled ? (
               <div className="mb-0.5 flex min-w-0">
                 <div className="flex min-w-0 flex-1 items-center justify-center rounded-lg border-2 border-red-300 bg-red-50 dark:border-blue-800 dark:bg-red-950/20 h-64">
                   <div className="text-center p-6">
@@ -3134,7 +3131,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                       // CRITICAL: L'array è ordinato per sequence, quindi idx-1 è la vera task precedente
                                       const prevTask = idx > 0 ? cleanerTasks[idx - 1] as any : null;
 
-                                      const workDateStr = localStorage.getItem('selected_work_date') || format(new Date(), 'yyyy-MM-dd');
+                                      const workDateStr = workDate;
 
                                       // CRITICAL: Normalizza le date per evitare mismatch di formato (es. "2025-12-15T00:00:00Z" vs "2025-12-15")
                                       const prevTaskDate = normDate(prevTask?.checkin_date);
@@ -3289,6 +3286,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           }
                                           task={task}
                                           index={idx}
+                                          workDate={workDate}
                                           isInTimeline={true}
                                           allTasks={cleanerTasks}
                                           isDragDisabled={isTimelineInteractionDisabled}
@@ -3346,6 +3344,37 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
             {/* Scrollbar (solo se serve overflow) + riga + / Salvato / Trasferisci */}
             <div className="relative z-20 -mx-1 flex shrink-0 flex-col bg-custom-blue-light">
+              {/* Linguetta + attaccata alla timeline (sopra la scrollbar se presente) */}
+              <div
+                className="absolute top-0 left-1 z-30 h-[40px] overflow-visible print:hidden"
+                style={{ width: `${cleanerColumnWidth}px` }}
+              >
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 z-0"
+                >
+                  <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
+                    <path
+                      d="M0,0 C16,0 30,4 44,12 C54,18 60,24 68,28 C72,30 76,31 80,31 C84,31 88,30 92,28 C100,24 106,18 116,12 C130,4 144,0 160,0 Z"
+                      fill="rgba(59,130,246,0.12)"
+                    />
+                  </svg>
+                </div>
+                <Button
+                  onClick={() => {
+                    setCleanerToReplace(null);
+                    handleOpenAddCleanerDialog();
+                  }}
+                  variant="ghost"
+                  size="sm"
+                  className="absolute inset-0 z-10 h-full w-full rounded-none border-0 bg-transparent p-0 text-custom-blue hover:bg-transparent hover:text-custom-blue dark:hover:text-custom-blue"
+                  disabled={isRosterEditDisabled}
+                  aria-label="Aggiungi cleaner"
+                  title={isRosterEditDisabled ? rosterEditDisabledTitle : "Aggiungi cleaner"}
+                >
+                  <UserPlus className="w-4 h-4" />
+                </Button>
+              </div>
               <TimelineHorizontalScrollbar
                 labelColumnWidth={cleanerColumnWidth}
                 contentWidth={timelineScaledWidth}
@@ -3354,35 +3383,10 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               />
               <div className="relative flex h-[40px] shrink-0 items-stretch px-1">
                 <div
-                  className="relative flex-shrink-0 overflow-visible print:hidden"
+                  className="relative flex-shrink-0 print:hidden"
                   style={{ width: `${cleanerColumnWidth}px` }}
-                >
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 z-0"
-                  >
-                    <svg className="h-full w-full" viewBox="0 0 160 38" preserveAspectRatio="none">
-                      <path
-                        d="M0,0 C16,0 30,4 44,12 C54,18 60,24 68,28 C72,30 76,31 80,31 C84,31 88,30 92,28 C100,24 106,18 116,12 C130,4 144,0 160,0 Z"
-                        fill="rgba(59,130,246,0.12)"
-                      />
-                    </svg>
-                  </div>
-                  <Button
-                    onClick={() => {
-                      setCleanerToReplace(null);
-                      handleOpenAddCleanerDialog();
-                    }}
-                    variant="ghost"
-                    size="sm"
-                    className="absolute inset-0 z-10 h-full w-full rounded-none border-0 bg-transparent p-0 text-custom-blue hover:bg-transparent hover:text-custom-blue dark:hover:text-custom-blue"
-                    disabled={isReadOnly}
-                    aria-label="Aggiungi cleaner"
-                    title="Aggiungi cleaner"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                  </Button>
-                </div>
+                  aria-hidden
+                />
                 <div className="grid h-full flex-1 grid-cols-[1fr_auto] items-center pl-2 pr-0">
                   <div className="col-start-2 flex items-center gap-3 justify-self-end print:hidden">
                     {onOperationalDayToggle && (
@@ -3807,7 +3811,11 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             <Button
               onClick={handleConfirmRemoveCleaner}
               variant="outline"
-              disabled={confirmRemovalDialog.cleanerId === null || removeCleanerMutation.isPending}
+              disabled={
+                isRosterEditDisabled ||
+                confirmRemovalDialog.cleanerId === null ||
+                removeCleanerMutation.isPending
+              }
               className="border-2 border-custom-blue hover:bg-accent hover:text-accent-foreground"
             >
               Conferma Rimozione
@@ -3953,7 +3961,11 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             <Button
               variant="outline"
               onClick={() => removeSelectedCleanersMutation.mutate(cleanerIdsToRemove)}
-              disabled={cleanerIdsToRemove.length === 0 || removeSelectedCleanersMutation.isPending}
+              disabled={
+                isRosterEditDisabled ||
+                cleanerIdsToRemove.length === 0 ||
+                removeSelectedCleanersMutation.isPending
+              }
               className="border-2 border-custom-blue hover:bg-accent hover:text-accent-foreground"
             >
               {removeSelectedCleanersMutation.isPending ? (
@@ -4158,6 +4170,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               variant="outline"
               size="sm"
               onClick={handleConfirmStartTimeAndAdd}
+              disabled={isRosterEditDisabled}
               className="border-2 border-custom-blue"
             >
               Conferma e Aggiungi
@@ -4191,6 +4204,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               variant="outline"
               size="sm"
               onClick={handleConfirmAddUnavailableCleaner}
+              disabled={isRosterEditDisabled}
               className="border-2 border-custom-blue"
             >
               Conferma e Aggiungi
@@ -4505,7 +4519,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     setConfirmRemovalDialog({ open: true, cleanerId: selectedCleaner.id });
                     setIsModalOpen(false);
                   }}
-                  disabled={removeCleanerMutation.isPending || isReadOnly}
+                  disabled={removeCleanerMutation.isPending || isRosterEditDisabled}
                   variant="destructive"
                   className="w-full"
                   data-testid="button-remove-cleaner"

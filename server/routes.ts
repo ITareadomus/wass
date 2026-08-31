@@ -68,7 +68,12 @@ async function rejectIfOperationalDayStarted(
     return true;
   } catch (error) {
     console.warn("⚠️ operational-day guard:", error);
-    return false;
+    res.status(503).json({
+      success: false,
+      error: "OPERATIONAL_DAY_STATUS_UNAVAILABLE",
+      message: "Impossibile verificare lo stato della giornata operativa: modifica bloccata per sicurezza.",
+    });
+    return true;
   }
 }
 
@@ -2903,8 +2908,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { buildManualLogisticsTaskKindPayload, normalizeLogisticsTaskKind } = await import(
         "../shared/logistics-task-kind"
       );
-      const normalizedKind = normalizeLogisticsTaskKind(kind, "manual");
-      if (!normalizedKind) {
+      const wantsClear =
+        kind === null || kind === undefined || kind === "" || kind === "none";
+      const normalizedKind = wantsClear ? null : normalizeLogisticsTaskKind(kind, "manual");
+      if (!wantsClear && !normalizedKind) {
         return res.status(400).json({ success: false, error: "Invalid logistics task kind" });
       }
 
@@ -2938,7 +2945,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           {
             editedField: "logistics_task_kind",
             oldValue: previousKind ?? "",
-            newValue: normalizedKind,
+            newValue: normalizedKind ?? "",
           }
         );
 
@@ -4528,6 +4535,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       const resolvedScope = isOfficeScope(scope) ? "office" : "housekeeping";
 
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+
       // Supporta sia array di ID che array di oggetti cleaner
       let ids: number[] = [];
       if (cleaner_ids && Array.isArray(cleaner_ids)) {
@@ -5680,6 +5689,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const resolvedScope = isOfficeScope(scope) ? "office" : "housekeeping";
 
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+
       // Carica dati completi dei cleaners da PostgreSQL
       const { pgDailyAssignmentsService } = await import('./services/pg-daily-assignments-service');
       const cleanerIds = selectedCleaners.map((c: any) => typeof c === 'number' ? c : c.id);
@@ -6224,6 +6235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentUsername = modified_by || getCurrentUsername(req);
 
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const selectedCleanersResult = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
       let selectedCleanersData = selectedCleanersResult || {
@@ -10563,6 +10575,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       }
 
       const workDate = date || format(new Date(), "yyyy-MM-dd");
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
 
       // Salva alias direttamente in PostgreSQL

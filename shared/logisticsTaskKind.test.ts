@@ -107,6 +107,19 @@ describe("resolveLogisticsTaskKind", () => {
     ).toBe("delivery");
   });
 
+  it("keeps a cleared manual kind empty instead of auto-filling", () => {
+    expect(
+      resolveLogisticsTaskKind({
+        cleanerId: 10,
+        cleanerSequence: 1,
+        premium: false,
+        paxIn: 2,
+        logisticsTaskKind: null,
+        logisticsTaskKindSource: "manual",
+      })
+    ).toBeNull();
+  });
+
   it("never auto-resolves delivery kind", () => {
     expect(
       resolveLogisticsTaskKind({
@@ -137,6 +150,22 @@ describe("buildLogisticsTaskKindPayload", () => {
   it("returns empty object when kind cannot be resolved", () => {
     expect(buildLogisticsTaskKindPayload({ cleanerId: null, cleanerSequence: null })).toEqual({});
   });
+
+  it("persists a cleared manual kind", () => {
+    expect(
+      buildLogisticsTaskKindPayload({
+        cleanerId: 10,
+        cleanerSequence: 1,
+        premium: false,
+        paxIn: 2,
+        logisticsTaskKind: null,
+        logisticsTaskKindSource: "manual",
+      })
+    ).toEqual({
+      logistics_task_kind: null,
+      logistics_task_kind_source: "manual",
+    });
+  });
 });
 
 describe("buildManualLogisticsTaskKindPayload", () => {
@@ -147,6 +176,10 @@ describe("buildManualLogisticsTaskKindPayload", () => {
     });
     expect(buildManualLogisticsTaskKindPayload("pick-up")).toEqual({
       logistics_task_kind: "pick-up",
+      logistics_task_kind_source: "manual",
+    });
+    expect(buildManualLogisticsTaskKindPayload(null)).toEqual({
+      logistics_task_kind: null,
       logistics_task_kind_source: "manual",
     });
   });
@@ -235,6 +268,11 @@ describe("buildLogisticsContainerAutoKindPatches", () => {
         {
           task_id: 300,
           logistics_task_kind: "delivery",
+          logistics_task_kind_source: "manual",
+        },
+        {
+          task_id: 400,
+          logistics_task_kind: null,
           logistics_task_kind_source: "manual",
         },
       ],

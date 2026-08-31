@@ -103,6 +103,22 @@ import {
 // Normalizza la chiave di una task indipendentemente dal campo usato
 const getTaskKey = (t: any) => String(t?.id ?? t?.task_id ?? t?.logistic_code ?? "");
 
+const localWorkDateYmd = (): string => {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+};
+
+/** HK e LG tengono la data in chiavi localStorage diverse. */
+const getSelectedWorkDateForScope = (
+  scope: "housekeeping" | "office" | "logistics"
+): string => {
+  const key =
+    scope === "logistics" ? "selected_logistics_work_date" : "selected_work_date";
+  return localStorage.getItem(key) || localWorkDateYmd();
+};
+
 // Chiave di navigazione per il dialog (evita collisioni su task_id duplicati).
 const getTaskNavigationKey = (t: any, listIndex?: number) =>
   `${getTaskKey(t)}::${String((t as any)?.sequence ?? "")}::${String(listIndex ?? "")}`;
@@ -245,6 +261,8 @@ interface MultiSelectContextType {
 export interface TaskCardProps {
   task: Task;
   index: number;
+  /** Data della pagina che ospita la card; evita richieste basate su localStorage non sincronizzato. */
+  workDate?: string;
   isInTimeline?: boolean;
   allTasks?: Task[];
   currentContainer?: 'early-out' | 'high' | 'low' | string;
@@ -416,6 +434,7 @@ function LogisticsAdamCodeLabel({
 export default function TaskCard({
   task,
   index,
+  workDate,
   isInTimeline = false,
   allTasks = [],
   currentContainer = '',
@@ -442,6 +461,7 @@ export default function TaskCard({
   onLogisticsTimelineMutated,
   showExecutionStatusColors,
 }: TaskCardProps) {
+  const effectiveWorkDate = workDate || getSelectedWorkDateForScope(operationsScope);
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [housekeepingNowMs, setHousekeepingNowMs] = useState(() => Date.now());
@@ -716,15 +736,14 @@ const displayClickableInputClass =
   // Handler per toggle blocco task
   const handleToggleLock = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isTaskReadOnly) return;
+
     const newLocked = !isLocked;
     const newReason = newLocked ? lockedReason : '';
     
-    // Ottieni la data selezionata da localStorage
-    const selectedWorkDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
-    
-    // Usa task_id se disponibile, altrimenti task.id
+    const selectedWorkDate = effectiveWorkDate;
     const taskId = (task as any).task_id || task.id;
-    
+
     try {
       const response = await fetch('/api/lock-task', {
         method: 'POST',
@@ -737,21 +756,28 @@ const displayClickableInputClass =
           date: selectedWorkDate,
         }),
       });
-      
-      if (response.ok) {
-        setIsLocked(newLocked);
-        if (!newLocked) {
-          setLockedReason('');
-          setIsEditingReason(false);
-        }
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({} as { message?: string }));
         toast({
-          title: newLocked ? "Task bloccata" : "Task sbloccata",
-          description: newLocked ? "La task non può essere assegnata o trascinata" : "La task è ora disponibile",
+          title: "Errore",
+          description: errData.message || "Impossibile modificare lo stato del blocco",
+          variant: "destructive",
         });
-        // Ricarica i container per aggiornare lo stato del pulsante Assegna
-        if ((window as any).reloadAllTasks) {
-          await (window as any).reloadAllTasks();
-        }
+        return;
+      }
+
+      setIsLocked(newLocked);
+      if (!newLocked) {
+        setLockedReason('');
+        setIsEditingReason(false);
+      }
+      toast({
+        title: newLocked ? "Task bloccata" : "Task sbloccata",
+        description: newLocked ? "La task non può essere assegnata o trascinata" : "La task è ora disponibile",
+      });
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
       }
     } catch (error) {
       console.error('Errore nel blocco task:', error);
@@ -765,9 +791,9 @@ const displayClickableInputClass =
 
   const handleSaveLockedReason = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isTaskReadOnly) return;
     
-    // Ottieni la data selezionata da localStorage
-    const selectedWorkDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
+    const selectedWorkDate = effectiveWorkDate;
     
     // Usa task_id se disponibile, altrimenti task.id
     const taskId = (task as any).task_id || task.id;
@@ -801,7 +827,7 @@ const displayClickableInputClass =
   const handleCollaboratorSelection = async (selectedCleanerIds: number[]) => {
     if (selectedCleanerIds.length === 0) return;
     
-    const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
+    const workDate = effectiveWorkDate;
     const taskId = (task as any).task_id || task.id;
     
     setIsCollaboratorLoading(true);
@@ -892,7 +918,7 @@ const displayClickableInputClass =
     Record<
       string,
       {
-        kind: LogisticsTaskKind;
+        kind: LogisticsTaskKind | null;
         source: "manual";
       }
     >
@@ -1051,7 +1077,7 @@ const displayClickableInputClass =
       }
 
       try {
-        const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
+        const workDate = effectiveWorkDate;
         const response = await fetch(`/api/tasks/${dialogTaskId}/collaborators?date=${workDate}`);
         const data = await response.json().catch(() => ({}));
         if (cancelled) return;
@@ -1076,7 +1102,7 @@ const displayClickableInputClass =
     return () => {
       cancelled = true;
     };
-  }, [isModalOpen, dialogTaskId]);
+  }, [isModalOpen, dialogTaskId, effectiveWorkDate]);
 
   console.log('🔍 Stato navigazione:', {
     currentTaskId,
@@ -1248,10 +1274,10 @@ const displayClickableInputClass =
       }
 
       measuring = true;
-      const prevTransform = inner.style.transform;
-      inner.style.transform = "none";
+      const prevZoom = inner.style.zoom;
+      inner.style.zoom = "1";
       const contentH = Math.max(inner.scrollHeight, inner.offsetHeight, 1);
-      inner.style.transform = prevTransform;
+      inner.style.zoom = prevZoom;
       measuring = false;
 
       const { width: viewportW, height: viewportH } = viewportSize();
@@ -1586,8 +1612,7 @@ const displayClickableInputClass =
         return;
       }
 
-      const dateStr =
-        localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
+      const dateStr = effectiveWorkDate;
 
       try {
         if (!cancelled) {
@@ -1657,7 +1682,7 @@ const displayClickableInputClass =
     return () => {
       cancelled = true;
     };
-  }, [isTimelineDetailsDialog, isModalOpen, cleanerId, dialogTaskId, dialogTaskKey, dialogStructureIdRaw]);
+  }, [isTimelineDetailsDialog, isModalOpen, cleanerId, dialogTaskId, dialogTaskKey, dialogStructureIdRaw, effectiveWorkDate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1695,8 +1720,7 @@ const displayClickableInputClass =
         return;
       }
 
-      const dateStr =
-        localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
+      const dateStr = effectiveWorkDate;
 
       if (!cancelled) {
         const taskKeyChanged = lastHousekeepingDetailsFetchTaskKeyRef.current !== detailsTaskKey;
@@ -1756,7 +1780,7 @@ const displayClickableInputClass =
     return () => {
       cancelled = true;
     };
-  }, [isTimelineDetailsDialog, isModalOpen, dialogTaskKey, dialogTaskIdRaw, dialogLogisticCodeRaw]);
+  }, [isTimelineDetailsDialog, isModalOpen, dialogTaskKey, dialogTaskIdRaw, dialogLogisticCodeRaw, effectiveWorkDate]);
 
   // Supporto navigazione con frecce da tastiera
   useEffect(() => {
@@ -1880,7 +1904,7 @@ const displayClickableInputClass =
 
       // CRITICAL: Salva anche su PostgreSQL (ma NON su ADAM) 
       // ADAM verrà aggiornato solo con "Trasferisci su ADAM"
-      const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
+      const workDate = effectiveWorkDate;
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
       
       const response = await fetch('/api/update-task-details', {
@@ -1961,8 +1985,7 @@ const displayClickableInputClass =
         (task as any).logistic_code ??
         (task as any).name ??
         null;
-      const dateStr =
-        localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
+      const dateStr = effectiveWorkDate;
       const taskKey = getTaskKey(displayTask);
       const duration = displayTask.duration || "0.0";
       const [hours, mins] = duration.split(".").map(Number);
@@ -2060,7 +2083,7 @@ const displayClickableInputClass =
       existingEdits[taskKey] = { ...(existingEdits[taskKey] || {}), ...pendingEdits };
       sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
 
-      const workDate = localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
+      const workDate = effectiveWorkDate;
       const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
       const response = await fetch("/api/update-task-details", {
         method: "POST",
@@ -2165,7 +2188,7 @@ const displayClickableInputClass =
       existingEdits[payload.taskKey] = { ...(existingEdits[payload.taskKey] || {}), ...pendingEdits };
       sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
 
-      const workDate = localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
+      const workDate = effectiveWorkDate;
       const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
       const response = await fetch("/api/update-task-details", {
         method: "POST",
@@ -2263,7 +2286,7 @@ const displayClickableInputClass =
       existingEdits[payload.taskKey] = { ...(existingEdits[payload.taskKey] || {}), ...pendingEdits };
       sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
 
-      const workDate = localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
+      const workDate = effectiveWorkDate;
       const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
       const response = await fetch("/api/update-task-details", {
         method: "POST",
@@ -2337,7 +2360,7 @@ const displayClickableInputClass =
       existingEdits[payload.taskKey] = { ...(existingEdits[payload.taskKey] || {}), ...pendingEdits };
       sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
 
-      const workDate = localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
+      const workDate = effectiveWorkDate;
       const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
       const response = await fetch("/api/update-task-details", {
         method: "POST",
@@ -2381,7 +2404,7 @@ const displayClickableInputClass =
     }
   };
 
-  const handleSelectLogisticsKind = async (kind: LogisticsTaskKind) => {
+  const handleSelectLogisticsKind = async (kind: LogisticsTaskKind | null) => {
     if (!Number.isFinite(dialogTaskId)) {
       toast({
         title: "Errore",
@@ -2393,8 +2416,7 @@ const displayClickableInputClass =
 
     setIsSavingLogisticsKind(true);
     try {
-      const workDate =
-        localStorage.getItem("selected_work_date") || new Date().toISOString().split("T")[0];
+      const workDate = effectiveWorkDate;
       const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
       const response = await fetch("/api/update-logistics-task-kind", {
         method: "POST",
@@ -2420,8 +2442,8 @@ const displayClickableInputClass =
       }));
       setLogisticsKindPickerOpen(false);
       toast({
-        title: "Tipologia logistica salvata",
-        description: LOGISTICS_KIND_BADGE_LABEL[kind],
+        title: kind ? "Tipologia logistica salvata" : "Tipologia logistica rimossa",
+        description: kind ? LOGISTICS_KIND_BADGE_LABEL[kind] : "Task senza tipologia",
       });
       onLogisticsTimelineMutated?.();
     } catch (error: any) {
@@ -2532,7 +2554,7 @@ const displayClickableInputClass =
     const taskObj = task as any;
 
     if (operationsScope === "logistics") {
-      const selectedWorkDate = localStorage.getItem("selected_work_date");
+      const selectedWorkDate = effectiveWorkDate;
       if (!selectedWorkDate || !logisticsViolationInput) return empty;
       return {
         timelineViolationMessages: getLogisticsTimelineViolationMessages(
@@ -2578,7 +2600,7 @@ const displayClickableInputClass =
     if (!checkinDate) return false;
 
     // Ottieni la data selezionata da localStorage
-    const selectedWorkDate = localStorage.getItem('selected_work_date');
+    const selectedWorkDate = effectiveWorkDate;
     if (!selectedWorkDate) return false;
 
     const [year, month, day] = selectedWorkDate.split('-').map(Number);
@@ -3711,15 +3733,13 @@ const displayClickableInputClass =
           >
           <div
             ref={taskDetailsInnerRef}
-            className={cn(
-              "grid max-w-none shrink-0 gap-4 p-6 origin-top-left",
-              taskDetailsFit.width != null && "absolute left-0 top-0"
-            )}
+            className="grid max-w-none shrink-0 gap-4 p-6 origin-top-left"
             style={{
               width: taskDetailsFit.designWidth ?? (isTimelineDetailsDialog ? "min(96vw, 1280px)" : undefined),
               minWidth: taskDetailsFit.designWidth,
-              transform: `scale(${taskDetailsFit.scale})`,
-              transformOrigin: "top left",
+              // zoom (non transform) così il box layout coincide col visivo:
+              // overflow:hidden non mangia i click su Blocca in fondo al dialog.
+              zoom: taskDetailsFit.scale,
             }}
           >
           <DialogHeader>
@@ -3956,9 +3976,11 @@ const displayClickableInputClass =
               <div className="pt-3 border-t mt-3">
                 <div className="flex items-center gap-3">
                   <Button
+                    type="button"
                     variant={isLocked ? "destructive" : "outline"}
                     size="sm"
                     onClick={handleToggleLock}
+                    disabled={isTaskReadOnly}
                     className="flex items-center gap-2"
                     data-testid={`lock-task-btn-${getTaskKey(task)}`}
                   >
@@ -3972,6 +3994,7 @@ const displayClickableInputClass =
                         value={lockedReason}
                         onChange={(e) => setLockedReason(e.target.value)}
                         onBlur={() => handleSaveLockedReason({ stopPropagation: () => {} } as any)}
+                        disabled={isTaskReadOnly}
                         placeholder="Motivo del blocco..."
                         className="text-sm"
                         data-testid={`lock-reason-input-${getTaskKey(task)}`}
@@ -4560,7 +4583,7 @@ const displayClickableInputClass =
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={async () => {
-                const workDate = localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0];
+                const workDate = effectiveWorkDate;
                 const taskId = (displayTask as any).task_id || displayTask.id;
                 
                 setIsDissolvingCollaboration(true);
@@ -4615,7 +4638,7 @@ const displayClickableInputClass =
         onConfirm={handleCollaboratorSelection}
         excludeCleanerId={(displayTask as any).cleaner_id || (displayTask as any).assignedCleaner}
         excludeCleanerIds={taskCollaborators.map((c: any) => Number(c.id)).filter((id: number) => Number.isFinite(id))}
-        workDate={localStorage.getItem('selected_work_date') || new Date().toISOString().split('T')[0]}
+        workDate={effectiveWorkDate}
         title="Aggiungi Collaboratori"
         description="Seleziona uno o più cleaners da aggiungere come collaboratori a questa task"
         confirmLabel="Aggiungi"

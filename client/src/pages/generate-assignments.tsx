@@ -315,6 +315,7 @@ export default function GenerateAssignments() {
   const [isSavingOperationalDay, setIsSavingOperationalDay] = useState(false);
   const isOperationalDayStartedRef = useRef(false);
   const operationalDayToggleInFlightRef = useRef(false);
+  const polledOperationalDayDateRef = useRef<string | null>(null);
   isOperationalDayStartedRef.current = isOperationalDayStarted;
   const isWassManualLocked = isTimelineReadOnly || isOperationalDayStarted;
 
@@ -443,6 +444,7 @@ export default function GenerateAssignments() {
     const day = String(selectedDate.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
     localStorage.setItem('selected_work_date', dateStr);
+    window.dispatchEvent(new Event("selected-work-date-change"));
   }, [selectedDate]);
   const [earlyOutTasks, setEarlyOutTasks] = useState<Task[]>([]);
   const [highPriorityTasks, setHighPriorityTasks] = useState<Task[]>([]);
@@ -726,12 +728,15 @@ export default function GenerateAssignments() {
     hasAdamUpdatesRef.current = false;
     setHasAdamUpdates(false);
     pendingForcedAdamSyncRef.current = false;
-    isOperationalDayStartedRef.current = false;
-    setIsOperationalDayStarted(false);
 
     let stopped = false;
     let inFlight = false;
     const workDate = format(selectedDate, "yyyy-MM-dd");
+    if (polledOperationalDayDateRef.current !== workDate) {
+      polledOperationalDayDateRef.current = workDate;
+      isOperationalDayStartedRef.current = false;
+      setIsOperationalDayStarted(false);
+    }
 
     const poll = async () => {
       if (stopped || inFlight) return;
@@ -1291,6 +1296,7 @@ export default function GenerateAssignments() {
       customer_name: (rawTask as any).customer_name,
       customer_reference: rawTask.customer_reference != null ? String(rawTask.customer_reference) : undefined,
       type_apt: (rawTask as any).type_apt,
+      task_id: rawTask.task_id,
       locked: (rawTask as any).locked,
       locked_reason: (rawTask as any).locked_reason,
       reasons: Array.isArray(rawTask.reasons) ? rawTask.reasons : undefined,
@@ -2675,6 +2681,7 @@ export default function GenerateAssignments() {
                     title="EARLY OUT"
                     priority="early-out"
                     tasks={earlyOutTasks}
+                    workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="early-out"
                     icon="clock"
                     assignAction={assignEarlyOutToTimeline}
@@ -2688,6 +2695,7 @@ export default function GenerateAssignments() {
                     title="HIGH PRIORITY"
                     priority="high"
                     tasks={highPriorityTasks}
+                    workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="high"
                     icon="alert-circle"
                     assignAction={assignHighPriorityToTimeline}
@@ -2702,6 +2710,7 @@ export default function GenerateAssignments() {
                     title="LOW PRIORITY"
                     priority="low"
                     tasks={lowPriorityTasks}
+                    workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="low"
                     icon="arrow-down"
                     assignAction={assignLowPriorityToTimeline}
@@ -2739,6 +2748,7 @@ export default function GenerateAssignments() {
                 <TimelineView
                   personnel={[]}
                   tasks={allTasksWithAssignments}
+                  selectedDate={selectedDate}
                   hasUnsavedChanges={hasUnsavedChanges}
                   onTaskMoved={handleTaskMoved}
                   onWaveAssignStateReset={() => {
@@ -2809,6 +2819,7 @@ export default function GenerateAssignments() {
                 >
                   <MapSection
                     tasks={allTasksWithAssignments}
+                    workDate={format(selectedDate, "yyyy-MM-dd")}
                     compact
                     className="h-full"
                     bodyClassName="flex flex-col"
