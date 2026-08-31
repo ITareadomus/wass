@@ -22,9 +22,20 @@ export function normalizeLogisticsTaskKind(
   value: unknown,
   source?: LogisticsTaskKindSource | string | null
 ): LogisticsTaskKind | null {
-  const raw = String(value ?? "").trim();
-  if (raw === "pick-up") return "pick-up";
-  if (raw === "delivery/pick-up") return "delivery/pick-up";
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return null;
+  if (raw === "pick-up" || raw === "pickup" || raw === "pick_up") return "pick-up";
+  if (
+    raw === "delivery/pick-up" ||
+    raw === "delivery/pickup" ||
+    raw === "d&p" ||
+    raw === "dp"
+  ) {
+    return "delivery/pick-up";
+  }
+  if (raw === "2") return "pick-up";
+  if (raw === "3") return "delivery/pick-up";
+  if (raw === "1") return "delivery";
   if (raw === "delivery") {
     return source === "manual" ? "delivery" : "delivery/pick-up";
   }
@@ -111,6 +122,36 @@ export function resolveLogisticsTaskKind(
   }
 
   return resolveAutoLogisticsTaskKind(input);
+}
+
+export function resolveLogisticsTaskKindFromRecord(task: {
+  logistics_task_kind?: unknown;
+  logisticsTaskKind?: unknown;
+  logistics_task_kind_source?: unknown;
+  logisticsTaskKindSource?: unknown;
+  cleaner_id?: unknown;
+  cleanerId?: unknown;
+  cleaner_sequence?: unknown;
+  cleanerSequence?: unknown;
+  premium?: unknown;
+  pax_in?: unknown;
+  paxIn?: unknown;
+  lg_operation?: unknown;
+  lgOperation?: unknown;
+} | null | undefined): LogisticsTaskKind | null {
+  if (!task) return null;
+  const resolved = resolveLogisticsTaskKind({
+    logisticsTaskKind: task.logistics_task_kind ?? task.logisticsTaskKind,
+    logisticsTaskKindSource:
+      (task.logistics_task_kind_source ??
+        task.logisticsTaskKindSource) as LogisticsTaskKindSource | null,
+    cleanerId: task.cleaner_id ?? task.cleanerId,
+    cleanerSequence: task.cleaner_sequence ?? task.cleanerSequence,
+    premium: task.premium === true,
+    paxIn: task.pax_in ?? task.paxIn,
+  });
+  if (resolved) return resolved;
+  return fromAdamLogisticsOperation(task.lg_operation ?? task.lgOperation);
 }
 
 export function buildManualLogisticsTaskKindPayload(

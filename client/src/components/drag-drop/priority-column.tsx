@@ -85,7 +85,6 @@ export default function PriorityColumn({
   const [isAssigning, setIsAssigning] = useState(false);
   const [duplicateDialog, setDuplicateDialog] = useState<{
     logisticCode: string;
-    tasks: Array<{ id: string; operation?: string; checkoutTime?: string }>;
   } | null>(null);
   const { toast } = useToast();
   const [workYear, workMonth, workDay] = workDate.split("-").map(Number);
@@ -397,22 +396,7 @@ export default function PriorityColumn({
   const openDuplicateDialog = (entries: typeof orderedEntries) => {
     const first = entries[0]?.task as any;
     const logisticCode = String(first?.logistic_code ?? first?.name ?? "").trim() || "N/D";
-    setDuplicateDialog({
-      logisticCode,
-      tasks: entries.map((entry) => {
-        const t = entry.task as any;
-        const operation =
-          String(t.operation_name ?? t.operationName ?? "").trim() ||
-          (t.operation_id != null && t.operation_id !== ""
-            ? `operazione ${t.operation_id}`
-            : "");
-        return {
-          id: String(t.task_id ?? t.id ?? ""),
-          operation: operation || undefined,
-          checkoutTime: String(t.checkout_time ?? "").trim() || undefined,
-        };
-      }),
-    });
+    setDuplicateDialog({ logisticCode });
   };
 
   const renderDuplicateInfoBadge = (entries: typeof orderedEntries) => (
@@ -420,7 +404,7 @@ export default function PriorityColumn({
       type="button"
       className="duplicate-info-badge"
       title="Stesso codice ADAM — clicca per i dettagli"
-      aria-label="Perché queste task hanno lo stesso codice ADAM"
+      aria-label="Perché questi task hanno lo stesso codice ADAM"
       onPointerDown={(event) => event.stopPropagation()}
       onMouseDown={(event) => event.stopPropagation()}
       onClick={(event) => {
@@ -647,21 +631,11 @@ export default function PriorityColumn({
             <DialogDescription asChild>
               <div className="space-y-3 text-sm text-foreground">
                 <p>
-                  Queste task hanno lo stesso codice ADAM{" "}
+                  Questi task hanno lo stesso codice ADAM{" "}
                   <strong>{duplicateDialog?.logisticCode}</strong>. Controlla che
-                  non siano duplicate (stesso appartamento inserito due volte).
+                  non siano duplicati (stesso appartamento inserito due volte).
+                  Se uno dei due è sbagliato, bloccalo.
                 </p>
-                {duplicateDialog && duplicateDialog.tasks.length > 0 && (
-                  <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-                    {duplicateDialog.tasks.map((item) => (
-                      <li key={item.id} className="text-foreground">
-                        Task id {item.id}
-                        {item.checkoutTime ? ` — checkout ${item.checkoutTime}` : ""}
-                        {item.operation ? ` — ${item.operation}` : ""}
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </div>
             </DialogDescription>
           </DialogHeader>
