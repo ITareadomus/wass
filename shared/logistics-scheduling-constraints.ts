@@ -418,6 +418,28 @@ export function getLogisticsTimelineViolationMessages(
   return messages;
 }
 
+/** Etichette brevi per tooltip hover. */
+export function getLogisticsTimelineViolationShortLabels(
+  task: LogisticsTaskTimeFields,
+  workDate: string
+): string[] {
+  const labels: string[] = [];
+  const violations = getLogisticsTimelineViolations(task, workDate);
+
+  if (violations.bagRuleViolated) {
+    labels.push("borsone violato");
+  }
+  if (
+    violations.checkinViolated ||
+    violations.startAtOrAfterCheckin ||
+    task._checkin_violated === true
+  ) {
+    labels.push("check-in violato");
+  }
+
+  return [...new Set(labels)];
+}
+
 /** @deprecated Use {@link shouldBlinkLogisticsTimelineTask} — stesso colore rosso per tutte le violazioni. */
 export function shouldBlinkLogisticsBagRule(task: LogisticsTaskTimeFields): boolean {
   return isBagRuleViolation(task);

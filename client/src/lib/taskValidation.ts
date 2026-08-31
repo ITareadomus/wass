@@ -257,6 +257,138 @@ function canHandleApartment(cleanerRole: string, task: any): boolean {
   return normalizedAllowedApts.includes(aptType);
 }
 
+function cleanerRoleLabel(roleKey: string, fallbackRole: string): string {
+  switch (roleKey) {
+    case "standard_cleaner":
+      return "Standard";
+    case "premium_cleaner":
+      return "Premium";
+    case "straordinario_cleaner":
+      return "Straordinario";
+    case "formatore_cleaner":
+      return "Formatore";
+    case "ufficio_cleaner":
+      return "Ufficio";
+    default:
+      return fallbackRole || roleKey;
+  }
+}
+
+function taskTypeLabel(taskType: TaskTypeKey): string {
+  switch (taskType) {
+    case "straordinario_apt":
+      return "straordinaria";
+    case "premium_apt":
+      return "premium";
+    case "standard_apt":
+      return "standard";
+    default:
+      return taskType;
+  }
+}
+
+function priorityLabel(
+  priority: "early_out" | "high_priority" | "low_priority"
+): string {
+  if (priority === "early_out") return "Early Out";
+  if (priority === "high_priority") return "High Priority";
+  return "Low Priority";
+}
+
+/**
+ * Elenca i parametri (ruolo, tipo apt, priorità, ufficio/straordinaria)
+ * che rendono la task incompatibile con il cleaner.
+ */
+export function explainCleanerTaskIncompatibility(
+  cleanerRole: string,
+  task: any,
+  rules: TaskTypesByCleaner | null,
+): string[] {
+  if (!rules) return [];
+
+  const roleKey = normalizeCleanerRole(cleanerRole);
+  const roleName = cleanerRoleLabel(roleKey, cleanerRole);
+  const reasons: string[] = [];
+  const officeTask = isOfficeTask(task);
+
+  if (officeTask && roleKey !== "ufficio_cleaner") {
+    reasons.push(
+      `Task ufficio: solo un cleaner con ruolo Ufficio può gestirla (ruolo attuale: ${roleName}).`
+    );
+    return reasons;
+  }
+  if (!officeTask && roleKey === "ufficio_cleaner") {
+    reasons.push("Il cleaner Ufficio non può gestire task non-ufficio.");
+    return reasons;
+  }
+
+  const taskType = determineTaskType(task);
+  if (!taskType) return reasons;
+
+  if (taskType === "straordinario_apt" && roleKey !== "straordinario_cleaner") {
+    reasons.push(
+      `Task straordinaria: solo un cleaner Straordinario può gestirla (ruolo attuale: ${roleName}).`
+    );
+  }
+
+  const roleRules = rules[roleKey];
+  if (roleRules && !roleRules[taskType] && taskType !== "straordinario_apt") {
+    reasons.push(
+      `Il ruolo ${roleName} non può gestire task di tipo ${taskTypeLabel(taskType)}.`
+    );
+  } else if (!roleRules && taskType === "straordinario_apt" && roleKey !== "straordinario_cleaner") {
+    // already pushed
+  }
+
+  const aptType = normalizeApartmentValue(task.apt_type || task.aptType || task.type_apt);
+  if (aptType && cachedApartmentTypes) {
+    let allowedApts: string[] = [];
+    if (roleKey === "standard_cleaner") {
+      allowedApts = cachedApartmentTypes.standard_apt || [];
+    } else if (roleKey === "premium_cleaner") {
+      allowedApts = cachedApartmentTypes.premium_apt || [];
+    } else if (roleKey === "straordinario_cleaner") {
+      allowedApts = cachedApartmentTypes.straordinario_apt || [];
+    } else if (roleKey === "formatore_cleaner") {
+      allowedApts = cachedApartmentTypes.formatore_apt || [];
+    }
+    const normalizedAllowedApts = allowedApts.map(normalizeApartmentValue).filter(Boolean);
+    if (normalizedAllowedApts.length > 0 && !normalizedAllowedApts.includes(aptType)) {
+      reasons.push(
+        `Tipo appartamento ${aptType}: non è tra quelli ammessi per il ruolo ${roleName} (${normalizedAllowedApts.join(", ")}).`
+      );
+    }
+  }
+
+  if (cachedPriorityTypes) {
+    const priorityRules = cachedPriorityTypes[roleKey];
+    if (priorityRules) {
+      const taskPriority = normalizeTaskPriority(task.priority || task.task_priority);
+      if (taskPriority === "early_out" && !priorityRules.early_out) {
+        reasons.push(
+          `Priorità ${priorityLabel("early_out")}: non è ammessa per il ruolo ${roleName}.`
+        );
+      }
+      if (taskPriority === "high_priority" && !priorityRules.high_priority) {
+        reasons.push(
+          `Priorità ${priorityLabel("high_priority")}: non è ammessa per il ruolo ${roleName}.`
+        );
+      }
+      if (taskPriority === "low_priority" && !priorityRules.low_priority) {
+        reasons.push(
+          `Priorità ${priorityLabel("low_priority")}: non è ammessa per il ruolo ${roleName}.`
+        );
+      }
+    }
+  }
+
+  if (reasons.length === 0 && !canCleanerHandleTaskSync(cleanerRole, task, rules)) {
+    reasons.push(`Task non compatibile con il ruolo ${roleName}.`);
+  }
+
+  return reasons;
+}
+
 export function canCleanerHandleTaskSync(
   cleanerRole: string,
   task: any,

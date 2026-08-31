@@ -2,9 +2,14 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from
 import { useQuery } from "@tanstack/react-query";
 import { TaskType as Task } from "@shared/schema";
 import {
+  getLogisticsTimelineViolationMessages,
+  getLogisticsTimelineViolationShortLabels,
   pickLogisticsViolationFields,
-  shouldBlinkLogisticsTimelineTask,
 } from "@shared/logistics-scheduling-constraints";
+import {
+  getHousekeepingTimelineViolationMessages,
+  getHousekeepingTimelineViolationShortLabels,
+} from "@shared/housekeeping-timeline-violations";
 import {
   resolveLogisticsTaskKind,
   type LogisticsTaskKind,
@@ -2521,50 +2526,48 @@ const displayClickableInputClass =
       ? pickLogisticsViolationFields((task as Record<string, unknown>) ?? null)
       : null;
 
-  const isOverdue = (() => {
-    const taskForBar = isInTimeline ? task : displayTask;
-    const taskObj = taskForBar as any;
-
-    if (!isInTimeline) return false;
+  const { timelineViolationMessages, timelineViolationShortLabels } = (() => {
+    const empty = { timelineViolationMessages: [] as string[], timelineViolationShortLabels: [] as string[] };
+    if (!isInTimeline) return empty;
+    const taskObj = task as any;
 
     if (operationsScope === "logistics") {
       const selectedWorkDate = localStorage.getItem("selected_work_date");
-      if (!selectedWorkDate || !logisticsViolationInput) return false;
-      return shouldBlinkLogisticsTimelineTask(logisticsViolationInput, selectedWorkDate);
+      if (!selectedWorkDate || !logisticsViolationInput) return empty;
+      return {
+        timelineViolationMessages: getLogisticsTimelineViolationMessages(
+          logisticsViolationInput,
+          selectedWorkDate
+        ),
+        timelineViolationShortLabels: getLogisticsTimelineViolationShortLabels(
+          logisticsViolationInput,
+          selectedWorkDate
+        ),
+      };
     }
 
-    // Housekeeping / office: regole esistenti
-    const startTime = normalizeTime(
-      assignmentTimes.start_time || taskObj.start_time || taskObj.startTime
-    );
-    const endTime = normalizeTime(
-      assignmentTimes.end_time || taskObj.end_time || taskObj.endTime
-    );
-    const checkoutTime = normalizeTime(taskObj.checkout_time);
-    const checkinTime = normalizeTime(taskObj.checkin_time);
-    const checkoutDate = normalizeDate(taskObj.checkout_date);
-    const checkinDate = normalizeDate(taskObj.checkin_date);
-
-    if (startTime && checkoutTime && checkoutDate) {
-      const taskStartDateTime = new Date(checkoutDate + "T" + startTime + ":00");
-      const checkoutDateTime = new Date(checkoutDate + "T" + checkoutTime + ":00");
-      if (taskStartDateTime < checkoutDateTime) return true;
-    }
-
-    if (endTime && checkinTime && checkoutDate && checkinDate) {
-      const checkoutDateTime = new Date(checkoutDate + "T" + endTime + ":00");
-      const checkinDateTime = new Date(checkinDate + "T" + checkinTime + ":00");
-      if (checkoutDateTime > checkinDateTime) return true;
-    }
-
-    if (startTime && checkinTime && checkoutDate && checkinDate) {
-      const taskStartDateTime = new Date(checkoutDate + "T" + startTime + ":00");
-      const checkinDateTime = new Date(checkinDate + "T" + checkinTime + ":00");
-      if (taskStartDateTime >= checkinDateTime) return true;
-    }
-
-    return false;
+    const hkInput = {
+      startTime: assignmentTimes.start_time || taskObj.start_time || taskObj.startTime,
+      endTime: assignmentTimes.end_time || taskObj.end_time || taskObj.endTime,
+      checkoutTime: taskObj.checkout_time,
+      checkinTime: taskObj.checkin_time,
+      checkoutDate: taskObj.checkout_date,
+      checkinDate: taskObj.checkin_date,
+    };
+    return {
+      timelineViolationMessages: getHousekeepingTimelineViolationMessages(hkInput),
+      timelineViolationShortLabels: getHousekeepingTimelineViolationShortLabels(hkInput),
+    };
   })();
+  const isOverdue = timelineViolationMessages.length > 0;
+  const missingLogisticsKindMessage =
+    operationsScope === "logistics" &&
+    !isInTimeline &&
+    cardLogisticsTaskKind == null &&
+    !isFinished &&
+    !isLockedTask
+      ? "Manca la tipologia logistica (consegna, ritiro o entrambi). Impostala prima di assegnare."
+      : null;
 
   // Verifica se il check-in è per una data futura (rispetto alla data selezionata)
   // Include anche i casi dove l'orario non è migrato ma la data è futura
@@ -3619,9 +3622,19 @@ const displayClickableInputClass =
                 </TooltipTrigger>
                 <TooltipContent
                   side="top"
-                  className="z-[10000] max-w-xs text-base px-3 py-2 pointer-events-none"
+                  className="z-[10000] max-w-sm text-base px-3 py-2 pointer-events-none"
                 >
                   <div className="flex flex-col items-center gap-2">
+                    {timelineViolationShortLabels.length > 0 && (
+                      <p className="w-full text-center text-xs font-semibold text-red-600 dark:text-red-400">
+                        {timelineViolationShortLabels.join(" · ")}
+                      </p>
+                    )}
+                    {missingLogisticsKindMessage && (
+                      <p className="w-full text-center text-xs font-semibold text-amber-700 dark:text-amber-400">
+                        Manca tipologia
+                      </p>
+                    )}
                     <p className="font-semibold">{cardTooltipAddressLine}</p>
                     {shouldShowTooltipCustomerRef && (task as any).customer_reference && (
                       <p className="text-sm font-bold text-red-500">
@@ -3758,6 +3771,23 @@ const displayClickableInputClass =
               </Button>
             </div>
           </DialogHeader>
+
+          {timelineViolationMessages.length > 0 && (
+            <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+              <p className="font-semibold">Violazioni:</p>
+              <ul className="mt-1 list-disc space-y-1 pl-4">
+                {timelineViolationMessages.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {missingLogisticsKindMessage && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+              <p className="font-semibold">Attenzione</p>
+              <p className="mt-1">{missingLogisticsKindMessage}</p>
+            </div>
+          )}
 
           <div
             className={cn(

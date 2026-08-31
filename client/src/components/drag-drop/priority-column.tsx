@@ -4,6 +4,13 @@ import DraggableTaskCard from "./draggable-task-card";
 import { ContainerTaskClip } from "./container-task-clip";
 import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useState, useEffect, useMemo } from "react";
@@ -76,6 +83,10 @@ export default function PriorityColumn({
 }: PriorityColumnProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isHistoricalDateLocked, setIsHistoricalDateLocked] = useState(false);
+  const [duplicateDialog, setDuplicateDialog] = useState<{
+    logisticCode: string;
+    tasks: Array<{ id: string; operation?: string; checkoutTime?: string }>;
+  } | null>(null);
   const { toast } = useToast();
   
   // Usa lo stato passato dal parent
@@ -410,6 +421,45 @@ export default function PriorityColumn({
     }
   };
 
+  const openDuplicateDialog = (entries: typeof orderedEntries) => {
+    const first = entries[0]?.task as any;
+    const logisticCode = String(first?.logistic_code ?? first?.name ?? "").trim() || "N/D";
+    setDuplicateDialog({
+      logisticCode,
+      tasks: entries.map((entry) => {
+        const t = entry.task as any;
+        const operation =
+          String(t.operation_name ?? t.operationName ?? "").trim() ||
+          (t.operation_id != null && t.operation_id !== ""
+            ? `operazione ${t.operation_id}`
+            : "");
+        return {
+          id: String(t.task_id ?? t.id ?? ""),
+          operation: operation || undefined,
+          checkoutTime: String(t.checkout_time ?? "").trim() || undefined,
+        };
+      }),
+    });
+  };
+
+  const renderDuplicateInfoBadge = (entries: typeof orderedEntries) => (
+    <button
+      type="button"
+      className="duplicate-info-badge"
+      title="Stesso codice ADAM — clicca per i dettagli"
+      aria-label="Perché queste task hanno lo stesso codice ADAM"
+      onPointerDown={(event) => event.stopPropagation()}
+      onMouseDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openDuplicateDialog(entries);
+      }}
+    >
+      !
+    </button>
+  );
+
   return (
     <div
       className={cn(
@@ -512,6 +562,7 @@ export default function PriorityColumn({
                       className={`duplicate-group-zone ${block.colorClass}`}
                       data-duplicate-group-id={block.groupId || undefined}
                     >
+                      {renderDuplicateInfoBadge(block.entries)}
                       {block.entries.map((entry) => {
                         const task = entry.task;
                         const isHighlighted = highlightedTaskIds.has(String(task.id));
@@ -554,6 +605,7 @@ export default function PriorityColumn({
                         className={`duplicate-single-block duplicate-zone duplicate-zone-pulse ${block.colorClass}`}
                         data-duplicate-group-id={block.groupId || undefined}
                       >
+                      {renderDuplicateInfoBadge(block.entries)}
                       <ContainerTaskClip className="max-w-full">
                         <DraggableTaskCard
                           {...dndCardProps}
@@ -606,6 +658,49 @@ export default function PriorityColumn({
               return rendered;
             })()}
       </div>
+
+      <Dialog
+        open={duplicateDialog != null}
+        onOpenChange={(open) => {
+          if (!open) setDuplicateDialog(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Stesso codice ADAM</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-3 text-sm text-foreground">
+                <p>
+                  Queste task hanno lo stesso codice ADAM{" "}
+                  <strong>{duplicateDialog?.logisticCode}</strong>. Controlla che
+                  non siano duplicate (stesso appartamento inserito due volte).
+                </p>
+                {duplicateDialog && duplicateDialog.tasks.length > 0 && (
+                  <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+                    {duplicateDialog.tasks.map((item) => (
+                      <li key={item.id} className="text-foreground">
+                        Task id {item.id}
+                        {item.checkoutTime ? ` — checkout ${item.checkoutTime}` : ""}
+                        {item.operation ? ` — ${item.operation}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-2 border-custom-blue"
+              onClick={() => setDuplicateDialog(null)}
+            >
+              Ho capito
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -40,6 +40,7 @@ import { format } from 'date-fns';
 import {
   loadValidationRules,
   canCleanerHandleTaskSync,
+  explainCleanerTaskIncompatibility,
   isContinuazioneStraordinariaTask,
 } from "@/lib/taskValidation";
 import { Badge } from "@/components/ui/badge";
@@ -298,7 +299,11 @@ export default function TimelineView({
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const [confirmUnavailableDialog, setConfirmUnavailableDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const [confirmRemovalDialog, setConfirmRemovalDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
-  const [incompatibleDialog, setIncompatibleDialog] = useState<{ open: boolean; cleanerId: number | null; tasks: Array<{ logisticCode: string; taskType: string }> }>({ open: false, cleanerId: null, tasks: [] });
+  const [incompatibleDialog, setIncompatibleDialog] = useState<{
+    open: boolean;
+    cleanerId: number | null;
+    tasks: Array<{ logisticCode: string; reasons: string[] }>;
+  }>({ open: false, cleanerId: null, tasks: [] });
   const [startTimeDialog, setStartTimeDialog] = useState<{ open: boolean; cleanerId: number | null; cleanerName: string; isAvailable: boolean }>({ open: false, cleanerId: null, cleanerName: '', isAvailable: true });
   const [pendingStartTime, setPendingStartTime] = useState<string>("10:00");
   const [pendingCleaner, setPendingCleaner] = useState<any>(null); // Added to track pending cleaner ID
@@ -419,9 +424,6 @@ export default function TimelineView({
 
   // Stato per le regole di validazione task-cleaner
   const [validationRules, setValidationRules] = useState<any>(null);
-
-  // Ref per tracciare i toast già mostrati (previene duplicati)
-  const shownToastsRef = useRef<Set<string>>(new Set());
 
   // Normalizza la data da localStorage per coerenza ovunque
   const workDate = localStorage.getItem('selected_work_date') || (() => {
@@ -1557,33 +1559,18 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
           if (incompatibleTasks.length > 0) {
             // Mostra dialog incompatibilità invece del modal normale
-            const tasksInfo = incompatibleTasks.map(task => {
-              const taskType = task.straordinaria ? 'Straordinaria' : task.premium ? 'Premium' : 'Standard';
-              const aptType = (task as any).apt_type || (task as any).aptType || (task as any).type_apt || '';
-
-              // Determina priorità dai campi canonici (priority/task_priority) con fallback ai flag legacy
-              const rawPriority = String((task as any).priority || (task as any).task_priority || '').toLowerCase().trim();
-              const isEarlyOut =
-                rawPriority === 'early_out' ||
-                rawPriority === 'early-out' ||
-                rawPriority === 'eo' ||
-                rawPriority.includes('early') ||
-                Boolean((task as any).early_out || (task as any).earlyOut || (task as any).is_early_out);
-              const isHighPriority =
-                rawPriority === 'high_priority' ||
-                rawPriority === 'high-priority' ||
-                rawPriority === 'high' ||
-                rawPriority === 'hp' ||
-                Boolean((task as any).high_priority || (task as any).highPriority || (task as any).is_high_priority);
-              const priority = isEarlyOut ? 'EO' : isHighPriority ? 'HP' : 'LP';
-
-              let fullType = taskType;
-              if (aptType) fullType += ` (Tipo ${aptType})`;
-              fullType += ` [${priority}]`;
-
+            const tasksInfo = incompatibleTasks.map((task) => {
+              const reasons = explainCleanerTaskIncompatibility(
+                cleanerRole,
+                task,
+                validationRules,
+              );
               return {
-                logisticCode: task.name,
-                taskType: fullType
+                logisticCode: String(task.name ?? task.logistic_code ?? ""),
+                reasons:
+                  reasons.length > 0
+                    ? reasons
+                    : ["Task non compatibile con il ruolo di questo cleaner."],
               };
             });
             setIncompatibleDialog({ open: true, cleanerId: cleaner.id, tasks: tasksInfo });
@@ -2307,66 +2294,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     };
   };
 
-  // Gestione toast per incompatibilità task-cleaner (con sistema per coppie)
-  useEffect(() => {
-    if (!validationRules) return;
-
-    const incompatibleAssignments: Array<{ cleanerId: number; cleanerName: string; role: string; taskNames: string }> = [];
-
-    allCleanersToShow.forEach(cleaner => {
-      if (removedCleanerIds.has(cleaner.id)) return;
-      const cleanerDisplay = getCleanerDisplayDataByRaw(cleaner, cleaner.id);
-      const cleanerRole = cleanerDisplay.role;
-      if (!cleanerRole || isOfficeCleanerRole(cleanerRole)) return;
-
-      const cleanerTasks = tasks
-        .filter(task => (task as any).assignedCleaner === cleaner.id)
-        .map(normalizeTask);
-
-      // CRITICAL: Verifica TUTTE le task incompatibili, ignorando lo stato di acknowledge
-      // L'acknowledge serve solo per non mostrare il dialog al click, NON per nascondere i toast
-      const incompatibleTasks = cleanerTasks.filter(task => {
-        if (isReadonlyPreassignedTask(task)) return false;
-        return !canCleanerHandleTaskSync(
-          cleanerRole,
-          task,
-          validationRules,
-        );
-      });
-
-      if (incompatibleTasks.length > 0) {
-        incompatibleAssignments.push({
-          cleanerId: cleaner.id,
-          cleanerName: cleanerDisplay.fullName || cleanerDisplay.primaryLabel,
-          role: cleanerRole,
-          taskNames: incompatibleTasks.map(t => t.name).join(', ')
-        });
-      }
-    });
-
-    // Mostra toast SEMPRE per incompatibilità, resettando i toast mostrati ad ogni cambio
-    shownToastsRef.current.clear();
-
-    if (incompatibleAssignments.length > 0) {
-      incompatibleAssignments.forEach(assignment => {
-        // Crea una chiave univoca per questo toast
-        const toastKey = `${assignment.cleanerId}-${assignment.taskNames}`;
-
-        // Mostra solo se non è già stato mostrato in questo ciclo
-        if (!shownToastsRef.current.has(toastKey)) {
-          shownToastsRef.current.add(toastKey);
-
-          toast({
-            title: "⚠️ Assegnazione incompatibile",
-            description: `${assignment.cleanerName} (${assignment.role}) ha task incompatibili: ${assignment.taskNames}`,
-            variant: "default",
-            className: "bg-yellow-200 dark:bg-yellow-800 border-2 border-yellow-600 dark:border-yellow-500 text-yellow-900 dark:text-yellow-50 shadow-lg",
-          });
-        }
-      });
-    }
-  }, [validationRules, allCleanersToShow, tasks, removedCleanerIds, toast]);
-
   // Funzione per verificare SE esistono assegnazioni salvate (senza caricarle)
   const checkSavedAssignmentExists = async () => {
     try {
@@ -2961,7 +2888,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           handleCleanerClick(cleaner, e);
                         }
                       }}
-                      title={isRemoved ? "Cleaner rimosso - Click per sostituire" : hasIncompatibleTasks ? "⚠️ Cleaner con task incompatibili" : "Click: dettagli | Doppio click: filtra mappa"}
+                      title={isRemoved ? "Cleaner rimosso - Click per sostituire" : hasIncompatibleTasks ? "Task incompatibili con il ruolo del cleaner — clicca per vedere quale parametro non è rispettato" : "Click: dettagli | Doppio click: filtra mappa"}
                     >
                       {!isRemoved && (
                         <div
@@ -3542,10 +3469,19 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                       <p className="font-semibold text-foreground">
                         Il cleaner <span className="text-black dark:text-white">{cleanerDisplay?.fullName || cleanerDisplay?.primaryLabel}</span> ({cleanerDisplay?.role || cleaner.role}) ha delle task non compatibili con il suo ruolo:
                       </p>
-                      <ul className="list-disc list-inside space-y-2 pl-2">
+                      <ul className="space-y-3 pl-0">
                         {incompatibleDialog.tasks.map((task, idx) => (
                           <li key={idx} className="text-foreground">
-                            Task <span className="font-bold text-red-600">{task.logisticCode}</span> di tipo <span className="font-bold">{task.taskType}</span>
+                            <p>
+                              Task <span className="font-bold text-red-600">{task.logisticCode}</span>
+                            </p>
+                            <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                              {task.reasons.map((reason) => (
+                                <li key={reason} className="text-foreground">
+                                  {reason}
+                                </li>
+                              ))}
+                            </ul>
                           </li>
                         ))}
                       </ul>

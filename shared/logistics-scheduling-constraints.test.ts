@@ -3,6 +3,7 @@ import {
   computeEarlyRouteWaitAbsorptionMin,
   formatLogisticsWorkedHours,
   getLogisticsTimelineViolationMessages,
+  getLogisticsTimelineViolationShortLabels,
   isBagRuleViolation,
   pickLogisticsViolationFields,
   resolveDriverBringsBagLatestStartMin,
@@ -176,6 +177,24 @@ describe("getLogisticsTimelineViolationMessages", () => {
       "2026-06-18"
     );
     expect(messages.some((m) => m.includes("Check-in"))).toBe(true);
+  });
+});
+
+describe("getLogisticsTimelineViolationShortLabels", () => {
+  it("usa etichette brevi per borsone e check-in", () => {
+    expect(
+      getLogisticsTimelineViolationShortLabels(
+        {
+          start_time: "13:02",
+          end_time: "13:17",
+          logistics_task_kind: "delivery/pick-up",
+          cleaner_sequence: 2,
+          hk_start_time: "11:20",
+          cleaning_time: 60,
+        },
+        "2026-06-18"
+      )
+    ).toEqual(["borsone violato"]);
   });
 });
 

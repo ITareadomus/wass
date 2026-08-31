@@ -455,6 +455,7 @@
   }
 
   .duplicate-single-block {
+    position: relative;
     display: inline-flex;
     width: fit-content;
     max-width: 100%;
@@ -487,7 +488,10 @@
 
   .duplicate-zone::before,
   .duplicate-group-zone::before {
-    content: "!";
+    content: none;
+  }
+
+  .duplicate-info-badge {
     position: absolute;
     top: -9px;
     left: -9px;
@@ -505,8 +509,17 @@
     box-shadow:
       0 0 0 2px color-mix(in srgb, var(--duplicate-ring-color) 58%, #fff 42%),
       0 0 12px 2px color-mix(in srgb, var(--duplicate-ring-color) 45%, transparent);
-    z-index: 40;
-    pointer-events: none;
+    z-index: 50;
+    pointer-events: auto;
+    cursor: pointer;
+    border: 0;
+    padding: 0;
+  }
+
+  .duplicate-info-badge:hover,
+  .duplicate-info-badge:focus-visible {
+    outline: none;
+    transform: scale(1.08);
   }
 
   .duplicate-zone-color-0 {
