@@ -337,8 +337,10 @@
     color: hsl(217, 91%, 53%);
   }
 
+  /* Horizontal position is applied in JS to every row at once.
+     Native overflow-x:auto on each row would scroll that row first. */
   .timeline-center-scroll {
-    overflow-x: auto;
+    overflow-x: hidden;
     overflow-y: hidden;
     overscroll-behavior-x: contain;
     scrollbar-width: none;

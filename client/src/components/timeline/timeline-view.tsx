@@ -47,6 +47,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { openTimelineMapPanel } from "@/lib/timeline-map-panel";
 import { getPersonnelHexColor } from "@/lib/cleaner-colors";
+import { useSyncedTimelineScroll } from "@/hooks/use-synced-timeline-scroll";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -497,92 +498,24 @@ export default function TimelineView({
 
   // Larghezza della timeline in pixel per calcolo larghezze task
   const [timelineWidthPx, setTimelineWidthPx] = useState<number>(0);
-  const [timelineScrollLeft, setTimelineScrollLeft] = useState(0);
   const [romeClockNow, setRomeClockNow] = useState<RomeClockNow>(() => getRomeClockNow());
   const timelineRowRef = useRef<HTMLDivElement | null>(null);
-  const timelineScrollRefs = useRef<HTMLDivElement[]>([]);
-  const isSyncingTimelineScrollRef = useRef(false);
+  const {
+    scrollLeft: timelineScrollLeft,
+    setScrollRootRef,
+    registerScrollRef: registerTimelineScrollRef,
+    handleScroll: handleTimelineScroll,
+    handlePointerDown: handleTimelinePointerDown,
+    handlePointerMove: handleTimelinePointerMove,
+    stopPan: stopTimelinePan,
+  } = useSyncedTimelineScroll();
   // Evita di riaprire "Aggiungi Cleaner" quando Start Time si chiude dopo una conferma
   const skipReopenAddCleanerOnStartTimeCloseRef = useRef(false);
-  const timelineScrollDragRef = useRef<{
-    scrollContainer: HTMLDivElement;
-    pointerId: number;
-    startX: number;
-    startScrollLeft: number;
-  } | null>(null);
 
   // Carica anche i cleaner dalla timeline.json per mostrare quelli nascosti
   // DEVE essere definito PRIMA di allCleanersToShow che lo usa
   const [timelineCleaners, setTimelineCleaners] = useState<any[]>([]);
 
-  const registerTimelineScrollRef = React.useCallback((node: HTMLDivElement | null) => {
-    if (node && !timelineScrollRefs.current.includes(node)) {
-      timelineScrollRefs.current.push(node);
-    }
-  }, []);
-
-  const handleTimelineScroll = React.useCallback((event: React.UIEvent<HTMLDivElement>) => {
-    if (isSyncingTimelineScrollRef.current) return;
-
-    const source = event.currentTarget;
-    setTimelineScrollLeft(source.scrollLeft);
-    isSyncingTimelineScrollRef.current = true;
-    timelineScrollRefs.current = timelineScrollRefs.current.filter((node) => node.isConnected);
-    timelineScrollRefs.current.forEach((node) => {
-      if (node !== source) {
-        node.scrollLeft = source.scrollLeft;
-      }
-    });
-    requestAnimationFrame(() => {
-      isSyncingTimelineScrollRef.current = false;
-    });
-  }, []);
-
-  const canStartTimelinePan = React.useCallback((target: EventTarget | null) => {
-    const element = target instanceof HTMLElement ? target : null;
-    if (!element) return false;
-
-    return !element.closest(
-      '[data-rbd-draggable-id], [data-rbd-drag-handle-draggable-id], button, input, textarea, select, a, [role="button"], [data-first-apt-time-shift]'
-    );
-  }, []);
-
-  const handleTimelinePointerDown = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    const scrollContainer = event.currentTarget;
-    // I contenuti in portal (dialog, select, popover) bollono nell'albero React ma
-    // vivono fuori dal container nel DOM: senza questo check il pan catturava il
-    // puntatore e rompeva la selezione (es. orari check-out).
-    if (!(event.target instanceof Node) || !scrollContainer.contains(event.target)) return;
-    if (event.button !== 0 || !canStartTimelinePan(event.target)) return;
-    if (scrollContainer.scrollWidth <= scrollContainer.clientWidth) return;
-
-    timelineScrollDragRef.current = {
-      scrollContainer,
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startScrollLeft: scrollContainer.scrollLeft,
-    };
-    scrollContainer.setPointerCapture(event.pointerId);
-    scrollContainer.classList.add("is-panning");
-    event.preventDefault();
-  }, [canStartTimelinePan]);
-
-  const handleTimelinePointerMove = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    const dragState = timelineScrollDragRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId) return;
-
-    dragState.scrollContainer.scrollLeft = dragState.startScrollLeft - (event.clientX - dragState.startX);
-    event.preventDefault();
-  }, []);
-
-  const stopTimelinePan = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    const dragState = timelineScrollDragRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId) return;
-
-    dragState.scrollContainer.releasePointerCapture(event.pointerId);
-    dragState.scrollContainer.classList.remove("is-panning");
-    timelineScrollDragRef.current = null;
-  }, []);
   const normalizeCleanerRole = (rawRole: string | undefined | null) => {
     const role = String(rawRole ?? "").trim();
     if (!role) return "";
@@ -2572,7 +2505,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             </div>
           </div>
         </div>
-        <div className="flex min-h-0 flex-col overflow-hidden px-1 pt-4 pb-4">
+        <div ref={setScrollRootRef} className="flex min-h-0 flex-col overflow-hidden px-1 pt-4 pb-4">
 
           <TimelineHorizontalScrollbar
             labelColumnWidth={cleanerColumnWidth}
