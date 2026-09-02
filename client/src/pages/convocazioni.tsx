@@ -19,7 +19,7 @@ import {
 import type { TaskType } from "@shared/schema";
 import { format, differenceInCalendarDays } from "date-fns";
 import { it } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn, toEntityId, entityIdSet, entityIdSetHas } from "@/lib/utils";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
@@ -662,9 +662,10 @@ export default function Convocazioni() {
           const selectedData = await selectedResponse.json();
           const selectedDateFromFile = selectedData.metadata?.date;
           if (selectedDateFromFile === dateStr) {
-            const selectedIds = isDrivers
-              ? selectedData.drivers?.map((c: any) => c.id) || []
-              : selectedData.cleaners?.map((c: any) => c.id) || [];
+            const selectedIds = (isDrivers
+              ? selectedData.drivers?.map((c: any) => toEntityId(c.id)) || []
+              : selectedData.cleaners?.map((c: any) => toEntityId(c.id)) || []
+            ).filter((id: number | null): id is number => id !== null);
             alreadySelectedIds = new Set(selectedIds);
             preselectedIds = new Set(selectedIds);
             if (isDrivers) {
@@ -691,12 +692,14 @@ export default function Convocazioni() {
             if (timelineDateFromFile === dateStr) {
               if (isDrivers && timelineData.drivers_assignments) {
                 for (const row of timelineData.drivers_assignments) {
-                  if (row.driver?.id) preselectedIds.add(row.driver.id);
+                  const id = toEntityId(row.driver?.id);
+                  if (id !== null) preselectedIds.add(id);
                 }
               }
               if (!isDrivers && timelineData.cleaners_assignments) {
                 for (const row of timelineData.cleaners_assignments) {
-                  if (row.cleaner?.id) preselectedIds.add(row.cleaner.id);
+                  const id = toEntityId(row.cleaner?.id);
+                  if (id !== null) preselectedIds.add(id);
                 }
               }
             }
@@ -705,7 +708,13 @@ export default function Convocazioni() {
           }
         }
 
-        const availableCleaners = dateCleaners.filter((c: any) => c.active === true);
+        const availableCleaners = dateCleaners
+          .filter((c: any) => c.active === true)
+          .map((c: any) => {
+            const id = toEntityId(c?.id);
+            return id === null ? null : { ...c, id };
+          })
+          .filter((c): c is Cleaner => c !== null);
         availableCleaners.sort((a: any, b: any) => {
           // Mantieni lo stesso ordinamento del dialog "Aggiungi cleaner":
           // Formatore -> Straordinario -> Premium -> Standard/altro
@@ -739,7 +748,7 @@ export default function Convocazioni() {
         setCleaners(availableCleaners);
         setFilteredCleaners(availableCleaners);
 
-        const visibleIds = new Set(availableCleaners.map((c: any) => c.id));
+        const visibleIds = entityIdSet(availableCleaners.map((c: any) => c.id));
         const allPreselectedIds = new Set(
           [...alreadySelectedIds, ...preselectedIds].filter((id) => visibleIds.has(id))
         );
@@ -904,7 +913,7 @@ export default function Convocazioni() {
   const visibleRoster = useMemo(() => cleanersToShow, [cleanersToShow]);
 
   const selectedDrivers = useMemo(
-    () => (isDrivers ? driversRoster.filter((c) => selectedCleaners.has(c.id)) : []),
+    () => (isDrivers ? driversRoster.filter((c) => entityIdSetHas(selectedCleaners,c.id)) : []),
     [driversRoster, selectedCleaners, isDrivers]
   );
   const assignedVehicleIds = useMemo(() => {
@@ -928,7 +937,7 @@ export default function Convocazioni() {
 
   const toggleCleanerSelection = (cleanerId: number, isAvailable: boolean) => {
     // Se il cleaner è già selezionato, lo deseleziona
-    if (selectedCleaners.has(cleanerId)) {
+    if (entityIdSetHas(selectedCleaners,cleanerId)) {
       setSelectedCleaners(prev => {
         const newSet = new Set(prev);
         newSet.delete(cleanerId);
@@ -968,7 +977,7 @@ export default function Convocazioni() {
       return;
     }
     const id = confirmDialog.cleanerId;
-    const isCurrentlySelected = selectedCleaners.has(id);
+    const isCurrentlySelected = entityIdSetHas(selectedCleaners,id);
     if (isCurrentlySelected) {
       setSelectedCleaners(prev => {
         const newSet = new Set(prev);
@@ -1028,15 +1037,15 @@ export default function Convocazioni() {
             if (timelineData.metadata?.date === dateStr && timelineData.drivers_assignments) {
               timelineDrivers = timelineData.drivers_assignments
                 .map((ca: any) => ca.driver)
-                .filter((c: any) => c && selectedCleaners.has(c.id));
+                .filter((c: any) => c && entityIdSetHas(selectedCleaners,c.id));
             }
           } catch (e) {
             console.warn("⚠️ Errore caricamento timeline logistics:", e);
           }
         }
-        const fromUI = filteredCleaners.filter((c) => selectedCleaners.has(c.id));
-        const tlIds = new Set(timelineDrivers.map((c) => c.id));
-        const uniqueFromUI = fromUI.filter((c) => !tlIds.has(c.id));
+        const fromUI = filteredCleaners.filter((c) => entityIdSetHas(selectedCleaners,c.id));
+        const tlIds = entityIdSet(timelineDrivers.map((c) => c.id));
+        const uniqueFromUI = fromUI.filter((c) => !entityIdSetHas(tlIds, c.id));
         const selectedData = [...timelineDrivers, ...uniqueFromUI].map((d: any) => {
           const assignedVehicleIdRaw = selectedVehicleByDriver[d.id];
           const assignedVehicleId = assignedVehicleIdRaw ? Number(assignedVehicleIdRaw) : null;
@@ -1091,15 +1100,15 @@ export default function Convocazioni() {
             if (timelineData.metadata?.date === dateStr && timelineData.cleaners_assignments) {
               timelineCleaners = timelineData.cleaners_assignments
                 .map((ca: any) => ca.cleaner)
-                .filter((c: any) => c && selectedCleaners.has(c.id));
+                .filter((c: any) => c && entityIdSetHas(selectedCleaners,c.id));
             }
           } catch (e) {
             console.warn("⚠️ Errore caricamento timeline cleaners:", e);
           }
         }
-        const cleanersFromUI = filteredCleaners.filter((c) => selectedCleaners.has(c.id));
-        const timelineCleanerIds = new Set(timelineCleaners.map((c) => c.id));
-        const uniqueCleanersFromUI = cleanersFromUI.filter((c) => !timelineCleanerIds.has(c.id));
+        const cleanersFromUI = filteredCleaners.filter((c) => entityIdSetHas(selectedCleaners,c.id));
+        const timelineCleanerIds = entityIdSet(timelineCleaners.map((c) => c.id));
+        const uniqueCleanersFromUI = cleanersFromUI.filter((c) => !entityIdSetHas(timelineCleanerIds, c.id));
         const selectedCleanersData = [...timelineCleaners, ...uniqueCleanersFromUI];
         const response = await fetch("/api/save-selected-cleaners", {
           method: "POST",
@@ -1164,7 +1173,7 @@ export default function Convocazioni() {
             if (timelineData.metadata?.date === dateStr && timelineData.drivers_assignments) {
               timelineDrivers = timelineData.drivers_assignments
                 .map((ca: any) => ca.driver)
-                .filter((c: any) => c && selectedCleaners.has(c.id));
+                .filter((c: any) => c && entityIdSetHas(selectedCleaners,c.id));
             }
           } catch (e) {
             console.warn("⚠️ Errore caricamento timeline logistics:", e);
@@ -1176,9 +1185,9 @@ export default function Convocazioni() {
         });
         const currentData = await currentResponse.json();
         const currentDrivers = currentData.drivers || [];
-        const fromUI = filteredCleaners.filter((c) => selectedCleaners.has(c.id));
-        const tlIds = new Set(timelineDrivers.map((c) => c.id));
-        const uniqueFromUI = fromUI.filter((c) => !tlIds.has(c.id));
+        const fromUI = filteredCleaners.filter((c) => entityIdSetHas(selectedCleaners,c.id));
+        const tlIds = entityIdSet(timelineDrivers.map((c) => c.id));
+        const uniqueFromUI = fromUI.filter((c) => !entityIdSetHas(tlIds, c.id));
         const allSelected = [...timelineDrivers, ...uniqueFromUI].map((d: any) => {
           const assignedVehicleIdRaw = selectedVehicleByDriver[d.id];
           const assignedVehicleId = assignedVehicleIdRaw ? Number(assignedVehicleIdRaw) : null;
@@ -1190,8 +1199,8 @@ export default function Convocazioni() {
             assigned_vehicle_pms_code: assignedVehicle?.pms_code ?? null,
           };
         });
-        const existingIds = new Set(currentDrivers.map((c: any) => c.id));
-        const newOnes = allSelected.filter((c) => !existingIds.has(c.id));
+        const existingIds = entityIdSet(currentDrivers.map((c: any) => c.id));
+        const newOnes = allSelected.filter((c) => !entityIdSetHas(existingIds, c.id));
         const merged = [...currentDrivers, ...newOnes];
         const response = await fetch("/api/save-selected-logistics-drivers", {
           method: "POST",
@@ -1231,7 +1240,7 @@ export default function Convocazioni() {
             if (timelineData.metadata?.date === dateStr && timelineData.cleaners_assignments) {
               timelineCleaners = timelineData.cleaners_assignments
                 .map((ca: any) => ca.cleaner)
-                .filter((c: any) => c && selectedCleaners.has(c.id));
+                .filter((c: any) => c && entityIdSetHas(selectedCleaners,c.id));
             }
           } catch (e) {
             console.warn("⚠️ Errore caricamento timeline cleaners:", e);
@@ -1243,12 +1252,12 @@ export default function Convocazioni() {
         });
         const currentData = await currentResponse.json();
         const currentCleaners = currentData.cleaners || [];
-        const cleanersFromUI = filteredCleaners.filter((c) => selectedCleaners.has(c.id));
-        const timelineCleanerIds = new Set(timelineCleaners.map((c) => c.id));
-        const uniqueCleanersFromUI = cleanersFromUI.filter((c) => !timelineCleanerIds.has(c.id));
+        const cleanersFromUI = filteredCleaners.filter((c) => entityIdSetHas(selectedCleaners,c.id));
+        const timelineCleanerIds = entityIdSet(timelineCleaners.map((c) => c.id));
+        const uniqueCleanersFromUI = cleanersFromUI.filter((c) => !entityIdSetHas(timelineCleanerIds, c.id));
         const allSelectedCleaners = [...timelineCleaners, ...uniqueCleanersFromUI];
-        const existingIds = new Set(currentCleaners.map((c: any) => c.id));
-        const newCleaners = allSelectedCleaners.filter((c) => !existingIds.has(c.id));
+        const existingIds = entityIdSet(currentCleaners.map((c: any) => c.id));
+        const newCleaners = allSelectedCleaners.filter((c) => !entityIdSetHas(existingIds, c.id));
         const mergedCleaners = [...currentCleaners, ...newCleaners];
         const response = await fetch("/api/save-selected-cleaners", {
           method: "POST",
@@ -1684,7 +1693,7 @@ export default function Convocazioni() {
                       </Button>
                     </div>
                     <Switch
-                      checked={selectedCleaners.has(cleaner.id)}
+                      checked={entityIdSetHas(selectedCleaners,cleaner.id)}
                       onCheckedChange={() => toggleCleanerSelection(cleaner.id, isAvailable)}
                       className="scale-150 pointer-events-none"
                     />

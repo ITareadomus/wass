@@ -44,7 +44,7 @@ import {
   isContinuazioneStraordinariaTask,
 } from "@/lib/taskValidation";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { cn, toEntityId, sameEntityId, entityIdSet, entityIdSetHas } from "@/lib/utils";
 import { openTimelineMapPanel } from "@/lib/timeline-map-panel";
 import { getPersonnelHexColor } from "@/lib/cleaner-colors";
 import {
@@ -634,11 +634,17 @@ export default function TimelineView({
   // Mostra cleaners da selected_cleaners API + cleaners che hanno task in timeline
   // DEVE essere definito PRIMA di getGlobalStartTime() che lo usa
   const allCleanersToShow = React.useMemo(() => {
-    const selectedCleanerIds = new Set(cleaners.map(c => c.id));
+    const selectedCleanerIds = entityIdSet(cleaners.map((c) => c.id));
     const timelineCleanersWithTasks = timelineCleaners
-      .filter(tc => tc.tasks && tc.tasks.length > 0) // Solo cleaners con task
-      .filter(tc => !selectedCleanerIds.has(tc.cleaner?.id)) // Non già in selected_cleaners
-      .map(tc => ({ ...tc.cleaner, isRemoved: true })); // Marca come rimosso
+      .filter((tc) => tc.tasks && tc.tasks.length > 0) // Solo cleaners con task
+      .filter((tc) => {
+        const id = toEntityId(tc.cleaner?.id);
+        return id === null || !selectedCleanerIds.has(id);
+      })
+      .map((tc) => {
+        const id = toEntityId(tc.cleaner?.id);
+        return { ...tc.cleaner, ...(id !== null ? { id } : {}), isRemoved: true };
+      });
 
     // Combina selected_cleaners + timeline cleaners con task
     const combined = [...cleaners, ...timelineCleanersWithTasks];
@@ -667,19 +673,23 @@ export default function TimelineView({
     // A giornata ON i convocati restano visibili (anche senza task) così si possono
     // ancora aggiungere/rimuovere cleaner; nascondi solo chi non è più in selezione
     // e non ha assegnazioni.
-    return combined.filter(
-      (cleaner) =>
-        selectedCleanerIds.has(Number(cleaner.id)) || assignedIds.has(Number(cleaner.id))
-    );
+    return combined.filter((cleaner) => {
+      const id = toEntityId(cleaner.id);
+      return id !== null && (selectedCleanerIds.has(id) || assignedIds.has(id));
+    });
   }, [cleaners, timelineCleaners, isOperationalDayStarted, tasks]);
 
   const visibleCleanerIds = React.useMemo(
-    () => new Set(allCleanersToShow.map(cleaner => Number(cleaner.id))),
+    () => entityIdSet(allCleanersToShow.map((cleaner) => cleaner.id)),
     [allCleanersToShow]
   );
 
   const timelineAssignedTasks = React.useMemo(
-    () => tasks.filter(task => visibleCleanerIds.has(Number((task as any).assignedCleaner))),
+    () =>
+      tasks.filter((task) => {
+        const id = toEntityId((task as any).assignedCleaner);
+        return id !== null && visibleCleanerIds.has(id);
+      }),
     [tasks, visibleCleanerIds]
   );
   const cleanerDirectoryIds = React.useMemo(() => {
@@ -704,15 +714,18 @@ export default function TimelineView({
 
   // Crea Set di ID cleaner rimossi per facile lookup
   const removedCleanerIds = React.useMemo(() => {
-    const selectedIds = new Set(cleaners.map(c => c.id));
-    return new Set(
+    const selectedIds = entityIdSet(cleaners.map((c) => c.id));
+    return entityIdSet(
       timelineCleaners
-        .filter(tc =>
-          Array.isArray(tc.tasks) &&
-          tc.tasks.some((task: any) => !isReadonlyPreassignedTask(task)) &&
-          !selectedIds.has(tc.cleaner?.id)
-        )
-        .map(tc => tc.cleaner?.id)
+        .filter((tc) => {
+          const id = toEntityId(tc.cleaner?.id);
+          return (
+            Array.isArray(tc.tasks) &&
+            tc.tasks.some((task: any) => !isReadonlyPreassignedTask(task)) &&
+            (id === null || !selectedIds.has(id))
+          );
+        })
+        .map((tc) => tc.cleaner?.id)
     );
   }, [cleaners, timelineCleaners]);
 
@@ -1396,7 +1409,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           const allCleaners = cleanersData.cleaners || [];
 
           cleanersList = timelineCleaners.map((tc: any) => {
-            const fullData = allCleaners.find((c: any) => c.id === tc.id);
+            const fullData = allCleaners.find((c: any) => sameEntityId(c.id, tc.id));
             return fullData || tc;
           });
 
@@ -1404,7 +1417,14 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
         }
       }
 
-      setCleaners(cleanersList);
+      setCleaners(
+        (cleanersList as any[])
+          .map((c) => {
+            const id = toEntityId(c?.id);
+            return id === null ? null : { ...c, id };
+          })
+          .filter(Boolean)
+      );
     } catch (error) {
       console.error("Errore nel caricamento dei cleaners selezionati:", error);
       setCleaners([]);
@@ -1509,7 +1529,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       setClickTimer(null);
 
       // Gestione doppio click: filtro mappa
-      if (filteredCleanerId === cleaner.id) {
+      if (sameEntityId(filteredCleanerId, cleaner.id)) {
         setFilteredCleanerId(null);
         (window as any).mapFilteredCleanerId = null;
         toast({
@@ -1517,8 +1537,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
           description: "Ora visualizzi tutti gli appartamenti sulla mappa",
         });
       } else {
-        setFilteredCleanerId(cleaner.id);
-        (window as any).mapFilteredCleanerId = cleaner.id;
+        const id = toEntityId(cleaner.id);
+        setFilteredCleanerId(id);
+        (window as any).mapFilteredCleanerId = id;
         toast({
           title: "Filtro attivato",
           description: `Visualizzi solo gli appartamenti di ${cleaner.name} ${cleaner.lastname}`,
@@ -1532,7 +1553,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
         const cleanerRole = getCleanerDisplayDataByRaw(cleaner, cleaner.id).role;
         if (validationRules && cleanerRole && !isOfficeCleanerRole(cleanerRole)) {
           const cleanerTasks = tasks
-            .filter(task => (task as any).assignedCleaner === cleaner.id)
+            .filter((task) => sameEntityId((task as any).assignedCleaner, cleaner.id))
             .map(normalizeTask);
 
           const incompatibleTasks = cleanerTasks.filter(task => {
@@ -1628,19 +1649,21 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
       // CRITICAL: Filtra cleaners già presenti in timeline (sia selezionati che rimossi)
       // Questo previene di avere duplicati (cleaner rimosso + stesso cleaner aggiunto)
-      const selectedCleanerIds = new Set(cleaners.map(c => c.id));
-      const timelineCleanerIds = new Set(
-        (timelineCleaners || []).map(tc => tc.cleaner?.id).filter(Boolean)
+      const selectedCleanerIds = entityIdSet(cleaners.map((c) => c.id));
+      const timelineCleanerIds = entityIdSet(
+        (timelineCleaners || []).map((tc) => tc.cleaner?.id)
       );
 
       const available = dateCleaners.filter((c: any) => {
         const isOfficeCleaner = String(c?.role || "").toLowerCase().includes("ufficio");
         const roleMatchesScope = isOfficeScope ? isOfficeCleaner : !isOfficeCleaner;
+        const cleanerId = toEntityId(c.id);
         return (
           c.active === true &&
           roleMatchesScope &&
-          !selectedCleanerIds.has(c.id) &&
-          !timelineCleanerIds.has(c.id) // NUOVO: escludi anche quelli già in timeline
+          cleanerId !== null &&
+          !selectedCleanerIds.has(cleanerId) &&
+          !timelineCleanerIds.has(cleanerId)
         );
       });
 
@@ -2828,15 +2851,15 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
                 // Trova tutte le task assegnate a questo cleaner
                 const cleanerTasks = tasks.filter(task =>
-                  (task as any).assignedCleaner === cleaner.id
+                  sameEntityId((task as any).assignedCleaner, cleaner.id)
                 ).map(normalizeTask); // Applica la normalizzazione qui
 
                 // Durante il drag: nascondi travel/checkout così i task possono riordinarsi in modo ottimistico
                 const hideRouteSpacers =
-                  activeDragCleanerId === cleaner.id ||
-                  draggingOverCleanerId === cleaner.id;
+                  sameEntityId(activeDragCleanerId, cleaner.id) ||
+                  sameEntityId(draggingOverCleanerId, cleaner.id);
 
-                const isRemoved = removedCleanerIds.has(cleaner.id);
+                const isRemoved = entityIdSetHas(removedCleanerIds, cleaner.id);
 
                 // Verifica se ci sono task incompatibili per questo cleaner
                 // Controlla ogni coppia (task, cleaner) invece del solo cleanerId
@@ -2862,7 +2885,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     <div
                       className={cn(
                         "flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-custom-blue-light cursor-pointer hover:bg-muted/35 transition-colors",
-                        filteredCleanerId === cleaner.id &&
+                        sameEntityId(filteredCleanerId, cleaner.id) &&
                           "ring-2 ring-inset ring-blue-500 border-blue-500",
                         hasIncompatibleTasks &&
                           !isRemoved &&
@@ -2906,7 +2929,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           </div>
                         )}
                         {/* Lucchetto per cleaner bloccati */}
-                        {!isRemoved && lockedCleaners.has(cleaner.id) && (
+                        {!isRemoved && entityIdSetHas(lockedCleaners, cleaner.id) && (
                           <div className="flex-shrink-0 mr-1">
                             <Lock className="w-3 h-3 text-gray-600 dark:text-gray-400" />
                           </div>
@@ -2942,7 +2965,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     {(() => {
                       const cleanerTasks = tasks
                         .filter((task) =>
-                          (task as any).assignedCleaner === cleaner.id
+                          sameEntityId((task as any).assignedCleaner, cleaner.id)
                         )
                         .map(normalizeTask)
                         .sort((a, b) => {
@@ -3016,19 +3039,19 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                               // non è nel SortableContext (cross-cleaner o assign da container).
                               const isExternalAssignTargetRow =
                                 hideRouteSpacers &&
-                                draggingOverCleanerId === cleaner.id &&
+                                sameEntityId(draggingOverCleanerId, cleaner.id) &&
                                 activeDragCleanerId == null &&
                                 lastValidDragIndex != null;
                               const isCrossCleanerTargetRow =
                                 (hideRouteSpacers &&
-                                  draggingOverCleanerId === cleaner.id &&
+                                  sameEntityId(draggingOverCleanerId, cleaner.id) &&
                                   activeDragCleanerId != null &&
-                                  activeDragCleanerId !== cleaner.id &&
+                                  !sameEntityId(activeDragCleanerId, cleaner.id) &&
                                   lastValidDragIndex != null) ||
                                 isExternalAssignTargetRow;
                               const isCrossCleanerSourceRow =
                                 hideRouteSpacers &&
-                                activeDragCleanerId === cleaner.id &&
+                                sameEntityId(activeDragCleanerId, cleaner.id) &&
                                 draggingOverCleanerId != null &&
                                 draggingOverCleanerId !== cleaner.id;
                               const crossCleanerInsertWidthPx = Math.max(
@@ -3096,7 +3119,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     if (seq === 1) {
                                       const gridStartMinutes = timeToMinutes(globalTimeSlots[0] || "10:00");
                                       const previewMinutes =
-                                        firstAptTimeShiftPreview?.cleanerId === cleaner.id
+                                        firstAptTimeShiftPreview &&
+                                        sameEntityId(firstAptTimeShiftPreview.cleanerId, cleaner.id)
                                           ? firstAptTimeShiftPreview.startMinutes
                                           : null;
                                       const taskStartMinutes = previewMinutes ?? parseClockToMinutes(
@@ -3322,7 +3346,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     <div className="flex-shrink-0 w-20 h-[50px] flex items-center justify-center border-l border-border bg-sky-100/30 dark:bg-sky-900/10 text-center">
                       {(() => {
                         const cleanerTasks = tasks.filter(task =>
-                          (task as any).assignedCleaner === cleaner.id
+                          sameEntityId((task as any).assignedCleaner, cleaner.id)
                         );
                         const totalMinutes = cleanerTasks.reduce((sum, task) => {
                           const ct = (task as any).cleaning_time || (task as any).cleaningTime || 0;
@@ -3506,7 +3530,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   if (cleaner && validationRules && cleanerRole && !isOfficeCleanerRole(cleanerRole)) {
                     // Recupera tutte le task di questo cleaner
                     const cleanerTasks = tasks
-                      .filter(task => (task as any).assignedCleaner === cleanerId)
+                      .filter(task => sameEntityId((task as any).assignedCleaner, cleanerId))
                       .map(normalizeTask);
 
                     // Aggiungi tutte le coppie (task incompatibile, cleaner) al Set
@@ -3875,34 +3899,32 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   return labelA.localeCompare(labelB, "it", { sensitivity: "base" });
                 })
                 .map((cleaner) => {
-                  const isSelected = cleanerIdsToRemove.includes(cleaner.id);
+                  const cleanerId = toEntityId(cleaner.id);
+                  const isSelected =
+                    cleanerId !== null && cleanerIdsToRemove.includes(cleanerId);
+                  const toggleSelected = () => {
+                    if (cleanerId === null) return;
+                    setCleanerIdsToRemove((prev) =>
+                      prev.includes(cleanerId)
+                        ? prev.filter((id) => id !== cleanerId)
+                        : [...prev, cleanerId]
+                    );
+                  };
                   return (
                     <div
-                      key={cleaner.id}
+                      key={cleanerId ?? cleaner.id}
                       className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer ${
                         isSelected
                           ? "bg-accent border-custom-blue"
                           : "hover:bg-accent"
                       }`}
-                      onClick={() => {
-                        setCleanerIdsToRemove((prev) =>
-                          prev.includes(cleaner.id)
-                            ? prev.filter((id) => id !== cleaner.id)
-                            : [...prev, cleaner.id]
-                        );
-                      }}
+                      onClick={toggleSelected}
                       data-testid={`remove-cleaner-option-${cleaner.id}`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <Checkbox
                           checked={isSelected}
-                          onCheckedChange={() => {
-                            setCleanerIdsToRemove((prev) =>
-                              prev.includes(cleaner.id)
-                                ? prev.filter((id) => id !== cleaner.id)
-                                : [...prev, cleaner.id]
-                            );
-                          }}
+                          onCheckedChange={toggleSelected}
                           onClick={(e) => e.stopPropagation()}
                         />
                         <div className="min-w-0">
@@ -4320,7 +4342,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     }
                   }}
                 >
-                  {lockedCleaners.has(selectedCleaner?.id) ? (
+                  {entityIdSetHas(lockedCleaners, selectedCleaner?.id) ? (
                     <Lock className="h-4 w-4 stroke-[2.5]" />
                   ) : (
                     <Unlock className="h-4 w-4 stroke-[2.5]" />
@@ -4472,7 +4494,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                       </SelectTrigger>
                       <SelectContent>
                         {cleaners
-                          .filter((c) => c.id !== selectedCleaner.id)
+                          .filter((c) => !sameEntityId(c.id, selectedCleaner.id))
                           .map((cleaner) => (
                             <SelectItem
                               key={cleaner.id}

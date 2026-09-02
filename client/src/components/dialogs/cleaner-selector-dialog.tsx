@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RefreshCw, Users } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, toEntityId, sameEntityId, entityIdSet, entityIdSetHas } from "@/lib/utils";
 
 interface Cleaner {
   id: number;
@@ -126,33 +126,39 @@ export function CleanerSelectorDialog({
       const cleanersData = await cleanersResponse.json();
       const selectedData = selectedResponse.ok ? await selectedResponse.json() : { cleaners: [] };
       
-      const convocatiIds = new Set(
+      const convocatiIds = entityIdSet(
         (selectedData.cleaners || []).map((c: any) => c.cleaner_id || c.id)
       );
 
-      let allCleaners = (cleanersData.cleaners || []).map((c: any) => ({
-        id: c.id,
-        cleaner_id: c.id,
-        name: c.name,
-        lastname: c.lastname || "",
-        available: c.available !== false,
-        start_time: c.start_time,
-        total_hours: c.total_hours,
-        counter_hours: c.counter_hours,
-        weekly_hours: c.weekly_hours,
-        role: c.role,
-        contract_type: c.contract_type,
-      }));
+      let allCleaners = (cleanersData.cleaners || [])
+        .map((c: any) => {
+          const id = toEntityId(c.id);
+          if (id === null) return null;
+          return {
+            id,
+            cleaner_id: id,
+            name: c.name,
+            lastname: c.lastname || "",
+            available: c.available !== false,
+            start_time: c.start_time,
+            total_hours: c.total_hours,
+            counter_hours: c.counter_hours,
+            weekly_hours: c.weekly_hours,
+            role: c.role,
+            contract_type: c.contract_type,
+          };
+        })
+        .filter((c: Cleaner | null): c is Cleaner => c !== null);
 
       if (excludeCleanerId) {
         allCleaners = allCleaners.filter(
-          (c: Cleaner) => c.id !== excludeCleanerId && c.cleaner_id !== excludeCleanerId
+          (c: Cleaner) => !sameEntityId(c.id, excludeCleanerId) && !sameEntityId(c.cleaner_id, excludeCleanerId)
         );
       }
       if (excludeCleanerIds.length > 0) {
-        const excluded = new Set(excludeCleanerIds.filter((id) => Number.isFinite(id)));
+        const excluded = entityIdSet(excludeCleanerIds);
         allCleaners = allCleaners.filter(
-          (c: Cleaner) => !excluded.has(c.id) && !excluded.has(Number(c.cleaner_id))
+          (c: Cleaner) => !entityIdSetHas(excluded, c.id) && !entityIdSetHas(excluded, c.cleaner_id)
         );
       }
 
@@ -187,8 +193,8 @@ export function CleanerSelectorDialog({
         });
       };
 
-      const convocati = allCleaners.filter((c: Cleaner) => convocatiIds.has(c.id));
-      const nonConvocati = allCleaners.filter((c: Cleaner) => !convocatiIds.has(c.id));
+      const convocati = allCleaners.filter((c: Cleaner) => entityIdSetHas(convocatiIds, c.id));
+      const nonConvocati = allCleaners.filter((c: Cleaner) => !entityIdSetHas(convocatiIds, c.id));
 
       setConvocatiCleaners(sortCleaners(convocati));
       setNonConvocatiCleaners(sortCleaners(nonConvocati));

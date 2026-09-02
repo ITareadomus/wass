@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { TaskType as Task } from "@shared/schema";
 import TaskCard from "@/components/drag-drop/task-card";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { cn, sameEntityId } from "@/lib/utils";
 import {
   getPersonnelHexColor,
   type PersonnelColorScope,
@@ -275,7 +275,7 @@ export default function MapSection({
         const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
         
         // Evidenzia solo se il task è assegnato al cleaner filtrato
-        if (assignedCleaner === filteredCleanerId) {
+        if (sameEntityId(assignedCleaner, filteredCleanerId)) {
           const markerId = getTaskMarkerId(task);
           highlightedMarkerIds.add(markerId);
         }

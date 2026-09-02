@@ -85,7 +85,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Calendar as CalendarIcon, Lock, LockOpen, Users, UserPlus, Trash2, RefreshCw, Truck, Building2, User } from "lucide-react";
 import { CleanerSelectorDialog } from "@/components/dialogs/cleaner-selector-dialog";
-import { cn } from "@/lib/utils";
+import { cn, sameEntityId } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
 import {
@@ -965,7 +965,7 @@ const displayClickableInputClass =
       const taskAssignedCleaner = (task as any).assignedCleaner;
       const allHaveAssigned = allTasks.every(t => (t as any).assignedCleaner != null);
       return allHaveAssigned
-        ? allTasks.filter(t => (t as any).assignedCleaner === taskAssignedCleaner)
+        ? allTasks.filter(t => sameEntityId((t as any).assignedCleaner, taskAssignedCleaner))
         : allTasks; // fallback, le tasks che arrivano da TimelineView sono già del cleaner corrente
     } else {
       return allTasks.filter(t => t.priority === task.priority);
@@ -975,7 +975,7 @@ const displayClickableInputClass =
   // CRITICAL: Memoizza navigableTasks per evitare ricalcoli che causano mismatch
   const navigableTasks = React.useMemo(() => {
     const tasks = allTasks.filter(t => {
-      const sameCleaner = (t as any).assignedCleaner === (task as any).assignedCleaner;
+      const sameCleaner = sameEntityId((t as any).assignedCleaner, (task as any).assignedCleaner);
       // NON escludere task senza assignedCleaner: basta che sia lo stesso cleaner della corrente
       return sameCleaner;
     });

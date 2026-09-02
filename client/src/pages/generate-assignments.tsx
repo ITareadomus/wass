@@ -46,7 +46,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AssignmentLoadingDialog } from "@/components/dialogs/assignment-loading-dialog";
-import { cn } from "@/lib/utils";
+import { cn, toEntityId } from "@/lib/utils";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { useToast } from "@/hooks/use-toast";
 import { isContinuazioneStraordinariaTask, isTaskLocked } from "@/lib/taskValidation";
@@ -1403,15 +1403,15 @@ export default function GenerateAssignments() {
       if (timelineAssignmentsData.cleaners_assignments) {
         dlog('📋 Caricamento da cleaners_assignments:', timelineAssignmentsData.cleaners_assignments.length);
         for (const cleanerEntry of timelineAssignmentsData.cleaners_assignments) {
-          if (!cleanerEntry.cleaner || !cleanerEntry.cleaner.id) {
+          const cleanerId = toEntityId(cleanerEntry?.cleaner?.id);
+          if (cleanerId === null) {
             console.warn('⚠️ Trovata entry senza cleaner, salto:', cleanerEntry);
             continue;
           }
 
-          dlog(`   Cleaner ${cleanerEntry.cleaner.id} (${cleanerEntry.cleaner.name}) ha ${cleanerEntry.tasks?.length || 0} task`);
+          dlog(`   Cleaner ${cleanerId} (${cleanerEntry.cleaner.name}) ha ${cleanerEntry.tasks?.length || 0} task`);
           for (const task of cleanerEntry.tasks || []) {
             const taskId = String(task.task_id);
-            const cleanerId = cleanerEntry.cleaner.id;
             const taskLC = String(task.logistic_code);
             dlog(`      → Task ${taskLC} (ID: ${taskId}) assegnata a cleaner ${cleanerId}`);
 
@@ -1438,7 +1438,8 @@ export default function GenerateAssignments() {
         dlog('📋 Caricamento da assignments (vecchia struttura):', timelineAssignmentsData.assignments.length);
         for (const a of timelineAssignmentsData.assignments) {
           const taskId = String(a.task_id);
-          const cleanerId = a.cleanerId || a.cleaner_id;
+          const cleanerId = toEntityId(a.cleanerId ?? a.cleaner_id);
+          if (cleanerId === null) continue;
           const taskWithAssignment = {
             ...a,
             id: a.task_id || a.id,
@@ -1532,7 +1533,7 @@ export default function GenerateAssignments() {
           priority: timelineAssignment.priority
         });
 
-        if (timelineAssignment.cleanerId) {
+        if (toEntityId(timelineAssignment.cleanerId)) {
           // Se la task esiste nei containers, usa quei dati come base
           // Altrimenti usa i dati dalla timeline (task già assegnata in sessioni precedenti)
           const baseTask = originalTask || {
@@ -1574,7 +1575,7 @@ export default function GenerateAssignments() {
             collaborator_count: timelineAssignment.collaborator_count,
             is_primary: timelineAssignment.is_primary,
             priority: timelineAssignment.priority || baseTask.priority,
-            assignedCleaner: timelineAssignment.cleanerId,
+            assignedCleaner: toEntityId(timelineAssignment.cleanerId),
             sequence: timelineAssignment.sequence,
             start_time: timelineAssignment.start_time,
             end_time: timelineAssignment.end_time,
