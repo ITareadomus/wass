@@ -2542,7 +2542,7 @@ const displayClickableInputClass =
       : cardTooltipAddressLabel;
 
   // Verifica violazioni temporali (considerando le date!)
-  // In timeline la barra deve riflettere la task che rappresenta (task), non la task nel dialog (displayTask)
+  // Card timeline: sempre la task che rappresenta (task), non quella nel dialog (displayTask).
   const logisticsViolationInput =
     operationsScope === "logistics" && isInTimeline
       ? pickLogisticsViolationFields((task as Record<string, unknown>) ?? null)
@@ -2569,8 +2569,8 @@ const displayClickableInputClass =
     }
 
     const hkInput = {
-      startTime: assignmentTimes.start_time || taskObj.start_time || taskObj.startTime,
-      endTime: assignmentTimes.end_time || taskObj.end_time || taskObj.endTime,
+      startTime: taskObj.start_time || taskObj.startTime,
+      endTime: taskObj.end_time || taskObj.endTime,
       checkoutTime: taskObj.checkout_time,
       checkinTime: taskObj.checkin_time,
       checkoutDate: taskObj.checkout_date,
@@ -2582,6 +2582,31 @@ const displayClickableInputClass =
     };
   })();
   const isOverdue = timelineViolationMessages.length > 0;
+
+  // Dialog dettagli: ricalcola le violazioni sulla task attualmente mostrata (frecce prev/next).
+  const dialogTimelineViolationMessages = (() => {
+    if (!isInTimeline || !isModalOpen) return [] as string[];
+    const dialogTaskObj = displayTask as any;
+
+    if (operationsScope === "logistics") {
+      const selectedWorkDate = effectiveWorkDate;
+      if (!selectedWorkDate) return [];
+      return getLogisticsTimelineViolationMessages(
+        pickLogisticsViolationFields((displayTask as Record<string, unknown>) ?? null),
+        selectedWorkDate
+      );
+    }
+
+    return getHousekeepingTimelineViolationMessages({
+      startTime:
+        assignmentTimes.start_time || dialogTaskObj.start_time || dialogTaskObj.startTime,
+      endTime: assignmentTimes.end_time || dialogTaskObj.end_time || dialogTaskObj.endTime,
+      checkoutTime: dialogTaskObj.checkout_time,
+      checkinTime: dialogTaskObj.checkin_time,
+      checkoutDate: dialogTaskObj.checkout_date,
+      checkinDate: dialogTaskObj.checkin_date,
+    });
+  })();
   const missingLogisticsKindMessage =
     operationsScope === "logistics" &&
     !isInTimeline &&
@@ -3798,12 +3823,12 @@ const displayClickableInputClass =
             </div>
           </DialogHeader>
 
-          {timelineViolationMessages.length > 0 && (
+          {dialogTimelineViolationMessages.length > 0 && (
             <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
               <p className="font-semibold">Violazioni:</p>
               <ul className="mt-1 list-disc space-y-1 pl-4">
-                {timelineViolationMessages.map((message) => (
-                  <li key={message}>{message}</li>
+                {dialogTimelineViolationMessages.map((message) => (
+                  <li key={`${dialogTaskKey}-${message}`}>{message}</li>
                 ))}
               </ul>
             </div>
