@@ -342,8 +342,11 @@ export default function GenerateAssignments() {
   // Traccia il cleaner su cui si sta trascinando per posizionare il placeholder
   const [draggingOverCleanerId, setDraggingOverCleanerId] = useState<number | null>(null);
   const [activeDragCleanerId, setActiveDragCleanerId] = useState<number | null>(null);
-  /** Nasconde i containers e mostra il sommario anche se restano task non locked. */
+  /** Nasconde i containers anche se restano task non locked. */
   const [containersManuallyCollapsed, setContainersManuallyCollapsed] = useState(false);
+  /** Riapre i containers a mano anche se vuoti o con soli task locked. */
+  const [containersForcedOpen, setContainersForcedOpen] = useState(false);
+  const prevHasUnlockedContainerTasksRef = useRef(false);
 
   // Stati per selezione multipla INDIPENDENTE per container (ma selezione CROSS-CONTAINER)
   const [multiSelectModes, setMultiSelectModes] = useState<{
@@ -2408,15 +2411,21 @@ export default function GenerateAssignments() {
 
   useEffect(() => {
     setContainersManuallyCollapsed(false);
+    setContainersForcedOpen(false);
   }, [selectedDate]);
 
   useEffect(() => {
     if (!hasUnlockedContainerTasks) {
       setContainersManuallyCollapsed(false);
     }
+    if (prevHasUnlockedContainerTasksRef.current && !hasUnlockedContainerTasks) {
+      setContainersForcedOpen(false);
+    }
+    prevHasUnlockedContainerTasksRef.current = hasUnlockedContainerTasks;
   }, [hasUnlockedContainerTasks]);
 
-  const showContainers = hasUnlockedContainerTasks && !containersManuallyCollapsed;
+  const showContainers =
+    containersForcedOpen || (hasUnlockedContainerTasks && !containersManuallyCollapsed);
 
   // Definisci la funzione handleDateSelect qui, se non è già definita
   const handleDateSelect = (date: Date | undefined) => {
@@ -2507,7 +2516,7 @@ export default function GenerateAssignments() {
             measuring={{ droppable: { strategy: MeasuringStrategy.WhileDragging } }}
             {...assignmentDnd.handlers}
           >
-            <div className={cn("flex items-center gap-3", hasUnlockedContainerTasks ? "mb-0" : "mb-4")}>
+            <div className="mb-0 flex items-center gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-custom-blue" />
                 <Input
@@ -2649,12 +2658,15 @@ export default function GenerateAssignments() {
               const highlightedLowPriority = getHighlightedTaskIds(lowPriorityTasks);
 
               return (
-                hasUnlockedContainerTasks && showContainers ? (
+                showContainers ? (
                 <div className="mb-4 w-full">
                   <div className="mt-[17px] flex justify-end">
                     <button
                       type="button"
-                      onClick={() => setContainersManuallyCollapsed(true)}
+                      onClick={() => {
+                        setContainersManuallyCollapsed(true);
+                        setContainersForcedOpen(false);
+                      }}
                       className="relative z-10 -mb-[2px] inline-flex max-w-full items-center gap-1.5 rounded-t-lg border-2 border-b-0 border-custom-blue bg-custom-blue-light px-2.5 py-1 text-[12px] font-medium leading-tight text-custom-blue after:pointer-events-none after:absolute after:-bottom-[2px] after:left-0 after:right-0 after:h-[2px] after:bg-custom-blue-light"
                       aria-label="Nascondi containers"
                     >
@@ -2730,16 +2742,20 @@ export default function GenerateAssignments() {
 
           <div className="mt-0 grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-3">
-              {hasUnlockedContainerTasks && !showContainers && (
+              {!showContainers && (
                 <div className="mt-[17px] flex justify-end">
                   <button
                     type="button"
-                    onClick={() => setContainersManuallyCollapsed(false)}
-                    className="relative z-10 -mb-[2px] inline-flex items-center gap-1 rounded-t-lg border-2 border-b-0 border-custom-blue bg-custom-blue-light px-2.5 py-1 text-custom-blue after:pointer-events-none after:absolute after:-bottom-[2px] after:left-0 after:right-0 after:h-[2px] after:bg-custom-blue-light"
-                    aria-label="Mostra containers"
-                    title="Mostra containers"
+                    onClick={() => {
+                      setContainersManuallyCollapsed(false);
+                      setContainersForcedOpen(true);
+                    }}
+                    className="relative z-10 -mb-[2px] inline-flex max-w-full items-center gap-1.5 rounded-t-lg border-2 border-b-0 border-custom-blue bg-custom-blue-light px-2.5 py-1 text-[12px] font-medium leading-tight text-custom-blue after:pointer-events-none after:absolute after:-bottom-[2px] after:left-0 after:right-0 after:h-[2px] after:bg-custom-blue-light"
+                    aria-label="Apri i containers"
+                    title="Apri i containers"
                   >
-                    <ChevronDown className="h-4 w-4" />
+                    <ChevronDown className="h-4 w-4 shrink-0" />
+                    <span>Apri i containers</span>
                   </button>
                 </div>
               )}
@@ -2771,11 +2787,7 @@ export default function GenerateAssignments() {
                   isOperationalDayStarted={isOperationalDayStarted}
                   onOperationalDayToggle={(started) => void handleOperationalDayToggle(started)}
                   isOperationalDaySwitchDisabled={isTimelineReadOnly || isSavingOperationalDay}
-                  className={
-                    hasUnlockedContainerTasks && !showContainers
-                      ? "rounded-tr-none"
-                      : undefined
-                  }
+                  className={!showContainers ? "rounded-tr-none" : undefined}
                 />
                 <TimelineFloatingPanel
                   side="right"
