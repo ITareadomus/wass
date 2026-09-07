@@ -207,18 +207,26 @@ export async function recalculateLogisticsDriverTimes(
   }
 
   const driverStartMin = parseHmToMinutes(entry.driver?.start_time, 10 * 60) ?? 10 * 60;
-  const scheduleInputs: LogisticsScheduleTaskInput[] = tasks.map((task) => ({
-    taskId: Number(task.task_id),
-    logisticCode: Number(task.logistic_code),
-    lat: toFiniteNumber(task?.lat),
-    lng: toFiniteNumber(task?.lng),
-    priorityType: mapPriorityType(task?.priority ?? null),
-    checkoutTime: task.checkout_time ?? null,
-    checkoutDate: task.checkout_date ?? null,
-    checkinTime: task.checkin_time ?? null,
-    checkinDate: task.checkin_date ?? null,
-    travelMinutesFromPrevious: toFiniteNumber(task?.travel_time),
-  }));
+  const scheduleInputs: LogisticsScheduleTaskInput[] = tasks.map((task, index) => {
+    if (index > 0 && task.manual_start_time) {
+      task.manual_start_time = null;
+    }
+    const manualStartMin =
+      index === 0 ? parseHmToMinutes(task.manual_start_time, null) : null;
+    return {
+      taskId: Number(task.task_id),
+      logisticCode: Number(task.logistic_code),
+      lat: toFiniteNumber(task?.lat),
+      lng: toFiniteNumber(task?.lng),
+      priorityType: mapPriorityType(task?.priority ?? null),
+      checkoutTime: task.checkout_time ?? null,
+      checkoutDate: task.checkout_date ?? null,
+      checkinTime: task.checkin_time ?? null,
+      checkinDate: task.checkin_date ?? null,
+      travelMinutesFromPrevious: toFiniteNumber(task?.travel_time),
+      manualStartMin,
+    };
+  });
 
   const built = buildLogisticsScheduleForDriver({
     tasks: scheduleInputs,

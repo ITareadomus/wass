@@ -12,6 +12,28 @@ type Deps = {
   getRomeTimestamp: () => string;
 };
 
+function isValidHHmm(value: string): boolean {
+  if (!/^\d{2}:\d{2}$/.test(value)) return false;
+  const [hh, mm] = value.split(":").map(Number);
+  return hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59;
+}
+
+function toMinutesHHmm(value: string): number {
+  const [hh, mm] = value.split(":").map(Number);
+  return hh * 60 + mm;
+}
+
+function minutesToHHmm(totalMinutes: number): string {
+  const clamped = Math.max(0, Math.min(23 * 60 + 30, Math.round(totalMinutes)));
+  const hh = Math.floor(clamped / 60);
+  const mm = clamped % 60;
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
+function snapToHalfHourMinutes(totalMinutes: number): number {
+  return Math.round(totalMinutes / 30) * 30;
+}
+
 function normalizeLogisticsPriorityContainer(priority: unknown): "early_out" | "high_priority" | "low_priority" {
   const value = String(priority ?? "").trim().toLowerCase();
   if (value === "early_out" || value === "early-out") return "early_out";
@@ -768,6 +790,129 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       });
     } catch (error: any) {
       console.error("swap-drivers-tasks:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/reschedule-first-logistics-task", async (req, res) => {
+    try {
+      const { date, driverId, taskId, startTime, modified_by } = req.body;
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const driverIdNum = Number(driverId);
+      const clearOverride = startTime === null || startTime === "";
+
+      if (!Number.isFinite(driverIdNum) || !taskId) {
+        return res.status(400).json({
+          success: false,
+          error: "driverId e taskId sono richiesti",
+        });
+      }
+      if (!clearOverride && (typeof startTime !== "string" || !isValidHHmm(startTime))) {
+        return res.status(400).json({
+          success: false,
+          error: "startTime deve essere HH:mm oppure null per resettare",
+        });
+      }
+
+      const timelineData = await workspaceFiles.loadLogisticsTimeline(workDate);
+      if (!timelineData?.drivers_assignments) {
+        return res.status(404).json({ success: false, error: "Timeline non trovata" });
+      }
+
+      const driverEntry = timelineData.drivers_assignments.find(
+        (entry: any) => Number(entry?.driver?.id) === driverIdNum
+      );
+      if (!driverEntry || !Array.isArray(driverEntry.tasks) || driverEntry.tasks.length === 0) {
+        return res.status(404).json({ success: false, error: "Driver non trovato" });
+      }
+
+      driverEntry.tasks = [...driverEntry.tasks].sort(
+        (left: any, right: any) => Number(left?.sequence ?? 0) - Number(right?.sequence ?? 0)
+      );
+      const firstTask = driverEntry.tasks[0];
+      if (String(firstTask?.task_id ?? firstTask?.id ?? "") !== String(taskId)) {
+        return res.status(400).json({
+          success: false,
+          error: "Si può spostare solo la prima task del driver",
+        });
+      }
+      if (Boolean(firstTask.is_finished)) {
+        return res.status(423).json({
+          success: false,
+          error: "TASK_FINISHED",
+          message: "Task già completata: impossibile spostare l'orario",
+        });
+      }
+
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const isLocked = await pgDailyAssignmentsService.isTaskLocked(workDate, Number(taskId));
+      if (isLocked) {
+        return res.status(423).json({
+          success: false,
+          error: "TASK_LOCKED",
+          message: "Task bloccata: impossibile spostare l'orario",
+        });
+      }
+
+      const previousStart = firstTask.start_time ?? null;
+      const previousManual = firstTask.manual_start_time ?? null;
+
+      if (clearOverride) {
+        firstTask.manual_start_time = null;
+      } else {
+        const driverStartMin = toMinutesHHmm(driverEntry.driver?.start_time || "10:00");
+        const driverEndMin = toMinutesHHmm(driverEntry.driver?.end_time || "20:00");
+        const maxStart = Math.max(driverStartMin, driverEndMin - 30);
+        let minutes = toMinutesHHmm(startTime);
+        if (minutes !== driverStartMin) {
+          minutes = snapToHalfHourMinutes(minutes);
+        }
+        const clamped = Math.max(driverStartMin, Math.min(maxStart, minutes));
+        firstTask.manual_start_time = minutesToHHmm(clamped);
+      }
+
+      try {
+        await recalculateLogisticsDriverEntry(driverEntry, workDate);
+      } catch (recalcError: any) {
+        console.error(
+          "⚠️ Errore nel ricalcolo tempi dopo reschedule prima task logistica:",
+          recalcError.message
+        );
+        driverEntry.tasks.forEach((t: any, i: number) => {
+          t.sequence = i + 1;
+          t.followup = i > 0;
+        });
+      }
+
+      const modifyingUser = modified_by || getCurrentUsername(req);
+      timelineData.metadata = timelineData.metadata || {};
+      timelineData.metadata.last_updated = getRomeTimestamp();
+      timelineData.metadata.date = workDate;
+      if (!timelineData.metadata.created_by) {
+        timelineData.metadata.created_by = modifyingUser;
+      }
+
+      await workspaceFiles.saveLogisticsTimeline(
+        workDate,
+        timelineData,
+        false,
+        modifyingUser,
+        clearOverride ? "first_task_start_reset" : "first_task_reschedule",
+        {
+          editedField: "manual_start_time",
+          oldValue: String(previousManual ?? previousStart ?? ""),
+          newValue: clearOverride ? "auto" : String(firstTask.manual_start_time ?? startTime),
+        }
+      );
+
+      const updatedFirst = driverEntry.tasks?.[0];
+      res.json({
+        success: true,
+        start_time: updatedFirst?.start_time ?? firstTask.manual_start_time,
+        manual_start_time: updatedFirst?.manual_start_time ?? firstTask.manual_start_time,
+      });
+    } catch (error: any) {
+      console.error("Errore nel reschedule della prima task logistica:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
