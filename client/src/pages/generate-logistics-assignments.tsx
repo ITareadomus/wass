@@ -437,6 +437,9 @@ export default function GenerateLogisticsAssignments() {
   const [draggingOverDriverId, setDraggingOverDriverId] = useState<number | null>(null);
   /** Nasconde i containers e mostra il sommario anche se restano task non locked. */
   const [containersManuallyCollapsed, setContainersManuallyCollapsed] = useState(false);
+  /** Riapre i containers a mano anche se vuoti o con soli task locked. */
+  const [containersForcedOpen, setContainersForcedOpen] = useState(false);
+  const prevHasUnlockedContainerTasksRef = useRef(false);
   const [activeDragDriverId, setActiveDragDriverId] = useState<number | null>(null);
   /** Estrazione / refresh da ADAM al cambio data (come checkAndAutoLoadSavedAssignments + extractData su HK) */
   const [isExtractingLogistics, setIsExtractingLogistics] = useState(false);
@@ -869,16 +872,22 @@ export default function GenerateLogisticsAssignments() {
 
   useEffect(() => {
     setContainersManuallyCollapsed(false);
+    setContainersForcedOpen(false);
   }, [selectedDate]);
 
   useEffect(() => {
     if (!hasUnlockedContainerTasks) {
       setContainersManuallyCollapsed(false);
     }
+    if (prevHasUnlockedContainerTasksRef.current && !hasUnlockedContainerTasks) {
+      setContainersForcedOpen(false);
+    }
+    prevHasUnlockedContainerTasksRef.current = hasUnlockedContainerTasks;
   }, [hasUnlockedContainerTasks]);
 
-  const showContainers = hasUnlockedContainerTasks && !containersManuallyCollapsed;
-  const showSequenceSummary = !hasUnlockedContainerTasks || containersManuallyCollapsed;
+  const showContainers =
+    containersForcedOpen || (hasUnlockedContainerTasks && !containersManuallyCollapsed);
+  const showSequenceSummary = !showContainers;
 
   const sequenceSummaryGroups = useMemo(() => {
     const groups = buildSequenceSummaryGroupsFromDriverAssignments(
@@ -1231,12 +1240,7 @@ export default function GenerateLogisticsAssignments() {
           </PageViewportCentered>
         ) : (
         <>
-        <div
-          className={cn(
-            "mx-auto flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-3",
-            hasUnlockedContainerTasks ? "mb-0" : "mb-[17px]"
-          )}
-        >
+        <div className="mx-auto mb-0 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="relative min-w-[200px] flex-1">
               <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-custom-blue" />
@@ -1280,12 +1284,15 @@ export default function GenerateLogisticsAssignments() {
           measuring={{ droppable: { strategy: MeasuringStrategy.WhileDragging } }}
           {...logisticsDnd.handlers}
         >
-          {hasUnlockedContainerTasks && showContainers && (
+          {showContainers && (
               <div className="mb-4 w-full">
                 <div className="mt-[17px] flex justify-end">
                   <button
                     type="button"
-                    onClick={() => setContainersManuallyCollapsed(true)}
+                    onClick={() => {
+                      setContainersManuallyCollapsed(true);
+                      setContainersForcedOpen(false);
+                    }}
                     className="relative z-10 -mb-[2px] inline-flex max-w-full items-center gap-1.5 rounded-t-lg border-2 border-b-0 border-custom-blue bg-custom-blue-light px-2.5 py-1 text-[12px] font-medium leading-tight text-custom-blue after:pointer-events-none after:absolute after:-bottom-[2px] after:left-0 after:right-0 after:h-[2px] after:bg-custom-blue-light"
                     aria-label="Nascondi containers per mostrare il sommario dei task assegnati"
                   >
@@ -1343,16 +1350,20 @@ export default function GenerateLogisticsAssignments() {
 
           <div className="mt-0 grid grid-cols-1 gap-4 xl:grid-cols-3">
             <div className="xl:col-span-3">
-              {hasUnlockedContainerTasks && !showContainers && (
+              {!showContainers && (
                 <div className="mt-[17px] flex justify-end">
                   <button
                     type="button"
-                    onClick={() => setContainersManuallyCollapsed(false)}
-                    className="relative z-10 -mb-[2px] inline-flex items-center gap-1 rounded-t-lg border-2 border-b-0 border-custom-blue bg-custom-blue-light px-2.5 py-1 text-custom-blue after:pointer-events-none after:absolute after:-bottom-[2px] after:left-0 after:right-0 after:h-[2px] after:bg-custom-blue-light"
-                    aria-label="Mostra containers"
-                    title="Mostra containers"
+                    onClick={() => {
+                      setContainersManuallyCollapsed(false);
+                      setContainersForcedOpen(true);
+                    }}
+                    className="relative z-10 -mb-[2px] inline-flex max-w-full items-center gap-1.5 rounded-t-lg border-2 border-b-0 border-custom-blue bg-custom-blue-light px-2.5 py-1 text-[12px] font-medium leading-tight text-custom-blue after:pointer-events-none after:absolute after:-bottom-[2px] after:left-0 after:right-0 after:h-[2px] after:bg-custom-blue-light"
+                    aria-label="Apri i containers"
+                    title="Apri i containers"
                   >
-                    <ChevronDown className="h-4 w-4" />
+                    <ChevronDown className="h-4 w-4 shrink-0" />
+                    <span>Apri i containers</span>
                   </button>
                 </div>
               )}
@@ -1368,11 +1379,7 @@ export default function GenerateLogisticsAssignments() {
                   activeDragDriverId={activeDragDriverId}
                   lastValidDragIndex={lastValidDragIndex}
                   onRefresh={reloadLogisticsPage}
-                  className={
-                    hasUnlockedContainerTasks && !showContainers
-                      ? "rounded-tr-none"
-                      : undefined
-                  }
+                  className={!showContainers ? "rounded-tr-none" : undefined}
                 />
                 <TimelineFloatingPanel
                   side="right"

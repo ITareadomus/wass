@@ -182,10 +182,10 @@ export function FirstApartmentTimeShift({
             : "Trascina per spostare l'inizio del primo appartamento (scatti da 30 min)"
         }
         className={cn(
-          "absolute top-1/2 z-30 flex h-9 w-9 -translate-y-1/2 cursor-ew-resize touch-none select-none items-center justify-center rounded-md border border-sky-400 bg-white shadow-md transition-opacity dark:bg-slate-900",
+          "absolute top-1/2 z-30 flex h-9 w-9 -translate-y-1/2 cursor-ew-resize touch-none select-none items-center justify-center rounded-md border-2 border-custom-blue bg-background text-custom-blue shadow-md transition-opacity",
           dockOnRight ? "right-0" : "left-0",
           showHandle ? "opacity-100" : "opacity-0",
-          isDragging && "bg-sky-100 dark:bg-sky-950",
+          isDragging && "bg-custom-blue-light",
           disabled && "pointer-events-none",
         )}
         onPointerDown={handlePointerDown}
@@ -195,11 +195,11 @@ export function FirstApartmentTimeShift({
         onDoubleClick={handleDoubleClick}
         onMouseEnter={reveal}
       >
-        <ChevronsLeftRight className="h-5 w-5 text-sky-700 dark:text-sky-300" />
+        <ChevronsLeftRight className="h-5 w-5 text-custom-blue" />
         {previewLabel && (
           <span
             className={cn(
-              "pointer-events-none absolute whitespace-nowrap rounded bg-sky-700 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-white shadow",
+              "pointer-events-none absolute whitespace-nowrap rounded border-2 border-custom-blue bg-background px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-custom-blue shadow",
               dockOnRight ? "left-full ml-1" : "right-full mr-1",
             )}
           >

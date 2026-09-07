@@ -19,8 +19,6 @@ import {
   useRef,
   useState,
   Fragment,
-  type PointerEvent,
-  type UIEvent,
 } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
@@ -28,18 +26,13 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import SortableTaskCard from "@/components/drag-drop/sortable-task-card";
 import { FirstApartmentTimeShift } from "@/components/timeline/first-apartment-time-shift-handle";
-import {
-  FIRST_APT_TIME_SHIFT_ATTRIBUTE,
-  isPointOnFirstAptTimeShift,
-  markTimelinePan,
-  releaseTimelinePan,
-} from "@/lib/first-apartment-time-shift";
 import { TimelineHorizontalScrollbar } from "@/components/timeline/timeline-horizontal-scrollbar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { openTimelineMapPanel } from "@/lib/timeline-map-panel";
 import { getPersonnelHexColor } from "@/lib/cleaner-colors";
+import { useSyncedTimelineScroll } from "@/hooks/use-synced-timeline-scroll";
 import type { TaskType as Task } from "@shared/schema";
 import {
   computeLogisticsCheckoutWaitGap,
@@ -81,7 +74,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import {
   DndDroppableSortableContainer,
   getTaskDndKey,
-  shouldStartTimelinePan,
   taskDndId,
   type AppDndItem,
 } from "@/lib/dnd";
@@ -435,103 +427,20 @@ export default function LogisticsTimelineView({
 
   const [priorityWindows, setPriorityWindows] = useState<PriorityWindows | null>(null);
   const [timelineWidthPx, setTimelineWidthPx] = useState(0);
-  const [timelineScrollLeft, setTimelineScrollLeft] = useState(0);
   const [romeClockNow, setRomeClockNow] = useState<RomeClockNow>(() => getRomeClockNow());
   const timelineRowRef = useRef<HTMLDivElement | null>(null);
-  const timelineScrollRefs = useRef<HTMLDivElement[]>([]);
-  const isSyncingTimelineScrollRef = useRef(false);
-  const timelineScrollDragRef = useRef<{
-    scrollContainer: HTMLDivElement;
-    pointerId: number;
-    startX: number;
-    startScrollLeft: number;
-  } | null>(null);
+  const {
+    scrollLeft: timelineScrollLeft,
+    setScrollRootRef,
+    registerScrollRef: registerTimelineScrollRef,
+    handleScroll: handleTimelineScroll,
+    handlePointerDown: handleTimelinePointerDown,
+    handlePointerMove: handleTimelinePointerMove,
+    stopPan: stopTimelinePan,
+  } = useSyncedTimelineScroll();
 
   const displayInputClass =
     "h-9 border-transparent bg-transparent shadow-none focus-visible:ring-0 px-0 pointer-events-none select-none";
-
-  const registerTimelineScrollRef = useCallback((node: HTMLDivElement | null) => {
-    if (node && !timelineScrollRefs.current.includes(node)) {
-      timelineScrollRefs.current.push(node);
-    }
-  }, []);
-
-  const handleTimelineScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
-    if (isSyncingTimelineScrollRef.current) return;
-
-    const source = event.currentTarget;
-    setTimelineScrollLeft(source.scrollLeft);
-    isSyncingTimelineScrollRef.current = true;
-    timelineScrollRefs.current = timelineScrollRefs.current.filter((node) => node.isConnected);
-    timelineScrollRefs.current.forEach((node) => {
-      if (node !== source) {
-        node.scrollLeft = source.scrollLeft;
-      }
-    });
-    requestAnimationFrame(() => {
-      isSyncingTimelineScrollRef.current = false;
-    });
-  }, []);
-
-  const canStartTimelinePan = useCallback((
-    target: EventTarget | null,
-    point?: { x: number; y: number },
-  ) => {
-    return shouldStartTimelinePan(target, point);
-  }, []);
-
-  const handleTimelinePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    const scrollContainer = event.currentTarget;
-    if (isPointOnFirstAptTimeShift(event.clientX, event.clientY)) return;
-    if (
-      event.target instanceof Element &&
-      event.target.closest(`[${FIRST_APT_TIME_SHIFT_ATTRIBUTE}]`)
-    ) {
-      return;
-    }
-    // I contenuti in portal (dialog, select, popover) bollono nell'albero React ma
-    // vivono fuori dal container nel DOM: senza questo check il pan catturava il
-    // puntatore e rompeva la selezione nei dialog aperti dalle card.
-    if (!(event.target instanceof Node) || !scrollContainer.contains(event.target)) return;
-    if (event.button !== 0 || !canStartTimelinePan(event.target, { x: event.clientX, y: event.clientY })) return;
-    if (scrollContainer.scrollWidth <= scrollContainer.clientWidth) return;
-
-    timelineScrollDragRef.current = {
-      scrollContainer,
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startScrollLeft: scrollContainer.scrollLeft,
-    };
-    scrollContainer.setPointerCapture(event.pointerId);
-    markTimelinePan(scrollContainer, event.pointerId);
-    event.preventDefault();
-  }, [canStartTimelinePan]);
-
-  const handleTimelinePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    const dragState = timelineScrollDragRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId) return;
-
-    dragState.scrollContainer.scrollLeft = dragState.startScrollLeft - (event.clientX - dragState.startX);
-    event.preventDefault();
-  }, []);
-
-  const stopTimelinePan = useCallback((event?: { pointerId: number }) => {
-    const dragState = timelineScrollDragRef.current;
-    if (!dragState || (event && dragState.pointerId !== event.pointerId)) return;
-
-    releaseTimelinePan(dragState.scrollContainer);
-    timelineScrollDragRef.current = null;
-  }, []);
-
-  useEffect(() => {
-    const onUp = (event: globalThis.PointerEvent) => stopTimelinePan(event);
-    window.addEventListener("pointerup", onUp, true);
-    window.addEventListener("pointercancel", onUp, true);
-    return () => {
-      window.removeEventListener("pointerup", onUp, true);
-      window.removeEventListener("pointercancel", onUp, true);
-    };
-  }, [stopTimelinePan]);
 
   // Driver name box variants:
   // - left-bar: thin colored stripe
@@ -1811,7 +1720,7 @@ export default function LogisticsTimelineView({
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-col overflow-hidden px-1 pt-4 pb-4">
+        <div ref={setScrollRootRef} className="flex min-h-0 flex-col overflow-hidden px-1 pt-4 pb-4">
           <div className="flex items-stretch mb-0 px-1 h-[40px]">
             <div className="flex-shrink-0 h-full print:hidden" style={{ width: `${driverColumnWidth}px` }} />
             <div
