@@ -136,6 +136,9 @@ interface LogisticsTimelineViewProps {
   className?: string;
 }
 
+/** Tasto shift orario prima fermata (come HK). Mettere `true` per riattivarlo. */
+const ENABLE_FIRST_LOGISTICS_TASK_TIME_SHIFT = false;
+
 /** Larghezza minima card 15' — anche scala minima della timeline (abilita scroll orizzontale). */
 const MIN_TIMELINE_TASK_WIDTH_PX = 56;
 const COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX = 56;
@@ -2154,6 +2157,7 @@ export default function LogisticsTimelineView({
                               ) {
                                 const gridStartMinutes = timelineStartMinutes;
                                 const previewMinutes =
+                                  ENABLE_FIRST_LOGISTICS_TASK_TIME_SHIFT &&
                                   firstTaskTimeShiftPreview?.driverId === driver.id
                                     ? firstTaskTimeShiftPreview.startMinutes
                                     : null;
@@ -2244,6 +2248,7 @@ export default function LogisticsTimelineView({
                                     return (
                                   <FirstApartmentTimeShift
                                     enabled={
+                                      ENABLE_FIRST_LOGISTICS_TASK_TIME_SHIFT &&
                                       seq === 1 &&
                                       !hideRouteSpacers &&
                                       !isReadOnly &&
