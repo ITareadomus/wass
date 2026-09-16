@@ -25,6 +25,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import SortableTaskCard from "@/components/drag-drop/sortable-task-card";
+import { FirstApartmentTimeShift } from "@/components/timeline/first-apartment-time-shift-handle";
 import { TimelineHorizontalScrollbar } from "@/components/timeline/timeline-horizontal-scrollbar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -136,6 +137,9 @@ interface LogisticsTimelineViewProps {
   className?: string;
 }
 
+/** Tasto shift orario prima fermata (come HK). Mettere `true` per riattivarlo. */
+const ENABLE_FIRST_LOGISTICS_TASK_TIME_SHIFT = false;
+
 /** Larghezza minima card 15' — anche scala minima della timeline (abilita scroll orizzontale). */
 const MIN_TIMELINE_TASK_WIDTH_PX = 56;
 const COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX = 56;
@@ -168,6 +172,22 @@ function minutesToTimelineWidthPx(
 ): number {
   if (minutes <= 0 || virtualMinutes <= 0 || timelineWidth <= 0) return 0;
   return (minutes / virtualMinutes) * timelineWidth;
+}
+
+function layoutFirstLogisticsStop(args: {
+  startMinutes: number;
+  travelMinutes: number;
+  waitMinutes: number;
+  gridStartMinutes: number;
+}): { idleMinutes: number; waitMinutes: number } {
+  const travelMinutes = Math.max(0, args.travelMinutes);
+  let waitMinutes = Math.max(0, args.waitMinutes);
+  let idleMinutes = args.startMinutes - waitMinutes - travelMinutes - args.gridStartMinutes;
+  if (idleMinutes < 0) {
+    waitMinutes = Math.max(0, waitMinutes + idleMinutes);
+    idleMinutes = 0;
+  }
+  return { idleMinutes: Math.max(0, idleMinutes), waitMinutes };
 }
 
 const ROME_TZ = "Europe/Rome";
@@ -400,6 +420,11 @@ export default function LogisticsTimelineView({
   const [showAdamTransferDialog, setShowAdamTransferDialog] = useState(false);
   const [lastAdamTransfer, setLastAdamTransfer] = useState<string | null>(null);
   const [isTransferringToAdam, setIsTransferringToAdam] = useState(false);
+  const [firstTaskTimeShiftPreview, setFirstTaskTimeShiftPreview] = useState<{
+    driverId: number;
+    startMinutes: number;
+  } | null>(null);
+  const [isSavingFirstTaskTime, setIsSavingFirstTaskTime] = useState(false);
 
   const [priorityWindows, setPriorityWindows] = useState<PriorityWindows | null>(null);
   const [timelineWidthPx, setTimelineWidthPx] = useState(0);
@@ -1585,6 +1610,42 @@ export default function LogisticsTimelineView({
     }
   };
 
+  const persistFirstLogisticsTaskStart = async (
+    driverId: number,
+    taskId: string | number,
+    startTime: string | null,
+  ) => {
+    setIsSavingFirstTaskTime(true);
+    try {
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const response = await fetch("/api/reschedule-first-logistics-task", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          driverId,
+          taskId,
+          startTime,
+          date: workDate,
+          modified_by: currentUser.username || "unknown",
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || result.message || "Errore nello spostamento dell'orario");
+      }
+      await onRefresh();
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile spostare l'inizio della prima task",
+        variant: "destructive",
+      });
+    } finally {
+      setFirstTaskTimeShiftPreview(null);
+      setIsSavingFirstTaskTime(false);
+    }
+  };
+
   const handleReset = async () => {
     setIsResetting(true);
     try {
@@ -1891,7 +1952,10 @@ export default function LogisticsTimelineView({
                   activeDragDriverId === driver.id ||
                   draggingOverDriverId === driver.id;
                 return (
-                  <div key={driver.id} className="mb-0.5 flex h-[50px] min-w-0">
+                  <div
+                    key={driver.id}
+                    className="mb-0.5 flex h-[50px] min-w-0"
+                  >
                     <div
                       className={cn(
                         "flex-shrink-0 flex items-center overflow-hidden rounded-md border border-border/60 bg-custom-blue-light",
@@ -2082,11 +2146,7 @@ export default function LogisticsTimelineView({
                                 virtualMinutes,
                                 timelineWidth
                               );
-                              const waitingGapWidthPx = minutesToTimelineWidthPx(
-                                checkoutWait,
-                                virtualMinutes,
-                                timelineWidth
-                              );
+                              let displayWait = checkoutWait;
                               let initialIdleOffsetPx = 0;
                               if (
                                 seq === 1 &&
@@ -2094,25 +2154,39 @@ export default function LogisticsTimelineView({
                                 timelineWidth > 0
                               ) {
                                 const gridStartMinutes = timelineStartMinutes;
-                                const taskStartMinutes = parseHmToMinutes(raw?.start_time, null);
+                                const previewMinutes =
+                                  ENABLE_FIRST_LOGISTICS_TASK_TIME_SHIFT &&
+                                  firstTaskTimeShiftPreview?.driverId === driver.id
+                                    ? firstTaskTimeShiftPreview.startMinutes
+                                    : null;
+                                const taskStartMinutes =
+                                  previewMinutes ?? parseHmToMinutes(raw?.start_time, null);
                                 const driverStartMinutes =
                                   parseHmToMinutes(driver.start_time, null) ?? gridStartMinutes;
-                                let routeStartMinutes = driverStartMinutes;
-                                if (taskStartMinutes != null) {
-                                  routeStartMinutes = taskStartMinutes - checkoutWait - travelTime;
-                                }
-                                const idleMinutes = Math.max(0, routeStartMinutes - gridStartMinutes);
+                                const layoutStartMinutes = taskStartMinutes ?? driverStartMinutes;
+                                const layout = layoutFirstLogisticsStop({
+                                  startMinutes: layoutStartMinutes,
+                                  travelMinutes: travelTime,
+                                  waitMinutes: checkoutWait,
+                                  gridStartMinutes,
+                                });
+                                displayWait = layout.waitMinutes;
                                 initialIdleOffsetPx = minutesToTimelineWidthPx(
-                                  idleMinutes,
+                                  layout.idleMinutes,
                                   virtualMinutes,
                                   timelineWidth
                                 );
                               }
+                              const waitingGapWidthPx = minutesToTimelineWidthPx(
+                                displayWait,
+                                virtualMinutes,
+                                timelineWidth
+                              );
                               return (
                                 <Fragment key={`${task.id}-${driver.id}-frag`}>
                                   {seq === 1 && initialIdleOffsetPx > 0 && (
                                     <div
-                                      className="flex-shrink-0"
+                                      className="pointer-events-none flex-shrink-0"
                                       style={{ width: `${initialIdleOffsetPx}px`, minHeight: "50px" }}
                                       aria-hidden
                                     />
@@ -2131,13 +2205,13 @@ export default function LogisticsTimelineView({
                                     />
                                   )}
                                   {!hideRouteSpacers &&
-                                    checkoutWait > 0 &&
+                                    displayWait > 0 &&
                                     waitingGapWidthPx > 0 &&
                                     raw?.checkout_time && (
                                     <div
                                       className="flex items-center justify-center flex-shrink-0 py-3 bg-amber-100/50 dark:bg-amber-900/20 border-y border-dashed border-amber-400"
                                       style={{ width: `${waitingGapWidthPx}px`, minHeight: "50px" }}
-                                      title={`Attesa checkout: ${checkoutWait} min`}
+                                      title={`Attesa checkout: ${displayWait} min`}
                                     >
                                       <svg
                                         width="16"
@@ -2167,8 +2241,47 @@ export default function LogisticsTimelineView({
                                         staffId: driver.id,
                                       },
                                     };
+                                    const firstTaskId = raw?.task_id || task.id;
 
                                     return (
+                                  <FirstApartmentTimeShift
+                                    enabled={
+                                      ENABLE_FIRST_LOGISTICS_TASK_TIME_SHIFT &&
+                                      seq === 1 &&
+                                      !hideRouteSpacers &&
+                                      !isReadOnly &&
+                                      !Boolean((task as any).locked) &&
+                                      !Boolean((task as any).is_finished)
+                                    }
+                                    isPinned={Boolean(raw?.manual_start_time)}
+                                    startTime={raw?.start_time || task.start_time}
+                                    cleanerStartTime={driver.start_time || "10:00"}
+                                    cleanerEndTime={driver.end_time || "20:00"}
+                                    pxPerMinute={timelinePxPerMinute}
+                                    leftSpacePx={initialIdleOffsetPx}
+                                    disabled={isSavingFirstTaskTime}
+                                    onPreview={(startMinutes) =>
+                                      setFirstTaskTimeShiftPreview({
+                                        driverId: driver.id,
+                                        startMinutes,
+                                      })
+                                    }
+                                    onCommit={(nextStart) =>
+                                      persistFirstLogisticsTaskStart(
+                                        driver.id,
+                                        firstTaskId,
+                                        nextStart,
+                                      )
+                                    }
+                                    onReset={() =>
+                                      persistFirstLogisticsTaskStart(
+                                        driver.id,
+                                        firstTaskId,
+                                        null,
+                                      )
+                                    }
+                                    onCancel={() => setFirstTaskTimeShiftPreview(null)}
+                                  >
                                   <SortableTaskCard
                                     key={`${task.id}-${driver.id}`}
                                     dndId={taskDndId("logistics", taskKey, driver.id, "timeline")}
@@ -2207,6 +2320,7 @@ export default function LogisticsTimelineView({
                                     timelineRowStaffDisplayLabel={driverRowDisplayLabel}
                                     onLogisticsTimelineMutated={onRefresh}
                                   />
+                                  </FirstApartmentTimeShift>
                                     );
                                   })()}
                                 </Fragment>

@@ -26,6 +26,11 @@ export interface LogisticsScheduleTaskInput {
   checkinDate?: string | null;
   /** Se presente, usa questo travel invece della stima da coordinate. */
   travelMinutesFromPrevious?: number | null;
+  /**
+   * Override inizio prima task (scatti da 30 min), come housekeeping.
+   * Vince su checkout/priority; non può essere prima dell'inizio turno.
+   */
+  manualStartMin?: number | null;
 }
 
 export interface LogisticsScheduledTaskRow {
@@ -113,6 +118,15 @@ function buildLogisticsScheduleForDriverOnce(args: {
       }
     }
 
+    // First-task drag override wins over checkout/priority, not over shift start.
+    if (
+      i === 0 &&
+      task.manualStartMin != null &&
+      Number.isFinite(task.manualStartMin)
+    ) {
+      startMin = Math.max(driverStartMin, task.manualStartMin);
+    }
+
     const checkoutWaitMinutes = Math.max(0, startMin - arrivalMin);
     const checkoutWaitExceeded = checkoutWaitMinutes > LOGISTICS_MAX_CHECKOUT_WAIT_MIN;
 
@@ -197,6 +211,9 @@ export function buildLogisticsScheduleForDriver(args: {
     priorityWindows,
   });
 
+  const hasManualFirstStart =
+    tasks[0]?.manualStartMin != null && Number.isFinite(tasks[0].manualStartMin);
+
   const absorptionMin = computeEarlyRouteWaitAbsorptionMin(
     driverStartMin,
     firstPass.tasks.map((row) => ({
@@ -206,7 +223,7 @@ export function buildLogisticsScheduleForDriver(args: {
     }))
   );
 
-  if (absorptionMin <= 0) {
+  if (hasManualFirstStart || absorptionMin <= 0) {
     return firstPass;
   }
 

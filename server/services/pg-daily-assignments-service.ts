@@ -158,6 +158,7 @@ export interface PgLogisticsAssignmentRow {
   sequence: number;
   travel_time: number;
   checkout_wait_minutes?: number;
+  manual_start_time?: string | null;
   manually_moved?: boolean;
   is_finished?: boolean;
   logistics_task_kind?: string | null;
@@ -833,6 +834,12 @@ export class PgDailyAssignmentsService {
       );
       await query(
         `ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS is_finished BOOLEAN NOT NULL DEFAULT FALSE`
+      );
+      await query(
+        `ALTER TABLE IF EXISTS lg_timeline ADD COLUMN IF NOT EXISTS manual_start_time VARCHAR(10)`
+      );
+      await query(
+        `ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS manual_start_time VARCHAR(10)`
       );
       await query(
         `ALTER TABLE IF EXISTS lg_containers ADD COLUMN IF NOT EXISTS logistics_task_kind VARCHAR(50)`
@@ -1802,6 +1809,9 @@ export class PgDailyAssignmentsService {
           travel_time: Number(task.travel_time || 0),
           checkout_wait_minutes:
             task.checkout_wait_minutes != null ? Number(task.checkout_wait_minutes) : 0,
+          manual_start_time: task.manual_start_time
+            ? String(task.manual_start_time).substring(0, 5)
+            : null,
           manually_moved: Boolean(task.manually_moved),
           is_finished: Boolean(task.is_finished ?? task.isFinished),
           logistics_task_kind:
@@ -1869,7 +1879,7 @@ export class PgDailyAssignmentsService {
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
             type_apt, alias, customer_name, customer_reference, customer_note, customer_note_history, reasons, manually_moved, priority,
             start_time, end_time, followup, sequence, travel_time, checkout_wait_minutes,
-            logistics_task_kind, logistics_task_kind_source, is_finished
+            logistics_task_kind, logistics_task_kind_source, is_finished, manual_start_time
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8,
             $9, $10, $11,
@@ -1878,7 +1888,7 @@ export class PgDailyAssignmentsService {
             $22, $23, $24, $25, $26, $27,
             $28, $29, $30, $31, $32, $33, $34, $35, $36,
             $37, $38, $39, $40, $41, $42,
-            $43, $44, $45
+            $43, $44, $45, $46
           )
         `, [
           row.work_date,
@@ -1926,6 +1936,7 @@ export class PgDailyAssignmentsService {
           row.logistics_task_kind,
           row.logistics_task_kind_source,
           row.is_finished === true,
+          row.manual_start_time || null,
         ]);
       }
       await client.query('COMMIT');
@@ -2032,6 +2043,9 @@ export class PgDailyAssignmentsService {
         if (row.travel_time !== null) task.travel_time = row.travel_time;
         const cw = Number((row as any).checkout_wait_minutes ?? 0);
         if (cw > 0) task.checkout_wait_minutes = cw;
+        if ((row as any).manual_start_time) {
+          task.manual_start_time = String((row as any).manual_start_time).substring(0, 5);
+        }
         if ((row as any).logistics_task_kind != null) {
           task.logistics_task_kind = String((row as any).logistics_task_kind);
         }
@@ -2129,7 +2143,7 @@ export class PgDailyAssignmentsService {
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
             type_apt, alias, customer_name, customer_reference, customer_note, customer_note_history, reasons, manually_moved, priority,
             start_time, end_time, followup, sequence, travel_time, checkout_wait_minutes,
-            logistics_task_kind, logistics_task_kind_source, is_finished, created_by
+            logistics_task_kind, logistics_task_kind_source, is_finished, manual_start_time, created_by
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9,
             $10, $11, $12,
@@ -2138,7 +2152,7 @@ export class PgDailyAssignmentsService {
             $23, $24, $25, $26, $27, $28,
             $29, $30, $31, $32, $33, $34, $35, $36, $37,
             $38, $39, $40, $41, $42, $43,
-            $44, $45, $46, $47
+            $44, $45, $46, $47, $48
           )
         `,
           [
@@ -2188,6 +2202,7 @@ export class PgDailyAssignmentsService {
             row.logistics_task_kind,
             row.logistics_task_kind_source,
             row.is_finished === true,
+            row.manual_start_time || null,
             createdBy,
           ]
         );
