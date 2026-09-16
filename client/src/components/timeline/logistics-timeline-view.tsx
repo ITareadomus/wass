@@ -33,6 +33,7 @@ import { openTimelineMapPanel } from "@/lib/timeline-map-panel";
 import { getPersonnelHexColor } from "@/lib/cleaner-colors";
 import { useSyncedTimelineScroll } from "@/hooks/use-synced-timeline-scroll";
 import type { TaskType as Task } from "@shared/schema";
+import { formatClockFromMinutes } from "@shared/clock-display";
 import {
   computeLogisticsCheckoutWaitGap,
   formatLogisticsWorkedHours,
@@ -158,10 +159,7 @@ const parseTimelineClockToMinutes = (value?: string | null) => {
 const roundDownToHour = (minutes: number) => Math.floor(minutes / 60) * 60;
 const roundUpToHour = (minutes: number) => Math.ceil(minutes / 60) * 60;
 
-const formatTimelineSlot = (minutes: number) => {
-  const hours = Math.floor(minutes / 60);
-  return `${String(hours).padStart(2, "0")}:00`;
-};
+const formatTimelineSlot = (minutes: number) => formatClockFromMinutes(roundDownToHour(minutes));
 
 function minutesToTimelineWidthPx(
   minutes: number,

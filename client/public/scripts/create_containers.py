@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
+import math
 import mysql.connector
 import sys
 from datetime import datetime, date, timedelta
@@ -29,6 +30,42 @@ def init_api_client(workflow="housekeeping"):
     except Exception as e:
         print(f"⚠️ Failed to initialize API client: {e}")
         return False
+
+def _int_or_none(value):
+    try:
+        if value is None:
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _collaborator_count_in_timeline(timeline_data, task):
+    """How many cleaners currently have this task on the timeline."""
+    task_id = _int_or_none(task.get("task_id"))
+    count = 0
+    if task_id is not None:
+        for entry in timeline_data.get("cleaners_assignments") or []:
+            for other in entry.get("tasks") or []:
+                if _int_or_none(other.get("task_id")) == task_id:
+                    count += 1
+    meta = _int_or_none(task.get("collaborator_count")) or 0
+    ids = task.get("collaborator_ids") if isinstance(task.get("collaborator_ids"), list) else []
+    return max(count, meta, len(ids), 1)
+
+
+def _apply_adam_cleaning_time(task, fresh_data, timeline_data):
+    """ADAM duration is the apartment total (base). Split it when the task is collaborative."""
+    adam_duration = _int_or_none(fresh_data.get("cleaning_time"))
+    if adam_duration is None:
+        return
+    collab_count = _collaborator_count_in_timeline(timeline_data, task)
+    task["base_cleaning_time"] = adam_duration
+    if collab_count > 1:
+        task["cleaning_time"] = math.ceil(adam_duration / collab_count)
+    else:
+        task["cleaning_time"] = adam_duration
+
 
 # Script paths
 EXTRACT_CLEANERS_SCRIPT = Path(__file__).parent / "extract_cleaners_optimized.py"
@@ -564,9 +601,11 @@ def main():
 
                     # CRITICAL: Campi da aggiornare dal DB (NON toccare campi timeline)
                     # Preserva: start_time, end_time, travel_time, sequence, followup, priority, reasons
+                    # cleaning_time is handled separately: ADAM has the apartment total,
+                    # while collaborative timeline rows store the per-cleaner split.
                     fields_to_update = [
                         "logistic_code", "client_id", "premium", "address", "lat", "lng",
-                        "cleaning_time", "checkin_date", "checkout_date", "checkin_time",
+                        "checkin_date", "checkout_date", "checkin_time",
                         "checkout_time", "pax_in", "pax_out", "small_equipment",
                         "operation_id", "confirmed_operation", "straordinaria",
                         "type_apt", "alias", "customer_name", "customer_reference"
@@ -575,6 +614,8 @@ def main():
                     for field in fields_to_update:
                         if field in fresh_data:
                             task[field] = fresh_data[field]
+
+                    _apply_adam_cleaning_time(task, fresh_data, timeline_data)
 
                     updated_count += 1
 

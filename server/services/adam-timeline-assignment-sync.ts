@@ -818,19 +818,14 @@ export async function syncTimelineAssignmentsFromAdam(
           selectedById.has(cleanerId)
       );
       const collabCount = Math.max(1, collaboratorIds.length);
-      const baseCleaning =
-        Number(
-          existingTask?.base_cleaning_time ??
-            existingTask?.cleaning_time ??
-            row.cleaning_time ??
-            0
-        ) || 0;
-      // If existing already split, recover base from count
-      const recoveredBase =
-        current && current.cleanerIds.length > 1 && existingTask?.cleaning_time
-          ? Number(existingTask.cleaning_time) * current.cleanerIds.length
-          : baseCleaning;
-      const effectiveBase = recoveredBase || row.cleaning_time || 0;
+      // ADAM duration is the apartment total. Never reconstruct base as
+      // cleaning_time * collaborator count: a prior APT refresh may have
+      // overwritten the split with the full duration, and multiplying would
+      // double it.
+      const adamBase = Number(row.cleaning_time ?? 0) || 0;
+      const storedBase = Number(existingTask?.base_cleaning_time ?? 0) || 0;
+      const effectiveBase =
+        adamBase || storedBase || Number(existingTask?.cleaning_time ?? 0) || 0;
       const splitCleaning = Math.ceil(effectiveBase / collabCount);
 
       if (collabCount > 1) collaborationUpdated += 1;

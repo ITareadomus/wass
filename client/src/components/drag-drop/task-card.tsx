@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { TaskType as Task } from "@shared/schema";
+import { formatClockLabel } from "@shared/clock-display";
 import {
   getLogisticsTimelineViolationMessages,
   getLogisticsTimelineViolationShortLabels,
@@ -2970,14 +2971,16 @@ const displayClickableInputClass =
           : "non assegnato";
   const housekeepingStartDisplayValue =
     isLogisticsScope
-      ? String(effectiveHousekeepingStartTime ?? "").trim() ||
-        "non assegnato"
-      : String(displayAssignmentStart ?? assignmentTimes.start_time ?? "non assegnato");
+      ? formatClockLabel(String(effectiveHousekeepingStartTime ?? "").trim() || "non assegnato")
+      : formatClockLabel(
+          String(displayAssignmentStart ?? assignmentTimes.start_time ?? "non assegnato")
+        );
   const housekeepingEndDisplayValue =
     isLogisticsScope
-      ? String(effectiveHousekeepingEndTime ?? "").trim() ||
-        "non assegnato"
-      : String(displayAssignmentEnd ?? assignmentTimes.end_time ?? "non assegnato");
+      ? formatClockLabel(String(effectiveHousekeepingEndTime ?? "").trim() || "non assegnato")
+      : formatClockLabel(
+          String(displayAssignmentEnd ?? assignmentTimes.end_time ?? "non assegnato")
+        );
 
   const alignLogisticsHousekeepingRows = false;
 

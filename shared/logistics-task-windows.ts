@@ -1,3 +1,4 @@
+import { formatClockLabel } from "./clock-display";
 import { minutesToHm } from "./logistics-scheduling-constraints";
 
 export function formatHmTime(value: unknown): string | null {
@@ -7,9 +8,9 @@ export function formatHmTime(value: unknown): string | null {
 
   const raw = String(value ?? "").trim();
   if (!raw) return null;
-  const match = raw.match(/^(\d{1,2}):(\d{2})/);
+  const match = raw.match(/^(\d{1,3}):(\d{2})/);
   if (!match) return null;
-  return `${String(match[1]).padStart(2, "0")}:${match[2]}`;
+  return formatClockLabel(`${match[1]}:${match[2]}`);
 }
 
 export function formatWorkWindowLabel(start: unknown, end: unknown): string {

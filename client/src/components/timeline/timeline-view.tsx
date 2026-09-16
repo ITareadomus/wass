@@ -1,4 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
+import { formatClockFromMinutes } from "@shared/clock-display";
 import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, UserMinus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap, Lock, Unlock, AlertCircle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
@@ -154,10 +155,7 @@ const getTimelineTravelMinutes = (task: any) => {
 const roundDownToHour = (minutes: number) => Math.floor(minutes / 60) * 60;
 const roundUpToHour = (minutes: number) => Math.ceil(minutes / 60) * 60;
 
-const formatTimelineSlot = (minutes: number) => {
-  const hours = Math.floor(minutes / 60);
-  return `${String(hours).padStart(2, "0")}:00`;
-};
+const formatTimelineSlot = (minutes: number) => formatClockFromMinutes(roundDownToHour(minutes));
 
 const ROME_TZ = "Europe/Rome";
 
