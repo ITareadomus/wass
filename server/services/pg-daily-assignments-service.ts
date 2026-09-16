@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg';
 import pool, { query } from '../../shared/pg-db';
 import { taskCollaborationService } from './pg-task-collaboration-service';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -570,6 +571,44 @@ export class PgDailyAssignmentsService {
   }
 
   /**
+   * Ultima barriera contro le timeline duplicate: una task puo comparire una sola
+   * volta per (giorno, cleaner, scope).
+   * Se la tabella contiene gia duplicati l'indice non viene creato e il problema
+   * viene segnalato: la deduplica resta un'operazione manuale, per non cancellare
+   * righe all'avvio dell'app.
+   */
+  async ensureDailyAssignmentsCurrentNoDuplicates(): Promise<void> {
+    try {
+      const duplicates = await query(`
+        SELECT COUNT(*)::int AS groups
+        FROM (
+          SELECT 1
+          FROM daily_assignments_current
+          GROUP BY work_date, cleaner_id, task_id, COALESCE(scope, 'housekeeping')
+          HAVING COUNT(*) > 1
+        ) d
+      `);
+
+      const duplicateGroups = Number(duplicates.rows[0]?.groups ?? 0);
+      if (duplicateGroups > 0) {
+        console.warn(
+          `⚠️ PG: daily_assignments_current contiene ${duplicateGroups} gruppi duplicati: ` +
+            `indice univoco non creato, serve una deduplica manuale`
+        );
+        return;
+      }
+
+      await query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS daily_assignments_current_no_dup_uidx
+        ON daily_assignments_current (work_date, cleaner_id, task_id, (COALESCE(scope, 'housekeeping')))
+      `);
+      console.log('✅ PG: daily_assignments_current UNIQUE su (work_date, cleaner_id, task_id, scope)');
+    } catch (error) {
+      console.warn('⚠️ PG: ensureDailyAssignmentsCurrentNoDuplicates:', error);
+    }
+  }
+
+  /**
    * Scope migration for selected cleaners tables:
    * - daily_selected_cleaners: unique per (work_date, scope)
    * - selected_cleaners_revisions: scope column + indexes
@@ -1020,6 +1059,11 @@ export class PgDailyAssignmentsService {
       return rows;
     }
 
+    // Una task non puo comparire due volte sullo stesso cleaner: se accade, la
+    // timeline in ingresso e corrotta e persisterla moltiplicherebbe le righe.
+    const seenCleanerTask = new Set<string>();
+    let skippedDuplicates = 0;
+
     for (const assignment of timeline.cleaners_assignments) {
       const cleaner = assignment.cleaner;
       if (!cleaner?.id) continue;
@@ -1027,6 +1071,13 @@ export class PgDailyAssignmentsService {
       const tasks = assignment.tasks || [];
       for (const task of tasks) {
         if (!task.task_id) continue;
+
+        const identity = `${Number(cleaner.id)}:${Number(task.task_id)}`;
+        if (seenCleanerTask.has(identity)) {
+          skippedDuplicates += 1;
+          continue;
+        }
+        seenCleanerTask.add(identity);
 
         const row: PgDailyAssignmentRow = {
           work_date: workDate,
@@ -1080,7 +1131,28 @@ export class PgDailyAssignmentsService {
       }
     }
 
+    if (skippedDuplicates > 0) {
+      console.warn(
+        `⚠️ PG: scartate ${skippedDuplicates} task duplicate (stesso cleaner) per ${workDate}`
+      );
+    }
+
     return rows;
+  }
+
+  /**
+   * Serializza le scritture della timeline per (giorno, scope).
+   *
+   * Senza lock due salvataggi concorrenti si sovrappongono: il DELETE del secondo
+   * non vede le righe appena inserite dal primo (snapshot READ COMMITTED), quindi
+   * non le rimuove e i due INSERT si sommano. Il risultato e una timeline
+   * duplicata a ogni sovrapposizione.
+   */
+  private async lockTimelineWrites(client: PoolClient, key: string): Promise<void> {
+    // Un salvataggio tiene il lock per qualche centinaio di ms: il timeout serve
+    // solo a non bloccare una connessione del pool se qualcosa resta appeso.
+    await client.query("SET LOCAL lock_timeout = '20s'");
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
   }
 
   /**
@@ -1096,6 +1168,7 @@ export class PgDailyAssignmentsService {
       console.log(`📝 PG: Salvando ${rows.length} righe per ${workDate}...`);
 
       await client.query('BEGIN');
+      await this.lockTimelineWrites(client, `daily_assignments:${workDate}:${normalizedScope}`);
 
       // Delete existing rows for this work_date
       if (normalizedScope === 'office') {
@@ -1864,6 +1937,7 @@ export class PgDailyAssignmentsService {
 
       const rows = this.logisticsTimelineToRows(workDate, timeline);
       await client.query('BEGIN');
+      await this.lockTimelineWrites(client, `lg_timeline:${workDate}`);
       await client.query('DELETE FROM lg_timeline WHERE work_date = $1', [workDate]);
       if (rows.length === 0) {
         await client.query('COMMIT');

@@ -460,12 +460,42 @@ async function fetchPreassignedTaskSeedsFromAdam(workDate: string): Promise<Arra
   }
 }
 
+type RehydrateResult = { rehydrated: number; autoConvokedCleaners: number };
+
+// Code di reidratazione per (data, scope).
+// La reidratazione legge la timeline, la modifica e la riscrive: due esecuzioni
+// in parallelo sulla stessa data partono dalla stessa versione e la seconda
+// reinserisce task che la prima ha appena salvato. Le mettiamo in fila.
+const rehydrateQueues = new Map<string, Promise<RehydrateResult>>();
+
 async function rehydratePreassignedAssignmentsFromAdam(
   workDate: string,
   currentUsername: string,
   scope: "housekeeping" | "office",
   options: { cleanerIds?: number[] } = {}
-): Promise<{ rehydrated: number; autoConvokedCleaners: number }> {
+): Promise<RehydrateResult> {
+  const queueKey = `${scope}:${workDate}`;
+  const previous = rehydrateQueues.get(queueKey);
+  const current = (previous ? previous.catch(() => undefined) : Promise.resolve()).then(() =>
+    runRehydratePreassignedAssignmentsFromAdam(workDate, currentUsername, scope, options)
+  );
+
+  rehydrateQueues.set(queueKey, current);
+  try {
+    return await current;
+  } finally {
+    if (rehydrateQueues.get(queueKey) === current) {
+      rehydrateQueues.delete(queueKey);
+    }
+  }
+}
+
+async function runRehydratePreassignedAssignmentsFromAdam(
+  workDate: string,
+  currentUsername: string,
+  scope: "housekeeping" | "office",
+  options: { cleanerIds?: number[] } = {}
+): Promise<RehydrateResult> {
   const preassignedSeeds = await fetchPreassignedTaskSeedsFromAdam(workDate);
   if (preassignedSeeds.length === 0) {
     return { rehydrated: 0, autoConvokedCleaners: 0 };
@@ -1137,6 +1167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await pgDailyAssignmentsService.ensureOperationalDayTable();
     await pgDailyAssignmentsService.ensureDailyAssignmentsRevisionsScopeUnique();
     await pgDailyAssignmentsService.ensureDailyContainersScopeUnique();
+    await pgDailyAssignmentsService.ensureDailyAssignmentsCurrentNoDuplicates();
     await pgDailyAssignmentsService.ensureSelectedCleanersScopeStructure();
     await pgDailyAssignmentsService.ensureLogisticsWorkspaceTables();
     

@@ -40,26 +40,37 @@ def _int_or_none(value):
         return None
 
 
-def _collaborator_count_in_timeline(timeline_data, task):
+def _count_tasks_per_id(timeline_data):
+    """task_id -> quanti cleaner hanno quella task sulla timeline.
+
+    Calcolato una volta per timeline: cercare ogni task scorrendo tutta la
+    timeline rende il refresh quadratico e lo fa scadere in timeout.
+    """
+    counts = {}
+    for entry in timeline_data.get("cleaners_assignments") or []:
+        for other in entry.get("tasks") or []:
+            other_id = _int_or_none(other.get("task_id"))
+            if other_id is None:
+                continue
+            counts[other_id] = counts.get(other_id, 0) + 1
+    return counts
+
+
+def _collaborator_count_in_timeline(task, counts_per_task_id):
     """How many cleaners currently have this task on the timeline."""
     task_id = _int_or_none(task.get("task_id"))
-    count = 0
-    if task_id is not None:
-        for entry in timeline_data.get("cleaners_assignments") or []:
-            for other in entry.get("tasks") or []:
-                if _int_or_none(other.get("task_id")) == task_id:
-                    count += 1
+    count = counts_per_task_id.get(task_id, 0) if task_id is not None else 0
     meta = _int_or_none(task.get("collaborator_count")) or 0
     ids = task.get("collaborator_ids") if isinstance(task.get("collaborator_ids"), list) else []
     return max(count, meta, len(ids), 1)
 
 
-def _apply_adam_cleaning_time(task, fresh_data, timeline_data):
+def _apply_adam_cleaning_time(task, fresh_data, counts_per_task_id):
     """ADAM duration is the apartment total (base). Split it when the task is collaborative."""
     adam_duration = _int_or_none(fresh_data.get("cleaning_time"))
     if adam_duration is None:
         return
-    collab_count = _collaborator_count_in_timeline(timeline_data, task)
+    collab_count = _collaborator_count_in_timeline(task, counts_per_task_id)
     task["base_cleaning_time"] = adam_duration
     if collab_count > 1:
         task["cleaning_time"] = math.ceil(adam_duration / collab_count)
@@ -588,6 +599,7 @@ def main():
                 continue
             db_tasks_map[tid_int] = task
         updated_count = 0
+        counts_per_task_id = _count_tasks_per_id(timeline_data)
 
         for cleaner_entry in timeline_data.get("cleaners_assignments", []):
             for task in cleaner_entry.get("tasks", []):
@@ -615,7 +627,7 @@ def main():
                         if field in fresh_data:
                             task[field] = fresh_data[field]
 
-                    _apply_adam_cleaning_time(task, fresh_data, timeline_data)
+                    _apply_adam_cleaning_time(task, fresh_data, counts_per_task_id)
 
                     updated_count += 1
 
