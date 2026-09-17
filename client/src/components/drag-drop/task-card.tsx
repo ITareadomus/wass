@@ -88,7 +88,7 @@ import { HelpCircle, ChevronLeft, ChevronRight, Save, Pencil, Calendar as Calend
 import { CleanerSelectorDialog } from "@/components/dialogs/cleaner-selector-dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { isContinuazioneStraordinariaTask } from "@/lib/taskValidation";
+import { isContinuazioneStraordinariaTask, isTaskLocked } from "@/lib/taskValidation";
 import {
   getHousekeepingTypeTier,
   type HousekeepingTypeTier,
@@ -621,12 +621,16 @@ const displayClickableInputClass =
   const isPreAssignedReadonly = preAssignedMode === "readonly";
   const isTaskReadOnly = isReadOnly || isPreAssignedReadonly || isFinished;
   
-  // Stato per blocco task
+  // Stato per blocco task (card cliccata). Il dialog usa dialogIsLocked, perché
+  // con le frecce displayTask cambia mentre `task` resta quello originale.
   const [isLocked, setIsLocked] = useState(taskLocked);
   const [lockedReason, setLockedReason] = useState(taskLockedReason);
+  const [dialogIsLocked, setDialogIsLocked] = useState(taskLocked);
+  const [dialogLockedReason, setDialogLockedReason] = useState(taskLockedReason);
+  const [dialogLockTaskKey, setDialogLockTaskKey] = useState("");
   const [isEditingReason, setIsEditingReason] = useState(false);
 
-  // Sincronizza isLocked quando il task cambia (es. dopo ricaricamento containers)
+  // Sincronizza isLocked quando il task della card cambia (es. dopo ricaricamento containers)
   useEffect(() => {
     setIsLocked(taskLocked);
     setLockedReason(taskLockedReason);
@@ -722,6 +726,10 @@ const displayClickableInputClass =
   const lastLogisticsDriverFetchTaskKeyRef = useRef<string>("");
   const lastHousekeepingDetailsFetchTaskKeyRef = useRef<string>("");
   const lastCollaboratorsTaskIdRef = useRef<number | null>(null);
+  const displayTaskRef = useRef<any>(task);
+  const dialogTaskKeyRef = useRef("");
+  const dialogIsLockedRef = useRef(taskLocked);
+  const dialogLockedReasonRef = useRef(taskLockedReason);
   const initializedEditFieldsTaskKeyRef = useRef<string>("");
   const taskDetailsInnerRef = useRef<HTMLDivElement>(null);
   const [taskDetailsFit, setTaskDetailsFit] = useState({
@@ -742,24 +750,29 @@ const displayClickableInputClass =
   const isTimelineDetailsDialog = !isOfficeScope;
   const { toast } = useToast();
 
-  // Handler per toggle blocco task
+  // Handler per toggle blocco task (opera sulla task attualmente mostrata nel dialog)
   const handleToggleLock = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isTaskReadOnly) return;
+    const lockTask = displayTaskRef.current ?? task;
+    const lockTaskReadOnly =
+      isReadOnly ||
+      resolvePreAssignedModeFromTask(lockTask) === "readonly" ||
+      Boolean((lockTask as any).is_finished ?? (lockTask as any).isFinished);
+    if (lockTaskReadOnly) return;
 
-    const newLocked = !isLocked;
-    const newReason = newLocked ? lockedReason : '';
-    
+    const newLocked = !dialogIsLockedRef.current;
+    const newReason = newLocked ? dialogLockedReasonRef.current : "";
+
     const selectedWorkDate = effectiveWorkDate;
-    const taskId = (task as any).task_id || task.id;
+    const taskId = (lockTask as any).task_id || lockTask.id;
 
     try {
-      const response = await fetch('/api/lock-task', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/lock-task", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(withMutationScope({
           task_id: taskId,
-          logistic_code: task.name,
+          logistic_code: lockTask.name ?? (lockTask as any).logistic_code,
           locked: newLocked,
           locked_reason: newReason,
           date: selectedWorkDate,
@@ -776,20 +789,31 @@ const displayClickableInputClass =
         return;
       }
 
-      setIsLocked(newLocked);
+      setDialogIsLocked(newLocked);
+      setDialogLockTaskKey(dialogTaskKeyRef.current || getTaskKey(lockTask));
+      dialogIsLockedRef.current = newLocked;
       if (!newLocked) {
-        setLockedReason('');
+        setDialogLockedReason("");
+        dialogLockedReasonRef.current = "";
         setIsEditingReason(false);
+      }
+      if (getTaskKey(lockTask) === getTaskKey(task)) {
+        setIsLocked(newLocked);
+        if (!newLocked) {
+          setLockedReason("");
+        }
       }
       toast({
         title: newLocked ? "Task bloccata" : "Task sbloccata",
-        description: newLocked ? "La task non può essere assegnata o trascinata" : "La task è ora disponibile",
+        description: newLocked
+          ? "La task non può essere assegnata o trascinata"
+          : "La task è ora disponibile",
       });
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
       }
     } catch (error) {
-      console.error('Errore nel blocco task:', error);
+      console.error("Errore nel blocco task:", error);
       toast({
         title: "Errore",
         description: "Impossibile modificare lo stato del blocco",
@@ -800,26 +824,29 @@ const displayClickableInputClass =
 
   const handleSaveLockedReason = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isTaskReadOnly) return;
-    
+    const lockTask = displayTaskRef.current ?? task;
+    const lockTaskReadOnly =
+      isReadOnly ||
+      resolvePreAssignedModeFromTask(lockTask) === "readonly" ||
+      Boolean((lockTask as any).is_finished ?? (lockTask as any).isFinished);
+    if (lockTaskReadOnly) return;
+
     const selectedWorkDate = effectiveWorkDate;
-    
-    // Usa task_id se disponibile, altrimenti task.id
-    const taskId = (task as any).task_id || task.id;
-    
+    const taskId = (lockTask as any).task_id || lockTask.id;
+
     try {
-      const response = await fetch('/api/lock-task', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/lock-task", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(withMutationScope({
           task_id: taskId,
-          logistic_code: task.name,
-          locked: isLocked,
-          locked_reason: lockedReason,
+          logistic_code: lockTask.name ?? (lockTask as any).logistic_code,
+          locked: dialogIsLockedRef.current,
+          locked_reason: dialogLockedReasonRef.current,
           date: selectedWorkDate,
         }, operationsScope)),
       });
-      
+
       if (response.ok) {
         setIsEditingReason(false);
         toast({
@@ -828,7 +855,7 @@ const displayClickableInputClass =
         });
       }
     } catch (error) {
-      console.error('Errore nel salvataggio motivo:', error);
+      console.error("Errore nel salvataggio motivo:", error);
     }
   };
 
@@ -1052,6 +1079,31 @@ const displayClickableInputClass =
     (task as any).structure_id ??
     (task as any).structureId ??
     "";
+
+  const displayTaskLocked = isTaskLocked(displayTask);
+  const displayTaskLockedReason = String(
+    (displayTask as any).locked_reason ?? (displayTask as any).lockedReason ?? ""
+  );
+  const displayTaskReadOnly =
+    isReadOnly ||
+    resolvePreAssignedModeFromTask(displayTask) === "readonly" ||
+    Boolean((displayTask as any).is_finished ?? (displayTask as any).isFinished);
+  const shownDialogLocked =
+    dialogLockTaskKey === dialogTaskKey ? dialogIsLocked : displayTaskLocked;
+  const shownDialogLockedReason =
+    dialogLockTaskKey === dialogTaskKey ? dialogLockedReason : displayTaskLockedReason;
+
+  displayTaskRef.current = displayTask;
+  dialogTaskKeyRef.current = dialogTaskKey;
+  dialogIsLockedRef.current = shownDialogLocked;
+  dialogLockedReasonRef.current = shownDialogLockedReason;
+
+  useEffect(() => {
+    if (!isModalOpen) {
+      setDialogLockTaskKey("");
+      setIsEditingReason(false);
+    }
+  }, [isModalOpen]);
 
   // Carica i dettagli della collaborazione per la task attualmente mostrata nel dialog.
   useEffect(() => {
@@ -3366,15 +3418,6 @@ const displayClickableInputClass =
         ? `${dragOverlayWidthPx}px`
         : calculateWidth(effectiveDurationForUi, isInTimeline);
 
-    // Nei container gli orari check-in/out sono in absolute a destra: riserviamo
-    // spazio sul contenuto così il customer reference non ci si sovrappone.
-    const reserveTimesSpace =
-      !isInTimeline &&
-      shouldShowCheckInOutArrows &&
-      (Boolean((taskWithPendingEdits as any).checkout_time) ||
-        Boolean((taskWithPendingEdits as any).checkin_time) ||
-        isFutureCheckin);
-
     return (
             <div
               ref={innerRef}
@@ -3559,90 +3602,10 @@ const displayClickableInputClass =
                       </div>
                     )}
 
-                    {/* Frecce check-in e check-out */}
-                    {shouldShowCheckInOutArrows &&
-                      ((taskWithPendingEdits as any).checkout_time ||
-                        (taskWithPendingEdits as any).checkin_time ||
-                        isFutureCheckin) && (() => {
-                        const hasCheckout = Boolean((taskWithPendingEdits as any).checkout_time);
-                        const hasCheckin = Boolean((taskWithPendingEdits as any).checkin_time) || isFutureCheckin;
-
-                        const linesCount = (hasCheckout ? 1 : 0) + (hasCheckin ? 1 : 0);
-                        const isSingleLine = linesCount === 1;
-
-                        const hasCustomerRef = Boolean((task as any).customer_reference);
-
-                        // task.duration è tipo "1.30" => 1h 30m
-                        const durationStr = String(effectiveDurationForUi ?? "0.0");
-                        const [hStr, mStr] = durationStr.split(".");
-                        const hours = Number(hStr || 0);
-                        const mins = Number(mStr || 0);
-                        const durationMinutes = hours * 60 + mins;
-
-                        const isShortTask = durationMinutes < 90; // < 1:30
-
-                        // Regola:
-                        // - 2 orari -> top leggermente sotto il ?
-                        // - 1 orario:
-                        //    - se customer ref e task < 1:30 => bottom-right
-                        //    - altrimenti => centrato
-                        // - calendario solo: è comunque "1 linea" (hasCheckin true) quindi segue la stessa regola
-                        const shouldBottomRightSingleLine = isSingleLine && hasCustomerRef && isShortTask;
-                        const shouldCenterSingleLine = isSingleLine && !shouldBottomRightSingleLine;
-
-                        return (
-                          <div
-                            className={[
-                              "absolute right-1 z-30 whitespace-nowrap", // z più basso del ? (che è z-50)
-                              "flex flex-col items-end gap-0.5 min-h-[28px]",
-                              // posizione verticale
-                              linesCount === 2
-                                ? "inset-y-0 justify-center"
-                                : shouldBottomRightSingleLine
-                                  ? "bottom-[5px] justify-end"
-                                  : "inset-y-0 justify-center",
-                            ].join(" ")}
-                          >
-                            {hasCheckout && (
-                              <div className="flex items-center gap-0.5 leading-none">
-                                <span className="font-black text-[15px] leading-none text-[#257537]">↑</span>
-                                <span className="text-[11px] leading-none text-[#137537] font-bold">
-                                  {(taskWithPendingEdits as any).checkout_time}
-                                </span>
-                              </div>
-                            )}
-
-                            {hasCheckin && (
-                              <div className="flex items-center gap-0.5 leading-none">
-                                {isFutureCheckin ? (
-                                  <>
-                                    <CalendarIcon className="w-3.5 h-3.5 text-red-600" strokeWidth={2.5} />
-                                    {(taskWithPendingEdits as any).checkin_time && (
-                                      <span className="text-red-600 text-[11px] leading-none font-bold">
-                                        {(taskWithPendingEdits as any).checkin_time}
-                                      </span>
-                                    )}
-                                  </>
-                                ) : (
-                                  (taskWithPendingEdits as any).checkin_time && (
-                                    <>
-                                      <span className="text-red-600 font-black text-[15px] leading-none">↓</span>
-                                      <span className="text-red-600 text-[11px] leading-none font-bold">
-                                        {(taskWithPendingEdits as any).checkin_time}
-                                      </span>
-                                    </>
-                                  )
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-
                     <div className={cn(
                       "flex flex-col items-start justify-center flex-1 min-w-0 gap-0.5 pl-2 overflow-visible",
                       (logisticsExecutionSurfaceClass || housekeepingExecutionSurfaceClassName) && "relative z-[2] isolate mix-blend-normal",
-                      reserveTimesSpace ? "pr-[52px]" : "pr-1"
+                      "pr-1"
                     )}>
                       <div className="flex items-center gap-1 w-full min-w-0 overflow-visible">
                         <span
@@ -3680,6 +3643,77 @@ const displayClickableInputClass =
                         </span>
                       )}
                     </div>
+
+                    {/* Check-in/out: in timeline restano absolute; nei container sticky sul bordo visibile (prima del chevron). */}
+                    {shouldShowCheckInOutArrows &&
+                      ((taskWithPendingEdits as any).checkout_time ||
+                        (taskWithPendingEdits as any).checkin_time ||
+                        isFutureCheckin) && (() => {
+                        const hasCheckout = Boolean((taskWithPendingEdits as any).checkout_time);
+                        const hasCheckin = Boolean((taskWithPendingEdits as any).checkin_time) || isFutureCheckin;
+
+                        const linesCount = (hasCheckout ? 1 : 0) + (hasCheckin ? 1 : 0);
+                        const isSingleLine = linesCount === 1;
+                        const hasCustomerRef = Boolean((task as any).customer_reference);
+                        const durationStr = String(effectiveDurationForUi ?? "0.0");
+                        const [hStr, mStr] = durationStr.split(".");
+                        const hours = Number(hStr || 0);
+                        const mins = Number(mStr || 0);
+                        const durationMinutes = hours * 60 + mins;
+                        const isShortTask = durationMinutes < 90;
+                        const shouldBottomRightSingleLine = isSingleLine && hasCustomerRef && isShortTask;
+
+                        return (
+                          <div
+                            className={cn(
+                              "z-40 flex min-h-[28px] flex-col items-end gap-0.5 whitespace-nowrap",
+                              isInTimeline
+                                ? cn(
+                                    "absolute right-1",
+                                    linesCount === 2 || !shouldBottomRightSingleLine
+                                      ? "inset-y-0 justify-center"
+                                      : "bottom-[5px] justify-end"
+                                  )
+                                : cn(
+                                    "sticky right-1 ml-auto shrink-0",
+                                    shouldBottomRightSingleLine ? "self-end mb-[5px]" : "self-center"
+                                  )
+                            )}
+                          >
+                            {hasCheckout && (
+                              <div className="flex items-center gap-0.5 leading-none">
+                                <span className="font-black text-[15px] leading-none text-[#257537]">↑</span>
+                                <span className="text-[11px] leading-none text-[#137537] font-bold">
+                                  {(taskWithPendingEdits as any).checkout_time}
+                                </span>
+                              </div>
+                            )}
+                            {hasCheckin && (
+                              <div className="flex items-center gap-0.5 leading-none">
+                                {isFutureCheckin ? (
+                                  <>
+                                    <CalendarIcon className="w-3.5 h-3.5 text-red-600" strokeWidth={2.5} />
+                                    {(taskWithPendingEdits as any).checkin_time && (
+                                      <span className="text-red-600 text-[11px] leading-none font-bold">
+                                        {(taskWithPendingEdits as any).checkin_time}
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  (taskWithPendingEdits as any).checkin_time && (
+                                    <>
+                                      <span className="text-red-600 font-black text-[15px] leading-none">↓</span>
+                                      <span className="text-red-600 text-[11px] leading-none font-bold">
+                                        {(taskWithPendingEdits as any).checkin_time}
+                                      </span>
+                                    </>
+                                  )
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                       </>
                     )}
                   </div>
@@ -4019,32 +4053,38 @@ const displayClickableInputClass =
                 <div className="flex items-center gap-3">
                   <Button
                     type="button"
-                    variant={isLocked ? "destructive" : "outline"}
+                    variant={shownDialogLocked ? "destructive" : "outline"}
                     size="sm"
                     onClick={handleToggleLock}
-                    disabled={isTaskReadOnly}
+                    disabled={displayTaskReadOnly}
                     className="flex items-center gap-2"
-                    data-testid={`lock-task-btn-${getTaskKey(task)}`}
+                    data-testid={`lock-task-btn-${dialogTaskKey}`}
                   >
-                    {isLocked ? <Lock className="w-4 h-4" /> : <LockOpen className="w-4 h-4" />}
-                    {isLocked ? "Sblocca" : "Blocca"}
+                    {shownDialogLocked ? <Lock className="w-4 h-4" /> : <LockOpen className="w-4 h-4" />}
+                    {shownDialogLocked ? "Sblocca" : "Blocca"}
                   </Button>
-                  {isLocked && (
+                  {shownDialogLocked && (
                     <div className="flex-1">
                       <Input
                         type="text"
-                        value={lockedReason}
-                        onChange={(e) => setLockedReason(e.target.value)}
+                        value={shownDialogLockedReason}
+                        onChange={(e) => {
+                          const nextReason = e.target.value;
+                          setDialogLockTaskKey(dialogTaskKey);
+                          setDialogIsLocked(true);
+                          setDialogLockedReason(nextReason);
+                          dialogLockedReasonRef.current = nextReason;
+                        }}
                         onBlur={() => handleSaveLockedReason({ stopPropagation: () => {} } as any)}
-                        disabled={isTaskReadOnly}
+                        disabled={displayTaskReadOnly}
                         placeholder="Motivo del blocco..."
                         className="text-sm"
-                        data-testid={`lock-reason-input-${getTaskKey(task)}`}
+                        data-testid={`lock-reason-input-${dialogTaskKey}`}
                       />
                     </div>
                   )}
                 </div>
-                {isLocked && (
+                {shownDialogLocked && (
                   <p className="text-xs text-red-600 mt-1">
                     Questa task non può essere assegnata o trascinata
                   </p>
