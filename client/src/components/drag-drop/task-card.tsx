@@ -120,6 +120,14 @@ const getSelectedWorkDateForScope = (
   return localStorage.getItem(key) || localWorkDateYmd();
 };
 
+function withMutationScope<T extends Record<string, unknown>>(
+  payload: T,
+  scope?: "housekeeping" | "office" | "logistics"
+): T {
+  if (!scope || scope === "housekeeping") return payload;
+  return { ...payload, scope };
+}
+
 // Chiave di navigazione per il dialog (evita collisioni su task_id duplicati).
 const getTaskNavigationKey = (t: any, listIndex?: number) =>
   `${getTaskKey(t)}::${String((t as any)?.sequence ?? "")}::${String(listIndex ?? "")}`;
@@ -749,13 +757,13 @@ const displayClickableInputClass =
       const response = await fetch('/api/lock-task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(withMutationScope({
           task_id: taskId,
           logistic_code: task.name,
           locked: newLocked,
           locked_reason: newReason,
           date: selectedWorkDate,
-        }),
+        }, operationsScope)),
       });
 
       if (!response.ok) {
@@ -803,13 +811,13 @@ const displayClickableInputClass =
       const response = await fetch('/api/lock-task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(withMutationScope({
           task_id: taskId,
           logistic_code: task.name,
           locked: isLocked,
           locked_reason: lockedReason,
           date: selectedWorkDate,
-        }),
+        }, operationsScope)),
       });
       
       if (response.ok) {
@@ -1911,7 +1919,7 @@ const displayClickableInputClass =
       const response = await fetch('/api/update-task-details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(withMutationScope({
           taskId: (displayTask as any).task_id || displayTask.id,
           logisticCode: displayTask.name,
           checkoutDate: editedCheckoutDate || null,
@@ -1924,7 +1932,7 @@ const displayClickableInputClass =
           date: workDate,
           modified_by: currentUser.username || 'unknown',
           skipAdam: true  // NON propagare su ADAM, solo PostgreSQL
-        }),
+        }, operationsScope)),
       });
 
       if (!response.ok) {
@@ -2016,14 +2024,14 @@ const displayClickableInputClass =
       const response = await fetch("/api/update-task-details", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withMutationScope({
           taskId: numericTaskId,
           logisticCode: logisticCodeRaw,
           customerNote: normalized,
           date: dateStr,
           modified_by: currentUser.username || "unknown",
           skipAdam: true,
-        }),
+        }, operationsScope)),
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -2089,7 +2097,7 @@ const displayClickableInputClass =
       const response = await fetch("/api/update-task-details", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withMutationScope({
           taskId: (displayTask as any).task_id || displayTask.id,
           logisticCode: displayTask.name,
           checkoutDate: (displayTask as any).checkout_date ?? null,
@@ -2102,7 +2110,7 @@ const displayClickableInputClass =
           date: workDate,
           modified_by: currentUser.username || "unknown",
           skipAdam: true,
-        }),
+        }, operationsScope)),
       });
       if (!response.ok) {
         const err = await response.json();
@@ -2194,7 +2202,7 @@ const displayClickableInputClass =
       const response = await fetch("/api/update-task-details", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withMutationScope({
           taskId: (displayTask as any).task_id || displayTask.id,
           logisticCode: displayTask.name,
           checkoutDate: payload.checkoutDate,
@@ -2207,7 +2215,7 @@ const displayClickableInputClass =
           date: workDate,
           modified_by: currentUser.username || "unknown",
           skipAdam: true,
-        }),
+        }, operationsScope)),
       });
       if (!response.ok) {
         const err = await response.json();
@@ -2292,7 +2300,7 @@ const displayClickableInputClass =
       const response = await fetch("/api/update-task-details", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withMutationScope({
           taskId: (displayTask as any).task_id || displayTask.id,
           logisticCode: displayTask.name,
           checkoutDate: payload.checkoutDate,
@@ -2305,7 +2313,7 @@ const displayClickableInputClass =
           date: workDate,
           modified_by: currentUser.username || "unknown",
           skipAdam: true,
-        }),
+        }, operationsScope)),
       });
       if (!response.ok) {
         const err = await response.json();
@@ -2366,7 +2374,7 @@ const displayClickableInputClass =
       const response = await fetch("/api/update-task-details", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withMutationScope({
           taskId: (displayTask as any).task_id || displayTask.id,
           logisticCode: displayTask.name,
           checkoutDate: payload.checkoutDate,
@@ -2379,7 +2387,7 @@ const displayClickableInputClass =
           date: workDate,
           modified_by: currentUser.username || "unknown",
           skipAdam: true,
-        }),
+        }, operationsScope)),
       });
       if (!response.ok) {
         const err = await response.json();

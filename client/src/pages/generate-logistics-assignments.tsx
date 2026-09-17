@@ -705,6 +705,7 @@ export default function GenerateLogisticsAssignments() {
           allowPartial: true,
           solver: "ortools-v1",
           debug: true,
+          scope: "logistics",
         }),
       });
       const data = await response.json().catch(() => ({}));
