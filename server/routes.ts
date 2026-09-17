@@ -46,12 +46,18 @@ function resolveScopeFromReq(req: any): "housekeeping" | "office" {
     : "housekeeping";
 }
 
+function isLogisticsScopeRequest(req: any): boolean {
+  const raw = String(req?.query?.scope ?? req?.body?.scope ?? "").toLowerCase();
+  return raw === "logistics";
+}
+
 async function rejectIfOperationalDayStarted(
   req: any,
   res: any,
   workDate?: string
 ): Promise<boolean> {
   try {
+    if (isLogisticsScopeRequest(req)) return false;
     const date = String(workDate || req?.body?.date || req?.query?.date || "");
     if (!date || !isValidWorkDate(date)) return false;
     const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");

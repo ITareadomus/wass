@@ -584,6 +584,7 @@ export default function LogisticsTimelineView({
                 operationId: taskEdit.operationId,
                 date: workDate,
                 modified_by: currentUser.username || "system",
+                scope: "logistics",
               }),
             });
             await updateResponse.json();
@@ -1485,6 +1486,7 @@ export default function LogisticsTimelineView({
           cleanerId: aliasDialog.driverId,
           alias: editingAlias,
           date: workDate,
+          scope: "logistics",
         }),
       });
       if (!response.ok) throw new Error("Salvataggio alias fallito");
