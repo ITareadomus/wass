@@ -5,7 +5,6 @@ import {
   getLogisticsTimelineViolationMessages,
   getLogisticsTimelineViolationShortLabels,
   pickLogisticsViolationFields,
-  shouldBlinkLogisticsTimelineTask,
 } from "@shared/logistics-scheduling-constraints";
 import {
   getHousekeepingTimelineViolationMessages,
@@ -45,6 +44,7 @@ import {
   HousekeepingWorkProgressLine,
   HOUSEKEEPING_PROGRESS_ADVANCED_CLASS,
   HOUSEKEEPING_PROGRESS_SURFACE_CLASS,
+  HOUSEKEEPING_TIME_ELAPSED_SURFACE_CLASS,
   housekeepingExecutionStatusSurfaceClass,
 } from "@/lib/housekeeping-task-execution-status-ui";
 import { format, parseISO } from "date-fns";
@@ -1504,7 +1504,10 @@ const displayClickableInputClass =
       return housekeepingExecutionStatusSurfaceClass("completed", "strong");
     }
     if (housekeepingExecutionStatus !== "in_progress") return undefined;
-    if (housekeepingWorkProgress && !housekeepingWorkProgress.overdue) {
+    if (housekeepingWorkProgress?.overdue) {
+      return HOUSEKEEPING_TIME_ELAPSED_SURFACE_CLASS;
+    }
+    if (housekeepingWorkProgress) {
       return HOUSEKEEPING_PROGRESS_SURFACE_CLASS;
     }
     return housekeepingExecutionStatusSurfaceClass("in_progress", "strong");
@@ -2584,10 +2587,6 @@ const displayClickableInputClass =
     };
   })();
   const isOverdue = timelineViolationMessages.length > 0;
-  const shouldBlinkOverdue =
-    operationsScope === "logistics" && logisticsViolationInput && effectiveWorkDate
-      ? shouldBlinkLogisticsTimelineTask(logisticsViolationInput, effectiveWorkDate)
-      : isOverdue;
   const timelineViolationVisible =
     isOverdue &&
     isInTimeline &&
@@ -3397,20 +3396,12 @@ const displayClickableInputClass =
                       "rounded-md border transition-colors duration-200",
                       showCompactAdamTimelineUi ? "px-1 py-0" : "flex items-center px-2 py-1",
                       isSelected && isMultiSelectMode && !isInTimeline && "z-[1] ring-2 ring-sky-500 ring-inset",
-                      isOverdue &&
-                        timelineViolationVisible &&
-                        (shouldBlinkOverdue
-                          ? "animate-blink"
-                          : "border-red-500 bg-red-50 shadow-[0_0_8px_1px_rgba(220,38,38,0.45)] dark:bg-red-950/30"),
+                      isOverdue && timelineViolationVisible && "task-violation-outline",
                       isInTimeline &&
                         executionColorsEnabled &&
                         housekeepingWorkProgress &&
                         !housekeepingWorkProgress.overdue &&
                         "isolation-isolate",
-                      isInTimeline &&
-                        executionColorsEnabled &&
-                        housekeepingWorkProgress?.overdue &&
-                        "animate-blink-green",
                       !isDragging && isMapFiltered && "task-border-map-filtered",
                       !isDragging && !isMapFiltered && isHighlighted && "task-border-search-highlighted",
                       "cursor-pointer flex-shrink-0 relative group"

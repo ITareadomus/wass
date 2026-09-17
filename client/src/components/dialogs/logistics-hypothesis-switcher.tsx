@@ -26,7 +26,7 @@ export function LogisticsHypothesisSwitcher({
 
   return (
     <div
-      className="mb-3 rounded-lg border-2 border-custom-blue bg-custom-blue-light/40 p-3"
+      className="rounded-lg border-2 border-custom-blue bg-custom-blue-light/40 p-3"
       data-testid="logistics-hypothesis-switcher"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">

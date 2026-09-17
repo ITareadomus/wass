@@ -56,6 +56,8 @@ import {
 } from "@/components/ui/dialog";
 import { AssignmentLoadingDialog } from "@/components/dialogs/assignment-loading-dialog";
 import { LogisticsHypothesisSwitcher } from "@/components/dialogs/logistics-hypothesis-switcher";
+import { LogisticsStartChoiceDialog } from "@/components/dialogs/logistics-start-choice-dialog";
+import type { LogisticsPreferredStartsPayload, LogisticsZoneStartPlan } from "@shared/logistics-zone-start-plan";
 import {
   mergeHypothesisPreviewAssignments,
   type LogisticsHypothesisPickerItem,
@@ -429,6 +431,9 @@ export default function GenerateLogisticsAssignments() {
   const [logisticsHypotheses, setLogisticsHypotheses] = useState<LogisticsHypothesisPickerItem[]>([]);
   const [previewHypothesisId, setPreviewHypothesisId] = useState<string | null>(null);
   const [applyingHypothesisId, setApplyingHypothesisId] = useState<string | null>(null);
+  const [zoneStartPlan, setZoneStartPlan] = useState<LogisticsZoneStartPlan | null>(null);
+  const [showStartChoiceDialog, setShowStartChoiceDialog] = useState(false);
+  const [isPlanningZoneStarts, setIsPlanningZoneStarts] = useState(false);
   const [showMissingLogisticsKindWarningDialog, setShowMissingLogisticsKindWarningDialog] = useState(false);
   const [missingLogisticsKindTaskCount, setMissingLogisticsKindTaskCount] = useState(0);
   const [missingLogisticsKindTaskCodes, setMissingLogisticsKindTaskCodes] = useState<string[]>([]);
@@ -484,6 +489,8 @@ export default function GenerateLogisticsAssignments() {
     if (date) {
       setLogisticsHypotheses([]);
       setPreviewHypothesisId(null);
+      setShowStartChoiceDialog(false);
+      setZoneStartPlan(null);
       setSelectedDate(date);
     }
   };
@@ -709,7 +716,10 @@ export default function GenerateLogisticsAssignments() {
     toast,
   ]);
 
-  const executeLogisticsOptimizer = useCallback(async () => {
+  const executeLogisticsOptimizer = useCallback(async (options?: {
+    preferredStarts?: LogisticsPreferredStartsPayload;
+    skipAutoConvoke?: boolean;
+  }) => {
     const dateStr = format(selectedDate, "yyyy-MM-dd");
     setIsRunningLogisticsOptimizer(true);
     try {
@@ -723,6 +733,8 @@ export default function GenerateLogisticsAssignments() {
           allowPartial: true,
           solver: "ortools-v1",
           debug: true,
+          skipAutoConvoke: options?.skipAutoConvoke === true,
+          preferredStarts: options?.preferredStarts ?? {},
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -840,7 +852,25 @@ export default function GenerateLogisticsAssignments() {
         return;
       }
 
-      await executeLogisticsOptimizer();
+      setIsPlanningZoneStarts(true);
+      const zoneRes = await fetch("/api/logistics-optimizer-final/zone-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: dateStr }),
+      });
+      const zoneData = await zoneRes.json().catch(() => ({}));
+      if (!zoneRes.ok || !zoneData?.success || !zoneData?.plan) {
+        throw new Error(
+          zoneData?.message || zoneData?.error || "Impossibile dividere i giri per autista"
+        );
+      }
+      const plan = zoneData.plan as LogisticsZoneStartPlan;
+      if (!Array.isArray(plan.drivers) || plan.drivers.length === 0) {
+        await executeLogisticsOptimizer({ skipAutoConvoke: true });
+        return;
+      }
+      setZoneStartPlan(plan);
+      setShowStartChoiceDialog(true);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Errore sconosciuto";
       toast({
@@ -849,6 +879,7 @@ export default function GenerateLogisticsAssignments() {
         description: msg,
       });
     } finally {
+      setIsPlanningZoneStarts(false);
       setIsRunningLogisticsOptimizer(false);
     }
   }, [selectedDate, executeLogisticsOptimizer, toast]);
@@ -1338,53 +1369,55 @@ export default function GenerateLogisticsAssignments() {
           </PageViewportCentered>
         ) : (
         <>
-        <div className="mx-auto mb-0 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="relative min-w-[200px] flex-1">
-              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-custom-blue" />
-              <Input
-                placeholder="Cerca task..."
-                value={searchTask}
-                onChange={(e) => setSearchTask(e.target.value)}
-                className="border-2 border-custom-blue pl-10"
-                data-testid="input-search-task-logistics"
-              />
-            </div>
-            <div className="flex shrink-0 items-center overflow-hidden rounded-md border-2 border-custom-blue bg-custom-blue">
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={isRunningLogisticsOptimizer || isHypothesisPreview}
-                onClick={() => void handleRunLogisticsOptimizer()}
-                className="flex items-center gap-2 rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
-                data-testid="button-run-logistics-optimizer"
-              >
-                {isRunningLogisticsOptimizer ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    Assegnando...
-                  </>
-                ) : (
-                  <>
-                    <CalendarIcon className="h-4 w-4" />
-                    Assegna
-                  </>
-                )}
-              </Button>
+        <div className="mx-auto mb-0 flex w-full max-w-[1920px] flex-col gap-[17px]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <div className="relative min-w-[200px] flex-1">
+                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-custom-blue" />
+                <Input
+                  placeholder="Cerca task..."
+                  value={searchTask}
+                  onChange={(e) => setSearchTask(e.target.value)}
+                  className="border-2 border-custom-blue pl-10"
+                  data-testid="input-search-task-logistics"
+                />
+              </div>
+              <div className="flex shrink-0 items-center overflow-hidden rounded-md border-2 border-custom-blue bg-custom-blue">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isRunningLogisticsOptimizer || isHypothesisPreview}
+                  onClick={() => void handleRunLogisticsOptimizer()}
+                  className="flex items-center gap-2 rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
+                  data-testid="button-run-logistics-optimizer"
+                >
+                  {isRunningLogisticsOptimizer ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Assegnando...
+                    </>
+                  ) : (
+                    <>
+                      <CalendarIcon className="h-4 w-4" />
+                      Assegna
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {isHypothesisPreview && selectedHypothesis && (
-          <LogisticsHypothesisSwitcher
-            hypotheses={logisticsHypotheses}
-            selectedId={selectedHypothesis.summary.id}
-            applyingId={applyingHypothesisId}
-            onSelect={setPreviewHypothesisId}
-            onApply={(hypothesis) => void applyLogisticsHypothesis(hypothesis)}
-            onCancel={clearHypothesisPreview}
-          />
-        )}
+          {isHypothesisPreview && selectedHypothesis && (
+            <LogisticsHypothesisSwitcher
+              hypotheses={logisticsHypotheses}
+              selectedId={selectedHypothesis.summary.id}
+              applyingId={applyingHypothesisId}
+              onSelect={setPreviewHypothesisId}
+              onApply={(hypothesis) => void applyLogisticsHypothesis(hypothesis)}
+              onCancel={clearHypothesisPreview}
+            />
+          )}
+        </div>
 
         <DndContext
           sensors={logisticsDnd.sensors}
@@ -1578,12 +1611,37 @@ export default function GenerateLogisticsAssignments() {
 
         <AssignmentLoadingDialog
           open={isRunningLogisticsOptimizer}
-          title={applyingHypothesisId ? "Applico l'ipotesi" : "Calcolo delle ipotesi"}
+          title={
+            applyingHypothesisId
+              ? "Applico l'ipotesi"
+              : isPlanningZoneStarts
+                ? "Divido i giri"
+                : "Calcolo delle ipotesi"
+          }
           description={
             applyingHypothesisId
               ? "Attendere, il giro scelto viene scritto in timeline."
-              : "Attendere, sto calcolando 4 giri per zona e le anteprime in timeline. Non chiudere la pagina."
+              : isPlanningZoneStarts
+                ? "Attendere, sto suddividendo gli appartamenti tra gli autisti."
+                : "Attendere, sto calcolando i giri per zona e le anteprime in timeline. Non chiudere la pagina."
           }
+        />
+
+        <LogisticsStartChoiceDialog
+          open={showStartChoiceDialog}
+          plan={zoneStartPlan}
+          onCancel={() => {
+            setShowStartChoiceDialog(false);
+            setZoneStartPlan(null);
+          }}
+          onConfirm={(preferredStarts) => {
+            setShowStartChoiceDialog(false);
+            setZoneStartPlan(null);
+            void executeLogisticsOptimizer({
+              preferredStarts,
+              skipAutoConvoke: true,
+            });
+          }}
         />
 
         <Dialog

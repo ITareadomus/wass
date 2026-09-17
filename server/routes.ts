@@ -11231,6 +11231,39 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     }
   });
 
+  app.post("/api/logistics-optimizer-final/zone-plan", async (req, res) => {
+    try {
+      const { date } = req.body || {};
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const { planLogisticsZoneStarts } = await import(
+        "./services/logistics-optimizer-final/zone-start-plan"
+      );
+
+      console.log(`🚀 POST /api/logistics-optimizer-final/zone-plan - ${workDate}`);
+      const plan = await planLogisticsZoneStarts(workDate, {
+        performedBy: getCurrentUsername(req),
+      });
+      return res.json({
+        success: true,
+        plan,
+      });
+    } catch (error: any) {
+      if (error?.name === "RoutingInputValidationError") {
+        return res.status(400).json({
+          success: false,
+          error: error.message,
+          message: error.message,
+          inputValidation: error.inputValidation,
+        });
+      }
+      console.error("❌ Errore logistics-optimizer-final zone-plan:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
   app.post("/api/logistics-optimizer-final/run", async (req, res) => {
     try {
       const {
@@ -11240,6 +11273,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         apply: applyBody,
         allowPartial: allowPartialBody,
         generateHypotheses: generateHypothesesBody,
+        preferredStarts: preferredStartsBody,
+        skipAutoConvoke: skipAutoConvokeBody,
       } = req.body || {};
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       const solver =
@@ -11266,6 +11301,10 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         generateHypothesesBody === true ||
         generateHypothesesBody === 1 ||
         String(generateHypothesesBody ?? "").toLowerCase() === "true";
+      const skipAutoConvoke =
+        skipAutoConvokeBody === true ||
+        skipAutoConvokeBody === 1 ||
+        String(skipAutoConvokeBody ?? "").toLowerCase() === "true";
 
       const { runLogisticsRouting } = await import(
         "./services/logistics-optimizer-final/run-routing"
@@ -11286,6 +11325,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         apply: generateHypotheses ? false : apply,
         allowPartial,
         generateHypotheses,
+        preferredStartByDriverId: preferredStartsBody,
+        skipAutoConvoke,
         performedBy: getCurrentUsername(req),
       });
 

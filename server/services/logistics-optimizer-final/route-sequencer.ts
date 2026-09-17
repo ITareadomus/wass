@@ -49,13 +49,19 @@ function bucketKeyOf(subZone: SubZoneAssignment | undefined): string | null {
  * business goal, so travel-first is the default; block count stays in the comparison
  * because two orders of equal length are not equally pleasant to drive.
  */
-export type SequenceRanking = "travel-first" | "shape-first";
+export type SequenceRanking = "travel-first" | "shape-first" | "schedule-first";
 
 function compareStates(
   left: BeamState,
   right: BeamState,
   ranking: SequenceRanking
 ): number {
+  if (ranking === "schedule-first") {
+    if (left.endMin !== right.endMin) return left.endMin - right.endMin;
+    if (left.travelMin !== right.travelMin) return left.travelMin - right.travelMin;
+    return 0;
+  }
+
   if (ranking === "travel-first") {
     if (left.travelMin !== right.travelMin) return left.travelMin - right.travelMin;
     if (left.revisitCount !== right.revisitCount) return left.revisitCount - right.revisitCount;

@@ -436,7 +436,6 @@ export default function AssignedTasksSequenceSummary({
                                   isHighlighted,
                                   isMapFiltered,
                                   executionStatus: entry.executionStatus,
-                                  shouldBlinkViolation: entry.timelineViolationBlink !== false,
                                 }),
                                 !isGroupDragDisabled &&
                                   !isTimelineViolated &&

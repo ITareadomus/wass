@@ -100,6 +100,16 @@
   animation: blink-border-inset 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* Violazioni timeline (HK + logistica): outline fissa al posto del lampeggio. */
+.task-violation-outline {
+  outline: 1.5px solid rgba(220, 38, 38, 0.5);
+  outline-offset: 1px;
+}
+
+.dark .task-violation-outline {
+  outline-color: rgba(248, 113, 113, 0.6);
+}
+
 @keyframes bounce {
   0% {
     transform: translateY(0);
@@ -275,7 +285,7 @@
     max-width: calc(100% + 0.5rem);
   }
 
-  /* Keep blink glow from expanding horizontal scroll width on reflow */
+  /* Keep outline from being clipped by the summary scroll container */
   .sequence-summary-task {
     contain: paint;
   }

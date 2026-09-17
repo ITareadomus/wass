@@ -28,4 +28,5 @@ export * from "./validation";
 export * from "./validation-contract";
 export * from "./exclusive-work-zones";
 export * from "./routing-hypotheses";
+export * from "./zone-start-plan";
 export * from "./task-urgency";

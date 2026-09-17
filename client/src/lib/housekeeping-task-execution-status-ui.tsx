@@ -31,6 +31,10 @@ export const HOUSEKEEPING_PROGRESS_ADVANCED_CLASS =
 
 export const HOUSEKEEPING_PROGRESS_SURFACE_CLASS = EXECUTION_IN_PROGRESS_SURFACE_CLASS;
 
+/** Cleaning time raggiunto, report non ancora compilato (`cleaned = 0`). */
+export const HOUSEKEEPING_TIME_ELAPSED_SURFACE_CLASS =
+  "border-green-400 bg-[#1bb054] text-white dark:border-green-300 dark:bg-[#178a45] dark:text-white";
+
 function formatHousekeepingStartworkAt(value: unknown): string | null {
   const ms = parseHousekeepingStartworkAtMs(value);
   if (ms == null) return null;

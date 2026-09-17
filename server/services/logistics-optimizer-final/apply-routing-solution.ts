@@ -275,8 +275,10 @@ async function buildLogisticsTimelineFromSolution(args: {
   solution: RoutingSolution;
   allowCheckinViolations?: boolean;
   debugDir?: string;
+  preserveUnassignedRoutingTasks?: boolean;
 }): Promise<BuiltLogisticsTimeline> {
   const { context, solution, allowCheckinViolations, debugDir } = args;
+  const preserveUnassignedRoutingTasks = args.preserveUnassignedRoutingTasks !== false;
   const { workDate, input, driverById, containersData } = context;
   const currentTimeline = cloneJson(context.currentTimeline);
   const inputTaskById = new Map(input.tasks.map((task) => [task.taskId, task]));
@@ -337,6 +339,7 @@ async function buildLogisticsTimelineFromSolution(args: {
         preservedOutsideSolverInputTasks += 1;
         return true;
       }
+      if (!preserveUnassignedRoutingTasks) return false;
       preservedUnassignedRoutingTasks += 1;
       return true;
     });
@@ -507,6 +510,7 @@ export async function attachHypothesisTimelinePreviews(args: {
         context,
         solution: hypothesis.solution,
         allowCheckinViolations: true,
+        preserveUnassignedRoutingTasks: false,
       });
       try {
         await enrichLogisticsTimelineData(args.workDate, built.timeline);

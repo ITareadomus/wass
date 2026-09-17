@@ -30,6 +30,7 @@ export interface RawLogisticsTaskInput {
   paxIn: number | null;
   logisticsTaskKind?: LogisticsTaskKind | string | null;
   logisticsTaskKindSource?: "auto" | "manual" | string | null;
+  address?: string | null;
   locked: boolean;
   lockedReason: string | null;
 }
@@ -66,6 +67,7 @@ export interface DriverNode {
   startLocationNodeId: string;
   endLocationNodeId?: string;
   operationalCode?: string;
+  displayName?: string;
   workWindow: {
     startMin: Minutes;
     endMin: Minutes;

@@ -1,7 +1,6 @@
 export const LOGISTICS_HYPOTHESIS_IDS = [
   "priority-strict",
   "proximity-strict",
-  "balanced-urgent-start",
   "balanced-geo-start",
 ] as const;
 
@@ -16,27 +15,21 @@ export interface LogisticsHypothesisProfileMeta {
 export const LOGISTICS_HYPOTHESIS_PROFILES: LogisticsHypothesisProfileMeta[] = [
   {
     id: "priority-strict",
-    title: "Priorità complete",
+    title: "Priorità",
     description:
-      "Rispetta tutte le finestre urgenti (D&P stretti, check-in). Il giro può zigzagare se serve per non perdere uno slot.",
+      "Stesse zone esclusive, tutti gli appartamenti. Rispetta le finestre (D&P urgenti, check-in, borsone) anche zigzagando. La distanza conta poco: prima i vincoli.",
   },
   {
     id: "proximity-strict",
-    title: "Sequenza per vicinanza",
+    title: "Distanza",
     description:
-      "Ordine geografico: ogni stop è il più vicino al precedente. Parte da un capolinea della zona. I vincoli orari restano visibili se sforati.",
-  },
-  {
-    id: "balanced-urgent-start",
-    title: "Bilanciato A",
-    description:
-      "Mix distanza/priorità, partenza dall'appartamento più vicino al deposito della zona.",
+      "Stesse zone esclusive, tutti gli appartamenti. Parte dal gruppo più in priorità della zona, poi segue solo la distanza: ogni stop è il più vicino, con un giro senza incroci. Gli sforamenti restano visibili.",
   },
   {
     id: "balanced-geo-start",
-    title: "Bilanciato B",
+    title: "Bilanciato",
     description:
-      "Mix distanza/priorità, partenza da un altro capolinea (finestra più precoce della zona).",
+      "Stesse zone, tutti gli appartamenti, mix distanza/priorità, senza far rubare lo slot ai D&P urgenti.",
   },
 ];
 

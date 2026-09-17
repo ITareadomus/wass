@@ -21,6 +21,8 @@ export interface SelectedLogisticsDriverInput {
   endTime: string;
   endTimeSource: "driver_row" | "default";
   operationalCode?: string;
+  name?: string | null;
+  lastname?: string | null;
 }
 
 export interface SchedulableLogisticsTaskInput extends RawLogisticsTaskInput {
@@ -85,6 +87,7 @@ function mapRowToRawTask(row: any): RawLogisticsTaskInput {
     logisticsTaskKindSource: row.logisticsTaskKindSource
       ? String(row.logisticsTaskKindSource)
       : null,
+    address: row.address != null ? String(row.address) : null,
   };
 }
 
@@ -118,7 +121,8 @@ export async function loadUnlockedLogisticsTasks(workDate: string): Promise<{
         COALESCE(dtl.locked, lc.locked, false) AS "locked",
         COALESCE(dtl.locked_reason, lc.locked_reason) AS "lockedReason",
         lc.logistics_task_kind AS "logisticsTaskKind",
-        lc.logistics_task_kind_source AS "logisticsTaskKindSource"
+        lc.logistics_task_kind_source AS "logisticsTaskKindSource",
+        lc.address AS "address"
       FROM lg_containers lc
       LEFT JOIN daily_task_locks dtl
         ON dtl.work_date = lc.work_date
@@ -200,6 +204,8 @@ export async function loadSelectedDrivers(workDate: string): Promise<SelectedLog
         lastname: row?.lastname,
         alias: row?.alias,
       }),
+      name: row?.name != null ? String(row.name) : null,
+      lastname: row?.lastname != null ? String(row.lastname) : null,
     };
   });
 }
