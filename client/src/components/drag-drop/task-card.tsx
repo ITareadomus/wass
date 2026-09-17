@@ -25,6 +25,7 @@ import {
   resolveHousekeepingWorkProgress,
   type HousekeepingTaskExecutionStatus,
 } from "@shared/housekeeping-task-execution-status";
+import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
 import {
   DIALOG_SECTION_CORNER_BADGE_WRAP_CLASS,
   LOGISTICS_KIND_BADGE_LABEL,
@@ -2587,6 +2588,11 @@ const displayClickableInputClass =
     operationsScope === "logistics" && logisticsViolationInput && effectiveWorkDate
       ? shouldBlinkLogisticsTimelineTask(logisticsViolationInput, effectiveWorkDate)
       : isOverdue;
+  const timelineViolationVisible =
+    isOverdue &&
+    isInTimeline &&
+    !hasHousekeepingExecutionStatusColor(housekeepingExecutionStatus) &&
+    !(operationsScope === "logistics" && hasLogisticsExecutionStatusColor(logisticsExecutionStatus));
 
   // Dialog dettagli: ricalcola le violazioni sulla task attualmente mostrata (frecce prev/next).
   const dialogTimelineViolationMessages = (() => {
@@ -3392,15 +3398,10 @@ const displayClickableInputClass =
                       showCompactAdamTimelineUi ? "px-1 py-0" : "flex items-center px-2 py-1",
                       isSelected && isMultiSelectMode && !isInTimeline && "z-[1] ring-2 ring-sky-500 ring-inset",
                       isOverdue &&
-                        isInTimeline &&
-                        !hasHousekeepingExecutionStatusColor(housekeepingExecutionStatus) &&
-                        !(
-                          operationsScope === "logistics" &&
-                          hasLogisticsExecutionStatusColor(logisticsExecutionStatus)
-                        ) &&
+                        timelineViolationVisible &&
                         (shouldBlinkOverdue
                           ? "animate-blink"
-                          : "border-red-500 shadow-[0_0_8px_1px_rgba(220,38,38,0.45)]"),
+                          : "border-red-500 bg-red-50 shadow-[0_0_8px_1px_rgba(220,38,38,0.45)] dark:bg-red-950/30"),
                       isInTimeline &&
                         executionColorsEnabled &&
                         housekeepingWorkProgress &&
@@ -3439,6 +3440,7 @@ const displayClickableInputClass =
                       }
                     }}
                   >
+                    {timelineViolationVisible && <SequenceSummaryViolationIndicator />}
                     {isInTimeline &&
                       executionColorsEnabled &&
                       housekeepingWorkProgress &&

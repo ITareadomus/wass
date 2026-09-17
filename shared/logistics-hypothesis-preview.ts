@@ -33,20 +33,66 @@ function asAssignmentRows(value: unknown): LogisticsHypothesisAssignmentRow[] {
   );
 }
 
+function hasValue(value: unknown): boolean {
+  return value != null && value !== "";
+}
+
+function overlayMissingTaskFields(target: any, source: any): any {
+  if (!source) return target;
+  const next = { ...target };
+  const keys = [
+    "hk_start_time",
+    "hk_end_time",
+    "hk_window",
+    "cleaner_task_start_time",
+    "cleanerTaskStartTime",
+    "cleaner_start_time",
+    "cleanerStartTime",
+    "cleaner_id",
+    "cleaner_sequence",
+    "cleaning_time",
+    "logistics_task_kind",
+    "logistics_task_kind_source",
+    "checkin_time",
+    "checkin_date",
+    "checkout_time",
+    "checkout_date",
+    "premium",
+    "pax_in",
+  ];
+  for (const key of keys) {
+    if (!hasValue(next[key]) && hasValue(source[key])) {
+      next[key] = source[key];
+    }
+  }
+  if (!hasValue(next.cleaner_task_start_time) && hasValue(source.cleanerTaskStartTime)) {
+    next.cleaner_task_start_time = source.cleanerTaskStartTime;
+  }
+  if (!hasValue(next.hk_start_time)) {
+    next.hk_start_time =
+      next.cleaner_task_start_time ??
+      source.hk_start_time ??
+      source.cleaner_task_start_time ??
+      source.cleanerTaskStartTime ??
+      null;
+  }
+  return next;
+}
+
 function collectTaskSources(
   containerTasks: any[],
   baselineAssignments: LogisticsHypothesisAssignmentRow[]
 ): Map<number, any> {
   const byId = new Map<number, any>();
-  for (const task of containerTasks) {
+  const merge = (task: any) => {
     const taskId = Number(task?.task_id);
-    if (Number.isFinite(taskId)) byId.set(taskId, task);
-  }
+    if (!Number.isFinite(taskId)) return;
+    const previous = byId.get(taskId);
+    byId.set(taskId, previous ? overlayMissingTaskFields(previous, task) : task);
+  };
+  for (const task of containerTasks) merge(task);
   for (const row of baselineAssignments) {
-    for (const task of row.tasks || []) {
-      const taskId = Number(task?.task_id);
-      if (Number.isFinite(taskId) && !byId.has(taskId)) byId.set(taskId, task);
-    }
+    for (const task of row.tasks || []) merge(task);
   }
   return byId;
 }
@@ -101,15 +147,17 @@ export function mergeHypothesisPreviewAssignments(args: {
   containerTasks: any[];
   baselineAssignments: LogisticsHypothesisAssignmentRow[];
 }): LogisticsHypothesisAssignmentRow[] {
+  const taskById = collectTaskSources(args.containerTasks, args.baselineAssignments);
   const previewRows = asAssignmentRows(args.preview?.drivers_assignments);
   const sourceRows =
     previewRows.length > 0
-      ? previewRows
-      : assignmentsFromSolution(
-          args.solution,
-          args.drivers,
-          collectTaskSources(args.containerTasks, args.baselineAssignments)
-        );
+      ? previewRows.map((row) => ({
+          ...row,
+          tasks: (row.tasks || []).map((task) =>
+            overlayMissingTaskFields(task, taskById.get(Number(task?.task_id)))
+          ),
+        }))
+      : assignmentsFromSolution(args.solution, args.drivers, taskById);
 
   const byId = new Map<number, LogisticsHypothesisAssignmentRow>();
   for (const row of sourceRows) {

@@ -66,4 +66,47 @@ describe("mergeHypothesisPreviewAssignments", () => {
       travel_time: 12,
     });
   });
+
+  it("copies HK window fields from baseline onto preview tasks", () => {
+    const merged = mergeHypothesisPreviewAssignments({
+      drivers,
+      preview: {
+        drivers_assignments: [
+          {
+            driver: { id: 7, name: "Driver", start_time: "09:45" },
+            tasks: [
+              {
+                task_id: 101,
+                start_time: "12:40",
+                logistics_task_kind: "delivery/pick-up",
+              },
+            ],
+          },
+        ],
+      },
+      solution: { routes: [] },
+      containerTasks: [],
+      baselineAssignments: [
+        {
+          driver: { id: 7 },
+          tasks: [
+            {
+              task_id: 101,
+              hk_start_time: "11:20",
+              cleaning_time: 60,
+              cleaner_sequence: 2,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(merged[0].tasks[0]).toMatchObject({
+      task_id: 101,
+      start_time: "12:40",
+      hk_start_time: "11:20",
+      cleaning_time: 60,
+      cleaner_sequence: 2,
+    });
+  });
 });

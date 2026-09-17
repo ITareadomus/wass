@@ -1,5 +1,14 @@
-import { minutesToHm, parseHmToMinutes } from "../../../shared/logistics-scheduling-constraints";
-import { enrichLogisticsTimelineTask } from "../logistics-task-kind-enrichment";
+import {
+  countLogisticsTimelineViolationTasks,
+  minutesToHm,
+  parseHmToMinutes,
+} from "../../../shared/logistics-scheduling-constraints";
+import {
+  attachCleanerContextFields,
+  enrichLogisticsTimelineData,
+  enrichLogisticsTimelineTask,
+} from "../logistics-task-kind-enrichment";
+import { attachLogisticsTaskWindowFields } from "../logistics-task-window-fields";
 import {
   assertLogisticsTimelineValidAfterRecalc,
   buildFinalTimelineValidation,
@@ -116,7 +125,7 @@ function buildTimelineTaskFromStop(args: {
     inputTask?.logisticCode ?? containerTask.logistic_code ?? 0
   );
 
-  return {
+  const task: any = {
     task_id: taskId,
     logistic_code: logisticCode,
     client_id: containerTask.client_id != null ? Number(containerTask.client_id) : null,
@@ -191,6 +200,40 @@ function buildTimelineTaskFromStop(args: {
           }
         : {}),
   };
+
+  const cleanerTaskStartTime =
+    inputTask?.rawTimes.cleanerTaskStartTime ??
+    containerTask.hk_start_time ??
+    containerTask.cleaner_task_start_time ??
+    null;
+  const cleanerTaskEndTime =
+    inputTask?.rawTimes.cleanerTaskEndTime ??
+    containerTask.hk_end_time ??
+    containerTask.cleaner_task_end_time ??
+    null;
+  attachCleanerContextFields(task, {
+    cleanerId: inputTask?.groupingHints.cleanerId ?? null,
+    cleanerSequence: inputTask?.groupingHints.cleanerSequence ?? null,
+    cleanerName: null,
+    cleanerLastname: null,
+    cleanerAlias: null,
+    cleanerStartTime: inputTask?.rawTimes.cleanerStartTime ?? null,
+    cleanerEndTime: null,
+    cleanerTaskStartTime,
+    cleanerTaskEndTime,
+  });
+  attachLogisticsTaskWindowFields(task, {
+    cleanerId: inputTask?.groupingHints.cleanerId ?? null,
+    cleanerSequence: inputTask?.groupingHints.cleanerSequence ?? null,
+    cleanerName: null,
+    cleanerLastname: null,
+    cleanerAlias: null,
+    cleanerStartTime: inputTask?.rawTimes.cleanerStartTime ?? null,
+    cleanerEndTime: null,
+    cleanerTaskStartTime,
+    cleanerTaskEndTime,
+  });
+  return task;
 }
 
 async function loadApplyContext(
@@ -465,6 +508,21 @@ export async function attachHypothesisTimelinePreviews(args: {
         solution: hypothesis.solution,
         allowCheckinViolations: true,
       });
+      try {
+        await enrichLogisticsTimelineData(args.workDate, built.timeline);
+      } catch (error) {
+        console.warn(
+          `⚠️ Enrich anteprima ipotesi ${hypothesis.summary.id} parziale:`,
+          error instanceof Error ? error.message : error
+        );
+      }
+      const previewTasks = ensureArray(built.timeline.drivers_assignments).flatMap((entry) =>
+        ensureArray(entry?.tasks)
+      );
+      hypothesis.summary.windowViolationCount = countLogisticsTimelineViolationTasks(
+        previewTasks,
+        args.workDate
+      );
       hypothesis.preview = {
         drivers_assignments: built.timeline.drivers_assignments,
       };

@@ -424,6 +424,20 @@ export function getLogisticsTimelineViolationMessages(
   const endLabel = formatTimeLabel(task.end_time ?? task.endTime);
   const checkinLabel = formatTimeLabel(task.checkin_time);
 
+  if (violations.startBeforeCheckout) {
+    messages.push(
+      `Check-out: l'inizio del servizio logistica (${startLabel}) è prima del check-out (${formatTimeLabel(task.checkout_time)}).`
+    );
+  }
+
+  if (violations.checkoutWaitExceeded) {
+    const waitMin = Number(task.checkout_wait_minutes ?? 0);
+    const waitLabel = Number.isFinite(waitMin) && waitMin > 0 ? ` (${waitMin} min)` : "";
+    messages.push(
+      `Attesa checkout: il driver attende più di ${LOGISTICS_MAX_CHECKOUT_WAIT_MIN} minuti prima del check-out${waitLabel}.`
+    );
+  }
+
   if (violations.bagRuleViolated) {
     const cleanerTaskStartMin = resolveCleanerTaskStartMin(task);
     const cleaningTimeMin = resolveCleaningTimeMin(task);
@@ -476,6 +490,22 @@ export function getLogisticsTimelineViolationMessages(
   return messages;
 }
 
+/** Quanti task hanno un dialog/pallino rosso (qualsiasi sforamento, anche ≤ 15 min). */
+export function countLogisticsTimelineViolationTasks(
+  tasks: Array<Record<string, unknown> | null | undefined>,
+  workDate: string
+): number {
+  let count = 0;
+  for (const task of tasks) {
+    if (
+      getLogisticsTimelineViolationMessages(pickLogisticsViolationFields(task), workDate).length > 0
+    ) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
 /** Etichette brevi per tooltip hover. */
 export function getLogisticsTimelineViolationShortLabels(
   task: LogisticsTaskTimeFields,
@@ -484,6 +514,12 @@ export function getLogisticsTimelineViolationShortLabels(
   const labels: string[] = [];
   const violations = getLogisticsTimelineViolations(task, workDate);
 
+  if (violations.startBeforeCheckout) {
+    labels.push("checkout violato");
+  }
+  if (violations.checkoutWaitExceeded) {
+    labels.push("attesa checkout eccessiva");
+  }
   if (violations.bagRuleViolated) {
     labels.push("regola borsone violata");
   }
