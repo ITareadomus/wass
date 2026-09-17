@@ -1,5 +1,5 @@
-import type { PoolClient } from 'pg';
 import pool, { query } from '../../shared/pg-db';
+import { acquireContainersWriteLock, acquireTimelineWriteLock } from './timeline-write-lock';
 import { taskCollaborationService } from './pg-task-collaboration-service';
 import { formatInTimeZone } from 'date-fns-tz';
 import { databaseConfig } from '../../config/database';
@@ -609,6 +609,72 @@ export class PgDailyAssignmentsService {
   }
 
   /**
+   * Equivalente per la timeline logistica: una task compare una volta sola nella
+   * giornata, su un solo driver (in logistica non esistono le collaborazioni, per
+   * questo la chiave non include il driver).
+   * Come per l'housekeeping, se ci sono gia duplicati l'indice non viene creato e
+   * il problema viene segnalato invece di cancellare righe all'avvio.
+   */
+  async ensureLogisticsTimelineNoDuplicates(): Promise<void> {
+    try {
+      const duplicates = await query(`
+        SELECT COUNT(*)::int AS groups
+        FROM (
+          SELECT 1
+          FROM lg_timeline
+          GROUP BY work_date, task_id
+          HAVING COUNT(*) > 1
+        ) d
+      `);
+
+      const duplicateGroups = Number(duplicates.rows[0]?.groups ?? 0);
+      if (duplicateGroups > 0) {
+        console.warn(
+          `⚠️ PG: lg_timeline contiene ${duplicateGroups} gruppi duplicati: ` +
+            `indice univoco non creato, serve una deduplica manuale`
+        );
+        return;
+      }
+
+      await query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS lg_timeline_no_dup_uidx
+        ON lg_timeline (work_date, task_id)
+      `);
+      console.log('✅ PG: lg_timeline UNIQUE su (work_date, task_id)');
+    } catch (error) {
+      console.warn('⚠️ PG: ensureLogisticsTimelineNoDuplicates:', error);
+    }
+  }
+
+  /**
+   * Riallinea la sequence della primary key di daily_assignments_current.
+   *
+   * Dopo un ripristino o un caricamento massivo con id espliciti la sequence resta
+   * indietro e i primi INSERT successivi collidono sulla primary key. Va rieseguita
+   * a mano se si ripristinano righe con id espliciti mentre l'app e in esecuzione.
+   */
+  async ensureDailyAssignmentsIdSequence(): Promise<void> {
+    try {
+      const maxId = await query(
+        'SELECT COALESCE(MAX(id), 0)::bigint AS max_id FROM daily_assignments_current'
+      );
+      const highestId = Number(maxId.rows[0]?.max_id ?? 0);
+      if (highestId <= 0) {
+        // Tabella vuota: setval(seq, 0) sarebbe fuori dai limiti della sequence.
+        return;
+      }
+
+      await query(
+        `SELECT setval(pg_get_serial_sequence('daily_assignments_current', 'id'), $1::bigint, true)`,
+        [highestId]
+      );
+      console.log(`✅ PG: sequence id di daily_assignments_current allineata a ${highestId}`);
+    } catch (error) {
+      console.warn('⚠️ PG: ensureDailyAssignmentsIdSequence:', error);
+    }
+  }
+
+  /**
    * Scope migration for selected cleaners tables:
    * - daily_selected_cleaners: unique per (work_date, scope)
    * - selected_cleaners_revisions: scope column + indexes
@@ -1141,21 +1207,6 @@ export class PgDailyAssignmentsService {
   }
 
   /**
-   * Serializza le scritture della timeline per (giorno, scope).
-   *
-   * Senza lock due salvataggi concorrenti si sovrappongono: il DELETE del secondo
-   * non vede le righe appena inserite dal primo (snapshot READ COMMITTED), quindi
-   * non le rimuove e i due INSERT si sommano. Il risultato e una timeline
-   * duplicata a ogni sovrapposizione.
-   */
-  private async lockTimelineWrites(client: PoolClient, key: string): Promise<void> {
-    // Un salvataggio tiene il lock per qualche centinaio di ms: il timeout serve
-    // solo a non bloccare una connessione del pool se qualcosa resta appeso.
-    await client.query("SET LOCAL lock_timeout = '20s'");
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
-  }
-
-  /**
    * Save timeline to PostgreSQL (replaces all rows for workDate)
    */
   async saveTimeline(workDate: string, timeline: any, scope: string | null = 'housekeeping'): Promise<number> {
@@ -1168,7 +1219,7 @@ export class PgDailyAssignmentsService {
       console.log(`📝 PG: Salvando ${rows.length} righe per ${workDate}...`);
 
       await client.query('BEGIN');
-      await this.lockTimelineWrites(client, `daily_assignments:${workDate}:${normalizedScope}`);
+      await acquireTimelineWriteLock(client, workDate, normalizedScope);
 
       // Delete existing rows for this work_date
       if (normalizedScope === 'office') {
@@ -1937,7 +1988,7 @@ export class PgDailyAssignmentsService {
 
       const rows = this.logisticsTimelineToRows(workDate, timeline);
       await client.query('BEGIN');
-      await this.lockTimelineWrites(client, `lg_timeline:${workDate}`);
+      await acquireTimelineWriteLock(client, workDate, 'logistics');
       await client.query('DELETE FROM lg_timeline WHERE work_date = $1', [workDate]);
       if (rows.length === 0) {
         await client.query('COMMIT');
@@ -2684,6 +2735,7 @@ export class PgDailyAssignmentsService {
     try {
       const normalizedScope = this.normalizeScope(scope);
       await client.query('BEGIN');
+      await acquireContainersWriteLock(client, workDate, normalizedScope);
 
       // Delete existing containers for this date
       if (normalizedScope === 'office') {
@@ -3275,6 +3327,9 @@ export class PgDailyAssignmentsService {
       await this.saveContainersToHistory(workDate, createdBy, 'pre_restore');
 
       await client.query('BEGIN');
+      // Il ripristino cancella il giorno senza filtrare lo scope: prende il lock
+      // housekeeping perche' e l'unico scope attivo (OFFICE_SCOPE_ENABLED = false).
+      await acquireContainersWriteLock(client, workDate, 'housekeeping');
 
       // Get containers at the target revision
       const historyResult = await client.query(

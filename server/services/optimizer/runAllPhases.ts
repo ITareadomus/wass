@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../../../shared/pg-db';
+import { acquireTimelineWriteLock } from '../timeline-write-lock';
 import { runPhase0, Phase0RunResult } from './runPhase0';
 import { runPhase1, Phase1RunResult } from './runPhase1';
 import { runPhase2, Phase2RunResult } from './runPhase2';
@@ -881,6 +882,10 @@ export async function applyOptimizerToProduction(
   try {
     await client.query('BEGIN');
 
+    // Le righe inserite qui non valorizzano `scope`, quindi valgono housekeeping:
+    // il lock deve essere quello housekeeping o non escluderebbe saveTimeline.
+    await acquireTimelineWriteLock(client, workDate, 'housekeeping');
+
     // Ensure PK sequence is aligned. If the table was bulk-loaded with explicit IDs
     // (or restored), the underlying sequence can lag behind and generate duplicates.
     // This would break MERGE MODE inserts with "duplicate key ... daily_assignments_current_pkey".
@@ -961,6 +966,7 @@ export async function applyOptimizerToProduction(
           SELECT task_id FROM daily_assignments_current
           WHERE work_date = $2
         )
+      ON CONFLICT DO NOTHING
     `;
 
     const insertResult = await client.query(insertQuery, [runId, workDate]);
@@ -1191,6 +1197,7 @@ async function synchronizeTimelineWithRunAfterRerun(
 
   try {
     await client.query('BEGIN');
+    await acquireTimelineWriteLock(client, workDate, 'housekeeping');
 
     // Enforce wave stage: drop future-priority rows that should not remain in timeline yet.
     if (futurePriorities.length > 0) {
@@ -1504,6 +1511,7 @@ export async function applyWaveToProduction(
 
   try {
     await client.query('BEGIN');
+    await acquireTimelineWriteLock(client, workDate, 'housekeeping');
 
     await client.query(`
       SELECT setval(
@@ -1582,6 +1590,7 @@ export async function applyWaveToProduction(
           SELECT task_id FROM daily_assignments_current
           WHERE work_date = $2
         )
+      ON CONFLICT DO NOTHING
     `;
 
     const insertResult = await client.query(insertQuery, [runId, workDate, wavePriority]);

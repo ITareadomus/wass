@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { formatInTimeZone } from "date-fns-tz";
 import { databaseConfig } from "../config/database";
+import { acquireTimelineWriteLock } from "./services/timeline-write-lock";
 import {
   buildSchedulingWindows,
   classifyTaskPriority,
@@ -1168,8 +1169,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await pgDailyAssignmentsService.ensureDailyAssignmentsRevisionsScopeUnique();
     await pgDailyAssignmentsService.ensureDailyContainersScopeUnique();
     await pgDailyAssignmentsService.ensureDailyAssignmentsCurrentNoDuplicates();
+    await pgDailyAssignmentsService.ensureDailyAssignmentsIdSequence();
     await pgDailyAssignmentsService.ensureSelectedCleanersScopeStructure();
     await pgDailyAssignmentsService.ensureLogisticsWorkspaceTables();
+    // Dopo ensureLogisticsWorkspaceTables: su un database nuovo lg_timeline non
+    // esiste ancora prima di quella chiamata.
+    await pgDailyAssignmentsService.ensureLogisticsTimelineNoDuplicates();
     
     // Migrate existing users from JSON if table is empty
     const existingUsers = await pgUsersService.getAllUsers();
@@ -6731,6 +6736,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         await client.query('BEGIN');
+        await acquireTimelineWriteLock(client, workDate, resolveScopeFromReq(req));
 
         // 1. Verifica che il task esista già in timeline
         const existingTask = await client.query(
@@ -6830,16 +6836,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         const newSequence = maxSeqResult.rows[0].max_seq + 1;
 
-        // 7. Crea la riga di assegnazione per il nuovo cleaner
-        // Genera un nuovo ID esplicitamente per evitare conflitti con sequence non sincronizzata
-        const maxIdResult = await client.query(
-          `SELECT COALESCE(MAX(id), 0) + 1 as new_id FROM daily_assignments_current`
-        );
-        const newId = maxIdResult.rows[0].new_id;
-
+        // 7. Crea la riga di assegnazione per il nuovo cleaner.
+        // L'id lo genera la sequence: calcolarlo con MAX(id) + 1 fa collidere due
+        // richieste simultanee sulla primary key.
         await client.query(`
           INSERT INTO daily_assignments_current (
-            id, work_date, cleaner_id, task_id, logistic_code, client_id,
+            work_date, cleaner_id, task_id, logistic_code, client_id,
             premium, address, lat, lng, cleaning_time, base_cleaning_time,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
@@ -6847,7 +6849,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             start_time, end_time, followup, sequence, travel_time
           )
           SELECT 
-            $7, $1, $2, task_id, logistic_code, client_id,
+            $1, $2, task_id, logistic_code, client_id,
             premium, address, lat, lng, $3, $4,
             checkin_date, checkout_date, checkin_time, checkout_time,
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
@@ -6856,7 +6858,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           FROM daily_assignments_current
           WHERE work_date = $1 AND task_id = $6 
           LIMIT 1
-        `, [workDate, Number(cleanerId), effectiveCleaningTime, baseCleaningTime, newSequence, taskId, newId]);
+        `, [workDate, Number(cleanerId), effectiveCleaningTime, baseCleaningTime, newSequence, taskId]);
 
         // 8. Aggiorna cleaning_time per tutti i collaboratori esistenti
         await client.query(
@@ -6999,6 +7001,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         await client.query('BEGIN');
+        await acquireTimelineWriteLock(client, workDate, resolveScopeFromReq(req));
 
         // 1. Verifica che il task NON sia già in timeline
         const existingTask = await client.query(
@@ -7248,6 +7251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         await client.query('BEGIN');
+        await acquireTimelineWriteLock(client, workDate, resolveScopeFromReq(req));
 
         // 1. Verifica collaborazione esistente
         const existingCollaboration = await taskCollaborationService.getCollaboration(workDate, taskId);
@@ -7475,6 +7479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         await client.query('BEGIN');
+        await acquireTimelineWriteLock(client, workDate, resolveScopeFromReq(req));
 
         // 1. Elimina collaboratori
         await client.query(
