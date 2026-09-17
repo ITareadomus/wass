@@ -93,6 +93,8 @@ export interface TaskSoftWindow {
   endMin?: Minutes;
   penaltyPerMin?: number;
   maxPenalty?: number;
+  /** If true, startMin is a soft lower bound (prefer later). */
+  preferLater?: boolean;
   reason: string;
 }
 
@@ -195,6 +197,7 @@ export type SoftConstraintSpec =
       startMin: Minutes;
       endMin?: Minutes;
       penaltyPerMinOutside: number;
+      preferLater?: boolean;
     }
   | {
       type: "KEEP_SAME_COORDINATES_BUILDING_TOGETHER";

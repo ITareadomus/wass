@@ -149,9 +149,14 @@ def solve_payload(payload):
     for entry in payload.get("softTimeWindows", []):
         node_index = int(entry["nodeIndex"])
         task_index = manager.NodeToIndex(node_index)
-        preferred_end = int(entry["preferredEndMin"])
-        penalty = int(entry.get("penaltyPerMinLate", 1))
-        time_dimension.SetCumulVarSoftUpperBound(task_index, preferred_end, penalty)
+        if entry.get("preferredEndMin") is not None:
+            preferred_end = int(entry["preferredEndMin"])
+            penalty = int(entry.get("penaltyPerMinLate", 1))
+            time_dimension.SetCumulVarSoftUpperBound(task_index, preferred_end, penalty)
+        if entry.get("preferredStartMin") is not None:
+            preferred_start = int(entry["preferredStartMin"])
+            early_penalty = int(entry.get("penaltyPerMinEarly", 1))
+            time_dimension.SetCumulVarSoftLowerBound(task_index, preferred_start, early_penalty)
 
     balance_weight = int(payload.get("balanceDriverLoadWeight", 0))
     if balance_weight > 0:

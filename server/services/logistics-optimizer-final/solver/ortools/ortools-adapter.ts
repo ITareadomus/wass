@@ -1,8 +1,7 @@
 import type { DriverNode, RoutingProblemInput, TaskNode } from "../../input-contract";
 import { BUSINESS_GROUP_THRESHOLDS } from "../../groups/group-weights";
 import { buildVehicleTaskPenalties } from "../../groups/territory-penalties";
-import { hasTightCheckinDeadline } from "../../priority-route-compatibility";
-import { requiresDriverBeforeCleaner } from "../../../../../shared/logistics-task-kind";
+import { classifyTaskNodeUrgency } from "../../task-urgency";
 import {
   ORTOOLS_SOLVER_ID,
   ROUTING_SOLUTION_SCHEMA_VERSION,
@@ -16,27 +15,28 @@ const DEPOT_NODE_INDEX = 0;
 /**
  * Drop penalty per priorita' (piu' alto = piu' costoso lasciare fuori il task).
  *
- * Regola di business: un task e' davvero "urgente" solo se ha una finestra
- * check-in/checkout stretta, o e' driver-before-cleaner, o l'alloggio e' premium,
- * o la pulizia e' straordinaria.
- * HP ha per definizione queste caratteristiche -> penalty alta.
- * Un EO con le stesse caratteristiche (EO_URGENT) e' altrettanto importante di un HP.
- * Un EO "ordinario" (senza nessuna di queste caratteristiche) NON deve pesare piu'
- * di un HP: viene trattato come LP.
+ * Un D&P e' urgente solo se la finestra borsone e' stretta (cleaning corto) o c'e'
+ * un check-in tight / premium / straordinaria. Un D&P da 6 ore NON deve pesare come
+ * un D&P da 1 ora, altrimenti ruba l'unica fascia utile.
+ * HP resta alto. EO ordinario e D&P laschi pesano come LP.
  */
 export const DROP_PENALTY_BY_PRIORITY = {
   EO_URGENT: 50_000,
   EO_ORDINARY: 25_000,
   HP: 50_000,
   LP: 25_000,
+  LOOSE_DP: 12_000,
+  TIGHT_DP: 60_000,
   default: 10_000,
 } as const;
 
 export interface OrToolsSoftTimeWindow {
   taskId: number;
   nodeIndex: number;
-  preferredEndMin: number;
-  penaltyPerMinLate: number;
+  preferredEndMin?: number;
+  penaltyPerMinLate?: number;
+  preferredStartMin?: number;
+  penaltyPerMinEarly?: number;
 }
 
 export interface OrToolsSoftGroupEntry {
@@ -121,32 +121,16 @@ function sortDrivers(drivers: DriverNode[]): DriverNode[] {
   return [...drivers].sort((left, right) => left.id - right.id);
 }
 
-/**
- * An EO task is "urgent" (as important as HP) when it has a tight check-in/checkout
- * deadline, requires the driver before the cleaner, or the accommodation is premium
- * or the cleaning is "straordinaria" (extra). Without any of these, it is an
- * "ordinary" EO and must not outweigh HP.
- */
-function isUrgentEoTask(task: TaskNode): boolean {
-  if (task.premium || task.straordinaria) return true;
-
-  const tightCheckin = hasTightCheckinDeadline({
-    customerCheckinMin: task.debug?.sourceTimes?.customerCheckinMin ?? null,
-    latestStartMin: task.hardWindow.latestStartMin,
-  });
-  if (tightCheckin) return true;
-
-  const cleanerTaskStartMin = task.debug?.sourceTimes?.cleanerTaskStartMin ?? null;
-  return requiresDriverBeforeCleaner(task.logisticsTaskKind) && cleanerTaskStartMin !== null;
-}
-
 function getDropPenalty(task: TaskNode): number {
-  if (task.priority === "EO") {
-    return isUrgentEoTask(task)
-      ? DROP_PENALTY_BY_PRIORITY.EO_URGENT
-      : DROP_PENALTY_BY_PRIORITY.EO_ORDINARY;
+  const urgency = classifyTaskNodeUrgency(task);
+  if (urgency === "urgent") {
+    return task.logisticsTaskKind === "delivery/pick-up"
+      ? DROP_PENALTY_BY_PRIORITY.TIGHT_DP
+      : DROP_PENALTY_BY_PRIORITY.EO_URGENT;
   }
+  if (urgency === "loose") return DROP_PENALTY_BY_PRIORITY.LOOSE_DP;
   if (task.priority === "HP") return DROP_PENALTY_BY_PRIORITY.HP;
+  if (task.priority === "EO") return DROP_PENALTY_BY_PRIORITY.EO_ORDINARY;
   if (task.priority === "LP") return DROP_PENALTY_BY_PRIORITY.LP;
   return DROP_PENALTY_BY_PRIORITY.default;
 }
@@ -181,8 +165,18 @@ function extractSoftConstraints(input: RoutingProblemInput): ExtractedSoftConstr
 
     if (constraint.type === "PREFERRED_PRIORITY_WINDOW") {
       const nodeIndex = taskIdToNodeIndex.get(constraint.taskId);
+      if (nodeIndex === undefined) continue;
+      if (constraint.preferLater === true && Number.isFinite(constraint.startMin)) {
+        softTimeWindows.push({
+          taskId: constraint.taskId,
+          nodeIndex,
+          preferredStartMin: constraint.startMin,
+          penaltyPerMinEarly: constraint.penaltyPerMinOutside,
+        });
+        continue;
+      }
       const preferredEndMin = constraint.endMin ?? constraint.startMin;
-      if (nodeIndex !== undefined && Number.isFinite(preferredEndMin)) {
+      if (Number.isFinite(preferredEndMin)) {
         softTimeWindows.push({
           taskId: constraint.taskId,
           nodeIndex,

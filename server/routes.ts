@@ -11239,6 +11239,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         solver: solverBody,
         apply: applyBody,
         allowPartial: allowPartialBody,
+        generateHypotheses: generateHypothesesBody,
       } = req.body || {};
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       const solver =
@@ -11261,6 +11262,10 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         allowPartialBody === true ||
         allowPartialBody === 1 ||
         String(allowPartialBody ?? "").toLowerCase() === "true";
+      const generateHypotheses =
+        generateHypothesesBody === true ||
+        generateHypothesesBody === 1 ||
+        String(generateHypothesesBody ?? "").toLowerCase() === "true";
 
       const { runLogisticsRouting } = await import(
         "./services/logistics-optimizer-final/run-routing"
@@ -11278,8 +11283,9 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       const result = await runLogisticsRouting(workDate, {
         debug: debugExplicit,
         solver,
-        apply,
+        apply: generateHypotheses ? false : apply,
         allowPartial,
+        generateHypotheses,
         performedBy: getCurrentUsername(req),
       });
 
@@ -11297,6 +11303,11 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         excludedFromSolve: result.excludedFromSolve,
         debugDir: result.debugDir,
         solution: result.solution,
+        hypotheses: result.hypotheses?.map((hypothesis) => ({
+          summary: hypothesis.summary,
+          solution: hypothesis.solution,
+          preview: hypothesis.preview ?? null,
+        })),
       });
     } catch (error: any) {
       if (error?.name === "RoutingInputValidationError") {
@@ -11349,6 +11360,70 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       return res.status(500).json({
         success: false,
         error: error.message,
+      });
+    }
+  });
+
+  app.post("/api/logistics-optimizer-final/apply-hypothesis", async (req, res) => {
+    try {
+      const { date, solution, allowPartial: allowPartialBody } = req.body || {};
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      if (!solution || typeof solution !== "object") {
+        return res.status(400).json({
+          success: false,
+          error: "MISSING_SOLUTION",
+          message: "Manca la soluzione dell'ipotesi da applicare.",
+        });
+      }
+      const allowPartial =
+        allowPartialBody === true ||
+        allowPartialBody === 1 ||
+        String(allowPartialBody ?? "").toLowerCase() === "true";
+
+      const { buildLogisticsRoutingInput } = await import(
+        "./services/logistics-optimizer-final/build-routing-input"
+      );
+      const { applyLogisticsRoutingSolution } = await import(
+        "./services/logistics-optimizer-final/apply-routing-solution"
+      );
+      const { evaluateSolutionApplyGate } = await import(
+        "./services/logistics-optimizer-final/solution-apply-gate"
+      );
+
+      const input = await buildLogisticsRoutingInput(workDate, {
+        performedBy: getCurrentUsername(req),
+      });
+      const applyGate = evaluateSolutionApplyGate(solution, { allowPartial });
+      if (!applyGate.canApply) {
+        return res.status(409).json({
+          success: false,
+          error: "SOLUTION_CANNOT_BE_APPLIED",
+          message: "L'ipotesi scelta non può essere applicata.",
+          applyGate,
+        });
+      }
+
+      const applyResult = await applyLogisticsRoutingSolution({
+        workDate,
+        input,
+        solution,
+        performedBy: getCurrentUsername(req),
+        allowPartial,
+        allowCheckinViolations: true,
+      });
+
+      return res.json({
+        success: true,
+        ok: true,
+        applyGate,
+        apply: applyResult,
+      });
+    } catch (error: any) {
+      console.error("❌ Errore logistics-optimizer-final apply-hypothesis:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+        message: error.message,
       });
     }
   });

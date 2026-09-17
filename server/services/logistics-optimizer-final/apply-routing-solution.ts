@@ -17,6 +17,7 @@ import {
 } from "../workspace-files";
 import { applyEarlyRouteWaitAbsorptionToRoute } from "./apply-early-route-wait-absorption";
 import type { RoutingProblemInput } from "./input-contract";
+import type { LogisticsRoutingHypothesis } from "./routing-hypotheses";
 import { assertSolutionCanBeApplied } from "./solution-apply-gate";
 import type { RoutingSolution, RoutingStopSolution } from "./solution-contract";
 import { assertRoutingProblemInputValid } from "./validation";
@@ -43,10 +44,23 @@ export interface ApplyLogisticsRoutingSolutionArgs {
   performedBy?: string;
   allowPartial?: boolean;
   debugDir?: string;
+  allowCheckinViolations?: boolean;
 }
 
 function ensureArray<T = any>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function cloneJson<T>(value: T): T {
+  return value == null ? value : (JSON.parse(JSON.stringify(value)) as T);
+}
+
+interface LoadedApplyContext {
+  workDate: string;
+  input: RoutingProblemInput;
+  driverById: Map<number, any>;
+  containersData: any;
+  currentTimeline: any;
 }
 
 function flattenContainerTasks(containersData: any): Map<number, any> {
@@ -179,14 +193,10 @@ function buildTimelineTaskFromStop(args: {
   };
 }
 
-export async function applyLogisticsRoutingSolution(
-  args: ApplyLogisticsRoutingSolutionArgs
-): Promise<ApplyRoutingSolutionResult> {
-  const { workDate, input, solution, allowPartial, debugDir } = args;
-
-  assertSolutionCanBeApplied(solution, { allowPartial });
-  assertRoutingProblemInputValid(input, { mode: "apply" });
-
+async function loadApplyContext(
+  workDate: string,
+  input: RoutingProblemInput
+): Promise<LoadedApplyContext> {
   const selectedDriverIds = input.drivers.map((driver) => driver.id).filter((id) => Number.isFinite(id));
   const [driverRows, containersData, currentTimeline] = await Promise.all([
     pgDailyAssignmentsService.loadLgDriversByIds(selectedDriverIds, workDate),
@@ -194,9 +204,38 @@ export async function applyLogisticsRoutingSolution(
     loadLogisticsTimeline(workDate),
   ]);
 
-  const driverById = new Map<number, any>(
-    ensureArray(driverRows).map((row: any) => [Number(row.id), row])
-  );
+  return {
+    workDate,
+    input,
+    driverById: new Map<number, any>(ensureArray(driverRows).map((row: any) => [Number(row.id), row])),
+    containersData,
+    currentTimeline,
+  };
+}
+
+interface BuiltLogisticsTimeline {
+  timeline: {
+    metadata: { date: string; generated_by: string };
+    drivers_assignments: Array<{ driver: any; tasks: any[]; return_travel_time?: number }>;
+    meta: { total_drivers: number; used_drivers: number; assigned_tasks: number };
+  };
+  solverAssignedTaskIds: Set<number>;
+  insertedTasks: number;
+  totalTasksOnTimeline: number;
+  preservedOutsideSolverInputTasks: number;
+  preservedUnassignedRoutingTasks: number;
+  finalValidation: LogisticsFinalTimelineValidation;
+}
+
+async function buildLogisticsTimelineFromSolution(args: {
+  context: LoadedApplyContext;
+  solution: RoutingSolution;
+  allowCheckinViolations?: boolean;
+  debugDir?: string;
+}): Promise<BuiltLogisticsTimeline> {
+  const { context, solution, allowCheckinViolations, debugDir } = args;
+  const { workDate, input, driverById, containersData } = context;
+  const currentTimeline = cloneJson(context.currentTimeline);
   const inputTaskById = new Map(input.tasks.map((task) => [task.taskId, task]));
   const routingTaskIds = new Set(input.tasks.map((task) => task.taskId));
 
@@ -397,7 +436,72 @@ export async function applyLogisticsRoutingSolution(
   if (debugDir) {
     await writeFinalTimelineValidationDebugFile(debugDir, finalValidation);
   }
-  assertLogisticsTimelineValidAfterRecalc(finalValidation);
+  if (!allowCheckinViolations) {
+    assertLogisticsTimelineValidAfterRecalc(finalValidation);
+  }
+
+  return {
+    timeline,
+    solverAssignedTaskIds,
+    insertedTasks,
+    totalTasksOnTimeline,
+    preservedOutsideSolverInputTasks,
+    preservedUnassignedRoutingTasks,
+    finalValidation,
+  };
+}
+
+export async function attachHypothesisTimelinePreviews(args: {
+  workDate: string;
+  input: RoutingProblemInput;
+  hypotheses: LogisticsRoutingHypothesis[];
+}): Promise<void> {
+  if (args.hypotheses.length === 0) return;
+  const context = await loadApplyContext(args.workDate, args.input);
+  for (const hypothesis of args.hypotheses) {
+    try {
+      const built = await buildLogisticsTimelineFromSolution({
+        context,
+        solution: hypothesis.solution,
+        allowCheckinViolations: true,
+      });
+      hypothesis.preview = {
+        drivers_assignments: built.timeline.drivers_assignments,
+      };
+    } catch (error) {
+      console.warn(
+        `⚠️ Anteprima ipotesi ${hypothesis.summary.id} non disponibile:`,
+        error instanceof Error ? error.message : error
+      );
+    }
+  }
+}
+
+export async function applyLogisticsRoutingSolution(
+  args: ApplyLogisticsRoutingSolutionArgs
+): Promise<ApplyRoutingSolutionResult> {
+  const { workDate, input, solution, allowPartial, debugDir, allowCheckinViolations } = args;
+
+  assertSolutionCanBeApplied(solution, { allowPartial });
+  assertRoutingProblemInputValid(input, { mode: "apply" });
+
+  const context = await loadApplyContext(workDate, input);
+  const built = await buildLogisticsTimelineFromSolution({
+    context,
+    solution,
+    allowCheckinViolations,
+    debugDir,
+  });
+  const {
+    timeline,
+    solverAssignedTaskIds,
+    insertedTasks,
+    totalTasksOnTimeline,
+    preservedOutsideSolverInputTasks,
+    preservedUnassignedRoutingTasks,
+    finalValidation,
+  } = built;
+  const { containersData } = context;
 
   const saved = await saveLogisticsTimeline(
     workDate,

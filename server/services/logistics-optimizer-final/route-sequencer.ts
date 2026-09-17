@@ -116,6 +116,7 @@ export function findBestFeasibleSequence(args: {
   subZoneByTaskId: Map<TaskId, SubZoneAssignment>;
   beamWidth?: number;
   ranking?: SequenceRanking;
+  forceFirstTaskId?: TaskId;
 }): SequencedRoute | null {
   const { input, driver, taskIds, taskById, subZoneByTaskId } = args;
   const beamWidth = args.beamWidth ?? ROUTE_SEQUENCER_CONFIG.beamWidth;
@@ -163,6 +164,13 @@ export function findBestFeasibleSequence(args: {
       for (let index = 0; index < taskCount; index += 1) {
         if ((state.visitedMask & (1 << index)) !== 0) continue;
         const task = orderedTasks[index];
+        if (
+          state.visitedMask === 0 &&
+          args.forceFirstTaskId != null &&
+          task.taskId !== args.forceFirstTaskId
+        ) {
+          continue;
+        }
 
         const travel = travelBetween(state.lastNodeIndex, task.nodeIndex);
         if (travel === null) continue;

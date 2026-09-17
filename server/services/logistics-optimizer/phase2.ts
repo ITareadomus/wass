@@ -30,7 +30,7 @@ import {
 } from "./phase2-debug";
 
 const LOGISTICS_TASK_DURATION_MIN = LOGISTICS_SERVICE_DURATION_MIN;
-const BAG_DELIVERY_DURATION_RATIO_TOLERANCE = 2 / 3;
+const BAG_DELIVERY_DURATION_RATIO_TOLERANCE = 1.2;
 const BAG_DELIVERY_FALLBACK_TOLERANCE_MIN = 30;
 const GROUP_MAX_TASKS = 4;
 const GROUP_NEARBY_THRESHOLD_MIN = 8;
@@ -511,7 +511,7 @@ function resolveBagDeliveryToleranceMin(task: LogisticsTaskForPhase2): number {
 /**
  * Vincolo cleaner:
  * - NORMAL_TASK / DRIVER_BRINGS_BAG: il task logistico può iniziare entro una tolleranza
- *   rispetto all'inizio HK (2/3 durata task, fallback 30').
+ *   rispetto all'inizio HK (120% durata task, fallback 30').
  * - CLEANER_HAS_BAG: solo ritiro sporco (deadline su checkout), senza consegna borsone.
  */
 function getCleanerViolation(task: LogisticsTaskForPhase2, taskStartMin: number): boolean {

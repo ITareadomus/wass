@@ -5,6 +5,7 @@ import {
   getLogisticsTimelineViolationMessages,
   getLogisticsTimelineViolationShortLabels,
   pickLogisticsViolationFields,
+  shouldBlinkLogisticsTimelineTask,
 } from "@shared/logistics-scheduling-constraints";
 import {
   getHousekeepingTimelineViolationMessages,
@@ -2582,6 +2583,10 @@ const displayClickableInputClass =
     };
   })();
   const isOverdue = timelineViolationMessages.length > 0;
+  const shouldBlinkOverdue =
+    operationsScope === "logistics" && logisticsViolationInput && effectiveWorkDate
+      ? shouldBlinkLogisticsTimelineTask(logisticsViolationInput, effectiveWorkDate)
+      : isOverdue;
 
   // Dialog dettagli: ricalcola le violazioni sulla task attualmente mostrata (frecce prev/next).
   const dialogTimelineViolationMessages = (() => {
@@ -3393,7 +3398,9 @@ const displayClickableInputClass =
                           operationsScope === "logistics" &&
                           hasLogisticsExecutionStatusColor(logisticsExecutionStatus)
                         ) &&
-                        "animate-blink",
+                        (shouldBlinkOverdue
+                          ? "animate-blink"
+                          : "border-red-500 shadow-[0_0_8px_1px_rgba(220,38,38,0.45)]"),
                       isInTimeline &&
                         executionColorsEnabled &&
                         housekeepingWorkProgress &&

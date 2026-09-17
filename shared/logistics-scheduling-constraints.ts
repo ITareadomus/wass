@@ -15,6 +15,19 @@ export const LOGISTICS_SERVICE_DURATION_MIN = 15;
 
 export const LOGISTICS_DEFAULT_BAG_DELIVERY_TOLERANCE_MIN = 30;
 
+/** Tolleranza borsone = 120% del cleaning time (ceil), se la durata è nota. */
+export const LOGISTICS_BAG_DELIVERY_CLEANING_TIME_RATIO = 1.2;
+
+export function resolveBagDeliveryToleranceMin(cleaningTimeMin: number | null | undefined): number {
+  if (cleaningTimeMin != null && Number.isFinite(cleaningTimeMin) && cleaningTimeMin > 0) {
+    return Math.ceil(cleaningTimeMin * LOGISTICS_BAG_DELIVERY_CLEANING_TIME_RATIO);
+  }
+  return LOGISTICS_DEFAULT_BAG_DELIVERY_TOLERANCE_MIN;
+}
+
+/** Sforamento vincoli (borsone/check-in) entro cui la card resta rossa ma non lampeggia. */
+export const LOGISTICS_VIOLATION_BLINK_TOLERANCE_MIN = 15;
+
 export function parseHmToMinutes(value: unknown, fallback: number | null = null): number | null {
   const raw = String(value ?? "").trim();
   const match = raw.match(/^(\d{1,2}):(\d{2})/);
@@ -206,11 +219,7 @@ export function resolveDriverBringsBagLatestStartMin(params: {
     params.cleaningTimeMin !== null && Number.isFinite(params.cleaningTimeMin)
       ? params.cleaningTimeMin
       : null;
-  const hasValidCleaningTime = validCleaningTime !== null && validCleaningTime > 0;
-  const toleranceMin = hasValidCleaningTime
-    ? Math.ceil(validCleaningTime * (2 / 3))
-    : LOGISTICS_DEFAULT_BAG_DELIVERY_TOLERANCE_MIN;
-  return params.cleanerTaskStartMin + toleranceMin;
+  return params.cleanerTaskStartMin + resolveBagDeliveryToleranceMin(validCleaningTime);
 }
 
 function resolveCleanerTaskStartMin(task: LogisticsTaskTimeFields): number | null {
@@ -342,7 +351,59 @@ export function shouldBlinkLogisticsTimelineTask(
   task: LogisticsTaskTimeFields,
   workDate: string
 ): boolean {
-  return getLogisticsTimelineViolationMessages(task, workDate).length > 0;
+  return (
+    getLogisticsTimelineViolationOverflowMin(task, workDate) >
+    LOGISTICS_VIOLATION_BLINK_TOLERANCE_MIN
+  );
+}
+
+/**
+ * Minuti di sforamento del vincolo più grave (0 se non c'è violazione misurabile).
+ * Usato per distinguere il dialog rosso (qualsiasi sforamento) dal lampeggio (> 15 min).
+ */
+export function getLogisticsTimelineViolationOverflowMin(
+  task: LogisticsTaskTimeFields,
+  workDate: string
+): number {
+  const violations = getLogisticsTimelineViolations(task, workDate);
+  if (!violations.hasViolation && task._checkin_violated !== true) return 0;
+
+  let overflow = 0;
+  const startMin = parseHmToMinutes(task.start_time ?? task.startTime, null);
+  const endMin = parseHmToMinutes(task.end_time ?? task.endTime, null);
+  const checkinMin = parseHmToMinutes(task.checkin_time, null);
+
+  if (violations.bagRuleViolated && startMin != null) {
+    const cleanerTaskStartMin = resolveCleanerTaskStartMin(task);
+    if (cleanerTaskStartMin != null) {
+      const latestStartMin = resolveDriverBringsBagLatestStartMin({
+        cleanerTaskStartMin,
+        cleaningTimeMin: resolveCleaningTimeMin(task),
+      });
+      overflow = Math.max(overflow, startMin - latestStartMin);
+    } else {
+      overflow = Math.max(overflow, LOGISTICS_VIOLATION_BLINK_TOLERANCE_MIN + 1);
+    }
+  }
+
+  if (checkinMin != null && isCheckinApplicableOnWorkDate(task.checkin_date, workDate)) {
+    if (violations.checkinViolated && endMin != null) {
+      overflow = Math.max(overflow, endMin - checkinMin);
+    }
+    if (violations.startAtOrAfterCheckin && startMin != null) {
+      overflow = Math.max(overflow, startMin - checkinMin);
+    }
+  }
+
+  if (
+    task._checkin_violated === true &&
+    !violations.checkinViolated &&
+    !violations.startAtOrAfterCheckin
+  ) {
+    overflow = Math.max(overflow, LOGISTICS_VIOLATION_BLINK_TOLERANCE_MIN + 1);
+  }
+
+  return Math.max(0, overflow);
 }
 
 function formatTimeLabel(value: unknown): string {
@@ -375,10 +436,7 @@ export function getLogisticsTimelineViolationMessages(
         task.cleanerStartTime
     );
     if (cleanerTaskStartMin != null) {
-      const toleranceMin =
-        cleaningTimeMin != null && cleaningTimeMin > 0
-          ? Math.ceil(cleaningTimeMin * (2 / 3))
-          : LOGISTICS_DEFAULT_BAG_DELIVERY_TOLERANCE_MIN;
+      const toleranceMin = resolveBagDeliveryToleranceMin(cleaningTimeMin);
       const latestStartLabel = minutesToHm(
         resolveDriverBringsBagLatestStartMin({
           cleanerTaskStartMin,

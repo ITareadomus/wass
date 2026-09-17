@@ -125,25 +125,29 @@ export function getSequenceSummaryTaskRowClassName({
   isMapFiltered,
   isDragging,
   executionStatus,
+  shouldBlinkViolation,
 }: {
   isTimelineViolated?: boolean;
   isHighlighted?: boolean;
   isMapFiltered?: boolean;
   isDragging?: boolean;
   executionStatus?: LogisticsTaskExecutionStatus | null;
+  shouldBlinkViolation?: boolean;
 } = {}) {
   const statusClass = logisticsExecutionStatusSurfaceClass(executionStatus);
   const statusWinsOverViolation = hasLogisticsExecutionStatusColor(executionStatus);
-  // Violazione lampeggia solo se non c'è colore status; l'icona resta comunque (--violated).
-  const showViolationBlink = isTimelineViolated === true && !statusWinsOverViolation;
+  const blink = shouldBlinkViolation !== false && isTimelineViolated === true && !statusWinsOverViolation;
+  const staticViolation = isTimelineViolated === true && !statusWinsOverViolation && !blink;
 
   return cn(
     "sequence-summary-task relative rounded-md border px-2 py-1.5 text-xs",
     isTimelineViolated && "sequence-summary-task--violated",
     isMapFiltered && "sequence-summary-task--map-filtered task-border-map-filtered",
-    showViolationBlink
+    blink
       ? "animate-blink-inset border-red-500 bg-red-50 dark:bg-red-950/30"
-      : !isMapFiltered && isHighlighted
+      : staticViolation
+        ? "border-red-500 bg-red-50 dark:bg-red-950/30"
+        : !isMapFiltered && isHighlighted
         ? "border-amber-400 bg-amber-50 dark:bg-amber-950/30"
         : statusClass
           ? cn(
@@ -280,6 +284,7 @@ export function SequenceSummaryTaskRow({
           isMapFiltered,
           isDragging,
           executionStatus: entry.executionStatus,
+          shouldBlinkViolation: entry.timelineViolationBlink !== false,
         }),
         className,
       )}

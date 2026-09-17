@@ -237,6 +237,52 @@ describe("buildOrToolsPayload", () => {
     expect(byId.get(102)! > byId.get(103)!).toBe(true);
   });
 
+  it("gives tight D&P a higher drop penalty than a long non-urgent D&P", () => {
+    const tightDp = {
+      taskId: 201,
+      logisticCode: 6201,
+      priority: "low_priority",
+      cleaningTime: 60,
+      lat: 45.45,
+      lng: 9.18,
+      checkinDate: null,
+      checkoutDate: null,
+      checkinTime: null,
+      checkoutTime: null,
+      cleanerId: 10,
+      cleanerStartTime: "11:00",
+      cleanerTaskStartTime: "11:00",
+      cleanerSequence: 2,
+      premium: false,
+      straordinaria: false,
+      paxIn: 2,
+      logisticsTaskKind: "delivery/pick-up",
+      logisticsTaskKindSource: "manual",
+      locked: false,
+      lockedReason: null,
+    };
+    const looseDp = {
+      ...tightDp,
+      taskId: 202,
+      logisticCode: 6202,
+      cleaningTime: 360,
+      lat: 45.46,
+    };
+
+    const input = buildRoutingProblemInputFromSource(
+      buildBaseSourceData({
+        schedulableTasks: [tightDp, looseDp],
+        allTaskData: [tightDp, looseDp],
+      })
+    );
+    const { payload } = buildOrToolsPayload(input);
+    const byId = new Map(payload.tasks.map((task) => [task.taskId, task.dropPenalty]));
+
+    expect(byId.get(201)).toBe(DROP_PENALTY_BY_PRIORITY.TIGHT_DP);
+    expect(byId.get(202)).toBe(DROP_PENALTY_BY_PRIORITY.LOOSE_DP);
+    expect(byId.get(201)!).toBeGreaterThan(byId.get(202)!);
+  });
+
   it("shapes costMatrixMin for same-building groups", () => {
     const task102 = {
       taskId: 102,
@@ -360,8 +406,18 @@ describe("buildOrToolsPayload", () => {
     );
   });
 
-  it("includes EO preferred soft time windows and balance weight", () => {
-    const input = buildMinimalInput();
+  it("includes EO preferred soft time windows and balance weight for urgent EO", () => {
+    const urgentEo = {
+      ...buildBaseSourceData().schedulableTasks[0],
+      checkinDate: "2026-06-04",
+      checkinTime: "13:00",
+    };
+    const input = buildRoutingProblemInputFromSource(
+      buildBaseSourceData({
+        schedulableTasks: [urgentEo],
+        allTaskData: [urgentEo],
+      })
+    );
     const { payload } = buildOrToolsPayload(input);
 
     expect(payload.schemaVersion).toBe("logistics-ortools-payload/v2");

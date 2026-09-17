@@ -141,6 +141,7 @@ function buildTaskNode(args: {
       startMin: window.startMin!,
       endMin: window.endMin,
       penaltyPerMinOutside: window.penaltyPerMin ?? 1,
+      ...(window.preferLater ? { preferLater: true } : {}),
     }));
 
   return {

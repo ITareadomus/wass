@@ -55,6 +55,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AssignmentLoadingDialog } from "@/components/dialogs/assignment-loading-dialog";
+import { LogisticsHypothesisSwitcher } from "@/components/dialogs/logistics-hypothesis-switcher";
+import {
+  mergeHypothesisPreviewAssignments,
+  type LogisticsHypothesisPickerItem,
+} from "@/lib/logistics-hypothesis-preview";
 import {
   DndRemoveZone,
   useLogisticsDnd,
@@ -421,6 +426,9 @@ export default function GenerateLogisticsAssignments() {
   const containerHighlightRef = useRef<string | null>(null);
 
   const [isRunningLogisticsOptimizer, setIsRunningLogisticsOptimizer] = useState(false);
+  const [logisticsHypotheses, setLogisticsHypotheses] = useState<LogisticsHypothesisPickerItem[]>([]);
+  const [previewHypothesisId, setPreviewHypothesisId] = useState<string | null>(null);
+  const [applyingHypothesisId, setApplyingHypothesisId] = useState<string | null>(null);
   const [showMissingLogisticsKindWarningDialog, setShowMissingLogisticsKindWarningDialog] = useState(false);
   const [missingLogisticsKindTaskCount, setMissingLogisticsKindTaskCount] = useState(0);
   const [missingLogisticsKindTaskCodes, setMissingLogisticsKindTaskCodes] = useState<string[]>([]);
@@ -474,9 +482,18 @@ export default function GenerateLogisticsAssignments() {
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
+      setLogisticsHypotheses([]);
+      setPreviewHypothesisId(null);
       setSelectedDate(date);
     }
   };
+
+  const clearHypothesisPreview = useCallback(() => {
+    setLogisticsHypotheses([]);
+    setPreviewHypothesisId(null);
+    setApplyingHypothesisId(null);
+    setContainersManuallyCollapsed(false);
+  }, []);
 
   /** Carica solo da PostgreSQL (GET), senza rigenerare da ADAM — come loadTasks dopo mount su HK */
   const loadLogisticsContainers = useCallback(async (date: Date) => {
@@ -560,7 +577,7 @@ export default function GenerateLogisticsAssignments() {
 
   useLogisticsExecutionStatusPoll({
     workDate: format(selectedDate, "yyyy-MM-dd"),
-    enabled: !isExtractingLogistics && hasTimelineAssignments,
+    enabled: !isExtractingLogistics && hasTimelineAssignments && logisticsHypotheses.length === 0,
     isPaused: () => isDraggingRef.current || isLoadingDragDrop,
     onStatuses: (statuses) => {
       setLogisticsDriversAssignments((prev) => {
@@ -701,7 +718,8 @@ export default function GenerateLogisticsAssignments() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date: dateStr,
-          apply: true,
+          apply: false,
+          generateHypotheses: true,
           allowPartial: true,
           solver: "ortools-v1",
           debug: true,
@@ -716,49 +734,82 @@ export default function GenerateLogisticsAssignments() {
             "Esecuzione logistics-optimizer-final fallita"
         );
       }
-      const assignedCount = Number(
-        data?.apply?.insertedTasks ?? data?.solutionSummary?.assignedTaskCount ?? 0
-      );
-      const unassignedCount = Number(
-        data?.solutionSummary?.droppedTaskCount ?? data?.solution?.droppedTasks?.length ?? 0
-      );
-      const skippedInvalidWindow = Array.isArray(data?.excludedFromSolve?.invalidHardWindow)
-        ? data.excludedFromSolve.invalidHardWindow
+      const hypotheses = Array.isArray(data?.hypotheses)
+        ? (data.hypotheses as LogisticsHypothesisPickerItem[]).filter(
+            (entry) => entry?.summary && entry?.solution
+          )
         : [];
-      const skippedCodes = skippedInvalidWindow
-        .map((entry: { logisticCode?: number | null; taskId?: number }) =>
-          entry?.logisticCode != null && Number.isFinite(Number(entry.logisticCode))
-            ? String(entry.logisticCode)
-            : entry?.taskId != null
-              ? `task ${entry.taskId}`
-              : null
-        )
-        .filter((value: string | null): value is string => Boolean(value));
+      if (hypotheses.length === 0) {
+        throw new Error("Nessuna ipotesi di giro disponibile. Riprova o controlla i driver convocati.");
+      }
       const debugDir = typeof data?.debugDir === "string" ? data.debugDir : null;
       if (debugDir) {
         console.info("[logistics-optimizer-final] Debug JSON:", debugDir);
       }
-      const skippedPart =
-        skippedCodes.length > 0
-          ? ` · ${skippedCodes.length} lasciate fuori per finestra oraria invalida (codici ADAM: ${skippedCodes.join(", ")})`
-          : "";
+      setLogisticsHypotheses(hypotheses);
+      setPreviewHypothesisId(hypotheses[0]?.summary.id ?? null);
+      setContainersManuallyCollapsed(true);
+      setContainersForcedOpen(false);
       toast({
-        variant: "success",
-        title: "Assegnazione completata",
-        description: `${assignedCount} task assegnate, ${unassignedCount} non assegnate${skippedPart}`,
+        title: "Ipotesi pronte",
+        description: "Confrontale in timeline e applica quella che preferisci.",
       });
-      await reloadLogisticsPage();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Errore sconosciuto";
       toast({
         variant: "destructive",
         title: "Assegnazione non riuscita",
-        description: msg || "Errore durante l'assegnazione automatica",
+        description: msg || "Errore durante il calcolo delle ipotesi",
       });
     } finally {
       setIsRunningLogisticsOptimizer(false);
     }
-  }, [selectedDate, toast, reloadLogisticsPage]);
+  }, [selectedDate, toast]);
+
+  const applyLogisticsHypothesis = useCallback(
+    async (hypothesis: LogisticsHypothesisPickerItem) => {
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      setApplyingHypothesisId(hypothesis.summary.id);
+      setIsRunningLogisticsOptimizer(true);
+      try {
+        const response = await fetch("/api/logistics-optimizer-final/apply-hypothesis", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date: dateStr,
+            solution: hypothesis.solution,
+            allowPartial: true,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.success) {
+          throw new Error(
+            data?.message || data?.error || "Impossibile applicare l'ipotesi scelta"
+          );
+        }
+        const assignedCount = Number(data?.apply?.insertedTasks ?? hypothesis.summary.assignedTaskCount);
+        const unassignedCount = Number(hypothesis.summary.droppedTaskCount);
+        toast({
+          variant: "success",
+          title: "Ipotesi applicata",
+          description: `${hypothesis.summary.title}: ${assignedCount} task assegnate, ${unassignedCount} non assegnate`,
+        });
+        clearHypothesisPreview();
+        await reloadLogisticsPage();
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Errore sconosciuto";
+        toast({
+          variant: "destructive",
+          title: "Applicazione non riuscita",
+          description: msg,
+        });
+      } finally {
+        setApplyingHypothesisId(null);
+        setIsRunningLogisticsOptimizer(false);
+      }
+    },
+    [selectedDate, toast, reloadLogisticsPage, clearHypothesisPreview]
+  );
 
   const handleRunLogisticsOptimizer = useCallback(async () => {
     const dateStr = format(selectedDate, "yyyy-MM-dd");
@@ -802,16 +853,51 @@ export default function GenerateLogisticsAssignments() {
     }
   }, [selectedDate, executeLogisticsOptimizer, toast]);
 
+  const selectedHypothesis = useMemo(
+    () =>
+      logisticsHypotheses.find((hypothesis) => hypothesis.summary.id === previewHypothesisId) ??
+      logisticsHypotheses[0] ??
+      null,
+    [logisticsHypotheses, previewHypothesisId]
+  );
+  const isHypothesisPreview = selectedHypothesis != null;
+
+  const displayedDriversAssignments = useMemo(() => {
+    if (!selectedHypothesis) return logisticsDriversAssignments;
+    return mergeHypothesisPreviewAssignments({
+      drivers: logisticsDrivers,
+      preview: selectedHypothesis.preview,
+      solution: selectedHypothesis.solution,
+      containerTasks: [
+        ...logisticsTaskLists.early_out,
+        ...logisticsTaskLists.high_priority,
+        ...logisticsTaskLists.low_priority,
+      ],
+      baselineAssignments: logisticsDriversAssignments,
+    });
+  }, [
+    selectedHypothesis,
+    logisticsDrivers,
+    logisticsDriversAssignments,
+    logisticsTaskLists.early_out,
+    logisticsTaskLists.high_priority,
+    logisticsTaskLists.low_priority,
+  ]);
+
+  const displayedDrivers = isHypothesisPreview
+    ? displayedDriversAssignments.map((row) => row.driver)
+    : logisticsDrivers;
+
   const assignedLogisticsTaskIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const row of logisticsDriversAssignments) {
+    for (const row of displayedDriversAssignments) {
       for (const task of row?.tasks || []) {
         const tid = task?.task_id ?? task?.id;
         if (tid != null && tid !== "") ids.add(String(tid));
       }
     }
     return ids;
-  }, [logisticsDriversAssignments]);
+  }, [displayedDriversAssignments]);
 
   const earlyOutTasks = useMemo(() => {
     const assigned = assignedLogisticsTaskIds;
@@ -834,7 +920,7 @@ export default function GenerateLogisticsAssignments() {
   const mapTasks = useMemo(() => {
     const assigned: TaskType[] = [];
 
-    for (const row of logisticsDriversAssignments) {
+    for (const row of displayedDriversAssignments) {
       const driverId = Number(row?.driver?.id);
       if (!Number.isFinite(driverId)) continue;
       for (const task of row?.tasks || []) {
@@ -843,7 +929,7 @@ export default function GenerateLogisticsAssignments() {
     }
 
     return [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks, ...assigned];
-  }, [earlyOutTasks, highPriorityTasks, lowPriorityTasks, logisticsDriversAssignments]);
+  }, [earlyOutTasks, highPriorityTasks, lowPriorityTasks, displayedDriversAssignments]);
   const assignmentStatistics = useMemo(
     () => computeAssignmentTaskStatisticsFromTasks(mapTasks, "logistics"),
     [mapTasks]
@@ -873,6 +959,8 @@ export default function GenerateLogisticsAssignments() {
   useEffect(() => {
     setContainersManuallyCollapsed(false);
     setContainersForcedOpen(false);
+    setLogisticsHypotheses([]);
+    setPreviewHypothesisId(null);
   }, [selectedDate]);
 
   useEffect(() => {
@@ -891,10 +979,10 @@ export default function GenerateLogisticsAssignments() {
 
   const sequenceSummaryGroups = useMemo(() => {
     const groups = buildSequenceSummaryGroupsFromDriverAssignments(
-      logisticsDriversAssignments,
+      displayedDriversAssignments,
       format(selectedDate, "yyyy-MM-dd")
     );
-    const order = logisticsDrivers.map((driver) => driver.id);
+    const order = displayedDrivers.map((driver) => driver.id);
     if (order.length === 0) return groups;
 
     const byId = new Map(groups.map((group) => [group.id, group]));
@@ -909,17 +997,17 @@ export default function GenerateLogisticsAssignments() {
     }
 
     return ordered;
-  }, [logisticsDriversAssignments, logisticsDrivers]);
+  }, [displayedDriversAssignments, displayedDrivers, selectedDate]);
 
   const allTasksWithAssignments = useMemo(() => {
     const timelineTasks: TaskType[] = [];
-    for (const row of logisticsDriversAssignments) {
+    for (const row of displayedDriversAssignments) {
       for (const t of row.tasks || []) {
         timelineTasks.push(timelineRowToTaskType(t, "low"));
       }
     }
     return [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks, ...timelineTasks];
-  }, [earlyOutTasks, highPriorityTasks, lowPriorityTasks, logisticsDriversAssignments]);
+  }, [earlyOutTasks, highPriorityTasks, lowPriorityTasks, displayedDriversAssignments]);
 
   const saveLogisticsAssignment = async (
     taskId: string,
@@ -997,6 +1085,15 @@ export default function GenerateLogisticsAssignments() {
     async (operation: DndDropOperation) => {
       if (operation.type === "noop") return;
       if (isDraggingRef.current || isLoadingDragDrop) return;
+
+      if (isHypothesisPreview) {
+        toast({
+          title: "Anteprima",
+          description: "Applica l'ipotesi prima di modificare i giri.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       if (isTimelineReadOnly) {
         toast({
@@ -1128,6 +1225,7 @@ export default function GenerateLogisticsAssignments() {
     },
     [
       allTasksWithAssignments,
+      isHypothesisPreview,
       isTimelineReadOnly,
       isLoadingDragDrop,
       reloadLogisticsPage,
@@ -1256,7 +1354,7 @@ export default function GenerateLogisticsAssignments() {
               <Button
                 variant="ghost"
                 size="sm"
-                disabled={isRunningLogisticsOptimizer}
+                disabled={isRunningLogisticsOptimizer || isHypothesisPreview}
                 onClick={() => void handleRunLogisticsOptimizer()}
                 className="flex items-center gap-2 rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
                 data-testid="button-run-logistics-optimizer"
@@ -1276,6 +1374,17 @@ export default function GenerateLogisticsAssignments() {
             </div>
           </div>
         </div>
+
+        {isHypothesisPreview && selectedHypothesis && (
+          <LogisticsHypothesisSwitcher
+            hypotheses={logisticsHypotheses}
+            selectedId={selectedHypothesis.summary.id}
+            applyingId={applyingHypothesisId}
+            onSelect={setPreviewHypothesisId}
+            onApply={(hypothesis) => void applyLogisticsHypothesis(hypothesis)}
+            onCancel={clearHypothesisPreview}
+          />
+        )}
 
         <DndContext
           sensors={logisticsDnd.sensors}
@@ -1308,7 +1417,7 @@ export default function GenerateLogisticsAssignments() {
                     workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="early-out"
                     icon="clock"
-                    isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
+                    isDragDisabled={isTimelineReadOnly || isHypothesisPreview || isLoadingDragDrop}
                     disableToolbar
                     flushDropZone
                     operationsScope="logistics"
@@ -1322,7 +1431,7 @@ export default function GenerateLogisticsAssignments() {
                     workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="high"
                     icon="alert-circle"
-                    isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
+                    isDragDisabled={isTimelineReadOnly || isHypothesisPreview || isLoadingDragDrop}
                     disableToolbar
                     flushDropZone
                     operationsScope="logistics"
@@ -1336,7 +1445,7 @@ export default function GenerateLogisticsAssignments() {
                     workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="low"
                     icon="arrow-down"
-                    isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
+                    isDragDisabled={isTimelineReadOnly || isHypothesisPreview || isLoadingDragDrop}
                     disableToolbar
                     flushDropZone
                     operationsScope="logistics"
@@ -1370,10 +1479,10 @@ export default function GenerateLogisticsAssignments() {
               <div className="relative">
                 <LogisticsTimelineView
                   workDate={format(selectedDate, "yyyy-MM-dd")}
-                  drivers={logisticsDrivers}
-                  driversAssignments={logisticsDriversAssignments}
+                  drivers={displayedDrivers}
+                  driversAssignments={displayedDriversAssignments}
                   searchTask={searchTask}
-                  isReadOnly={isTimelineReadOnly}
+                  isReadOnly={isTimelineReadOnly || isHypothesisPreview}
                   isLoadingOverlay={isLoadingDragDrop}
                   draggingOverDriverId={draggingOverDriverId}
                   activeDragDriverId={activeDragDriverId}
@@ -1441,7 +1550,7 @@ export default function GenerateLogisticsAssignments() {
               groups={sequenceSummaryGroups}
               searchTask={searchTask}
               staffLabel="Driver"
-              isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
+              isDragDisabled={isTimelineReadOnly || isHypothesisPreview || isLoadingDragDrop}
               loadingDriverIds={
                 isLoadingDragDrop ? logisticsDrivers.map((driver) => driver.id) : []
               }
@@ -1453,8 +1562,8 @@ export default function GenerateLogisticsAssignments() {
           )}
           <DndRemoveZone
             scope="logistics"
-            visible={isDraggingTimelineTask && !isTimelineReadOnly && !isLoadingDragDrop}
-            disabled={isTimelineReadOnly || isLoadingDragDrop}
+            visible={isDraggingTimelineTask && !isTimelineReadOnly && !isHypothesisPreview && !isLoadingDragDrop}
+            disabled={isTimelineReadOnly || isHypothesisPreview || isLoadingDragDrop}
           />
           <TaskCardDragOverlay
             activeItem={logisticsDnd.activeItem}
@@ -1467,7 +1576,15 @@ export default function GenerateLogisticsAssignments() {
           />
         </DndContext>
 
-        <AssignmentLoadingDialog open={isRunningLogisticsOptimizer} />
+        <AssignmentLoadingDialog
+          open={isRunningLogisticsOptimizer}
+          title={applyingHypothesisId ? "Applico l'ipotesi" : "Calcolo delle ipotesi"}
+          description={
+            applyingHypothesisId
+              ? "Attendere, il giro scelto viene scritto in timeline."
+              : "Attendere, sto calcolando 4 giri per zona e le anteprime in timeline. Non chiudere la pagina."
+          }
+        />
 
         <Dialog
           open={showMissingLogisticsKindWarningDialog}
