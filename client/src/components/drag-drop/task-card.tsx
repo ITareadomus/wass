@@ -1134,6 +1134,14 @@ const displayClickableInputClass =
     isReadOnly ||
     resolvePreAssignedModeFromTask(displayTask) === "readonly" ||
     Boolean((displayTask as any).is_finished ?? (displayTask as any).isFinished);
+  // Eccezione: un task readonly con durata 0 si può comunque valorizzare.
+  // Resta chiuso se la giornata è bloccata o la task è già finita.
+  const canEditZeroDurationOnReadonly =
+    getDisplayedCleaningMinutes(displayTask) <= 0 &&
+    !isReadOnly &&
+    resolvePreAssignedModeFromTask(displayTask) === "readonly" &&
+    !Boolean((displayTask as any).is_finished ?? (displayTask as any).isFinished);
+  const canEditDuration = !displayTaskReadOnly || canEditZeroDurationOnReadonly;
   const shownDialogLocked =
     dialogLockTaskKey === dialogTaskKey ? dialogIsLocked : displayTaskLocked;
   const shownDialogLockedReason =
@@ -3272,28 +3280,33 @@ const displayClickableInputClass =
               <div className="self-start">
                 <p className={cn("text-sm font-semibold text-muted-foreground flex items-center gap-1", !isLogisticsTimelineDetails && "mb-1")}>
                   Durata pulizia
-                  {!isTaskReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  {canEditDuration && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
                 <Input
                   readOnly
                   value={`${formatCleaningHours(getDisplayedCleaningMinutes(displayTask))} ore`}
                   className={
-                    isTaskReadOnly
-                      ? displayInputClass
-                      : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
+                    canEditDuration
+                      ? cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
+                      : displayInputClass
                   }
-                  tabIndex={isTaskReadOnly ? -1 : 0}
+                  tabIndex={canEditDuration ? 0 : -1}
                   onFocus={(e) => {
-                    if (isTaskReadOnly) e.currentTarget.blur();
+                    if (!canEditDuration) e.currentTarget.blur();
                   }}
                   onMouseDown={(e) => {
                     e.preventDefault();
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!isTaskReadOnly) handleOpenDurationDialog();
+                    if (canEditDuration) handleOpenDurationDialog();
                   }}
                 />
+                {canEditZeroDurationOnReadonly && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Durata a zero: puoi impostarla anche su questo task in sola lettura.
+                  </p>
+                )}
               </div>
             </div>
 
