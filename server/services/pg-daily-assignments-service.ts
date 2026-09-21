@@ -2413,7 +2413,13 @@ export class PgDailyAssignmentsService {
         if (row.address) task.address = row.address;
         if (row.lat !== null) task.lat = String(row.lat);
         if (row.lng !== null) task.lng = String(row.lng);
-        if (row.cleaning_time) task.cleaning_time = row.cleaning_time;
+        if (row.cleaning_time != null) {
+          const cleaningMinutes = Number(row.cleaning_time) || 0;
+          task.cleaning_time = cleaningMinutes;
+          const hours = Math.floor(cleaningMinutes / 60);
+          const mins = cleaningMinutes % 60;
+          task.duration = `${hours}.${String(mins).padStart(2, "0")}`;
+        }
         task.checkin_date = normalizeDateToYmd(row.checkin_date) ?? undefined;
         task.checkout_date = normalizeDateToYmd(row.checkout_date) ?? undefined;
         if (row.checkin_time) task.checkin_time = row.checkin_time.substring(0, 5);
@@ -2600,7 +2606,13 @@ export class PgDailyAssignmentsService {
         if (row.address) task.address = row.address;
         if (row.lat !== null) task.lat = String(row.lat);
         if (row.lng !== null) task.lng = String(row.lng);
-        if (row.cleaning_time) task.cleaning_time = row.cleaning_time;
+        if (row.cleaning_time != null) {
+          const cleaningMinutes = Number(row.cleaning_time) || 0;
+          task.cleaning_time = cleaningMinutes;
+          const hours = Math.floor(cleaningMinutes / 60);
+          const mins = cleaningMinutes % 60;
+          task.duration = `${hours}.${String(mins).padStart(2, "0")}`;
+        }
         task.checkin_date = normalizeDateToYmd(row.checkin_date) ?? undefined;
         task.checkout_date = normalizeDateToYmd(row.checkout_date) ?? undefined;
         if (row.checkin_time) task.checkin_time = row.checkin_time.substring(0, 5);

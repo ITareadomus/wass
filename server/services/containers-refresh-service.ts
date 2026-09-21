@@ -2,6 +2,11 @@ import { exec } from 'child_process';
 import path from 'path';
 import * as workspaceFiles from './workspace-files';
 import {
+  collectManualCleaningTimeOverrides,
+  restoreManualCleaningTimeOverrides,
+  type ManualCleaningTimeOverride,
+} from '../../shared/wass-cleaning-time';
+import {
   syncTimelineAssignmentsFromAdam,
   type AssignmentSyncResult,
   type RefreshSyncMode,
@@ -134,6 +139,7 @@ export async function refreshContainersFromAdam(
     mode?: RefreshSyncMode;
     /** Skip create_containers (e.g. retry after apt already refreshed). */
     skipContainersRefresh?: boolean;
+    extraManualOverrides?: Map<number, ManualCleaningTimeOverride>;
   } = {}
 ): Promise<RefreshContainersResult> {
   const lockKey = `${workflow}:${workDate}`;
@@ -164,6 +170,7 @@ async function runRefreshContainersFromAdam(
   options: {
     mode?: RefreshSyncMode;
     skipContainersRefresh?: boolean;
+    extraManualOverrides?: Map<number, ManualCleaningTimeOverride>;
   }
 ): Promise<RefreshContainersResult> {
   const mode: RefreshSyncMode = options.mode === 'assignments' ? 'assignments' : 'apt';
@@ -174,6 +181,18 @@ async function runRefreshContainersFromAdam(
     let removedCount = 0;
 
     if (!options.skipContainersRefresh) {
+      const previousContainers = await workspaceFiles.loadContainers(workDate, workflow);
+      const previousTimeline = await workspaceFiles.loadTimeline(workDate, workflow);
+      const manualOverrides = collectManualCleaningTimeOverrides(
+        previousContainers,
+        previousTimeline
+      );
+      if (options.extraManualOverrides) {
+        for (const [taskId, override] of options.extraManualOverrides.entries()) {
+          manualOverrides.set(taskId, override);
+        }
+      }
+
       const createContainersPath = path.join(process.cwd(), 'client/public/scripts/create_containers.py');
 
       const workflowArg = workflow === 'office' ? ' --workflow office' : '';
@@ -245,6 +264,16 @@ async function runRefreshContainersFromAdam(
           containersData.summary.early_out +
           containersData.summary.high_priority +
           containersData.summary.low_priority;
+      }
+
+      const restoredManual = restoreManualCleaningTimeOverrides(
+        containersData,
+        manualOverrides
+      );
+      if (restoredManual > 0) {
+        console.log(
+          `🔒 Restore durata WASS manuale su ${restoredManual} task nei containers dopo refresh ADAM`
+        );
       }
 
       await workspaceFiles.saveContainers(

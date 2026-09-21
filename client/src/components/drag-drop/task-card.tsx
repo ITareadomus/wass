@@ -25,6 +25,10 @@ import {
   resolveHousekeepingWorkProgress,
   type HousekeepingTaskExecutionStatus,
 } from "@shared/housekeeping-task-execution-status";
+import {
+  hasManualCleaningTime,
+  splitCleaningTimeAcrossCollaborators,
+} from "@shared/wass-cleaning-time";
 import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
 import {
   DIALOG_SECTION_CORNER_BADGE_WRAP_CLASS,
@@ -167,12 +171,36 @@ const applyPendingEdits = (task: any): any => {
     checkin_time: edits.checkinTime !== undefined ? edits.checkinTime : task.checkin_time,
     pax_in: edits.paxIn !== undefined ? edits.paxIn : task.pax_in,
     operation_id: operationIdToUse,
-    // Converti cleaningTime in duration formato "H.MM"
-    duration: edits.cleaningTime !== undefined 
-      ? `${Math.floor(edits.cleaningTime / 60)}.${String(edits.cleaningTime % 60).padStart(2, '0')}`
-      : task.duration,
+    // cleaning_time/duration NON arrivano da qui: la durata passa sempre dal
+    // server, altrimenti una modifica vecchia in cache contraddice la barra.
     _hasPendingEdits: true, // Flag per indicare che ha modifiche pendenti
   };
+};
+
+// Minuti del singolo cleaner: in collaborazione è già la quota divisa.
+const getDisplayedCleaningMinutes = (taskObj: any): number => {
+  const direct = Number(taskObj?.cleaning_time ?? taskObj?.cleaningTime);
+  if (Number.isFinite(direct) && direct > 0) return Math.round(direct);
+  const duration = String(taskObj?.duration || "0.0");
+  const [hours, mins] = duration.split(".").map(Number);
+  return (hours || 0) * 60 + (mins || 0);
+};
+
+const getCollaboratorCount = (taskObj: any): number => {
+  const count = Number(taskObj?.collaborator_count);
+  return Number.isFinite(count) && count > 1 ? Math.round(count) : 1;
+};
+
+// Minuti dell'intero appartamento, indipendenti da quanti cleaner ci lavorano.
+const getTotalCleaningMinutes = (taskObj: any): number => {
+  const base = Number(taskObj?.base_cleaning_time);
+  if (Number.isFinite(base) && base > 0) return Math.round(base);
+  return getDisplayedCleaningMinutes(taskObj) * getCollaboratorCount(taskObj);
+};
+
+const formatCleaningHours = (minutes: unknown): string => {
+  const total = Math.max(0, Math.round(Number(minutes) || 0));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 };
 
 // Normalizza data nel formato YYYY-MM-DD per il picker HTML5
@@ -978,6 +1006,10 @@ const displayClickableInputClass =
   const [editingCheckinTimeInDialog, setEditingCheckinTimeInDialog] = useState("");
   const [isSavingCheckin, setIsSavingCheckin] = useState(false);
 
+  const [durationDialogOpen, setDurationDialogOpen] = useState(false);
+  const [editingDurationInDialog, setEditingDurationInDialog] = useState("");
+  const [isSavingDuration, setIsSavingDuration] = useState(false);
+
   // Dialog Tipologia intervento
   const [operationDialogOpen, setOperationDialogOpen] = useState(false);
   const [editingOperationIdInDialog, setEditingOperationIdInDialog] = useState("");
@@ -993,6 +1025,18 @@ const displayClickableInputClass =
   // Stato per i collaboratori caricati
   const [taskCollaborators, setTaskCollaborators] = useState<any[]>([]);
   const [isLoadingCollabs, setIsLoadingCollabs] = useState(false);
+  // Durata nominale del task vs lavoro distribuito fra i collaboratori
+  const [collaborationTotals, setCollaborationTotals] = useState<{
+    baseCleaningTime: number;
+    assignedTotalMinutes: number;
+    hasManualSplit: boolean;
+  } | null>(null);
+  const [collaboratorsVersion, setCollaboratorsVersion] = useState(0);
+
+  // Dialog per sbilanciare la quota di un singolo collaboratore
+  const [shareDialogCleaner, setShareDialogCleaner] = useState<any | null>(null);
+  const [editingShareMinutes, setEditingShareMinutes] = useState("");
+  const [isSavingShare, setIsSavingShare] = useState(false);
 
   // CRITICAL: Applica le pending edits alla task per la visualizzazione nella card
   const taskWithPendingEdits = React.useMemo(() => applyPendingEdits(task), [task, pendingEditsVersion]);
@@ -1146,13 +1190,20 @@ const displayClickableInputClass =
         if (cancelled) return;
         if (data.success) {
           setTaskCollaborators(Array.isArray(data.collaborators) ? data.collaborators : []);
+          setCollaborationTotals({
+            baseCleaningTime: Number(data.baseCleaningTime) || 0,
+            assignedTotalMinutes: Number(data.assignedTotalMinutes) || 0,
+            hasManualSplit: data.hasManualSplit === true,
+          });
         } else {
           setTaskCollaborators([]);
+          setCollaborationTotals(null);
         }
       } catch (error) {
         if (!cancelled) {
           console.error("Errore caricamento collaboratori:", error);
           setTaskCollaborators([]);
+          setCollaborationTotals(null);
         }
       } finally {
         if (!cancelled) {
@@ -1165,7 +1216,7 @@ const displayClickableInputClass =
     return () => {
       cancelled = true;
     };
-  }, [isModalOpen, dialogTaskId, effectiveWorkDate]);
+  }, [isModalOpen, dialogTaskId, effectiveWorkDate, collaboratorsVersion]);
 
   console.log('🔍 Stato navigazione:', {
     currentTaskId,
@@ -1954,7 +2005,6 @@ const displayClickableInputClass =
         checkoutTime: editedCheckoutTime || null,  // null se vuoto
         checkinDate: editedCheckinDate || null,    // null se vuoto
         checkinTime: editedCheckinTime || null,    // null se vuoto
-        cleaningTime: parseInt(editedDuration),
         paxIn: parseInt(editedPaxIn),
         paxOut: displayTask.pax_out,
         operationId: operationIdValue,
@@ -1983,7 +2033,6 @@ const displayClickableInputClass =
           checkoutTime: editedCheckoutTime || null,
           checkinDate: editedCheckinDate || null,
           checkinTime: editedCheckinTime || null,
-          cleaningTime: parseInt(editedDuration),
           paxIn: parseInt(editedPaxIn),
           operationId: operationIdValue,
           date: workDate,
@@ -2187,6 +2236,130 @@ const displayClickableInputClass =
       });
     } finally {
       setIsSavingPaxIn(false);
+    }
+  };
+
+  const handleOpenDurationDialog = () => {
+    setEditingDurationInDialog(String(getTotalCleaningMinutes(displayTask) || ""));
+    setDurationDialogOpen(true);
+  };
+
+  const handleSaveDuration = async () => {
+    const value = parseInt(editingDurationInDialog, 10);
+    if (isNaN(value) || value <= 0) {
+      toast({
+        title: "Errore di validazione",
+        description: "La durata della pulizia deve essere maggiore di 0 minuti",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSavingDuration(true);
+    try {
+      const taskKey = getTaskKey(displayTask);
+      const durationCollaboratorCount = getCollaboratorCount(displayTask);
+      const workDate = effectiveWorkDate;
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const response = await fetch("/api/update-task-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withMutationScope({
+          taskId: (displayTask as any).task_id || displayTask.id,
+          logisticCode: displayTask.name,
+          cleaningTime: value,
+          cleaningTimeModified: true,
+          date: workDate,
+          modified_by: currentUser.username || "unknown",
+          skipAdam: true,
+        }, operationsScope)),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Errore nel salvataggio");
+      }
+
+      // Scarta la durata rimasta in cache: da qui in poi vale solo quella del server.
+      const existingEdits = JSON.parse(sessionStorage.getItem("pending_task_edits") || "{}");
+      if (existingEdits[taskKey]?.cleaningTime !== undefined) {
+        delete existingEdits[taskKey].cleaningTime;
+        sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
+      }
+
+      toast({
+        title: "Durata pulizia aggiornata",
+        description:
+          durationCollaboratorCount > 1
+            ? `${formatCleaningHours(value)} ore in totale, ${formatCleaningHours(
+                splitCleaningTimeAcrossCollaborators(value, durationCollaboratorCount)
+              )} per ciascuno dei ${durationCollaboratorCount} cleaner. Non viene inviata ad ADAM.`
+            : "Valore salvato solo su WASS. Non viene inviato ad ADAM.",
+      });
+      setDurationDialogOpen(false);
+      setPendingEditsVersion((v) => v + 1);
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile salvare la durata pulizia",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDuration(false);
+    }
+  };
+
+  const handleOpenShareDialog = (collaborator: any) => {
+    setShareDialogCleaner(collaborator);
+    setEditingShareMinutes(String(Number(collaborator?.cleaningTime) || ""));
+  };
+
+  const handleSaveCollaboratorShare = async () => {
+    const value = parseInt(editingShareMinutes, 10);
+    if (isNaN(value) || value <= 0) {
+      toast({
+        title: "Errore di validazione",
+        description: "La durata del collaboratore deve essere maggiore di 0 minuti",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSavingShare(true);
+    try {
+      const response = await fetch(
+        `/api/tasks/${dialogTaskId}/collaborators/cleaning-time`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(withMutationScope({
+            date: effectiveWorkDate,
+            cleanerId: Number(shareDialogCleaner?.id),
+            cleaningTime: value,
+          }, operationsScope)),
+        }
+      );
+      const result = await response.json().catch(() => ({} as any));
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Errore nel salvataggio");
+      }
+      toast({
+        title: "Durata collaboratore aggiornata",
+        description: `${shareDialogCleaner?.alias || "Cleaner"}: ${formatCleaningHours(value)} ore. Totale distribuito ${formatCleaningHours(result.assignedTotalMinutes)} ore.`,
+      });
+      setShareDialogCleaner(null);
+      setCollaboratorsVersion((v) => v + 1);
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile salvare la durata del collaboratore",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingShare(false);
     }
   };
 
@@ -3007,6 +3180,10 @@ const displayClickableInputClass =
     if (!primary) return "";
     return String(primary.alias ?? primary.name ?? (primary.id != null ? `Cleaner ${primary.id}` : "")).trim();
   })();
+  // Le quote per-cleaner esistono solo per le task housekeeping in timeline.
+  const hasCollaborationShares =
+    taskCollaborators.length > 0 &&
+    (collaborationTotals?.assignedTotalMinutes ?? 0) > 0;
   const collaboratorLabels = taskCollaborators
     .map((c: any) => String(c?.alias ?? c?.name ?? (c?.id != null ? `Cleaner ${c.id}` : "")).trim())
     .filter((label: string) => label.length > 0);
@@ -3093,13 +3270,29 @@ const displayClickableInputClass =
                 />
               </div>
               <div className="self-start">
-                <p className={cn("text-sm font-semibold text-muted-foreground", !isLogisticsTimelineDetails && "mb-1")}>Durata pulizia</p>
+                <p className={cn("text-sm font-semibold text-muted-foreground flex items-center gap-1", !isLogisticsTimelineDetails && "mb-1")}>
+                  Durata pulizia
+                  {!isTaskReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                </p>
                 <Input
-                  value={`${(displayTask.duration || "0.0").replace(".", ":")} ore`}
                   readOnly
-                  className={displayInputClass}
-                  tabIndex={-1}
-                  onFocus={(e) => e.currentTarget.blur()}
+                  value={`${formatCleaningHours(getDisplayedCleaningMinutes(displayTask))} ore`}
+                  className={
+                    isTaskReadOnly
+                      ? displayInputClass
+                      : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
+                  }
+                  tabIndex={isTaskReadOnly ? -1 : 0}
+                  onFocus={(e) => {
+                    if (isTaskReadOnly) e.currentTarget.blur();
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isTaskReadOnly) handleOpenDurationDialog();
+                  }}
                 />
               </div>
             </div>
@@ -4154,16 +4347,64 @@ const displayClickableInputClass =
                 </span>
               </div>
               <p>
-                <strong>Durata originale:</strong> {(() => {
-                  const baseTime = (displayTask as any).base_cleaning_time || 0;
-                  const hours = Math.floor(baseTime / 60);
-                  const mins = baseTime % 60;
-                  return `${hours}:${String(mins).padStart(2, '0')} ore`;
-                })()}
+                <strong>Durata originale:</strong>{" "}
+                {formatCleaningHours(
+                  collaborationTotals?.baseCleaningTime || getTotalCleaningMinutes(displayTask)
+                )}{" "}
+                ore
               </p>
-              <p>
-                <strong>Durata per cleaner:</strong> {(displayTask.duration || "0.0").replace(".", ":")} ore
-              </p>
+              {hasCollaborationShares && (
+                <p>
+                  <strong>Durata distribuita:</strong>{" "}
+                  {formatCleaningHours(collaborationTotals!.assignedTotalMinutes)} ore
+                  {collaborationTotals!.assignedTotalMinutes !==
+                    collaborationTotals!.baseCleaningTime && (
+                    <span className="ml-1 text-xs">(somma delle quote)</span>
+                  )}
+                </p>
+              )}
+
+              {/* Quote dei singoli collaboratori: modificabili una per una */}
+              {hasCollaborationShares && (
+                <div className="mt-2 space-y-1">
+                  {taskCollaborators.map((collab: any) => (
+                    <div key={collab.id} className="flex items-center justify-between gap-2">
+                      <span className="truncate">
+                        {collab.alias || `Cleaner ${collab.id}`}
+                        {collab.isPrimary && (
+                          <span className="ml-1 text-blue-600 font-semibold text-xs">(P)</span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={isTaskReadOnly}
+                        onClick={() => handleOpenShareDialog(collab)}
+                        className={cn(
+                          "flex items-center gap-1 font-semibold",
+                          isTaskReadOnly
+                            ? "cursor-default"
+                            : "cursor-pointer hover:underline"
+                        )}
+                      >
+                        {formatCleaningHours(collab.cleaningTime)} ore
+                        {!isTaskReadOnly && <Pencil className="w-3 h-3 opacity-60" />}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {collaborationTotals?.hasManualSplit && (
+                <p className="text-xs mt-2">
+                  Quote sbilanciate a mano: non vengono più divise in parti uguali. Aggiungere o
+                  togliere un collaboratore le riporta alla divisione equa.
+                </p>
+              )}
+              {!collaborationTotals?.hasManualSplit && hasManualCleaningTime(displayTask) && (
+                <p className="text-xs mt-2">
+                  Durata impostata a mano in WASS: i refresh ADAM non la sovrascrivono.
+                </p>
+              )}
               {(displayTask as any).is_primary && (
                 <p className="text-blue-600 font-semibold mt-1">Questo cleaner è il Primary</p>
               )}
@@ -4186,6 +4427,158 @@ const displayClickableInputClass =
           ) : (
             <p className="text-sm text-muted-foreground mt-2">Nessuna collaborazione attiva per questa task.</p>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog quota del singolo collaboratore - solo WASS, non inviata ad ADAM */}
+      <Dialog
+        open={shareDialogCleaner != null}
+        onOpenChange={(open) => !open && setShareDialogCleaner(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-custom-blue" />
+              Durata di {shareDialogCleaner?.alias || "questo cleaner"}
+            </DialogTitle>
+            <DialogDescription>
+              Quanto lavora questo collaboratore su questa task. Gli altri collaboratori non
+              vengono toccati: la durata distribuita diventa la somma delle quote.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm font-semibold text-muted-foreground mb-2 block">
+                Durata di questo cleaner (minuti)
+              </label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={editingShareMinutes}
+                onChange={(e) => setEditingShareMinutes(e.target.value.replace(/\D/g, ""))}
+                placeholder="es. 180"
+                className="w-full"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveCollaboratorShare();
+                }}
+              />
+            </div>
+            <p className="text-xs text-purple-600 dark:text-purple-400">
+              {(() => {
+                const next = parseInt(editingShareMinutes, 10);
+                const others = taskCollaborators
+                  .filter((c: any) => Number(c.id) !== Number(shareDialogCleaner?.id))
+                  .reduce((sum: number, c: any) => sum + (Number(c.cleaningTime) || 0), 0);
+                if (!Number.isFinite(next) || next <= 0) {
+                  return "Gli altri collaboratori mantengono la loro quota attuale.";
+                }
+                return `Durata distribuita: ${formatCleaningHours(others + next)} ore in totale.`;
+              })()}
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setShareDialogCleaner(null)}
+              disabled={isSavingShare}
+            >
+              Annulla
+            </Button>
+            <Button onClick={handleSaveCollaboratorShare} disabled={isSavingShare}>
+              {isSavingShare ? "Salvataggio..." : "Salva"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Modifica Durata pulizia - solo WASS, non inviata ad ADAM */}
+      <Dialog open={durationDialogOpen} onOpenChange={(open) => !open && setDurationDialogOpen(false)}>
+        <DialogContent className="sm:max-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-custom-blue" />
+              Modifica Durata pulizia
+            </DialogTitle>
+            <DialogDescription>
+              Task <strong>#{getTaskKey(displayTask)}</strong> — Inserisci la durata dell'appartamento in minuti. Il valore resta solo su WASS.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm font-semibold text-muted-foreground mb-2 block">
+                Durata totale (minuti)
+              </label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={editingDurationInDialog}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, "");
+                  setEditingDurationInDialog(v);
+                }}
+                placeholder="es. 90"
+                className="w-full"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveDuration();
+                }}
+              />
+            </div>
+            {hasCollaboration && (
+              <p className="text-xs text-purple-600 dark:text-purple-400">
+                {(() => {
+                  const total = parseInt(editingDurationInDialog, 10);
+                  const count = getCollaboratorCount(displayTask);
+                  if (!Number.isFinite(total) || total <= 0) {
+                    return `Durata divisa fra i ${count} cleaner in collaborazione. Non verrà più presa da ADAM.`;
+                  }
+                  const perCleaner = splitCleaningTimeAcrossCollaborators(total, count);
+                  const resplitWarning = collaborationTotals?.hasManualSplit
+                    ? " Le quote sbilanciate a mano tornano alla divisione equa."
+                    : "";
+                  return `${total} minuti in totale → ${formatCleaningHours(perCleaner)} ore a testa su ${count} cleaner. Non verrà più presa da ADAM.${resplitWarning}`;
+                })()}
+              </p>
+            )}
+            {!hasCollaboration && hasManualCleaningTime(displayTask) && (
+              <p className="text-xs text-muted-foreground">
+                Durata già impostata in WASS: i refresh ADAM non la sovrascrivono.
+              </p>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDurationDialogOpen(false)}
+              disabled={isSavingDuration}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSaveDuration}
+              disabled={isSavingDuration}
+              className="border-2 border-custom-blue"
+            >
+              {isSavingDuration ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Salvataggio...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Salva
+                </>
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -4643,13 +5036,20 @@ const displayClickableInputClass =
                   La collaborazione verrà rimossa e la task tornerà nei containers con la durata originale.
                 </p>
                 <div className="bg-purple-50 dark:bg-purple-900/20 rounded p-3 mb-3 text-sm">
-                  <p><strong>Durata originale:</strong> {(() => {
-                    const baseTime = (displayTask as any).base_cleaning_time || 0;
-                    const hours = Math.floor(baseTime / 60);
-                    const mins = baseTime % 60;
-                    return `${hours}:${String(mins).padStart(2, '0')} ore`;
-                  })()}</p>
-                  <p><strong>Durata attuale per cleaner:</strong> {(displayTask.duration || "0.0").replace(".", ":")} ore</p>
+                  <p>
+                    <strong>Durata al rientro:</strong>{" "}
+                    {formatCleaningHours(
+                      collaborationTotals?.baseCleaningTime ||
+                        getTotalCleaningMinutes(displayTask)
+                    )}{" "}
+                    ore
+                  </p>
+                  {collaborationTotals?.hasManualSplit && (
+                    <p className="text-xs">
+                      Lo sbilanciamento delle quote va perso: la task torna con la sua durata
+                      originale.
+                    </p>
+                  )}
                   <p><strong>Cleaners coinvolti:</strong> {(displayTask as any).collaborator_count || 0}</p>
                 </div>
               </div>
