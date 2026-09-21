@@ -10762,13 +10762,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           error: "Si può spostare solo il primo appartamento del cleaner",
         });
       }
-      if (isReadonlyPreassignedTask(firstTask)) {
-        return res.status(423).json({
-          success: false,
-          error: "PREASSIGNED_READONLY",
-          message: "Task pre-assegnata readonly: operazione non consentita",
-        });
-      }
+      // I task readonly possono usare lo scatto da 30 minuti: sposta solo l'orario
+      // di inizio in WASS, non il cleaner e non i dati ADAM.
 
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const isLocked = await pgDailyAssignmentsService.isTaskLocked(workDate, Number(taskId));

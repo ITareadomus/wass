@@ -3168,8 +3168,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           enabled={
                                             seq === 1 &&
                                             !hideRouteSpacers &&
-                                            !isTimelineInteractionDisabled &&
-                                            !isReadonlyPreassignedTask(task)
+                                            !isTimelineInteractionDisabled
                                           }
                                           isPinned={Boolean(taskObj.manual_start_time)}
                                           startTime={
