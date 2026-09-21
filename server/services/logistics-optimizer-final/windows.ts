@@ -21,9 +21,14 @@ import {
   type RuleTrace,
 } from "./business-rules";
 import { resolveEoEarlyDecision } from "./priority-route-compatibility";
+import {
+  classifyLogisticsTaskUrgency,
+  resolveLooseDpPreferredStartMin,
+  TASK_URGENCY_CONFIG,
+} from "./task-urgency";
 
 export const DRIVER_BRINGS_BAG_TOLERANCE_REASON =
-  "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE" as const;
+  "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_120_PERCENT_TOLERANCE" as const;
 
 export interface BuildTaskWindowInput {
   taskId: number;
@@ -79,6 +84,7 @@ function addPriorityWindow(
   context: {
     customerCheckinMin: Minutes | null;
     cleanerTaskStartMin: Minutes | null;
+    earliestStartMin: Minutes;
     latestStartMin: Minutes;
   }
 ): void {
@@ -98,6 +104,8 @@ function addPriorityWindow(
       customerCheckinMin: context.customerCheckinMin,
       cleanerTaskStartMin: context.cleanerTaskStartMin,
       latestStartMin: context.latestStartMin,
+      cleaningTimeMin: input.cleaningTime,
+      earliestStartMin: context.earliestStartMin,
     });
     if (!decision) return;
 
@@ -201,8 +209,47 @@ export function buildTaskWindow(input: BuildTaskWindowInput): BuiltTaskWindow {
   addPriorityWindow(input, softWindows, ruleTrace, {
     customerCheckinMin,
     cleanerTaskStartMin,
+    earliestStartMin,
     latestStartMin,
   });
+
+  if (
+    requiresDriverBeforeCleaner(input.logisticsTaskKind) &&
+    classifyLogisticsTaskUrgency({
+      priority: input.priority,
+      logisticsTaskKind: input.logisticsTaskKind,
+      cleaningTimeMin: input.cleaningTime,
+      earliestStartMin,
+      latestStartMin,
+      customerCheckinMin,
+      cleanerTaskStartMin,
+    }) === "loose" &&
+    latestStartMin > TASK_URGENCY_CONFIG.defaultDayStartMin + 30
+  ) {
+    const preferredStartMin = resolveLooseDpPreferredStartMin({
+      earliestStartMin: Math.max(earliestStartMin, TASK_URGENCY_CONFIG.defaultDayStartMin),
+      latestStartMin,
+    });
+    if (preferredStartMin > earliestStartMin) {
+      softWindows.push({
+        type: "preferred_start",
+        startMin: preferredStartMin,
+        endMin: latestStartMin,
+        penaltyPerMin: TASK_URGENCY_CONFIG.looseDpEarlyPenaltyPerMin,
+        preferLater: true,
+        reason: "LOOSE_DP_DEFER_SOFT_PREFERENCE",
+      });
+      ruleTrace.push({
+        code: "LOOSE_DP_DEFER_SOFT_PREFERENCE",
+        value: {
+          preferredStartMin,
+          earliestStartMin,
+          latestStartMin,
+        },
+      });
+    }
+  }
+
   const latestEndMin = Math.min(...latestEndCandidates);
   const hardWindow: TaskHardWindow = {
     earliestStartMin,

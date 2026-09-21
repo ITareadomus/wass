@@ -167,7 +167,7 @@ describe("business rules", () => {
         cleaningTimeMin: 60,
       })
     ).toMatchObject({
-      value: 880,
+      value: 912,
       trace: [{ code: DRIVER_BRINGS_BAG_TOLERANCE_REASON }],
     });
 
@@ -222,16 +222,16 @@ describe("business rules", () => {
 });
 
 describe("buildTaskWindow", () => {
-  it("allows DRIVER_BRINGS_BAG until cleaner start + 2/3 cleaning time", () => {
+  it("allows DRIVER_BRINGS_BAG until cleaner start + 120% cleaning time", () => {
     expect(
       resolveDriverBringsBagLatestStartMin({
         cleanerTaskStartMin: 840,
         cleaningTimeMin: 60,
       }).value
-    ).toBe(880);
+    ).toBe(912);
   });
 
-  it("keeps route-compatible EO early soft and HP/LP lower bounds hard", () => {
+  it("does not force ordinary EO to start early", () => {
     const eo = buildTaskWindow({
       taskId: 1,
       priority: "EO",
@@ -264,8 +264,8 @@ describe("buildTaskWindow", () => {
     });
 
     expect(eo.hardWindow.earliestStartMin).toBe(0);
-    expect(eo.softWindows[0]?.reason).toBe("EO_EARLY_IF_ROUTE_COMPATIBLE_SOFT_PREFERENCE");
-    expect(eo.ruleTrace.some((trace) => trace.code === "EO_EARLY_ROUTE_COMPATIBLE")).toBe(true);
+    expect(eo.softWindows).toEqual([]);
+    expect(eo.ruleTrace.some((trace) => trace.code === "EO_EARLY_FLEXIBLE_SUPPRESSED")).toBe(true);
     expect(hp.hardWindow.earliestStartMin).toBe(660);
   });
 
@@ -311,6 +311,30 @@ describe("buildTaskWindow", () => {
     expect(result.softWindows[0]?.reason).toBe("EO_EARLY_URGENT_SOFT_PREFERENCE");
     expect(result.softWindows[0]?.penaltyPerMin).toBe(1);
     expect(result.ruleTrace.some((trace) => trace.code === "EO_EARLY_URGENT")).toBe(true);
+  });
+
+  it("does not let a long non-urgent D&P take early pressure", () => {
+    const result = buildTaskWindow({
+      taskId: 41,
+      priority: "EO",
+      logisticsTaskKind: "delivery/pick-up",
+      workDate: "2026-06-04",
+      cleaningTime: 360,
+      checkoutDate: null,
+      checkoutTime: null,
+      checkinDate: null,
+      checkinTime: null,
+      cleanerStartTime: "10:00",
+      cleanerTaskStartTime: "10:00",
+      priorityWindows,
+      dayEndMin: 1200,
+    });
+
+    expect(result.ruleTrace.some((trace) => trace.code === "EO_EARLY_URGENT")).toBe(false);
+    expect(result.ruleTrace.some((trace) => trace.code === "LOOSE_DP_DEFER_SOFT_PREFERENCE")).toBe(
+      true
+    );
+    expect(result.softWindows.some((window) => window.preferLater === true)).toBe(true);
   });
 
   it("does not treat a late-evening check-in EO as urgent", () => {
@@ -502,7 +526,7 @@ describe("buildTaskWindow", () => {
     expect(checkout.hardWindow.earliestStartMin).not.toBeLessThan(720);
     expect(checkout.hardWindow.latestEndMin).toBe(780);
     expect(checkout.hardConstraints.map((constraint) => constraint.type)).not.toContain("CHECKOUT_MAX_WAIT");
-    expect(cleaner.hardWindow.latestStartMin).toBe(640);
+    expect(cleaner.hardWindow.latestStartMin).toBe(672);
     expect(cleaner.hardWindow.reasons).toContain(DRIVER_BRINGS_BAG_TOLERANCE_REASON);
     expect(cleaner.ruleTrace.map((trace) => trace.code)).toContain(DRIVER_BRINGS_BAG_TOLERANCE_REASON);
   });

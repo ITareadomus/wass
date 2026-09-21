@@ -319,6 +319,7 @@ export async function enrichLogisticsTimelineData(
         cleanerCtx?.cleanerSequence ?? null
       );
       attachCleanerContextFields(enriched, cleanerCtx);
+      attachLogisticsTaskWindowFields(enriched, cleanerCtx);
       return enriched;
     });
   }

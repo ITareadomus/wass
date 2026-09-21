@@ -32,6 +32,7 @@ export interface PostSolvePipelineOptions {
   solverId?: string;
   sequenceRefinement?: boolean;
   sequenceRefinementOptions?: SequenceRefinementOptions;
+  skipTerritoryRepair?: boolean;
 }
 
 /**
@@ -48,7 +49,18 @@ export async function runPostSolvePipeline(args: {
   const shapeMetricsBefore = computeSolutionShapeMetrics(input, args.solution);
 
   const polished = polishRoutingSolutionWithDiagnostics(input, args.solution);
-  const repaired = repairTerritoryAssignments(input, polished.solution);
+  const repaired = args.options?.skipTerritoryRepair
+    ? {
+        solution: polished.solution,
+        diagnostics: {
+          candidateTaskIds: [],
+          appliedMoves: [],
+          rejectedMoves: [],
+          before: computeSolutionShapeMetrics(input, polished.solution),
+          after: computeSolutionShapeMetrics(input, polished.solution),
+        },
+      }
+    : repairTerritoryAssignments(input, polished.solution);
 
   const useRefinement =
     (args.options?.solverId ?? ORTOOLS_SOLVER_ID) === ORTOOLS_SOLVER_ID &&
@@ -67,7 +79,7 @@ export async function runPostSolvePipeline(args: {
   // the extra tasks without paying for the drift.
   let solution = refined?.solution ?? repaired.solution;
   let finalRepair = repaired;
-  if (refined) {
+  if (refined && !args.options?.skipTerritoryRepair) {
     const cleanup = repairTerritoryAssignments(input, solution);
     const repolished = polishRoutingSolutionWithDiagnostics(input, cleanup.solution);
     if (
@@ -78,6 +90,16 @@ export async function runPostSolvePipeline(args: {
     ) {
       solution = repolished.solution;
       finalRepair = cleanup;
+    }
+  } else if (refined) {
+    const repolished = polishRoutingSolutionWithDiagnostics(input, solution);
+    if (
+      compareSolutionShape(
+        computeSolutionShapeMetrics(input, repolished.solution),
+        computeSolutionShapeMetrics(input, solution)
+      ) < 0
+    ) {
+      solution = repolished.solution;
     }
   }
 

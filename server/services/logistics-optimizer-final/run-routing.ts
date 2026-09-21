@@ -1,4 +1,4 @@
-import { applyLogisticsRoutingSolution, type ApplyRoutingSolutionResult } from "./apply-routing-solution";
+import { applyLogisticsRoutingSolution, attachHypothesisTimelinePreviews, type ApplyRoutingSolutionResult } from "./apply-routing-solution";
 import { buildLogisticsRoutingInput, type BuildLogisticsRoutingInputOptions } from "./build-routing-input";
 import {
   isLogisticsOptimizerFinalDebugEnabled,
@@ -24,6 +24,12 @@ import {
   buildVehicleArcPenalties,
   computeRouteSequenceDiagnostics,
 } from "./groups/route-sequence-penalties";
+import { generateLogisticsRoutingHypotheses, type LogisticsRoutingHypothesis } from "./routing-hypotheses";
+import { parsePreferredStartByDriverId } from "../../../shared/logistics-zone-start-plan";
+import {
+  shouldSolveAsExclusiveWorkZones,
+  solveExclusiveWorkZoneRouting,
+} from "./exclusive-work-zones";
 import { runPostSolvePipeline } from "./post-solve-pipeline";
 
 export interface RunLogisticsRoutingOptions extends BuildLogisticsRoutingInputOptions {
@@ -35,6 +41,10 @@ export interface RunLogisticsRoutingOptions extends BuildLogisticsRoutingInputOp
   allowDebugSolverApply?: boolean;
   /** Defaults to enabled; env LOGISTICS_SEQUENCE_REFINEMENT=0 disables it globally. */
   sequenceRefinement?: boolean;
+  /** Generate zone-isolated tour hypotheses instead of applying one plan. */
+  generateHypotheses?: boolean;
+  /** Driver id → first task id. Omitted drivers keep the algorithm start. */
+  preferredStartByDriverId?: Map<number, number> | Record<string, number>;
 }
 
 export class GreedySolverNotAllowedForApplyError extends Error {
@@ -75,6 +85,7 @@ export interface RunLogisticsRoutingResult {
       logisticCode: number | null;
     }>;
   };
+  hypotheses?: LogisticsRoutingHypothesis[];
 }
 
 export async function runLogisticsRouting(
@@ -98,12 +109,52 @@ export async function runLogisticsRouting(
     throw new GreedySolverNotAllowedForApplyError();
   }
 
-  const solverSolution = await solveRouting(input, { solverId });
-  const postSolve = await runPostSolvePipeline({
-    input,
-    solution: solverSolution,
-    options: { solverId, sequenceRefinement: options.sequenceRefinement },
-  });
+  const exclusiveZones = shouldSolveAsExclusiveWorkZones(input);
+  let hypotheses: LogisticsRoutingHypothesis[] | undefined;
+  let solverSolution: RoutingSolution;
+
+  if (options.generateHypotheses) {
+    const preferredStartByDriverId = parsePreferredStartByDriverId(
+      options.preferredStartByDriverId instanceof Map
+        ? Object.fromEntries(options.preferredStartByDriverId)
+        : options.preferredStartByDriverId
+    );
+    hypotheses = generateLogisticsRoutingHypotheses(input, {
+      preferredStartByDriverId:
+        preferredStartByDriverId.size > 0 ? preferredStartByDriverId : undefined,
+    });
+    solverSolution = hypotheses[0]?.solution ?? {
+      schemaVersion: "logistics-routing-solution/v1",
+      solverId: solverId,
+      workDate,
+      status: "INFEASIBLE",
+      generatedAt: new Date().toISOString(),
+      routes: [],
+      droppedTasks: input.tasks.map((task) => ({
+        taskId: task.taskId,
+        reason: "NO_FEASIBLE_DRIVER" as const,
+      })),
+    };
+  } else if (exclusiveZones) {
+    solverSolution = await solveExclusiveWorkZoneRouting(input, { solverId });
+  } else {
+    solverSolution = await solveRouting(input, { solverId });
+  }
+
+  const postSolve = options.generateHypotheses
+    ? {
+        solution: solverSolution,
+        diagnostics: {},
+      }
+    : await runPostSolvePipeline({
+        input,
+        solution: solverSolution,
+        options: {
+          solverId,
+          sequenceRefinement: options.sequenceRefinement,
+          skipTerritoryRepair: exclusiveZones,
+        },
+      });
   const solution = postSolve.solution;
   const solutionValidation = validateRoutingSolution(input, solution);
   const applyGate = evaluateSolutionApplyGate(solution, {
@@ -131,7 +182,9 @@ export async function runLogisticsRouting(
       inputValidation,
       solutionValidation,
       ortoolsPayload:
-        solverId === ORTOOLS_SOLVER_ID ? buildOrToolsPayload(input).payload : undefined,
+        !options.generateHypotheses && solverId === ORTOOLS_SOLVER_ID
+          ? buildOrToolsPayload(input).payload
+          : undefined,
       extra: {
         applyGate,
         droppedDiagnostics,
@@ -143,7 +196,7 @@ export async function runLogisticsRouting(
   }
 
   let applyResult: ApplyRoutingSolutionResult | null = null;
-  if (options.apply === true) {
+  if (options.apply === true && !options.generateHypotheses) {
     assertRoutingSolutionValid(input, solution);
     applyResult = await applyLogisticsRoutingSolution({
       workDate,
@@ -153,6 +206,21 @@ export async function runLogisticsRouting(
       allowPartial: options.allowPartial,
       debugDir: debugDir ?? undefined,
     });
+  }
+
+  if (hypotheses?.length) {
+    try {
+      await attachHypothesisTimelinePreviews({
+        workDate,
+        input,
+        hypotheses,
+      });
+    } catch (error) {
+      console.warn(
+        "⚠️ Anteprime ipotesi non disponibili:",
+        error instanceof Error ? error.message : error
+      );
+    }
   }
 
   const assignedTaskCount = solution.routes.reduce((sum, route) => sum + route.stops.length, 0);
@@ -190,6 +258,7 @@ export async function runLogisticsRouting(
     excludedFromSolve: {
       invalidHardWindow: invalidHardWindowExcluded,
     },
+    ...(hypotheses ? { hypotheses } : {}),
   };
 }
 

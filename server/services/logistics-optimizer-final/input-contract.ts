@@ -30,6 +30,7 @@ export interface RawLogisticsTaskInput {
   paxIn: number | null;
   logisticsTaskKind?: LogisticsTaskKind | string | null;
   logisticsTaskKindSource?: "auto" | "manual" | string | null;
+  address?: string | null;
   locked: boolean;
   lockedReason: string | null;
 }
@@ -66,6 +67,7 @@ export interface DriverNode {
   startLocationNodeId: string;
   endLocationNodeId?: string;
   operationalCode?: string;
+  displayName?: string;
   workWindow: {
     startMin: Minutes;
     endMin: Minutes;
@@ -93,6 +95,8 @@ export interface TaskSoftWindow {
   endMin?: Minutes;
   penaltyPerMin?: number;
   maxPenalty?: number;
+  /** If true, startMin is a soft lower bound (prefer later). */
+  preferLater?: boolean;
   reason: string;
 }
 
@@ -195,6 +199,7 @@ export type SoftConstraintSpec =
       startMin: Minutes;
       endMin?: Minutes;
       penaltyPerMinOutside: number;
+      preferLater?: boolean;
     }
   | {
       type: "KEEP_SAME_COORDINATES_BUILDING_TOGETHER";

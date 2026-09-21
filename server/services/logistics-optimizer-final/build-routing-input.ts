@@ -1,4 +1,5 @@
 import { LOGISTICS_SERVICE_DURATION_MIN, parseHmToMinutes } from "../../../shared/logistics-scheduling-constraints";
+import { formatLogisticsDriverDisplayName } from "../../../shared/logistics-zone-start-plan";
 import {
   resolveLogisticsTaskKind,
   type LogisticsTaskKind,
@@ -84,6 +85,7 @@ function buildDriverNodes(sourceData: LogisticsRoutingSourceData): DriverNode[] 
       id: driver.id,
       startLocationNodeId: "depot",
       operationalCode: driver.operationalCode,
+      displayName: formatLogisticsDriverDisplayName(driver),
       workWindow: {
         startMin,
         endMin,
@@ -141,6 +143,7 @@ function buildTaskNode(args: {
       startMin: window.startMin!,
       endMin: window.endMin,
       penaltyPerMinOutside: window.penaltyPerMin ?? 1,
+      ...(window.preferLater ? { preferLater: true } : {}),
     }));
 
   return {
@@ -151,6 +154,7 @@ function buildTaskNode(args: {
       location: {
         lat: taskData.lat,
         lng: taskData.lng,
+        address: taskData.address ?? null,
         addressGroupId: null,
       },
       priority,

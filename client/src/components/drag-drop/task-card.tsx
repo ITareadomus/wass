@@ -25,6 +25,7 @@ import {
   resolveHousekeepingWorkProgress,
   type HousekeepingTaskExecutionStatus,
 } from "@shared/housekeeping-task-execution-status";
+import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
 import {
   DIALOG_SECTION_CORNER_BADGE_WRAP_CLASS,
   LOGISTICS_KIND_BADGE_LABEL,
@@ -44,6 +45,7 @@ import {
   HousekeepingWorkProgressLine,
   HOUSEKEEPING_PROGRESS_ADVANCED_CLASS,
   HOUSEKEEPING_PROGRESS_SURFACE_CLASS,
+  HOUSEKEEPING_TIME_ELAPSED_SURFACE_CLASS,
   housekeepingExecutionStatusSurfaceClass,
 } from "@/lib/housekeeping-task-execution-status-ui";
 import { format, parseISO } from "date-fns";
@@ -1563,7 +1565,10 @@ const displayClickableInputClass =
       return housekeepingExecutionStatusSurfaceClass("completed", "strong");
     }
     if (housekeepingExecutionStatus !== "in_progress") return undefined;
-    if (housekeepingWorkProgress && !housekeepingWorkProgress.overdue) {
+    if (housekeepingWorkProgress?.overdue) {
+      return HOUSEKEEPING_TIME_ELAPSED_SURFACE_CLASS;
+    }
+    if (housekeepingWorkProgress) {
       return HOUSEKEEPING_PROGRESS_SURFACE_CLASS;
     }
     return housekeepingExecutionStatusSurfaceClass("in_progress", "strong");
@@ -2643,6 +2648,11 @@ const displayClickableInputClass =
     };
   })();
   const isOverdue = timelineViolationMessages.length > 0;
+  const timelineViolationVisible =
+    isOverdue &&
+    isInTimeline &&
+    !hasHousekeepingExecutionStatusColor(housekeepingExecutionStatus) &&
+    !(operationsScope === "logistics" && hasLogisticsExecutionStatusColor(logisticsExecutionStatus));
 
   // Dialog dettagli: ricalcola le violazioni sulla task attualmente mostrata (frecce prev/next).
   const dialogTimelineViolationMessages = (() => {
@@ -3440,23 +3450,12 @@ const displayClickableInputClass =
                       "rounded-md border transition-colors duration-200",
                       showCompactAdamTimelineUi ? "px-1 py-0" : "flex items-center px-2 py-1",
                       isSelected && isMultiSelectMode && !isInTimeline && "z-[1] ring-2 ring-sky-500 ring-inset",
-                      isOverdue &&
-                        isInTimeline &&
-                        !hasHousekeepingExecutionStatusColor(housekeepingExecutionStatus) &&
-                        !(
-                          operationsScope === "logistics" &&
-                          hasLogisticsExecutionStatusColor(logisticsExecutionStatus)
-                        ) &&
-                        "animate-blink",
+                      isOverdue && timelineViolationVisible && "task-violation-outline",
                       isInTimeline &&
                         executionColorsEnabled &&
                         housekeepingWorkProgress &&
                         !housekeepingWorkProgress.overdue &&
                         "isolation-isolate",
-                      isInTimeline &&
-                        executionColorsEnabled &&
-                        housekeepingWorkProgress?.overdue &&
-                        "animate-blink-green",
                       !isDragging && isMapFiltered && "task-border-map-filtered",
                       !isDragging && !isMapFiltered && isHighlighted && "task-border-search-highlighted",
                       "cursor-pointer flex-shrink-0 relative group"
@@ -3486,6 +3485,7 @@ const displayClickableInputClass =
                       }
                     }}
                   >
+                    {timelineViolationVisible && <SequenceSummaryViolationIndicator />}
                     {isInTimeline &&
                       executionColorsEnabled &&
                       housekeepingWorkProgress &&

@@ -134,15 +134,14 @@ export function getSequenceSummaryTaskRowClassName({
 } = {}) {
   const statusClass = logisticsExecutionStatusSurfaceClass(executionStatus);
   const statusWinsOverViolation = hasLogisticsExecutionStatusColor(executionStatus);
-  // Violazione lampeggia solo se non c'è colore status; l'icona resta comunque (--violated).
-  const showViolationBlink = isTimelineViolated === true && !statusWinsOverViolation;
+  const violated = isTimelineViolated === true && !statusWinsOverViolation;
 
   return cn(
     "sequence-summary-task relative rounded-md border px-2 py-1.5 text-xs",
     isTimelineViolated && "sequence-summary-task--violated",
     isMapFiltered && "sequence-summary-task--map-filtered task-border-map-filtered",
-    showViolationBlink
-      ? "animate-blink-inset border-red-500 bg-red-50 dark:bg-red-950/30"
+    violated
+      ? "task-violation-outline border-transparent bg-background"
       : !isMapFiltered && isHighlighted
         ? "border-amber-400 bg-amber-50 dark:bg-amber-950/30"
         : statusClass

@@ -55,6 +55,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AssignmentLoadingDialog } from "@/components/dialogs/assignment-loading-dialog";
+import { LogisticsHypothesisSwitcher } from "@/components/dialogs/logistics-hypothesis-switcher";
+import { LogisticsStartChoiceDialog } from "@/components/dialogs/logistics-start-choice-dialog";
+import type { LogisticsPreferredStartsPayload, LogisticsZoneStartPlan } from "@shared/logistics-zone-start-plan";
+import {
+  mergeHypothesisPreviewAssignments,
+  type LogisticsHypothesisPickerItem,
+} from "@/lib/logistics-hypothesis-preview";
 import {
   DndRemoveZone,
   useLogisticsDnd,
@@ -421,6 +428,12 @@ export default function GenerateLogisticsAssignments() {
   const containerHighlightRef = useRef<string | null>(null);
 
   const [isRunningLogisticsOptimizer, setIsRunningLogisticsOptimizer] = useState(false);
+  const [logisticsHypotheses, setLogisticsHypotheses] = useState<LogisticsHypothesisPickerItem[]>([]);
+  const [previewHypothesisId, setPreviewHypothesisId] = useState<string | null>(null);
+  const [applyingHypothesisId, setApplyingHypothesisId] = useState<string | null>(null);
+  const [zoneStartPlan, setZoneStartPlan] = useState<LogisticsZoneStartPlan | null>(null);
+  const [showStartChoiceDialog, setShowStartChoiceDialog] = useState(false);
+  const [isPlanningZoneStarts, setIsPlanningZoneStarts] = useState(false);
   const [showMissingLogisticsKindWarningDialog, setShowMissingLogisticsKindWarningDialog] = useState(false);
   const [missingLogisticsKindTaskCount, setMissingLogisticsKindTaskCount] = useState(0);
   const [missingLogisticsKindTaskCodes, setMissingLogisticsKindTaskCodes] = useState<string[]>([]);
@@ -474,9 +487,20 @@ export default function GenerateLogisticsAssignments() {
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
+      setLogisticsHypotheses([]);
+      setPreviewHypothesisId(null);
+      setShowStartChoiceDialog(false);
+      setZoneStartPlan(null);
       setSelectedDate(date);
     }
   };
+
+  const clearHypothesisPreview = useCallback(() => {
+    setLogisticsHypotheses([]);
+    setPreviewHypothesisId(null);
+    setApplyingHypothesisId(null);
+    setContainersManuallyCollapsed(false);
+  }, []);
 
   /** Carica solo da PostgreSQL (GET), senza rigenerare da ADAM — come loadTasks dopo mount su HK */
   const loadLogisticsContainers = useCallback(async (date: Date) => {
@@ -560,7 +584,7 @@ export default function GenerateLogisticsAssignments() {
 
   useLogisticsExecutionStatusPoll({
     workDate: format(selectedDate, "yyyy-MM-dd"),
-    enabled: !isExtractingLogistics && hasTimelineAssignments,
+    enabled: !isExtractingLogistics && hasTimelineAssignments && logisticsHypotheses.length === 0,
     isPaused: () => isDraggingRef.current || isLoadingDragDrop,
     onStatuses: (statuses) => {
       setLogisticsDriversAssignments((prev) => {
@@ -692,7 +716,10 @@ export default function GenerateLogisticsAssignments() {
     toast,
   ]);
 
-  const executeLogisticsOptimizer = useCallback(async () => {
+  const executeLogisticsOptimizer = useCallback(async (options?: {
+    preferredStarts?: LogisticsPreferredStartsPayload;
+    skipAutoConvoke?: boolean;
+  }) => {
     const dateStr = format(selectedDate, "yyyy-MM-dd");
     setIsRunningLogisticsOptimizer(true);
     try {
@@ -701,11 +728,14 @@ export default function GenerateLogisticsAssignments() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date: dateStr,
-          apply: true,
+          apply: false,
+          generateHypotheses: true,
           allowPartial: true,
           solver: "ortools-v1",
           debug: true,
           scope: "logistics",
+          skipAutoConvoke: options?.skipAutoConvoke === true,
+          preferredStarts: options?.preferredStarts ?? {},
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -717,49 +747,82 @@ export default function GenerateLogisticsAssignments() {
             "Esecuzione logistics-optimizer-final fallita"
         );
       }
-      const assignedCount = Number(
-        data?.apply?.insertedTasks ?? data?.solutionSummary?.assignedTaskCount ?? 0
-      );
-      const unassignedCount = Number(
-        data?.solutionSummary?.droppedTaskCount ?? data?.solution?.droppedTasks?.length ?? 0
-      );
-      const skippedInvalidWindow = Array.isArray(data?.excludedFromSolve?.invalidHardWindow)
-        ? data.excludedFromSolve.invalidHardWindow
+      const hypotheses = Array.isArray(data?.hypotheses)
+        ? (data.hypotheses as LogisticsHypothesisPickerItem[]).filter(
+            (entry) => entry?.summary && entry?.solution
+          )
         : [];
-      const skippedCodes = skippedInvalidWindow
-        .map((entry: { logisticCode?: number | null; taskId?: number }) =>
-          entry?.logisticCode != null && Number.isFinite(Number(entry.logisticCode))
-            ? String(entry.logisticCode)
-            : entry?.taskId != null
-              ? `task ${entry.taskId}`
-              : null
-        )
-        .filter((value: string | null): value is string => Boolean(value));
+      if (hypotheses.length === 0) {
+        throw new Error("Nessuna ipotesi di giro disponibile. Riprova o controlla i driver convocati.");
+      }
       const debugDir = typeof data?.debugDir === "string" ? data.debugDir : null;
       if (debugDir) {
         console.info("[logistics-optimizer-final] Debug JSON:", debugDir);
       }
-      const skippedPart =
-        skippedCodes.length > 0
-          ? ` · ${skippedCodes.length} lasciate fuori per finestra oraria invalida (codici ADAM: ${skippedCodes.join(", ")})`
-          : "";
+      setLogisticsHypotheses(hypotheses);
+      setPreviewHypothesisId(hypotheses[0]?.summary.id ?? null);
+      setContainersManuallyCollapsed(true);
+      setContainersForcedOpen(false);
       toast({
-        variant: "success",
-        title: "Assegnazione completata",
-        description: `${assignedCount} task assegnate, ${unassignedCount} non assegnate${skippedPart}`,
+        title: "Ipotesi pronte",
+        description: "Confrontale in timeline e applica quella che preferisci.",
       });
-      await reloadLogisticsPage();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Errore sconosciuto";
       toast({
         variant: "destructive",
         title: "Assegnazione non riuscita",
-        description: msg || "Errore durante l'assegnazione automatica",
+        description: msg || "Errore durante il calcolo delle ipotesi",
       });
     } finally {
       setIsRunningLogisticsOptimizer(false);
     }
-  }, [selectedDate, toast, reloadLogisticsPage]);
+  }, [selectedDate, toast]);
+
+  const applyLogisticsHypothesis = useCallback(
+    async (hypothesis: LogisticsHypothesisPickerItem) => {
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      setApplyingHypothesisId(hypothesis.summary.id);
+      setIsRunningLogisticsOptimizer(true);
+      try {
+        const response = await fetch("/api/logistics-optimizer-final/apply-hypothesis", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date: dateStr,
+            solution: hypothesis.solution,
+            allowPartial: true,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.success) {
+          throw new Error(
+            data?.message || data?.error || "Impossibile applicare l'ipotesi scelta"
+          );
+        }
+        const assignedCount = Number(data?.apply?.insertedTasks ?? hypothesis.summary.assignedTaskCount);
+        const unassignedCount = Number(hypothesis.summary.droppedTaskCount);
+        toast({
+          variant: "success",
+          title: "Ipotesi applicata",
+          description: `${hypothesis.summary.title}: ${assignedCount} task assegnate, ${unassignedCount} non assegnate`,
+        });
+        clearHypothesisPreview();
+        await reloadLogisticsPage();
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Errore sconosciuto";
+        toast({
+          variant: "destructive",
+          title: "Applicazione non riuscita",
+          description: msg,
+        });
+      } finally {
+        setApplyingHypothesisId(null);
+        setIsRunningLogisticsOptimizer(false);
+      }
+    },
+    [selectedDate, toast, reloadLogisticsPage, clearHypothesisPreview]
+  );
 
   const handleRunLogisticsOptimizer = useCallback(async () => {
     const dateStr = format(selectedDate, "yyyy-MM-dd");
@@ -790,7 +853,25 @@ export default function GenerateLogisticsAssignments() {
         return;
       }
 
-      await executeLogisticsOptimizer();
+      setIsPlanningZoneStarts(true);
+      const zoneRes = await fetch("/api/logistics-optimizer-final/zone-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: dateStr }),
+      });
+      const zoneData = await zoneRes.json().catch(() => ({}));
+      if (!zoneRes.ok || !zoneData?.success || !zoneData?.plan) {
+        throw new Error(
+          zoneData?.message || zoneData?.error || "Impossibile dividere i giri per autista"
+        );
+      }
+      const plan = zoneData.plan as LogisticsZoneStartPlan;
+      if (!Array.isArray(plan.drivers) || plan.drivers.length === 0) {
+        await executeLogisticsOptimizer({ skipAutoConvoke: true });
+        return;
+      }
+      setZoneStartPlan(plan);
+      setShowStartChoiceDialog(true);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Errore sconosciuto";
       toast({
@@ -799,20 +880,56 @@ export default function GenerateLogisticsAssignments() {
         description: msg,
       });
     } finally {
+      setIsPlanningZoneStarts(false);
       setIsRunningLogisticsOptimizer(false);
     }
   }, [selectedDate, executeLogisticsOptimizer, toast]);
 
+  const selectedHypothesis = useMemo(
+    () =>
+      logisticsHypotheses.find((hypothesis) => hypothesis.summary.id === previewHypothesisId) ??
+      logisticsHypotheses[0] ??
+      null,
+    [logisticsHypotheses, previewHypothesisId]
+  );
+  const isHypothesisPreview = selectedHypothesis != null;
+
+  const displayedDriversAssignments = useMemo(() => {
+    if (!selectedHypothesis) return logisticsDriversAssignments;
+    return mergeHypothesisPreviewAssignments({
+      drivers: logisticsDrivers,
+      preview: selectedHypothesis.preview,
+      solution: selectedHypothesis.solution,
+      containerTasks: [
+        ...logisticsTaskLists.early_out,
+        ...logisticsTaskLists.high_priority,
+        ...logisticsTaskLists.low_priority,
+      ],
+      baselineAssignments: logisticsDriversAssignments,
+    });
+  }, [
+    selectedHypothesis,
+    logisticsDrivers,
+    logisticsDriversAssignments,
+    logisticsTaskLists.early_out,
+    logisticsTaskLists.high_priority,
+    logisticsTaskLists.low_priority,
+  ]);
+
+  const displayedDrivers = isHypothesisPreview
+    ? displayedDriversAssignments.map((row) => row.driver)
+    : logisticsDrivers;
+
   const assignedLogisticsTaskIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const row of logisticsDriversAssignments) {
+    for (const row of displayedDriversAssignments) {
       for (const task of row?.tasks || []) {
         const tid = task?.task_id ?? task?.id;
         if (tid != null && tid !== "") ids.add(String(tid));
       }
     }
     return ids;
-  }, [logisticsDriversAssignments]);
+  }, [displayedDriversAssignments]);
 
   const earlyOutTasks = useMemo(() => {
     const assigned = assignedLogisticsTaskIds;
@@ -835,7 +952,7 @@ export default function GenerateLogisticsAssignments() {
   const mapTasks = useMemo(() => {
     const assigned: TaskType[] = [];
 
-    for (const row of logisticsDriversAssignments) {
+    for (const row of displayedDriversAssignments) {
       const driverId = Number(row?.driver?.id);
       if (!Number.isFinite(driverId)) continue;
       for (const task of row?.tasks || []) {
@@ -844,7 +961,7 @@ export default function GenerateLogisticsAssignments() {
     }
 
     return [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks, ...assigned];
-  }, [earlyOutTasks, highPriorityTasks, lowPriorityTasks, logisticsDriversAssignments]);
+  }, [earlyOutTasks, highPriorityTasks, lowPriorityTasks, displayedDriversAssignments]);
   const assignmentStatistics = useMemo(
     () => computeAssignmentTaskStatisticsFromTasks(mapTasks, "logistics"),
     [mapTasks]
@@ -874,6 +991,8 @@ export default function GenerateLogisticsAssignments() {
   useEffect(() => {
     setContainersManuallyCollapsed(false);
     setContainersForcedOpen(false);
+    setLogisticsHypotheses([]);
+    setPreviewHypothesisId(null);
   }, [selectedDate]);
 
   useEffect(() => {
@@ -892,10 +1011,10 @@ export default function GenerateLogisticsAssignments() {
 
   const sequenceSummaryGroups = useMemo(() => {
     const groups = buildSequenceSummaryGroupsFromDriverAssignments(
-      logisticsDriversAssignments,
+      displayedDriversAssignments,
       format(selectedDate, "yyyy-MM-dd")
     );
-    const order = logisticsDrivers.map((driver) => driver.id);
+    const order = displayedDrivers.map((driver) => driver.id);
     if (order.length === 0) return groups;
 
     const byId = new Map(groups.map((group) => [group.id, group]));
@@ -910,17 +1029,17 @@ export default function GenerateLogisticsAssignments() {
     }
 
     return ordered;
-  }, [logisticsDriversAssignments, logisticsDrivers]);
+  }, [displayedDriversAssignments, displayedDrivers, selectedDate]);
 
   const allTasksWithAssignments = useMemo(() => {
     const timelineTasks: TaskType[] = [];
-    for (const row of logisticsDriversAssignments) {
+    for (const row of displayedDriversAssignments) {
       for (const t of row.tasks || []) {
         timelineTasks.push(timelineRowToTaskType(t, "low"));
       }
     }
     return [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks, ...timelineTasks];
-  }, [earlyOutTasks, highPriorityTasks, lowPriorityTasks, logisticsDriversAssignments]);
+  }, [earlyOutTasks, highPriorityTasks, lowPriorityTasks, displayedDriversAssignments]);
 
   const saveLogisticsAssignment = async (
     taskId: string,
@@ -998,6 +1117,15 @@ export default function GenerateLogisticsAssignments() {
     async (operation: DndDropOperation) => {
       if (operation.type === "noop") return;
       if (isDraggingRef.current || isLoadingDragDrop) return;
+
+      if (isHypothesisPreview) {
+        toast({
+          title: "Anteprima",
+          description: "Applica l'ipotesi prima di modificare i giri.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       if (isTimelineReadOnly) {
         toast({
@@ -1129,6 +1257,7 @@ export default function GenerateLogisticsAssignments() {
     },
     [
       allTasksWithAssignments,
+      isHypothesisPreview,
       isTimelineReadOnly,
       isLoadingDragDrop,
       reloadLogisticsPage,
@@ -1241,41 +1370,54 @@ export default function GenerateLogisticsAssignments() {
           </PageViewportCentered>
         ) : (
         <>
-        <div className="mx-auto mb-0 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="relative min-w-[200px] flex-1">
-              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-custom-blue" />
-              <Input
-                placeholder="Cerca task..."
-                value={searchTask}
-                onChange={(e) => setSearchTask(e.target.value)}
-                className="border-2 border-custom-blue pl-10"
-                data-testid="input-search-task-logistics"
-              />
-            </div>
-            <div className="flex shrink-0 items-center overflow-hidden rounded-md border-2 border-custom-blue bg-custom-blue">
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={isRunningLogisticsOptimizer}
-                onClick={() => void handleRunLogisticsOptimizer()}
-                className="flex items-center gap-2 rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
-                data-testid="button-run-logistics-optimizer"
-              >
-                {isRunningLogisticsOptimizer ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    Assegnando...
-                  </>
-                ) : (
-                  <>
-                    <CalendarIcon className="h-4 w-4" />
-                    Assegna
-                  </>
-                )}
-              </Button>
+        <div className="mx-auto mb-0 flex w-full max-w-[1920px] flex-col gap-[17px]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <div className="relative min-w-[200px] flex-1">
+                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-custom-blue" />
+                <Input
+                  placeholder="Cerca task..."
+                  value={searchTask}
+                  onChange={(e) => setSearchTask(e.target.value)}
+                  className="border-2 border-custom-blue pl-10"
+                  data-testid="input-search-task-logistics"
+                />
+              </div>
+              <div className="flex shrink-0 items-center overflow-hidden rounded-md border-2 border-custom-blue bg-custom-blue">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isRunningLogisticsOptimizer || isHypothesisPreview}
+                  onClick={() => void handleRunLogisticsOptimizer()}
+                  className="flex items-center gap-2 rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
+                  data-testid="button-run-logistics-optimizer"
+                >
+                  {isRunningLogisticsOptimizer ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Assegnando...
+                    </>
+                  ) : (
+                    <>
+                      <CalendarIcon className="h-4 w-4" />
+                      Assegna
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
+
+          {isHypothesisPreview && selectedHypothesis && (
+            <LogisticsHypothesisSwitcher
+              hypotheses={logisticsHypotheses}
+              selectedId={selectedHypothesis.summary.id}
+              applyingId={applyingHypothesisId}
+              onSelect={setPreviewHypothesisId}
+              onApply={(hypothesis) => void applyLogisticsHypothesis(hypothesis)}
+              onCancel={clearHypothesisPreview}
+            />
+          )}
         </div>
 
         <DndContext
@@ -1309,7 +1451,7 @@ export default function GenerateLogisticsAssignments() {
                     workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="early-out"
                     icon="clock"
-                    isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
+                    isDragDisabled={isTimelineReadOnly || isHypothesisPreview || isLoadingDragDrop}
                     disableToolbar
                     flushDropZone
                     operationsScope="logistics"
@@ -1323,7 +1465,7 @@ export default function GenerateLogisticsAssignments() {
                     workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="high"
                     icon="alert-circle"
-                    isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
+                    isDragDisabled={isTimelineReadOnly || isHypothesisPreview || isLoadingDragDrop}
                     disableToolbar
                     flushDropZone
                     operationsScope="logistics"
@@ -1337,7 +1479,7 @@ export default function GenerateLogisticsAssignments() {
                     workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="low"
                     icon="arrow-down"
-                    isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
+                    isDragDisabled={isTimelineReadOnly || isHypothesisPreview || isLoadingDragDrop}
                     disableToolbar
                     flushDropZone
                     operationsScope="logistics"
@@ -1371,10 +1513,10 @@ export default function GenerateLogisticsAssignments() {
               <div className="relative">
                 <LogisticsTimelineView
                   workDate={format(selectedDate, "yyyy-MM-dd")}
-                  drivers={logisticsDrivers}
-                  driversAssignments={logisticsDriversAssignments}
+                  drivers={displayedDrivers}
+                  driversAssignments={displayedDriversAssignments}
                   searchTask={searchTask}
-                  isReadOnly={isTimelineReadOnly}
+                  isReadOnly={isTimelineReadOnly || isHypothesisPreview}
                   isLoadingOverlay={isLoadingDragDrop}
                   draggingOverDriverId={draggingOverDriverId}
                   activeDragDriverId={activeDragDriverId}
@@ -1442,7 +1584,7 @@ export default function GenerateLogisticsAssignments() {
               groups={sequenceSummaryGroups}
               searchTask={searchTask}
               staffLabel="Driver"
-              isDragDisabled={isTimelineReadOnly || isLoadingDragDrop}
+              isDragDisabled={isTimelineReadOnly || isHypothesisPreview || isLoadingDragDrop}
               loadingDriverIds={
                 isLoadingDragDrop ? logisticsDrivers.map((driver) => driver.id) : []
               }
@@ -1454,8 +1596,8 @@ export default function GenerateLogisticsAssignments() {
           )}
           <DndRemoveZone
             scope="logistics"
-            visible={isDraggingTimelineTask && !isTimelineReadOnly && !isLoadingDragDrop}
-            disabled={isTimelineReadOnly || isLoadingDragDrop}
+            visible={isDraggingTimelineTask && !isTimelineReadOnly && !isHypothesisPreview && !isLoadingDragDrop}
+            disabled={isTimelineReadOnly || isHypothesisPreview || isLoadingDragDrop}
           />
           <TaskCardDragOverlay
             activeItem={logisticsDnd.activeItem}
@@ -1468,7 +1610,40 @@ export default function GenerateLogisticsAssignments() {
           />
         </DndContext>
 
-        <AssignmentLoadingDialog open={isRunningLogisticsOptimizer} />
+        <AssignmentLoadingDialog
+          open={isRunningLogisticsOptimizer}
+          title={
+            applyingHypothesisId
+              ? "Applico l'ipotesi"
+              : isPlanningZoneStarts
+                ? "Divido i giri"
+                : "Calcolo delle ipotesi"
+          }
+          description={
+            applyingHypothesisId
+              ? "Attendere, il giro scelto viene scritto in timeline."
+              : isPlanningZoneStarts
+                ? "Attendere, sto suddividendo gli appartamenti tra gli autisti."
+                : "Attendere, sto calcolando i giri per zona e le anteprime in timeline. Non chiudere la pagina."
+          }
+        />
+
+        <LogisticsStartChoiceDialog
+          open={showStartChoiceDialog}
+          plan={zoneStartPlan}
+          onCancel={() => {
+            setShowStartChoiceDialog(false);
+            setZoneStartPlan(null);
+          }}
+          onConfirm={(preferredStarts) => {
+            setShowStartChoiceDialog(false);
+            setZoneStartPlan(null);
+            void executeLogisticsOptimizer({
+              preferredStarts,
+              skipAutoConvoke: true,
+            });
+          }}
+        />
 
         <Dialog
           open={showMissingLogisticsKindWarningDialog}

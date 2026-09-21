@@ -6,6 +6,7 @@ import {
   getLogisticsTimelineViolationShortLabels,
   isBagRuleViolation,
   pickLogisticsViolationFields,
+  countLogisticsTimelineViolationTasks,
   resolveDriverBringsBagLatestStartMin,
   shouldBlinkLogisticsTimelineTask,
   sumLogisticsTaskWorkedMinutes,
@@ -72,13 +73,13 @@ describe("computeEarlyRouteWaitAbsorptionMin", () => {
 });
 
 describe("resolveDriverBringsBagLatestStartMin", () => {
-  it("uses 2/3 cleaning time tolerance when available", () => {
+  it("uses 120% cleaning time tolerance when available", () => {
     expect(
       resolveDriverBringsBagLatestStartMin({
         cleanerTaskStartMin: 11 * 60 + 20,
         cleaningTimeMin: 60,
       })
-    ).toBe(12 * 60);
+    ).toBe(12 * 60 + 32);
   });
 });
 
@@ -91,6 +92,21 @@ describe("isBagRuleViolation", () => {
         cleaner_sequence: 2,
         cleaner_id: 24,
         hk_start_time: "11:20",
+        cleaning_time: 60,
+        premium: false,
+        pax_in: 2,
+      })
+    ).toBe(true);
+  });
+
+  it("flags bag rule using cleaner_task_start_time when hk_start_time is missing", () => {
+    expect(
+      isBagRuleViolation({
+        start_time: "12:40",
+        logistics_task_kind: "delivery/pick-up",
+        cleaner_sequence: 2,
+        cleaner_id: 24,
+        cleaner_task_start_time: "11:20",
         cleaning_time: 60,
         premium: false,
         pax_in: 2,
@@ -163,7 +179,7 @@ describe("getLogisticsTimelineViolationMessages", () => {
       "2026-06-18"
     );
     expect(messages.some((m) => m.includes("Regola borsone"))).toBe(true);
-    expect(messages.some((m) => m.includes("12:00"))).toBe(true);
+    expect(messages.some((m) => m.includes("12:32"))).toBe(true);
   });
 
   it("describes check-in violation", () => {
@@ -177,6 +193,20 @@ describe("getLogisticsTimelineViolationMessages", () => {
       "2026-06-18"
     );
     expect(messages.some((m) => m.includes("Check-in"))).toBe(true);
+  });
+
+  it("describes checkout wait over 15 minutes", () => {
+    const messages = getLogisticsTimelineViolationMessages(
+      {
+        start_time: "11:00",
+        end_time: "11:15",
+        checkout_time: "10:30",
+        checkout_date: "2026-06-18",
+        checkout_wait_minutes: 30,
+      },
+      "2026-06-18"
+    );
+    expect(messages.some((m) => m.includes("Attesa checkout"))).toBe(true);
   });
 });
 
@@ -199,7 +229,20 @@ describe("getLogisticsTimelineViolationShortLabels", () => {
 });
 
 describe("shouldBlinkLogisticsTimelineTask", () => {
-  it("blinks for bag rule or check-in violations", () => {
+  it("does not blink when the bag rule is exceeded by 15 minutes or less", () => {
+    const task = {
+      start_time: "12:40",
+      logistics_task_kind: "delivery/pick-up",
+      cleaner_sequence: 2,
+      hk_start_time: "11:20",
+      cleaning_time: 60,
+    };
+    expect(getLogisticsTimelineViolationMessages(task, "2026-06-18").length).toBeGreaterThan(0);
+    expect(shouldBlinkLogisticsTimelineTask(task, "2026-06-18")).toBe(false);
+    expect(countLogisticsTimelineViolationTasks([task], "2026-06-18")).toBe(1);
+  });
+
+  it("blinks for bag rule or check-in violations beyond 15 minutes", () => {
     expect(
       shouldBlinkLogisticsTimelineTask(
         {

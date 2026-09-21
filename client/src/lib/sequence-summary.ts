@@ -5,6 +5,7 @@ import {
   minutesToHm,
   parseHmToMinutes,
   pickLogisticsViolationFields,
+  shouldBlinkLogisticsTimelineTask,
 } from "@shared/logistics-scheduling-constraints";
 import { estimateLogisticsReturnToDepotMinutes } from "@shared/logistics-travel-estimate";
 import {
@@ -41,6 +42,7 @@ export type SequenceSummaryEntry = {
   /** Stato esecuzione da Adam lg_real_start / lg_real_end / lg_paused. */
   executionStatus?: LogisticsTaskExecutionStatus;
   timelineViolated?: boolean;
+  timelineViolationBlink?: boolean;
   violationMessages?: string[];
 };
 
@@ -249,6 +251,10 @@ function mapTaskToSummaryEntry(
       ? getLogisticsTimelineViolationMessages(violationFields, workDate)
       : [];
   const timelineViolated = violationMessages.length > 0;
+  const timelineViolationBlink =
+    workDate != null && workDate !== ""
+      ? shouldBlinkLogisticsTimelineTask(violationFields, workDate)
+      : timelineViolated;
 
   const executionStatus =
     (task?.logistics_execution_status as LogisticsTaskExecutionStatus | undefined) ??
@@ -280,6 +286,7 @@ function mapTaskToSummaryEntry(
     logisticsTaskKind: resolveLogisticsTaskKindForSummary(task),
     executionStatus,
     timelineViolated,
+    timelineViolationBlink,
     violationMessages,
   };
 }

@@ -56,11 +56,7 @@ function isTaskScheduleUrgent(task: TaskNode): boolean {
   if (task.hardWindow.latestStartMin <= ROUTE_SEQUENCE_CONFIG.tightLatestStartMin) {
     return true;
   }
-  if (
-    task.debug?.ruleTrace?.some(
-      (trace) => trace.code === "EO_EARLY_URGENT" || trace.code === "EO_DRIVER_BEFORE_CLEANER_REQUIRED"
-    )
-  ) {
+  if (task.debug?.ruleTrace?.some((trace) => trace.code === "EO_EARLY_URGENT")) {
     return true;
   }
   const checkinMin = task.debug?.sourceTimes?.customerCheckinMin ?? null;

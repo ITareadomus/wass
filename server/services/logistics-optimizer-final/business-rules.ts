@@ -1,6 +1,6 @@
 import type { Priority, PriorityWindows } from "../optimizer/priorityWindows";
 import type { Minutes } from "./input-contract";
-import { LOGISTICS_DEFAULT_BAG_DELIVERY_TOLERANCE_MIN } from "./constants";
+import { resolveBagDeliveryToleranceMin } from "./constants";
 
 export type RuleCode =
   | "CUSTOMER_CHECKOUT_MIGRATED"
@@ -8,6 +8,7 @@ export type RuleCode =
   | "HP_CONFIGURED_START"
   | "LP_CONFIGURED_START"
   | "PRIORITY_WINDOWS_UNAVAILABLE"
+  | "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_120_PERCENT_TOLERANCE"
   | "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
   | "DRIVER_BRINGS_BAG_DEFAULT_TOLERANCE"
   | "CLEANER_HAS_BAG_FLEXIBLE_PICKUP"
@@ -18,7 +19,8 @@ export type RuleCode =
   | "CUSTOMER_CHECKIN_DEADLINE"
   | "EO_EARLY_URGENT"
   | "EO_EARLY_ROUTE_COMPATIBLE"
-  | "EO_EARLY_FLEXIBLE_SUPPRESSED";
+  | "EO_EARLY_FLEXIBLE_SUPPRESSED"
+  | "LOOSE_DP_DEFER_SOFT_PREFERENCE";
 
 export interface RuleTrace {
   code: RuleCode;
@@ -105,9 +107,7 @@ export function resolveDriverBringsBagLatestStartMin(params: {
   const hasValidCleaningTime =
     validCleaningTime !== null && validCleaningTime > 0;
 
-  const toleranceMin = hasValidCleaningTime
-    ? Math.ceil(validCleaningTime * 2 / 3)
-    : LOGISTICS_DEFAULT_BAG_DELIVERY_TOLERANCE_MIN;
+  const toleranceMin = resolveBagDeliveryToleranceMin(validCleaningTime);
   const latestStartMin = params.cleanerTaskStartMin + toleranceMin;
 
   return {
@@ -115,7 +115,7 @@ export function resolveDriverBringsBagLatestStartMin(params: {
     trace: [
       {
         code: hasValidCleaningTime
-          ? "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_2_3_TOLERANCE"
+          ? "DRIVER_BRINGS_BAG_BEFORE_CLEANER_WITH_120_PERCENT_TOLERANCE"
           : "DRIVER_BRINGS_BAG_DEFAULT_TOLERANCE",
         value: {
           cleanerTaskStartMin: params.cleanerTaskStartMin,

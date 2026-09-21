@@ -13,6 +13,29 @@ export function simulateRouteTiming(args: {
   orderedTaskIds: TaskId[];
   taskById: Map<TaskId, TaskNode>;
 }): RoutingRouteSolution | null {
+  return simulateRouteTimingInternal({ ...args, allowWindowViolations: false });
+}
+
+/**
+ * Same replay as {@link simulateRouteTiming}, but keeps going when a deadline is
+ * missed so proximity-first tours can still be shown (red dialog in the UI).
+ */
+export function simulateRouteTimingAllowingViolations(args: {
+  input: RoutingProblemInput;
+  driver: DriverNode;
+  orderedTaskIds: TaskId[];
+  taskById: Map<TaskId, TaskNode>;
+}): RoutingRouteSolution | null {
+  return simulateRouteTimingInternal({ ...args, allowWindowViolations: true });
+}
+
+function simulateRouteTimingInternal(args: {
+  input: RoutingProblemInput;
+  driver: DriverNode;
+  orderedTaskIds: TaskId[];
+  taskById: Map<TaskId, TaskNode>;
+  allowWindowViolations: boolean;
+}): RoutingRouteSolution | null {
   const { input, driver, orderedTaskIds, taskById } = args;
   const stops: RoutingStopSolution[] = [];
 
@@ -35,9 +58,11 @@ export function simulateRouteTiming(args: {
     const startMin = Math.max(arrivalMin, task.hardWindow.earliestStartMin);
     const endMin = startMin + task.serviceDurationMin;
 
-    if (startMin > task.hardWindow.latestStartMin) return null;
-    if (endMin > task.hardWindow.latestEndMin) return null;
-    if (endMin > driver.workWindow.endMin) return null;
+    if (!args.allowWindowViolations) {
+      if (startMin > task.hardWindow.latestStartMin) return null;
+      if (endMin > task.hardWindow.latestEndMin) return null;
+      if (endMin > driver.workWindow.endMin) return null;
+    }
 
     stops.push({
       sequence: index + 1,

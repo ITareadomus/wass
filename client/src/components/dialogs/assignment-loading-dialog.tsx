@@ -9,9 +9,15 @@ import { Loader2 } from "lucide-react";
 
 interface AssignmentLoadingDialogProps {
   open: boolean;
+  title?: string;
+  description?: string;
 }
 
-export function AssignmentLoadingDialog({ open }: AssignmentLoadingDialogProps) {
+export function AssignmentLoadingDialog({
+  open,
+  title = "Assegnazione in corso",
+  description = "Attendere, le task vengono assegnate. Non chiudere la pagina finché non termina.",
+}: AssignmentLoadingDialogProps) {
   return (
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent
@@ -22,10 +28,8 @@ export function AssignmentLoadingDialog({ open }: AssignmentLoadingDialogProps) 
       >
         <DialogHeader className="items-center text-center sm:text-center">
           <Loader2 className="mb-2 h-10 w-10 animate-spin text-custom-blue" />
-          <DialogTitle>Assegnazione in corso</DialogTitle>
-          <DialogDescription>
-            Attendere, le task vengono assegnate. Non chiudere la pagina finché non termina.
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
       </DialogContent>
     </Dialog>
