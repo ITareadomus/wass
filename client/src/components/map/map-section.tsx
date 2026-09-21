@@ -20,6 +20,33 @@ interface MapSectionProps {
   personnelColorScope?: PersonnelColorScope;
 }
 
+const MILAN_CENTER = { lat: 45.464, lng: 9.19 };
+const MILAN_ZOOM = 12;
+
+function parseValidMapLatLng(lat: unknown, lng: unknown): { lat: number; lng: number } | null {
+  const parsedLat = typeof lat === "number" ? lat : parseFloat(String(lat ?? ""));
+  const parsedLng = typeof lng === "number" ? lng : parseFloat(String(lng ?? ""));
+  if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLng)) return null;
+  if (parsedLat === 0 && parsedLng === 0) return null;
+  if (parsedLat < -90 || parsedLat > 90 || parsedLng < -180 || parsedLng > 180) return null;
+  return { lat: parsedLat, lng: parsedLng };
+}
+
+function centerMapOnMilan(map: any) {
+  if (!map) return;
+  map.setCenter(MILAN_CENTER);
+  map.setZoom(MILAN_ZOOM);
+}
+
+function fitMapToBoundsOrMilan(map: any, bounds: any) {
+  if (!map) return;
+  if (!bounds || typeof bounds.isEmpty !== "function" || bounds.isEmpty()) {
+    centerMapOnMilan(map);
+    return;
+  }
+  map.fitBounds(bounds);
+}
+
 declare global {
   interface Window {
     google: any;
@@ -206,8 +233,8 @@ export default function MapSection({
     if (!isMapLoaded || !mapRef.current || googleMapRef.current) return;
 
     const map = new window.google.maps.Map(mapRef.current, {
-      center: { lat: 45.464, lng: 9.19 },
-      zoom: 12,
+      center: MILAN_CENTER,
+      zoom: MILAN_ZOOM,
       gestureHandling: 'greedy',
       disableDefaultUI: true,
       fullscreenControl: true,
@@ -228,7 +255,21 @@ export default function MapSection({
     if (!isMapLoaded || !mapRef.current || !googleMapRef.current || !window.google?.maps) return;
 
     const resizeMap = () => {
-      window.google.maps.event.trigger(googleMapRef.current, "resize");
+      const map = googleMapRef.current;
+      if (!map) return;
+      const center = map.getCenter?.();
+      window.google.maps.event.trigger(map, "resize");
+      if (center) {
+        const lat = typeof center.lat === "function" ? center.lat() : center.lat;
+        const lng = typeof center.lng === "function" ? center.lng() : center.lng;
+        if (lat === 0 && lng === 0) {
+          centerMapOnMilan(map);
+        } else {
+          map.setCenter(center);
+        }
+      } else {
+        centerMapOnMilan(map);
+      }
     };
 
     resizeMap();
@@ -252,7 +293,7 @@ export default function MapSection({
 
     // Filtra task con coordinate valide e non locked
     let tasksWithCoordinates = tasks.filter(task => {
-      const hasCoordinates = task.address && task.lat && task.lng;
+      const hasCoordinates = Boolean(task.address && parseValidMapLatLng(task.lat, task.lng));
       const isNotLocked = !task.locked;
       return hasCoordinates && isNotLocked;
     });
@@ -293,7 +334,10 @@ export default function MapSection({
       lng: t.lng
     })));
 
-    if (tasksWithCoordinates.length === 0) return;
+    if (tasksWithCoordinates.length === 0) {
+      centerMapOnMilan(googleMapRef.current);
+      return;
+    }
 
     const bounds = new window.google.maps.LatLngBounds();
 
@@ -312,10 +356,10 @@ export default function MapSection({
 
     // Crea marker per ogni task
     tasksWithCoordinates.forEach((task, index) => {
-      const baseLat = parseFloat(task.lat || '0');
-      const baseLng = parseFloat(task.lng || '0');
-
-      if (isNaN(baseLat) || isNaN(baseLng) || baseLat === 0 || baseLng === 0) return;
+      const parsed = parseValidMapLatLng(task.lat, task.lng);
+      if (!parsed) return;
+      const baseLat = parsed.lat;
+      const baseLng = parsed.lng;
 
       // Chiave per identificare coordinate duplicate
       const coordKey = `${baseLat.toFixed(6)},${baseLng.toFixed(6)}`;
@@ -601,30 +645,27 @@ export default function MapSection({
       bounds.extend(position);
     });
 
-    // Adatta la vista per mostrare tutti i marker
+    // Adatta la vista ai marker validi; senza punti reali Google Maps andrebbe a (0,0) sull'equatore.
     if (tasksWithCoordinates.length > 0) {
-      googleMapRef.current.fitBounds(bounds);
+      fitMapToBoundsOrMilan(googleMapRef.current, bounds);
       
       // Se ci sono marker evidenziati, centra sulla loro area
       if (highlightedMarkerIds.size > 0 && highlightedMarkerIds.size < tasksWithCoordinates.length) {
         const highlightedBounds = new window.google.maps.LatLngBounds();
         tasksWithCoordinates.forEach(task => {
-          const collaboratorIds = (task as any).collaborator_ids as number[] | null;
-          const assignedCleaner = (task as any).assignedCleaner as number | null;
-          const isCollaborativeTask = collaboratorIds && Array.isArray(collaboratorIds) && collaboratorIds.length > 1;
           const markerId = getTaskMarkerId(task);
           
           if (highlightedMarkerIds.has(markerId)) {
-            const lat = parseFloat(task.lat || '0');
-            const lng = parseFloat(task.lng || '0');
-            if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-              highlightedBounds.extend({ lat, lng });
+            const parsed = parseValidMapLatLng(task.lat, task.lng);
+            if (parsed) {
+              highlightedBounds.extend(parsed);
             }
           }
         });
         
         setTimeout(() => {
-          googleMapRef.current.fitBounds(highlightedBounds);
+          if (!googleMapRef.current) return;
+          fitMapToBoundsOrMilan(googleMapRef.current, highlightedBounds);
           const currentZoom = googleMapRef.current.getZoom();
           if (currentZoom > 15) {
             googleMapRef.current.setZoom(15);

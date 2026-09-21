@@ -1030,16 +1030,18 @@ const displayClickableInputClass =
     const normalizedCurrentId = currentTaskId ? String(currentTaskId) : null;
     const normalizedTaskId = getTaskNavigationKey(task, index);
     const normalizedPlainTaskId = getTaskKey(task);
+    const currentPlainTaskId = normalizedCurrentId?.split("::")[0] || "";
 
-    // CRITICAL: Cerca l'indice della task corrente (quella cliccata)
-    let currIdx = navigableTasks.findIndex(t => (t as any).__key === (normalizedCurrentId || normalizedTaskId));
+    let currIdx = navigableTasks.findIndex((t) => (t as any).__key === (normalizedCurrentId || normalizedTaskId));
 
-    // Se non trovato, usa l'indice della task originale
-    if (currIdx === -1) {
-      currIdx = navigableTasks.findIndex(t => (t as any).__key === normalizedTaskId);
+    if (currIdx === -1 && currentPlainTaskId) {
+      currIdx = navigableTasks.findIndex((t) => (t as any).__taskKey === currentPlainTaskId);
     }
     if (currIdx === -1) {
-      currIdx = navigableTasks.findIndex(t => (t as any).__taskKey === normalizedPlainTaskId);
+      currIdx = navigableTasks.findIndex((t) => (t as any).__key === normalizedTaskId);
+    }
+    if (currIdx === -1) {
+      currIdx = navigableTasks.findIndex((t) => (t as any).__taskKey === normalizedPlainTaskId);
     }
 
     // Se ancora non trovato, usa 0 come fallback
@@ -1197,10 +1199,14 @@ const displayClickableInputClass =
     }
   }, [isModalOpen, isTaskReadOnly]);
 
-  // All'apertura del modal, allinea sempre la task corrente a quella cliccata.
-  // Evita che un currentTaskId stale faccia aprire sempre la stessa task.
+  // All'apertura del modal, allinea la task corrente a quella cliccata.
+  // Non riallineare quando `task` si aggiorna (es. cambio tipologia): altrimenti
+  // frecce e dialog restano bloccati sulla card originale.
+  const wasModalOpenRef = useRef(false);
   useEffect(() => {
-    if (isModalOpen) {
+    const justOpened = isModalOpen && !wasModalOpenRef.current;
+    wasModalOpenRef.current = isModalOpen;
+    if (justOpened) {
       setCurrentTaskId(getTaskNavigationKey(task, index));
     }
   }, [isModalOpen, task, index]);
