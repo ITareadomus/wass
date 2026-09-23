@@ -1,7 +1,10 @@
 import {
   buildLogisticsTaskKindPayload,
+  resolveAutoLogisticsTaskKind,
   type LogisticsContainerKindPatch,
 } from "../../shared/logistics-task-kind";
+import * as mysql from "mysql2/promise";
+import { databaseConfig } from "../../config/database";
 import pool from "../../shared/pg-db";
 import { formatHmTime } from "../../shared/logistics-task-windows";
 import { attachLogisticsTaskWindowFields } from "./logistics-task-window-fields";
@@ -52,77 +55,103 @@ export function enrichLogisticsTimelineTask(
     return withoutBagPolicy({ ...task, ...kindPayload });
   }
 
-  const kindPayload = buildLogisticsTaskKindPayload({
+  // Il tipo auto salvato non è una fonte: sequenza HK, pax e premium possono essere cambiati.
+  const kind = resolveAutoLogisticsTaskKind({
     cleanerId,
     cleanerSequence,
     premium: task?.premium,
     paxIn: task?.pax_in,
-    logisticsTaskKind: task?.logistics_task_kind,
-    logisticsTaskKindSource: task?.logistics_task_kind_source,
   });
 
   return withoutBagPolicy({
     ...task,
-    ...kindPayload,
+    logistics_task_kind: kind,
+    logistics_task_kind_source: kind ? "auto" : null,
   });
 }
 
+/**
+ * Contesto cleaner già trasferito su ADAM.
+ * Non legge daily_assignments_current: una sequenza cambiata solo in WASS
+ * housekeeping non deve ricalcolare la logistica prima del transfer.
+ */
 export async function loadCleanerContextByTaskIds(
   workDate: string,
   taskIds: number[]
 ): Promise<Map<number, CleanerContextForTask>> {
   if (taskIds.length === 0) return new Map();
 
-  const result = await pool.query(
-    `
-      SELECT DISTINCT ON (dac.task_id)
-        dac.task_id AS "taskId",
-        dac.cleaner_id AS "cleanerId",
-        dac.sequence AS "cleanerSequence",
-        dac.cleaner_name AS "cleanerName",
-        dac.cleaner_lastname AS "cleanerLastname",
-        a.alias AS "cleanerAlias",
-        dac.cleaner_start_time::text AS "cleanerStartTime",
-        dac.cleaner_end_time::text AS "cleanerEndTime",
-        dac.start_time::text AS "cleanerTaskStartTime",
-        dac.end_time::text AS "cleanerTaskEndTime"
-      FROM daily_assignments_current dac
-      LEFT JOIN aliases a ON a.cleaner_id = dac.cleaner_id
-      WHERE dac.work_date = $1
-        AND dac.task_id = ANY($2::int[])
-        AND (dac.scope = 'housekeeping' OR dac.scope IS NULL)
-        AND dac.cleaner_id IS NOT NULL
-      ORDER BY dac.task_id,
-        EXISTS (
-          SELECT 1 FROM task_collaborators tc
-          WHERE tc.work_date = dac.work_date
-            AND tc.task_id = dac.task_id
-            AND tc.cleaner_id = dac.cleaner_id
-            AND tc.is_primary IS TRUE
-        ) DESC,
-        dac.sequence ASC NULLS LAST,
-        dac.id ASC
-    `,
-    [workDate, taskIds]
+  const uniqueIds = Array.from(
+    new Set(taskIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0))
   );
+  if (uniqueIds.length === 0) return new Map();
 
-  return new Map(
-    result.rows.map((row: any) => [
-      Number(row.taskId),
-      {
-        cleanerId: row.cleanerId != null ? Number(row.cleanerId) : null,
-        cleanerSequence: row.cleanerSequence != null ? Number(row.cleanerSequence) : null,
-        cleanerName: row.cleanerName != null ? String(row.cleanerName).trim() || null : null,
-        cleanerLastname:
-          row.cleanerLastname != null ? String(row.cleanerLastname).trim() || null : null,
-        cleanerAlias: row.cleanerAlias != null ? String(row.cleanerAlias).trim() || null : null,
-        cleanerStartTime: formatHmTime(row.cleanerStartTime),
-        cleanerEndTime: formatHmTime(row.cleanerEndTime),
-        cleanerTaskStartTime: formatHmTime(row.cleanerTaskStartTime),
-        cleanerTaskEndTime: formatHmTime(row.cleanerTaskEndTime),
-      },
-    ])
-  );
+  let connection: mysql.Connection | null = null;
+  try {
+    connection = await mysql.createConnection({
+      host: databaseConfig.mysql.host,
+      port: databaseConfig.mysql.port,
+      user: databaseConfig.mysql.user,
+      password: databaseConfig.mysql.password,
+      database: databaseConfig.mysql.database,
+    });
+
+    const placeholders = uniqueIds.map(() => "?").join(",");
+    const [rows]: any = await connection.execute(
+      `
+        SELECT
+          h.id AS taskId,
+          h.cleaned_by_us AS cleanerId,
+          h.sequence AS cleanerSequence,
+          u.name AS cleanerName,
+          u.lastname AS cleanerLastname,
+          u.tw_start AS cleanerStartTime,
+          h.start_time AS cleanerTaskStartTime,
+          h.end_time AS cleanerTaskEndTime
+        FROM app_housekeeping h
+        LEFT JOIN app_users u ON u.id = h.cleaned_by_us
+        WHERE h.checkout = ?
+          AND h.id IN (${placeholders})
+          AND h.deleted_at IS NULL
+          AND h.deleted_at_client IS NULL
+          AND h.cleaned_by_us IS NOT NULL
+          AND h.cleaned_by_us > 0
+      `,
+      [workDate, ...uniqueIds]
+    );
+
+    const list = Array.isArray(rows) ? rows : [];
+    return new Map(
+      list.map((row: any) => {
+        const taskId = Number(row.taskId);
+        const cleanerId = Number(row.cleanerId);
+        const sequence = Number(row.cleanerSequence);
+        return [
+          taskId,
+          {
+            cleanerId: Number.isFinite(cleanerId) && cleanerId > 0 ? cleanerId : null,
+            cleanerSequence: Number.isFinite(sequence) && sequence > 0 ? sequence : null,
+            cleanerName: row.cleanerName != null ? String(row.cleanerName).trim() || null : null,
+            cleanerLastname:
+              row.cleanerLastname != null ? String(row.cleanerLastname).trim() || null : null,
+            cleanerAlias: null,
+            cleanerStartTime: formatHmTime(row.cleanerStartTime),
+            cleanerEndTime: null,
+            cleanerTaskStartTime: formatHmTime(row.cleanerTaskStartTime),
+            cleanerTaskEndTime: formatHmTime(row.cleanerTaskEndTime),
+          },
+        ] as const;
+      })
+    );
+  } finally {
+    if (connection) {
+      try {
+        await connection.end();
+      } catch {
+        /* ignore */
+      }
+    }
+  }
 }
 
 export async function enrichDriverTasksWithLogisticsKind(

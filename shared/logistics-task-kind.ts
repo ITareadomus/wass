@@ -216,8 +216,8 @@ export function logisticsTaskKindBadge(kind: LogisticsTaskKind): {
 
 export interface LogisticsContainerKindPatch {
   taskId: number;
-  logistics_task_kind: LogisticsTaskKind;
-  logistics_task_kind_source: "auto";
+  logistics_task_kind: LogisticsTaskKind | null;
+  logistics_task_kind_source: "auto" | null;
 }
 
 export function buildLogisticsContainerAutoKindPatches(
@@ -238,12 +238,12 @@ export function buildLogisticsContainerAutoKindPatches(
 
     const taskId = Number(row.task_id);
     const enriched = enrichedTasksById.get(taskId);
-    if (!enriched?.logistics_task_kind || enriched.logistics_task_kind_source !== "auto") {
-      continue;
-    }
+    if (!enriched || enriched.logistics_task_kind_source === "manual") continue;
 
-    const nextKind = normalizeLogisticsTaskKind(enriched.logistics_task_kind, "auto");
-    if (!nextKind) continue;
+    const nextKind = enriched.logistics_task_kind
+      ? normalizeLogisticsTaskKind(enriched.logistics_task_kind, "auto")
+      : null;
+    const nextSource = nextKind ? "auto" : null;
 
     const currentKind =
       row.logistics_task_kind != null ? String(row.logistics_task_kind) : null;
@@ -252,12 +252,12 @@ export function buildLogisticsContainerAutoKindPatches(
         ? String(row.logistics_task_kind_source)
         : null;
 
-    if (currentKind === nextKind && currentSource === "auto") continue;
+    if (currentKind === nextKind && currentSource === nextSource) continue;
 
     patches.push({
       taskId,
       logistics_task_kind: nextKind,
-      logistics_task_kind_source: "auto",
+      logistics_task_kind_source: nextSource,
     });
   }
 

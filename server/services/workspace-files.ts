@@ -93,6 +93,15 @@ function getNormalizedTask(task: any): any {
   if (task.cleaner_id !== undefined) normalizedTask.cleaner_id = task.cleaner_id;
   if (task.cleaner_sequence !== undefined) normalizedTask.cleaner_sequence = task.cleaner_sequence;
   if (task.cleaner_alias !== undefined) normalizedTask.cleaner_alias = task.cleaner_alias;
+  if (task.persisted_logistics_task_kind !== undefined) {
+    normalizedTask.persisted_logistics_task_kind = task.persisted_logistics_task_kind;
+  }
+  if (task.persisted_logistics_task_kind_source !== undefined) {
+    normalizedTask.persisted_logistics_task_kind_source = task.persisted_logistics_task_kind_source;
+  }
+  if (task.adam_assignment_snapshot !== undefined) {
+    normalizedTask.adam_assignment_snapshot = task.adam_assignment_snapshot;
+  }
 
   return normalizedTask;
 }
