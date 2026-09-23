@@ -11316,6 +11316,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         allowPartial: allowPartialBody,
         generateHypotheses: generateHypothesesBody,
         preferredStarts: preferredStartsBody,
+        zoneDriverIds: zoneDriverIdsBody,
         skipAutoConvoke: skipAutoConvokeBody,
       } = req.body || {};
       const workDate = date || format(new Date(), "yyyy-MM-dd");
@@ -11368,6 +11369,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         allowPartial,
         generateHypotheses,
         preferredStartByDriverId: preferredStartsBody,
+        driverIdByZoneIndex: zoneDriverIdsBody,
         skipAutoConvoke,
         performedBy: getCurrentUsername(req),
       });

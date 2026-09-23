@@ -830,16 +830,39 @@ function fallbackSingleZone(input: RoutingProblemInput): ExclusiveWorkZoneSpec[]
   ];
 }
 
+function applyDriverIdByZoneIndex(args: {
+  zones: ExclusiveWorkZoneSpec[];
+  driverIdByZoneIndex?: ReadonlyMap<number, number>;
+  validDriverIds: Set<number>;
+}): ExclusiveWorkZoneSpec[] {
+  const override = args.driverIdByZoneIndex;
+  if (!override || override.size === 0) return args.zones;
+  const next = args.zones.map((zone) => {
+    const driverId = override.get(zone.zoneIndex);
+    if (driverId == null || !args.validDriverIds.has(driverId)) return zone;
+    return { ...zone, driverId };
+  });
+  const assigned = next.map((zone) => zone.driverId);
+  if (new Set(assigned).size !== assigned.length) return args.zones;
+  return next;
+}
+
 export function generateLogisticsRoutingHypotheses(
   input: RoutingProblemInput,
   options?: {
     preferredStartByDriverId?: ReadonlyMap<number, number>;
+    driverIdByZoneIndex?: ReadonlyMap<number, number>;
   }
 ): LogisticsRoutingHypothesis[] {
   const partitioned = partitionExclusiveWorkZones(input);
-  const zones = partitioned.length > 0 ? partitioned : fallbackSingleZone(input);
+  const baseZones = partitioned.length > 0 ? partitioned : fallbackSingleZone(input);
   const taskById = new Map(input.tasks.map((task) => [task.taskId, task]));
   const driverById = new Map(input.drivers.map((driver) => [driver.id, driver]));
+  const zones = applyDriverIdByZoneIndex({
+    zones: baseZones,
+    driverIdByZoneIndex: options?.driverIdByZoneIndex,
+    validDriverIds: new Set(input.drivers.map((driver) => driver.id)),
+  });
 
   const firstStopsByZone = new Map<number, Partial<Record<LogisticsHypothesisId, TaskId>>>();
   for (const zone of zones) {

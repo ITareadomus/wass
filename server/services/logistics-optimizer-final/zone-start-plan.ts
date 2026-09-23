@@ -28,11 +28,15 @@ function fallbackSingleZone(input: RoutingProblemInput): ExclusiveWorkZoneSpec[]
 }
 
 function taskOption(task: TaskNode) {
+  const lat = Number(task.location.lat);
+  const lng = Number(task.location.lng);
   return {
     taskId: task.taskId,
     logisticCode: task.logisticCode,
     address: task.location.address ?? null,
     priority: task.priority ?? null,
+    lat: Number.isFinite(lat) ? lat : null,
+    lng: Number.isFinite(lng) ? lng : null,
   };
 }
 
@@ -59,6 +63,7 @@ export function buildZoneStartPlanFromInput(input: RoutingProblemInput): Logisti
             id: zone.driverId,
             operationalCode: driver?.operationalCode,
           }),
+        zoneIndex: zone.zoneIndex,
         zoneLabel: zone.label,
         zoneColor: zone.color,
         tasks,

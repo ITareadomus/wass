@@ -57,7 +57,11 @@ import {
 import { AssignmentLoadingDialog } from "@/components/dialogs/assignment-loading-dialog";
 import { LogisticsHypothesisSwitcher } from "@/components/dialogs/logistics-hypothesis-switcher";
 import { LogisticsStartChoiceDialog } from "@/components/dialogs/logistics-start-choice-dialog";
-import type { LogisticsPreferredStartsPayload, LogisticsZoneStartPlan } from "@shared/logistics-zone-start-plan";
+import type {
+  LogisticsPreferredStartsPayload,
+  LogisticsZoneDriverAssignmentsPayload,
+  LogisticsZoneStartPlan,
+} from "@shared/logistics-zone-start-plan";
 import {
   mergeHypothesisPreviewAssignments,
   type LogisticsHypothesisPickerItem,
@@ -718,6 +722,7 @@ export default function GenerateLogisticsAssignments() {
 
   const executeLogisticsOptimizer = useCallback(async (options?: {
     preferredStarts?: LogisticsPreferredStartsPayload;
+    zoneDriverIds?: LogisticsZoneDriverAssignmentsPayload;
     skipAutoConvoke?: boolean;
   }) => {
     const dateStr = format(selectedDate, "yyyy-MM-dd");
@@ -736,6 +741,7 @@ export default function GenerateLogisticsAssignments() {
           scope: "logistics",
           skipAutoConvoke: options?.skipAutoConvoke === true,
           preferredStarts: options?.preferredStarts ?? {},
+          zoneDriverIds: options?.zoneDriverIds ?? {},
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -1635,11 +1641,12 @@ export default function GenerateLogisticsAssignments() {
             setShowStartChoiceDialog(false);
             setZoneStartPlan(null);
           }}
-          onConfirm={(preferredStarts) => {
+          onConfirm={(preferredStarts, zoneDriverIds) => {
             setShowStartChoiceDialog(false);
             setZoneStartPlan(null);
             void executeLogisticsOptimizer({
               preferredStarts,
+              zoneDriverIds,
               skipAutoConvoke: true,
             });
           }}

@@ -5,11 +5,14 @@ export interface LogisticsZoneStartTaskOption {
   logisticCode: number;
   address: string | null;
   priority: string | null;
+  lat: number | null;
+  lng: number | null;
 }
 
 export interface LogisticsDriverZoneStartChoice {
   driverId: number;
   driverName: string;
+  zoneIndex: number;
   zoneLabel: string;
   zoneColor: string;
   tasks: LogisticsZoneStartTaskOption[];
@@ -22,6 +25,9 @@ export interface LogisticsZoneStartPlan {
 
 export type LogisticsPreferredStartsPayload = Record<string, number>;
 
+/** zoneIndex → driverId after optional swaps. */
+export type LogisticsZoneDriverAssignmentsPayload = Record<string, number>;
+
 export function parsePreferredStartByDriverId(
   raw: unknown
 ): Map<number, number> {
@@ -33,6 +39,19 @@ export function parsePreferredStartByDriverId(
     if (!Number.isFinite(driverId) || driverId <= 0) continue;
     if (!Number.isFinite(taskId) || taskId <= 0) continue;
     map.set(driverId, taskId);
+  }
+  return map;
+}
+
+export function parseZoneDriverByZoneIndex(raw: unknown): Map<number, number> {
+  const map = new Map<number, number>();
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return map;
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const zoneIndex = Number(key);
+    const driverId = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(zoneIndex) || zoneIndex < 0) continue;
+    if (!Number.isFinite(driverId) || driverId <= 0) continue;
+    map.set(zoneIndex, driverId);
   }
   return map;
 }

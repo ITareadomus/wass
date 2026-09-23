@@ -1,139 +1,102 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ArrowLeftRight, Check, ChevronsUpDown, MapPin } from "lucide-react";
+import { LogisticsZoneStartMap } from "@/components/dialogs/logistics-zone-start-map";
 import { Button } from "@/components/ui/button";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { LOGISTICS_START_CHOICE_AUTO } from "@shared/logistics-zone-start-plan";
+import { getPersonnelHexColor } from "@/lib/cleaner-colors";
 import type {
+  LogisticsDriverZoneStartChoice,
   LogisticsPreferredStartsPayload,
+  LogisticsZoneDriverAssignmentsPayload,
   LogisticsZoneStartPlan,
   LogisticsZoneStartTaskOption,
 } from "@shared/logistics-zone-start-plan";
 
-const AUTO = LOGISTICS_START_CHOICE_AUTO;
-const AUTO_SEARCH_VALUE = "auto lascia scegliere algoritmo";
-
-type DriverPlan = LogisticsZoneStartPlan["drivers"][number];
-
-function taskLabel(task: LogisticsZoneStartTaskOption): string {
-  const address = task.address?.trim();
-  const priority = task.priority ? ` · ${task.priority}` : "";
-  return address
-    ? `${task.logisticCode} · ${address}${priority}`
-    : `${task.logisticCode}${priority}`;
-}
-
-function taskSearchValue(task: LogisticsZoneStartTaskOption): string {
-  return [task.logisticCode, task.address, task.priority, task.taskId]
-    .filter((part) => part != null && String(part).trim() !== "")
-    .join(" ");
-}
-
-function StartTaskCombobox({
-  driverId,
-  tasks,
-  value,
-  onChange,
-}: {
+type DriverStartDraft = {
   driverId: number;
+  driverName: string;
+  zoneIndex: number;
+  zoneLabel: string;
+  zoneColor: string;
   tasks: LogisticsZoneStartTaskOption[];
-  value: string;
-  onChange: (value: string) => void;
+  selectedTaskId: number | null;
+};
+
+function taskSearchText(task: LogisticsZoneStartTaskOption): string {
+  return [task.logisticCode, task.address, task.priority].filter(Boolean).join(" ").toLowerCase();
+}
+
+function StartAptCombobox({
+  tasks,
+  selectedTaskId,
+  onSelect,
+}: {
+  tasks: LogisticsZoneStartTaskOption[];
+  selectedTaskId: number | null;
+  onSelect: (taskId: number | null) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const selectedTask = tasks.find((task) => String(task.taskId) === value);
-  const label =
-    value !== AUTO && selectedTask ? taskLabel(selectedTask) : "Lascia scegliere all'algoritmo";
+  const selectedTask = tasks.find((task) => task.taskId === selectedTaskId) ?? null;
+  const triggerLabel = selectedTask
+    ? `${selectedTask.logisticCode}${selectedTask.address ? ` · ${selectedTask.address}` : ""}`
+    : "Lascia scegliere all'algoritmo";
 
   return (
-    <Popover open={open} onOpenChange={setOpen} modal>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
-          type="button"
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between border-2 border-custom-blue font-normal"
-          data-testid={`select-start-task-${driverId}`}
+          className="h-auto min-h-9 w-full justify-between border-custom-blue px-3 py-2 text-left font-normal"
         >
-          <span className="truncate">{label}</span>
+          <span className="min-w-0 flex-1 truncate">{triggerLabel}</span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent
-        className="z-[200] w-[var(--radix-popover-trigger-width)] p-0"
-        align="start"
-        onCloseAutoFocus={(event) => event.preventDefault()}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") event.stopPropagation();
-        }}
-      >
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command>
-          <CommandInput placeholder="Cerca codice o indirizzo..." />
+          <CommandInput placeholder="Cerca apt, indirizzo o priorità..." />
           <CommandList>
             <CommandEmpty>Nessun appartamento trovato.</CommandEmpty>
             <CommandGroup>
               <CommandItem
-                value={AUTO_SEARCH_VALUE}
+                value="lascia scegliere algoritmo automatico"
                 onSelect={() => {
-                  onChange(AUTO);
+                  onSelect(null);
                   setOpen(false);
                 }}
               >
-                <Check
-                  className={cn("mr-2 h-4 w-4", value === AUTO ? "opacity-100" : "opacity-0")}
-                />
-                Lascia scegliere all&apos;algoritmo
+                <Check className={cn("mr-2 h-4 w-4", selectedTaskId == null ? "opacity-100" : "opacity-0")} />
+                Lascia scegliere all'algoritmo
               </CommandItem>
-              {tasks.map((task) => {
-                const selected = value === String(task.taskId);
-                return (
-                  <CommandItem
-                    key={task.taskId}
-                    value={taskSearchValue(task)}
-                    onSelect={() => {
-                      onChange(String(task.taskId));
-                      setOpen(false);
-                    }}
-                  >
-                    <Check
-                      className={cn("mr-2 h-4 w-4", selected ? "opacity-100" : "opacity-0")}
-                    />
-                    <span className="truncate">{taskLabel(task)}</span>
-                  </CommandItem>
-                );
-              })}
+              {tasks.map((task) => (
+                <CommandItem
+                  key={task.taskId}
+                  value={`${task.taskId} ${taskSearchText(task)}`}
+                  onSelect={() => {
+                    onSelect(task.taskId);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", selectedTaskId === task.taskId ? "opacity-100" : "opacity-0")} />
+                  <span className="min-w-0 flex-1 truncate">
+                    {task.logisticCode}
+                    {task.address ? ` · ${task.address}` : ""}
+                    {task.priority ? ` · ${task.priority}` : ""}
+                  </span>
+                </CommandItem>
+              ))}
             </CommandGroup>
           </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
-  );
-}
-
-function isPopoverOutsideEvent(event: { target: EventTarget | null }): boolean {
-  const target = event.target;
-  if (!(target instanceof Element)) return false;
-  return Boolean(
-    target.closest("[data-radix-popper-content-wrapper]") ||
-      target.closest("[cmdk-list]") ||
-      target.closest("[cmdk-input-wrapper]")
   );
 }
 
@@ -146,34 +109,92 @@ export function LogisticsStartChoiceDialog({
   open: boolean;
   plan: LogisticsZoneStartPlan | null;
   onCancel: () => void;
-  onConfirm: (preferredStarts: LogisticsPreferredStartsPayload) => void;
+  onConfirm: (
+    preferredStarts: LogisticsPreferredStartsPayload,
+    zoneDriverIds: LogisticsZoneDriverAssignmentsPayload,
+  ) => void;
 }) {
-  const [choices, setChoices] = useState<Record<string, string>>({});
+  const [drafts, setDrafts] = useState<DriverStartDraft[]>([]);
+  const [swapNonce, setSwapNonce] = useState(0);
 
   useEffect(() => {
-    if (!open || !plan) return;
-    const next: Record<string, string> = {};
-    for (const driver of plan.drivers) {
-      next[String(driver.driverId)] = AUTO;
-    }
-    setChoices(next);
+    if (!open) return;
+    setDrafts(
+      (plan?.drivers ?? []).map((driver) => ({
+        driverId: driver.driverId,
+        driverName: driver.driverName,
+        zoneIndex: driver.zoneIndex,
+        zoneLabel: driver.zoneLabel,
+        zoneColor: getPersonnelHexColor(driver.driverId, "logistics"),
+        tasks: driver.tasks,
+        selectedTaskId: null,
+      })),
+    );
+    setSwapNonce(0);
   }, [open, plan]);
 
-  const drivers = plan?.drivers ?? [];
-  const canConfirm = drivers.length > 0;
+  const selectedTaskIds = useMemo(() => {
+    return new Set(
+      drafts
+        .map((draft) => draft.selectedTaskId)
+        .filter((taskId): taskId is number => Number.isInteger(taskId) && taskId > 0),
+    );
+  }, [drafts]);
 
-  const payload = useMemo(() => {
+  const mapDrivers = useMemo<LogisticsDriverZoneStartChoice[]>(
+    () =>
+      drafts.map((draft) => ({
+        driverId: draft.driverId,
+        driverName: draft.driverName,
+        zoneIndex: draft.zoneIndex,
+        zoneLabel: draft.zoneLabel,
+        zoneColor: draft.zoneColor,
+        tasks: draft.tasks,
+      })),
+    [drafts],
+  );
+
+  const swapZone = (fromDriverId: number, toDriverId: number) => {
+    if (fromDriverId === toDriverId) return;
+    setDrafts((current) => {
+      const fromIndex = current.findIndex((draft) => draft.driverId === fromDriverId);
+      const toIndex = current.findIndex((draft) => draft.driverId === toDriverId);
+      if (fromIndex < 0 || toIndex < 0) return current;
+      const next = current.map((draft) => ({ ...draft }));
+      const from = next[fromIndex];
+      const to = next[toIndex];
+      next[fromIndex] = {
+        ...from,
+        zoneIndex: to.zoneIndex,
+        zoneLabel: to.zoneLabel,
+        tasks: to.tasks,
+        selectedTaskId: to.selectedTaskId,
+      };
+      next[toIndex] = {
+        ...to,
+        zoneIndex: from.zoneIndex,
+        zoneLabel: from.zoneLabel,
+        tasks: from.tasks,
+        selectedTaskId: from.selectedTaskId,
+      };
+      return next;
+    });
+    setSwapNonce((value) => value + 1);
+  };
+
+  const handleConfirm = () => {
     const preferredStarts: LogisticsPreferredStartsPayload = {};
-    for (const driver of drivers) {
-      const value = choices[String(driver.driverId)] ?? AUTO;
-      if (value === AUTO) continue;
-      const taskId = Number(value);
-      if (Number.isFinite(taskId) && taskId > 0) {
-        preferredStarts[String(driver.driverId)] = taskId;
+    const zoneDriverIds: LogisticsZoneDriverAssignmentsPayload = {};
+    for (const draft of drafts) {
+      zoneDriverIds[String(draft.zoneIndex)] = draft.driverId;
+      if (draft.selectedTaskId != null) {
+        preferredStarts[String(draft.driverId)] = draft.selectedTaskId;
       }
     }
-    return preferredStarts;
-  }, [choices, drivers]);
+    onConfirm(preferredStarts, zoneDriverIds);
+  };
+
+  const canSwap = drafts.length >= 2;
 
   return (
     <Dialog
@@ -182,79 +203,107 @@ export function LogisticsStartChoiceDialog({
         if (!nextOpen) onCancel();
       }}
     >
-      <DialogContent
-        className="max-h-[85vh] overflow-y-auto sm:max-w-xl"
-        data-testid="dialog-logistics-start-choice"
-        onPointerDownOutside={(event) => {
-          if (isPopoverOutsideEvent(event)) event.preventDefault();
-        }}
-        onFocusOutside={(event) => {
-          if (isPopoverOutsideEvent(event)) event.preventDefault();
-        }}
-        onInteractOutside={(event) => {
-          if (isPopoverOutsideEvent(event)) event.preventDefault();
-        }}
-      >
+      <DialogContent className="max-h-[92vh] w-[min(96vw,1180px)] max-w-[1180px] overflow-hidden border-custom-blue">
         <DialogHeader>
-          <DialogTitle>Da dove partire</DialogTitle>
+          <DialogTitle>Scegli il primo appartamento per ogni autista</DialogTitle>
           <DialogDescription>
-            I giri sono già divisi per autista. Per ciascuno scegli il primo task, oppure lascia
-            che lo scelga l&apos;algoritmo. Puoi digitare codice o indirizzo per trovarlo.
+            A destra vedi le zone geografiche colorate per autista. Puoi scambiarle e, se vuoi, fissare da quale apt parte
+            ciascuno: il punto scelto si evidenzia in giallo sulla mappa.
           </DialogDescription>
         </DialogHeader>
-
-        <div className="space-y-4">
-          {drivers.map((driver: DriverPlan) => (
-            <div
-              key={driver.driverId}
-              className="rounded-md border-2 border-custom-blue/50 p-3"
-              data-testid={`start-choice-driver-${driver.driverId}`}
-            >
-              <div className="mb-2 flex items-center gap-2">
-                <span
-                  className="h-3 w-3 shrink-0 rounded-full"
-                  style={{ backgroundColor: driver.zoneColor }}
-                  aria-hidden
-                />
-                <p className="min-w-0 truncate text-sm font-semibold text-foreground">
-                  {driver.driverName}
-                </p>
-                <span className="text-xs text-muted-foreground">{driver.zoneLabel}</span>
+        <div className="grid min-h-0 max-h-[68vh] gap-4 overflow-y-auto lg:grid-cols-[minmax(280px,0.95fr)_minmax(420px,1.15fr)] lg:overflow-hidden">
+          <div className="space-y-4 pr-1 lg:max-h-full lg:overflow-y-auto">
+            {drafts.map((driver) => (
+              <div key={driver.driverId} className="space-y-2 rounded-md border-2 border-custom-blue p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="h-3 w-3 shrink-0 rounded-full border border-black/10"
+                        style={{ backgroundColor: driver.zoneColor }}
+                        aria-hidden
+                      />
+                      <p className="truncate text-sm font-semibold">{driver.driverName}</p>
+                    </div>
+                    <p className="mt-1 text-xs text-custom-blue">{driver.zoneLabel}</p>
+                  </div>
+                  {canSwap ? (
+                    <div className="flex min-w-[176px] items-center gap-1">
+                      <Select
+                        key={`${driver.driverId}-${swapNonce}`}
+                        onValueChange={(value) => {
+                          const targetId = Number(value);
+                          if (Number.isInteger(targetId) && targetId > 0) {
+                            swapZone(driver.driverId, targetId);
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-8 border-custom-blue text-xs">
+                          <SelectValue placeholder="Scambia con zona" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {drafts
+                            .filter((other) => other.driverId !== driver.driverId)
+                            .map((other) => (
+                              <SelectItem key={other.driverId} value={String(other.driverId)}>
+                                {other.zoneLabel}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <ArrowLeftRight className="h-4 w-4 shrink-0 text-custom-blue" aria-hidden />
+                    </div>
+                  ) : null}
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="flex items-center gap-1.5 text-xs text-custom-blue">
+                    <MapPin className="h-3.5 w-3.5" />
+                    Primo appartamento
+                  </Label>
+                  <StartAptCombobox
+                    tasks={driver.tasks}
+                    selectedTaskId={driver.selectedTaskId}
+                    onSelect={(taskId) =>
+                      setDrafts((current) =>
+                        current.map((draft) =>
+                          draft.driverId === driver.driverId ? { ...draft, selectedTaskId: taskId } : draft,
+                        ),
+                      )
+                    }
+                  />
+                </div>
               </div>
-              <StartTaskCombobox
-                driverId={driver.driverId}
-                tasks={driver.tasks}
-                value={choices[String(driver.driverId)] ?? AUTO}
-                onChange={(nextValue) =>
-                  setChoices((current) => ({
-                    ...current,
-                    [String(driver.driverId)]: nextValue,
-                  }))
-                }
-              />
-            </div>
-          ))}
+            ))}
+          </div>
+          <div className="min-h-[280px] h-[42vh] lg:h-full lg:min-h-[360px]">
+            <LogisticsZoneStartMap
+              drivers={mapDrivers}
+              selectedTaskIds={selectedTaskIds}
+              onSelectTask={(driverId, taskId) =>
+                setDrafts((current) =>
+                  current.map((draft) => (draft.driverId === driverId ? { ...draft, selectedTaskId: taskId } : draft)),
+                )
+              }
+            />
+          </div>
         </div>
-
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            className="border-2 border-custom-blue"
-            onClick={onCancel}
-            data-testid="button-cancel-start-choice"
-          >
-            Annulla
-          </Button>
-          <Button
-            type="button"
-            className="border-2 border-custom-blue"
-            disabled={!canConfirm}
-            onClick={() => onConfirm(payload)}
-            data-testid="button-confirm-start-choice"
-          >
-            Continua
-          </Button>
+        <DialogFooter className="gap-2 sm:justify-between">
+          <p className="text-xs text-custom-blue">
+            Clicca un punto sulla mappa per fissare il primo apt. I colori coincidono con quelli della timeline.
+          </p>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="border-2 border-custom-blue" onClick={onCancel}>
+              Annulla
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-2 border-custom-blue bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={handleConfirm}
+            >
+              Continua
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

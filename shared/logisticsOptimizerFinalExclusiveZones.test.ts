@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildRoutingProblemInputFromSource } from "../server/services/logistics-optimizer-final/build-routing-input";
 import {
   computeExclusiveWorkZones,
+  geographicZoneLabels,
   partitionExclusiveWorkZones,
 } from "../server/services/logistics-optimizer-final/exclusive-work-zones";
 import { generateLogisticsRoutingHypotheses } from "../server/services/logistics-optimizer-final/routing-hypotheses";
@@ -387,6 +388,56 @@ describe("exclusive work zones", () => {
     const listed = plan.drivers.flatMap((driver) => driver.tasks.map((task) => task.taskId)).sort();
     expect(listed).toEqual([1, 2, 3, 4]);
     expect(plan.drivers.every((driver) => driver.tasks.length > 0)).toBe(true);
+    expect(plan.drivers.every((driver) => Number.isInteger(driver.zoneIndex))).toBe(true);
+    expect(
+      plan.drivers.every((driver) =>
+        driver.tasks.every(
+          (task) => Number.isFinite(task.lat) && Number.isFinite(task.lng)
+        )
+      )
+    ).toBe(true);
+  });
+
+  it("labels exclusive zones by number", () => {
+    expect(geographicZoneLabels(2)).toEqual(["Zona 1", "Zona 2"]);
+    expect(geographicZoneLabels(3)).toEqual(["Zona 1", "Zona 2", "Zona 3"]);
+    const tasks = [
+      makeTask(1, 45.51, 9.19),
+      makeTask(2, 45.508, 9.188),
+      makeTask(3, 45.43, 9.17),
+      makeTask(4, 45.432, 9.172),
+    ];
+    const input = buildRoutingProblemInputFromSource(buildSource(tasks, 2));
+    const labels = partitionExclusiveWorkZones(input).map((zone) => zone.label);
+    expect(labels).toEqual(["Zona 1", "Zona 2"]);
+  });
+
+  it("assigns swapped exclusive zones to the chosen drivers", () => {
+    const tasks = [
+      makeTask(1, 45.51, 9.19),
+      makeTask(2, 45.508, 9.188),
+      makeTask(3, 45.43, 9.17),
+      makeTask(4, 45.432, 9.172),
+    ];
+    const input = buildRoutingProblemInputFromSource(buildSource(tasks, 2));
+    const zones = partitionExclusiveWorkZones(input);
+    expect(zones).toHaveLength(2);
+    const driverIdByZoneIndex = new Map<number, number>([
+      [zones[0].zoneIndex, zones[1].driverId],
+      [zones[1].zoneIndex, zones[0].driverId],
+    ]);
+    const hypotheses = generateLogisticsRoutingHypotheses(input, { driverIdByZoneIndex });
+    expect(hypotheses).toHaveLength(3);
+    for (const hypothesis of hypotheses) {
+      for (const zone of zones) {
+        const driverId = driverIdByZoneIndex.get(zone.zoneIndex);
+        const route = hypothesis.solution.routes.find((entry) => entry.driverId === driverId);
+        const stopIds = new Set(route?.stops.map((stop) => stop.taskId) ?? []);
+        for (const taskId of zone.taskIds) {
+          expect(stopIds.has(taskId)).toBe(true);
+        }
+      }
+    }
   });
 
   it("starts every hypothesis from the driver start chosen by the user", () => {

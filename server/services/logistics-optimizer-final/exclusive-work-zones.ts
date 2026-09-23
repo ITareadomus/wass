@@ -52,6 +52,10 @@ function geographicDistance(left: { lat: number; lng: number }, right: { lat: nu
   return haversineMeters(Number(left.lat), Number(left.lng), Number(right.lat), Number(right.lng));
 }
 
+export function geographicZoneLabels(count: number): string[] {
+  return Array.from({ length: Math.max(0, count) }, (_, index) => `Zona ${index + 1}`);
+}
+
 function buildingCoordKey(lat: number, lng: number): string {
   return `${Number(lat).toFixed(5)},${Number(lng).toFixed(5)}`;
 }
@@ -494,6 +498,8 @@ function clusterExclusiveZones(args: {
     driverAssignments.map((assignment) => [assignment.territoryIndex, assignment.assignedDriverId])
   );
 
+  const labels = geographicZoneLabels(nonEmpty.length);
+
   return nonEmpty.map((entry, zoneIndex) => {
     const locatedInZone = entry.zoneTasks.filter(hasFiniteCoordinates);
     const centroid =
@@ -503,7 +509,7 @@ function clusterExclusiveZones(args: {
     return {
       zoneIndex,
       zoneId: `exclusive-zone:${zoneIndex}`,
-      label: `Zona ${zoneIndex + 1}`,
+      label: labels[zoneIndex] ?? `Zona ${zoneIndex + 1}`,
       driverId: driverByZone.get(zoneIndex) ?? drivers[zoneIndex % drivers.length].id,
       taskIds: entry.zoneTasks.map((task) => task.taskId).sort((left, right) => left - right),
       centroid,
