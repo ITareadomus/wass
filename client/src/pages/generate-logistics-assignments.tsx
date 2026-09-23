@@ -15,6 +15,13 @@ import {
 import { useLogisticsExecutionStatusPoll } from "@/hooks/use-logistics-execution-status-poll";
 import { isWorkDateHistoricallyLocked } from "@shared/work-date-access";
 import {
+  bindLogisticsProgramPoll,
+  markLogisticsProgramCatchupDone,
+  nudgeLogisticsProgramPoll,
+} from "@/lib/logistics-program-poll";
+import type { LogisticsAssignedSyncNotice } from "@shared/logistics-assigned-sync-diff";
+import { ensureProgramPollClock, flushProgramPollTick } from "@/lib/program-poll-clock";
+import {
   CalendarIcon,
   RefreshCw,
   Search,
@@ -460,6 +467,7 @@ export default function GenerateLogisticsAssignments() {
   const [activeDragDriverId, setActiveDragDriverId] = useState<number | null>(null);
   /** Estrazione / refresh da ADAM al cambio data (come checkAndAutoLoadSavedAssignments + extractData su HK) */
   const [isExtractingLogistics, setIsExtractingLogistics] = useState(false);
+  const [adamSyncNotice, setAdamSyncNotice] = useState<LogisticsAssignedSyncNotice | null>(null);
   const [extractionStep, setExtractionStep] = useState("Inizializzazione...");
   /** Allinea titolo e riga "Step x/2" al loader housekeeping */
   const [logisticsLoaderKind, setLogisticsLoaderKind] = useState<
@@ -469,6 +477,8 @@ export default function GenerateLogisticsAssignments() {
   const lastValidDragIndexRef = useRef<number | null>(null);
   const isDraggingRef = useRef(false);
   const dragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isExtractingLogisticsRef = useRef(false);
+  const logisticsProgramBlockedRef = useRef(false);
 
   const isTimelineReadOnly = isWorkDateHistoricallyLocked(selectedDate);
 
@@ -529,15 +539,19 @@ export default function GenerateLogisticsAssignments() {
     }
   }, [toast]);
 
-  const loadLogisticsTimelineState = useCallback(async (date: Date) => {
+  const loadLogisticsTimelineState = useCallback(async (
+    date: Date,
+    options?: { preserveSchedule?: boolean }
+  ) => {
     const dateStr = format(date, "yyyy-MM-dd");
+    const preserve = options?.preserveSchedule ? "&preserveSchedule=1" : "";
     try {
       const [selRes, tlRes] = await Promise.all([
         fetch(`/api/selected-logistics-drivers?date=${dateStr}`, {
           cache: "no-store",
           headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
         }),
-        fetch(`/api/logistics-timeline?date=${dateStr}`, {
+        fetch(`/api/logistics-timeline?date=${dateStr}${preserve}`, {
           cache: "no-store",
           headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
         }),
@@ -577,9 +591,9 @@ export default function GenerateLogisticsAssignments() {
     }
   }, []);
 
-  const reloadLogisticsPage = useCallback(async () => {
+  const reloadLogisticsPage = useCallback(async (options?: { preserveSchedule?: boolean }) => {
     await loadLogisticsContainers(selectedDate);
-    await loadLogisticsTimelineState(selectedDate);
+    await loadLogisticsTimelineState(selectedDate, options);
   }, [selectedDate, loadLogisticsContainers, loadLogisticsTimelineState]);
 
   const hasTimelineAssignments = logisticsDriversAssignments.some(
@@ -613,8 +627,9 @@ export default function GenerateLogisticsAssignments() {
   }, [reloadLogisticsPage]);
 
   /**
-   * Allineato a generate-assignments: data passata → solo PG; data oggi/futura → se la timeline ha già task
-   * per quella data si ricarica senza script; altrimenti extract driver + create_containers logistics (ADAM).
+   * Data passata: solo PostgreSQL. Data oggi/futura: se la timeline ha già task si mostra quella,
+   * senza riscrivere gli orari del giro; il polling programma fa poi il catch-up da ADAM/HK.
+   * Timeline vuota: extract driver + refresh containers.
    */
   useEffect(() => {
     let cancelled = false;
@@ -623,11 +638,15 @@ export default function GenerateLogisticsAssignments() {
 
     const run = async () => {
       if (isWorkDateHistoricallyLocked(date)) {
+        isExtractingLogisticsRef.current = false;
+        markLogisticsProgramCatchupDone("");
         await loadLogisticsContainers(date);
-        await loadLogisticsTimelineState(date);
+        await loadLogisticsTimelineState(date, { preserveSchedule: true });
         return;
       }
 
+      isExtractingLogisticsRef.current = true;
+      markLogisticsProgramCatchupDone("");
       setIsExtractingLogistics(true);
       setLogisticsLoaderKind("general");
       setExtractionStep("Caricamento dati...");
@@ -650,7 +669,7 @@ export default function GenerateLogisticsAssignments() {
           setLogisticsLoaderKind("load-tasks");
           setExtractionStep("Caricamento task nei contenitori...");
           await loadLogisticsContainers(date);
-          await loadLogisticsTimelineState(date);
+          await loadLogisticsTimelineState(date, { preserveSchedule: true });
           setExtractionStep("Dati caricati!");
           await new Promise((resolve) => setTimeout(resolve, 100));
           return;
@@ -679,6 +698,7 @@ export default function GenerateLogisticsAssignments() {
           const j = await refreshRes.json().catch(() => ({}));
           throw new Error((j as { error?: string }).error || "Refresh containers fallito");
         }
+        markLogisticsProgramCatchupDone(dateStr);
 
         if (cancelled) return;
 
@@ -702,6 +722,7 @@ export default function GenerateLogisticsAssignments() {
         await loadLogisticsTimelineState(date);
       } finally {
         if (!cancelled) {
+          isExtractingLogisticsRef.current = false;
           setIsExtractingLogistics(false);
           setExtractionStep("Inizializzazione...");
           setLogisticsLoaderKind("general");
@@ -899,6 +920,77 @@ export default function GenerateLogisticsAssignments() {
     [logisticsHypotheses, previewHypothesisId]
   );
   const isHypothesisPreview = selectedHypothesis != null;
+
+  logisticsProgramBlockedRef.current =
+    isExtractingLogistics ||
+    isRunningLogisticsOptimizer ||
+    isHypothesisPreview ||
+    isPlanningZoneStarts ||
+    isLoadingDragDrop ||
+    isDraggingTimelineTask ||
+    isDraggingRef.current;
+
+  const logisticsPollBindingRef = useRef({
+    getWorkDate: () => format(selectedDate, "yyyy-MM-dd"),
+    isBlocked: () => logisticsProgramBlockedRef.current || isDraggingRef.current,
+    onSynced: async (workDate: string, notice: LogisticsAssignedSyncNotice | null) => {
+      if (format(selectedDate, "yyyy-MM-dd") !== workDate) return;
+      setAdamSyncNotice(notice?.tasks.length ? notice : null);
+      await reloadLogisticsPage({ preserveSchedule: true });
+    },
+    onError: (message: string) => {
+      toast({
+        variant: "destructive",
+        title: "Errore sync logistica automatica",
+        description: message,
+      });
+    },
+  });
+  logisticsPollBindingRef.current = {
+    getWorkDate: () => format(selectedDate, "yyyy-MM-dd"),
+    isBlocked: () =>
+      isTimelineReadOnly ||
+      isExtractingLogisticsRef.current ||
+      logisticsProgramBlockedRef.current ||
+      isDraggingRef.current,
+    onSynced: async (workDate: string, notice: LogisticsAssignedSyncNotice | null) => {
+      if (format(selectedDate, "yyyy-MM-dd") !== workDate) return;
+      setAdamSyncNotice(notice?.tasks.length ? notice : null);
+      await reloadLogisticsPage({ preserveSchedule: true });
+    },
+    onError: (message: string) => {
+      toast({
+        variant: "destructive",
+        title: "Errore sync logistica automatica",
+        description: message,
+      });
+    },
+  };
+
+  useEffect(() => {
+    return bindLogisticsProgramPoll(() => logisticsPollBindingRef.current);
+  }, []);
+
+  useEffect(() => {
+    const startedClock = ensureProgramPollClock();
+    if (startedClock) flushProgramPollTick();
+  }, []);
+
+  useEffect(() => {
+    setAdamSyncNotice(null);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    nudgeLogisticsProgramPoll();
+  }, [
+    isTimelineReadOnly,
+    isExtractingLogistics,
+    isRunningLogisticsOptimizer,
+    isHypothesisPreview,
+    isPlanningZoneStarts,
+    isLoadingDragDrop,
+    isDraggingTimelineTask,
+  ]);
 
   const displayedDriversAssignments = useMemo(() => {
     if (!selectedHypothesis) return logisticsDriversAssignments;
@@ -1528,6 +1620,7 @@ export default function GenerateLogisticsAssignments() {
                   activeDragDriverId={activeDragDriverId}
                   lastValidDragIndex={lastValidDragIndex}
                   onRefresh={reloadLogisticsPage}
+                  adamSyncNotice={adamSyncNotice}
                   className={!showContainers ? "rounded-tr-none" : undefined}
                 />
                 <TimelineFloatingPanel

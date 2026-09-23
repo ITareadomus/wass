@@ -305,4 +305,50 @@ describe("buildLogisticsContainerAutoKindPatches", () => {
       },
     ]);
   });
+
+  it("recomputes a persisted auto kind and clears it when housekeeping context is gone", () => {
+    const patches = buildLogisticsContainerAutoKindPatches(
+      [
+        {
+          task_id: 199,
+          logistics_task_kind: "pick-up",
+          logistics_task_kind_source: "auto",
+        },
+        {
+          task_id: 200,
+          logistics_task_kind: "pick-up",
+          logistics_task_kind_source: "auto",
+        },
+      ],
+      new Map<number, any>([
+        [
+          199,
+          {
+            logistics_task_kind: "delivery/pick-up",
+            logistics_task_kind_source: "auto",
+          },
+        ],
+        [
+          200,
+          {
+            logistics_task_kind: null,
+            logistics_task_kind_source: null,
+          },
+        ],
+      ])
+    );
+
+    expect(patches).toEqual([
+      {
+        taskId: 199,
+        logistics_task_kind: "delivery/pick-up",
+        logistics_task_kind_source: "auto",
+      },
+      {
+        taskId: 200,
+        logistics_task_kind: null,
+        logistics_task_kind_source: null,
+      },
+    ]);
+  });
 });

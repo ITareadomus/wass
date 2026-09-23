@@ -164,6 +164,7 @@ export interface PgLogisticsAssignmentRow {
   is_finished?: boolean;
   logistics_task_kind?: string | null;
   logistics_task_kind_source?: string | null;
+  adam_assignment_snapshot?: Record<string, unknown> | null;
 }
 
 export class PgDailyAssignmentsService {
@@ -933,6 +934,12 @@ export class PgDailyAssignmentsService {
       );
       await query(
         `ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS logistics_task_kind_source VARCHAR(20)`
+      );
+      await query(
+        `ALTER TABLE IF EXISTS lg_timeline ADD COLUMN IF NOT EXISTS adam_assignment_snapshot JSONB`
+      );
+      await query(
+        `ALTER TABLE IF EXISTS lg_timeline_history ADD COLUMN IF NOT EXISTS adam_assignment_snapshot JSONB`
       );
       await query(
         `ALTER TABLE IF EXISTS lg_timeline ADD COLUMN IF NOT EXISTS is_finished BOOLEAN NOT NULL DEFAULT FALSE`
@@ -1944,6 +1951,10 @@ export class PgDailyAssignmentsService {
             task.logistics_task_kind_source != null
               ? String(task.logistics_task_kind_source)
               : null,
+          adam_assignment_snapshot:
+            task.adam_assignment_snapshot && typeof task.adam_assignment_snapshot === "object"
+              ? task.adam_assignment_snapshot
+              : null,
         });
       }
     }
@@ -2004,7 +2015,8 @@ export class PgDailyAssignmentsService {
             pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
             type_apt, alias, customer_name, customer_reference, customer_note, customer_note_history, reasons, manually_moved, priority,
             start_time, end_time, followup, sequence, travel_time, checkout_wait_minutes,
-            logistics_task_kind, logistics_task_kind_source, is_finished, manual_start_time
+            logistics_task_kind, logistics_task_kind_source, is_finished, manual_start_time,
+            adam_assignment_snapshot
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8,
             $9, $10, $11,
@@ -2013,7 +2025,7 @@ export class PgDailyAssignmentsService {
             $22, $23, $24, $25, $26, $27,
             $28, $29, $30, $31, $32, $33, $34, $35, $36,
             $37, $38, $39, $40, $41, $42,
-            $43, $44, $45, $46
+            $43, $44, $45, $46, $47
           )
         `, [
           row.work_date,
@@ -2062,6 +2074,7 @@ export class PgDailyAssignmentsService {
           row.logistics_task_kind_source,
           row.is_finished === true,
           row.manual_start_time || null,
+          row.adam_assignment_snapshot ? JSON.stringify(row.adam_assignment_snapshot) : null,
         ]);
       }
       await client.query('COMMIT');
@@ -2173,9 +2186,18 @@ export class PgDailyAssignmentsService {
         }
         if ((row as any).logistics_task_kind != null) {
           task.logistics_task_kind = String((row as any).logistics_task_kind);
+          task.persisted_logistics_task_kind = String((row as any).logistics_task_kind);
+        } else {
+          task.persisted_logistics_task_kind = null;
         }
         if ((row as any).logistics_task_kind_source != null) {
           task.logistics_task_kind_source = String((row as any).logistics_task_kind_source);
+          task.persisted_logistics_task_kind_source = String((row as any).logistics_task_kind_source);
+        } else {
+          task.persisted_logistics_task_kind_source = null;
+        }
+        if ((row as any).adam_assignment_snapshot && typeof (row as any).adam_assignment_snapshot === "object") {
+          task.adam_assignment_snapshot = (row as any).adam_assignment_snapshot;
         }
 
         const cleanerCtx = cleanerContextByTaskId.get(Number(row.task_id));

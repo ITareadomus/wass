@@ -2812,6 +2812,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         message: `Logistics containers rigenerati da ADAM per ${workDate}`,
         removedDuplicates: refreshResult.removedCount,
+        assignedChanges: refreshResult.assignedChanges ?? { syncedAt: new Date().toISOString(), tasks: [] },
       });
     } catch (error: any) {
       console.error("Errore refresh logistics-containers:", error);
@@ -2830,13 +2831,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           meta: { total_drivers: 0, used_drivers: 0, assigned_tasks: 0 },
         });
       }
+      const preserveSchedule =
+        req.query.preserveSchedule === "1" ||
+        req.query.preserveSchedule === "true";
       if (Array.isArray(timeline.drivers_assignments)) {
         for (const entry of timeline.drivers_assignments) {
           const tasks = entry?.tasks;
           if (!tasks?.length) continue;
           tasks.sort((a: any, b: any) => (a.sequence ?? 9999) - (b.sequence ?? 9999));
         }
-        const scheduleChanged = await recalculateLogisticsTimeline(timeline, workDate);
+        const scheduleChanged = preserveSchedule
+          ? false
+          : await recalculateLogisticsTimeline(timeline, workDate);
         const { enrichDriverTasksWithLogisticsKind } = await import(
           "./services/logistics-task-kind-enrichment"
         );
@@ -3031,8 +3037,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Resolve housekeeping cleaner for a logistics task (daily_assignments_current + aliases)
+  // Dettagli cleaner già trasferiti su ADAM (non la timeline WASS housekeeping).
   app.get("/api/logistics-task-housekeeping-cleaner", async (req, res) => {
+    let adamConnection: mysql.Connection | null = null;
     try {
       const workDate = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
       const taskIdRaw = req.query.taskId as string | undefined;
@@ -3049,47 +3056,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // altrimenti si fa fallback sul logistic_code (callsite legacy che hanno solo il
       // codice ADAM).
       const useTaskIdMatch = normalizedTaskId.length > 0;
-      const matchValue = useTaskIdMatch ? normalizedTaskId : normalizedLogisticCode;
+      const matchValue = useTaskIdMatch ? Number(normalizedTaskId) : Number(normalizedLogisticCode);
+      if (!Number.isFinite(matchValue)) {
+        return res.status(400).json({ success: false, error: "taskId or logisticCode must be numeric" });
+      }
 
       const { query } = await import("../shared/pg-db");
-      const [housekeepingResult, logisticsResult] = await Promise.all([
-        query(
+      adamConnection = await mysql.createConnection({
+        host: databaseConfig.mysql.host,
+        port: databaseConfig.mysql.port,
+        user: databaseConfig.mysql.user,
+        password: databaseConfig.mysql.password,
+        database: databaseConfig.mysql.database,
+      });
+
+      const hkFilter = useTaskIdMatch ? "h.id = ?" : "s.logistic_code = ?";
+      const [housekeepingRows, logisticsResult]: [any, any] = await Promise.all([
+        adamConnection.execute(
           `
             SELECT
-              dac.cleaner_id,
-              dac.cleaner_name,
-              dac.cleaner_lastname,
-              dac.sequence,
-              dac.start_time::text AS start_time,
-              dac.end_time::text AS end_time,
-              dac.travel_time,
-              a.alias,
-              COALESCE(
-                NULLIF(TRIM(a.alias), ''),
-                NULLIF(TRIM(CONCAT(COALESCE(dac.cleaner_name, ''), ' ', COALESCE(dac.cleaner_lastname, ''))), ''),
-                'Cleaner ' || dac.cleaner_id::text
-              ) AS cleaner_label
-            FROM daily_assignments_current dac
-            LEFT JOIN aliases a ON a.cleaner_id = dac.cleaner_id
-            WHERE dac.work_date = $1
-              AND (dac.scope = 'housekeeping' OR dac.scope IS NULL)
-              AND (
-                ($3::boolean IS TRUE AND dac.task_id::text = $2)
-                OR ($3::boolean IS FALSE AND dac.logistic_code::text = $2)
-              )
-            ORDER BY
-              EXISTS (
-                SELECT 1 FROM task_collaborators tc
-                WHERE tc.work_date = dac.work_date
-                  AND tc.task_id = dac.task_id
-                  AND tc.cleaner_id = dac.cleaner_id
-                  AND tc.is_primary IS TRUE
-              ) DESC,
-              dac.sequence ASC NULLS LAST,
-              dac.id ASC
+              h.cleaned_by_us AS cleaner_id,
+              u.name AS cleaner_name,
+              u.lastname AS cleaner_lastname,
+              h.sequence AS sequence,
+              h.start_time AS start_time,
+              h.end_time AS end_time,
+              h.travel_time AS travel_time
+            FROM app_housekeeping h
+            LEFT JOIN app_users u ON u.id = h.cleaned_by_us
+            LEFT JOIN app_structures s ON s.id = h.structure_id
+            WHERE h.checkout = ?
+              AND h.deleted_at IS NULL
+              AND h.deleted_at_client IS NULL
+              AND h.cleaned_by_us IS NOT NULL
+              AND h.cleaned_by_us > 0
+              AND ${hkFilter}
+            ORDER BY h.sequence ASC, h.id ASC
             LIMIT 1
           `,
-          [workDate, matchValue, useTaskIdMatch]
+          [workDate, matchValue]
         ),
         query(
           `
@@ -3103,34 +3108,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ORDER BY lt.sequence ASC, lt.id ASC
             LIMIT 1
           `,
-          [workDate, matchValue, useTaskIdMatch]
+          [workDate, String(matchValue), useTaskIdMatch]
         ),
       ]);
 
-      const hkRow = housekeepingResult.rows?.[0];
+      const hkRow = Array.isArray(housekeepingRows?.[0]) ? housekeepingRows[0][0] : null;
       const lgRow = logisticsResult.rows?.[0];
 
       if (!hkRow && !lgRow) {
         return res.json({ success: true, found: false });
       }
 
+      const cleanerName = hkRow?.cleaner_name != null ? String(hkRow.cleaner_name).trim() : "";
+      const cleanerLastname = hkRow?.cleaner_lastname != null ? String(hkRow.cleaner_lastname).trim() : "";
+      const cleanerId = hkRow?.cleaner_id != null ? Number(hkRow.cleaner_id) : null;
+      const sequence = hkRow?.sequence != null ? Number(hkRow.sequence) : null;
+      let alias = "";
+      if (Number.isFinite(cleanerId) && (cleanerId as number) > 0) {
+        const aliasResult = await query(
+          `SELECT alias FROM aliases WHERE cleaner_id = $1 LIMIT 1`,
+          [cleanerId]
+        );
+        alias = String(aliasResult.rows?.[0]?.alias ?? "").trim();
+      }
+      const nameLabel = [cleanerName, cleanerLastname].filter(Boolean).join(" ").trim();
+      const toHm = (value: unknown): string | null => {
+        if (value == null || value === "") return null;
+        const text = String(value).trim();
+        const match = text.match(/^(\d{1,2}):(\d{2})/);
+        if (!match) return text || null;
+        return `${match[1].padStart(2, "0")}:${match[2]}`;
+      };
+
       res.json({
         success: true,
         found: true,
-        cleanerId: hkRow?.cleaner_id ?? null,
-        alias: hkRow?.alias || null,
-        cleanerName: hkRow?.cleaner_name || null,
-        cleanerLastname: hkRow?.cleaner_lastname || null,
-        sequence: hkRow?.sequence ?? null,
-        startTime: hkRow?.start_time ?? null,
-        endTime: hkRow?.end_time ?? null,
-        travelTime: hkRow?.travel_time ?? null,
+        cleanerId: Number.isFinite(cleanerId) && (cleanerId as number) > 0 ? cleanerId : null,
+        alias: alias || null,
+        cleanerName: cleanerName || null,
+        cleanerLastname: cleanerLastname || null,
+        sequence: Number.isFinite(sequence) && (sequence as number) > 0 ? sequence : null,
+        startTime: toHm(hkRow?.start_time),
+        endTime: toHm(hkRow?.end_time),
+        travelTime: hkRow?.travel_time != null && hkRow.travel_time !== "" ? Number(hkRow.travel_time) : null,
         logisticsSequence: lgRow?.sequence ?? null,
-        cleanerLabel: hkRow?.cleaner_label || null,
+        cleanerLabel: alias || nameLabel || (cleanerId ? `Cleaner ${cleanerId}` : null),
       });
     } catch (error: any) {
       console.error("GET /api/logistics-task-housekeeping-cleaner:", error);
       res.status(500).json({ success: false, error: error.message });
+    } finally {
+      if (adamConnection) {
+        try {
+          await adamConnection.end();
+        } catch {
+          /* ignore */
+        }
+      }
     }
   });
 
@@ -9239,7 +9273,15 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           COALESCE(TRIM(h.checkout_time), ''),
           COALESCE(h.operation_id, 0),
           COALESCE(h.checkin_pax, 0),
-          COALESCE(h.checkout_pax, 0)
+          COALESCE(h.checkout_pax, 0),
+          COALESCE(s.premium, 0),
+          COALESCE(s.address1, ''),
+          COALESCE(s.lat, ''),
+          COALESCE(s.lng, ''),
+          COALESCE(h.cleaned_by_us, 0),
+          COALESCE(h.sequence, 0),
+          COALESCE(TRIM(h.start_time), ''),
+          COALESCE(TRIM(h.end_time), '')
         ))
       `;
 

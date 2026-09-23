@@ -12,6 +12,11 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext, us
 const DEBUG = false;
 const dlog = (...args: any[]) => DEBUG && console.log(...args);
 import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
+import {
+  ensureProgramPollClock,
+  flushProgramPollTick,
+  subscribeProgramPoll,
+} from "@/lib/program-poll-clock";
 import { CalendarIcon, Users, RefreshCw, Settings, Search, Map as MapIcon, BarChart3, ChevronUp, ChevronDown } from "lucide-react";
 import TaskCardDragOverlay from "@/components/drag-drop/task-card-drag-overlay";
 import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
@@ -725,7 +730,7 @@ export default function GenerateAssignments() {
     ]
   );
 
-  // Polling fingerprint ADAM (pausato quando tab non visibile)
+  // Polling fingerprint ADAM. Lo stesso tick avvia subito anche il polling logistica.
   useEffect(() => {
     adamBaselineRef.current = null;
     hasAdamUpdatesRef.current = false;
@@ -741,60 +746,56 @@ export default function GenerateAssignments() {
       setIsOperationalDayStarted(false);
     }
 
-    const poll = async () => {
+    const poll = () => {
       if (stopped || inFlight) return;
       if (document.visibilityState !== "visible") return;
 
       inFlight = true;
-      try {
-        const [fp, started] = await Promise.all([
-          fetchAdamFingerprint(workDate),
-          operationalDayToggleInFlightRef.current
-            ? Promise.resolve<boolean | null>(null)
-            : fetchOperationalDay(workDate),
-        ]);
-        if (stopped) return;
+      void (async () => {
+        try {
+          const [fp, started] = await Promise.all([
+            fetchAdamFingerprint(workDate),
+            operationalDayToggleInFlightRef.current
+              ? Promise.resolve<boolean | null>(null)
+              : fetchOperationalDay(workDate),
+          ]);
+          if (stopped) return;
 
-        if (started !== null && started !== isOperationalDayStartedRef.current) {
-          isOperationalDayStartedRef.current = started;
-          setIsOperationalDayStarted(started);
-        }
+          if (started !== null && started !== isOperationalDayStartedRef.current) {
+            isOperationalDayStartedRef.current = started;
+            setIsOperationalDayStarted(started);
+          }
 
-        if (!fp) return;
+          if (!fp) return;
 
-        // Prima lettura: baseline senza sync
-        if (!adamBaselineRef.current) {
-          adamBaselineRef.current = fp;
-          hasAdamUpdatesRef.current = false;
-          setHasAdamUpdates(false);
-          return;
-        }
+          // Prima lettura: baseline senza sync
+          if (!adamBaselineRef.current) {
+            adamBaselineRef.current = fp;
+            hasAdamUpdatesRef.current = false;
+            setHasAdamUpdates(false);
+            return;
+          }
 
-        if (fingerprintsDiffer(fp, adamBaselineRef.current)) {
-          hasAdamUpdatesRef.current = true;
-          setHasAdamUpdates(true);
+          if (fingerprintsDiffer(fp, adamBaselineRef.current)) {
+            hasAdamUpdatesRef.current = true;
+            setHasAdamUpdates(true);
+          }
+          if (hasAdamUpdatesRef.current) {
+            tryAutoAdamSync();
+          }
+        } finally {
+          inFlight = false;
         }
-        if (hasAdamUpdatesRef.current) {
-          tryAutoAdamSync();
-        }
-      } finally {
-        inFlight = false;
-      }
+      })();
     };
 
-    const timer = setInterval(() => {
-      void poll();
-    }, 15000);
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") void poll();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    void poll();
+    ensureProgramPollClock();
+    const unsubscribe = subscribeProgramPoll(poll);
+    flushProgramPollTick();
 
     return () => {
       stopped = true;
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisibility);
+      unsubscribe();
     };
   }, [selectedDate, fetchAdamFingerprint, fetchOperationalDay, tryAutoAdamSync]);
 

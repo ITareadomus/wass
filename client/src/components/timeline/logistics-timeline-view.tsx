@@ -34,6 +34,7 @@ import { openTimelineMapPanel } from "@/lib/timeline-map-panel";
 import { getPersonnelHexColor } from "@/lib/cleaner-colors";
 import { useSyncedTimelineScroll } from "@/hooks/use-synced-timeline-scroll";
 import type { TaskType as Task } from "@shared/schema";
+import type { LogisticsAssignedSyncNotice } from "@shared/logistics-assigned-sync-diff";
 import { formatClockFromMinutes } from "@shared/clock-display";
 import {
   computeLogisticsCheckoutWaitGap,
@@ -134,6 +135,7 @@ interface LogisticsTimelineViewProps {
   /** Indice di insert durante drag cross-autista (per spacer di preview). */
   lastValidDragIndex?: number | null;
   onRefresh: () => Promise<void>;
+  adamSyncNotice?: LogisticsAssignedSyncNotice | null;
   className?: string;
 }
 
@@ -376,6 +378,20 @@ function highlightedIdsForDriverTasks(tasks: Task[], q: string): Set<string> {
   return result;
 }
 
+function formatAdamSyncClock(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Rome",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "";
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "";
+  return hour && minute ? `${hour}:${minute}` : "";
+}
+
 export default function LogisticsTimelineView({
   workDate,
   drivers,
@@ -388,11 +404,18 @@ export default function LogisticsTimelineView({
   activeDragDriverId = null,
   lastValidDragIndex = null,
   onRefresh,
+  adamSyncNotice = null,
   className,
 }: LogisticsTimelineViewProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [showResetDialog, setShowResetDialog] = useState(false);
+  const [showAdamSyncChanges, setShowAdamSyncChanges] = useState(false);
+  const adamSyncClock = adamSyncNotice ? formatAdamSyncClock(adamSyncNotice.syncedAt) : "";
+
+  useEffect(() => {
+    if (!adamSyncNotice?.tasks.length) setShowAdamSyncChanges(false);
+  }, [adamSyncNotice]);
   const [showRemoveDriversDialog, setShowRemoveDriversDialog] = useState(false);
   const [driverIdsToRemove, setDriverIdsToRemove] = useState<number[]>([]);
   const [addDriverOpen, setAddDriverOpen] = useState(false);
@@ -1688,14 +1711,26 @@ export default function LogisticsTimelineView({
         )}
 
         <div className="px-4 py-4 border-b border-border">
-          <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-            <div>
-              <h2 className="text-xl font-bold text-foreground flex items-center">
-                <CalendarIcon className="w-5 h-5 mr-2 text-custom-blue" />
-                Timeline Logistica - {drivers.length} Driver
-              </h2>
-            </div>
-            <div className="flex gap-3 print:hidden">
+          <div className="mb-1 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            <h2 className="text-xl font-bold text-foreground flex items-center justify-self-start">
+              <CalendarIcon className="w-5 h-5 mr-2 text-custom-blue" />
+              Timeline Logistica - {drivers.length} Driver
+            </h2>
+            {adamSyncNotice && adamSyncNotice.tasks.length > 0 ? (
+              <button
+                type="button"
+                className="print:hidden justify-self-center inline-flex items-center gap-1.5 rounded-md border border-yellow-400 bg-yellow-200 px-3 py-1 text-center text-sm font-semibold text-yellow-950 shadow-sm hover:bg-yellow-300 dark:border-yellow-600 dark:bg-yellow-800/50 dark:text-yellow-50 dark:hover:bg-yellow-800/70"
+                onClick={() => setShowAdamSyncChanges(true)}
+              >
+                <span aria-hidden="true">⚠️</span>
+                <span>
+                  {`${adamSyncClock ? `${adamSyncClock} ` : ""}Sync from ADAM, ci sono dei cambiamenti ai task assegnati`}
+                </span>
+              </button>
+            ) : (
+              <span />
+            )}
+            <div className="flex justify-self-end gap-3 print:hidden">
               <Button
                 variant="outline"
                 size="sm"
@@ -2478,6 +2513,28 @@ export default function LogisticsTimelineView({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showAdamSyncChanges} onOpenChange={setShowAdamSyncChanges}>
+        <DialogContent className="max-h-[80vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Cambiamenti da ADAM</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {adamSyncNotice?.tasks.map((task) => (
+              <div key={`${task.taskId}-${task.removed ? "removed" : "updated"}`}>
+                <p className="text-sm font-semibold text-foreground">Task {task.logisticCode}</p>
+                <ul className="mt-1 space-y-1">
+                  {task.changes.map((change) => (
+                    <li key={`${task.taskId}-${change.field}`} className="text-sm text-foreground">
+                      <span className="font-medium">{change.label}:</span> {change.from} → {change.to}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
         <AlertDialogContent className="sm:max-md">
