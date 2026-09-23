@@ -292,7 +292,8 @@ export default function AssignedTasksSequenceSummary({
               activeDragDriverId === group.id &&
               draggingOverDriverId != null &&
               draggingOverDriverId !== group.id;
-            const isDriverMapFiltered = filteredCleanerId === group.id;
+            const realDriverId = group.driverId ?? group.id;
+            const isDriverMapFiltered = filteredCleanerId === realDriverId;
 
             const renderCrossDriverInsertSlot = (atIndex: number) =>
               isCrossDriverTargetCol && lastValidDragIndex === atIndex ? (
@@ -309,11 +310,12 @@ export default function AssignedTasksSequenceSummary({
               key={group.id}
               className={cn(
                 "relative flex h-full min-h-[120px] min-w-0 flex-col overflow-hidden rounded-lg border border-custom-blue/40 p-3",
+                group.isRemoved && "border-red-400 bg-red-50/60 dark:border-red-700 dark:bg-red-950/25",
                 isDriverMapFiltered &&
                   "ring-2 ring-amber-400 border-amber-500 dark:ring-amber-500/80 dark:border-amber-500",
               )}
             >
-              {loadingDriverIdSet.has(group.id) && (
+              {(loadingDriverIdSet.has(group.id) || loadingDriverIdSet.has(realDriverId)) && (
                 <div className="absolute inset-0 z-40 flex items-center justify-center rounded-lg bg-black/20 backdrop-blur-sm pointer-events-none dark:bg-black/40">
                   <div className="flex flex-col items-center gap-3">
                     <Loader2 className="h-8 w-8 animate-spin text-custom-blue" />
@@ -329,7 +331,7 @@ export default function AssignedTasksSequenceSummary({
                     if (driverClickTimerRef.current) {
                       clearTimeout(driverClickTimerRef.current);
                       driverClickTimerRef.current = null;
-                      toggleSummaryDriverMapFilter(group.id);
+                      toggleSummaryDriverMapFilter(realDriverId);
                       return;
                     }
                     driverClickTimerRef.current = setTimeout(() => {
@@ -343,7 +345,7 @@ export default function AssignedTasksSequenceSummary({
                   <div className="flex flex-wrap items-center justify-end gap-1.5">
                     {workDate && (
                       <Link
-                        href={`/generate-logistics-assignments/driver/${group.id}?date=${encodeURIComponent(workDate)}`}
+                        href={`/generate-logistics-assignments/driver/${realDriverId}?date=${encodeURIComponent(workDate)}`}
                       >
                         <Button
                           type="button"

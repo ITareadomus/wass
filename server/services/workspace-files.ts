@@ -92,7 +92,10 @@ function getNormalizedTask(task: any): any {
   }
   if (task.cleaner_id !== undefined) normalizedTask.cleaner_id = task.cleaner_id;
   if (task.cleaner_sequence !== undefined) normalizedTask.cleaner_sequence = task.cleaner_sequence;
+  if (task.cleaner_name !== undefined) normalizedTask.cleaner_name = task.cleaner_name;
+  if (task.cleaner_lastname !== undefined) normalizedTask.cleaner_lastname = task.cleaner_lastname;
   if (task.cleaner_alias !== undefined) normalizedTask.cleaner_alias = task.cleaner_alias;
+  if (task.cleaner_phone !== undefined) normalizedTask.cleaner_phone = task.cleaner_phone;
   if (task.persisted_logistics_task_kind !== undefined) {
     normalizedTask.persisted_logistics_task_kind = task.persisted_logistics_task_kind;
   }

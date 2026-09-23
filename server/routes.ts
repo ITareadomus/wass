@@ -3756,10 +3756,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!ok) {
         return res.status(500).json({ success: false, error: "save failed" });
       }
+      const { runLogisticsDriverVehiclesAdamSync } = await import(
+        "./services/adam-logistics-vehicle-service"
+      );
+      let adamSync: Awaited<ReturnType<typeof runLogisticsDriverVehiclesAdamSync>> | null = null;
+      try {
+        adamSync = await runLogisticsDriverVehiclesAdamSync(workDate, currentUsername);
+      } catch (syncError: any) {
+        console.error("save-selected-logistics-drivers ADAM vehicle sync:", syncError);
+      }
       res.json({
         success: true,
         count: driverIds.length,
         vehicle_warnings: vehicleWarnings,
+        adam_sync: adamSync,
       });
     } catch (error: any) {
       console.error("POST /api/save-selected-logistics-drivers:", error);
@@ -3769,152 +3779,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   /**
    * Sync ADAM SOLO driver-veicolo (senza timeline): aggiorna cleaned_by_us sui task veicolo del giorno.
-   * Da usare dalla pagina convocazioni subito dopo il save PG.
+   * Anche con zero assegnazioni: azzera cleaned_by_us su tutti i task veicolo della data.
    */
   app.post("/api/sync-logistics-driver-vehicles-to-adam", async (req, res) => {
-    let connection: any = null;
     try {
       const { date, username: reqUsername } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       const username = reqUsername || getCurrentUsername(req);
-
-      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
-      const vehicleAssignments =
-        await pgDailyAssignmentsService.loadSelectedLogisticsDriverVehicleAssignments(workDate);
-
-      const hasVehicleBindings = Object.values(vehicleAssignments || {}).some((a: any) => {
-        const v = a?.vehicle_id;
-        return v != null && v !== "" && Number.isFinite(Number(v));
-      });
-      if (!hasVehicleBindings) {
-        return res.json({
-          success: false,
-          message: "Nessuna associazione driver-veicolo da sincronizzare",
-        });
+      const { runLogisticsDriverVehiclesAdamSync } = await import(
+        "./services/adam-logistics-vehicle-service"
+      );
+      const result = await runLogisticsDriverVehiclesAdamSync(workDate, username);
+      if (result.warnings.length) {
+        console.warn("sync-logistics-driver-vehicles-to-adam warnings:", result.warnings);
       }
-
-      const {
-        normalizeVehicleStructureId,
-        resolveVehicleStructureIdsToTaskIds,
-        listVehicleHousekeepingTaskIdsForDate,
-      } = await import("./services/adam-logistics-vehicle-service");
-
-      const taskToDriver = new Map<number, number>();
-      const pendingStructureResolve: { structureId: number; driverId: number }[] = [];
-
-      for (const [driverIdStr, a] of Object.entries(vehicleAssignments || {})) {
-        const driverId = Number(driverIdStr);
-        if (!Number.isFinite(driverId) || !a || typeof a !== "object") continue;
-        const sid = normalizeVehicleStructureId(
-          a.vehicle_id != null ? Number(a.vehicle_id) : null
-        );
-        if (!sid) continue;
-
-        const tid: number | null =
-          a.vehicle_task_id != null && Number.isFinite(Number(a.vehicle_task_id))
-            ? Number(a.vehicle_task_id)
-            : null;
-        if (tid != null) {
-          taskToDriver.set(tid, driverId);
-        } else {
-          pendingStructureResolve.push({ structureId: sid, driverId });
-        }
-      }
-
-      connection = await mysql.createConnection({
-        host: databaseConfig.mysql.host,
-        port: databaseConfig.mysql.port,
-        user: databaseConfig.mysql.user,
-        password: databaseConfig.mysql.password,
-        database: databaseConfig.mysql.database,
-      });
-
-      if (pendingStructureResolve.length > 0) {
-        const uniqueSids = [...new Set(pendingStructureResolve.map((p) => p.structureId))];
-        const { map, warnings } = await resolveVehicleStructureIdsToTaskIds(
-          connection,
-          workDate,
-          uniqueSids
-        );
-        for (const { structureId, driverId } of pendingStructureResolve) {
-          const tid = map.get(structureId);
-          if (tid != null) taskToDriver.set(tid, driverId);
-        }
-        if (warnings.length) {
-          console.warn("sync-logistics-driver-vehicles-to-adam warnings:", warnings);
-        }
-      }
-
-      const { pgUsersService } = await import("./services/pg-users-service");
-      const userRecord = await pgUsersService.getUserByUsername(username);
-      const adamUpdatedBy = userRecord?.adam_id ? `E${userRecord.adam_id}` : username;
-
-      const allVehicleTaskIds = await listVehicleHousekeepingTaskIdsForDate(connection, workDate);
-      const nowRome = format(new Date(), "yyyy-MM-dd HH:mm:ss");
-      let updated = 0;
-      let errors = 0;
-      for (const taskId of allVehicleTaskIds) {
-        const cleanedBy = taskToDriver.get(taskId) ?? null;
-        const assignedAtUs = cleanedBy != null ? nowRome : null;
-        const assignedAtMilliseconds = cleanedBy != null ? Date.now() : null;
-        try {
-          await connection.execute(
-            `UPDATE app_housekeeping
-             SET
-               cleaned_by_us = ?,
-               sequence = NULL,
-               updated_by = ?,
-               updated_at = ?,
-               assigned_at_us = ?,
-               assigned_at_milliseconds = ?,
-               collaboration = 0,
-               collaboration_by = NULL,
-               collaboration_at = NULL,
-               collaboration_bypass = 0,
-               helpwork = 0,
-               helpwork_by = 0,
-               helpwork_at = NULL,
-               startwork = 0,
-               startwork_at = NULL,
-               startreport = 0,
-               startreport_at = NULL,
-               extratimes = ''
-             WHERE id = ?`,
-            [
-              cleanedBy,
-              adamUpdatedBy,
-              nowRome,
-              assignedAtUs,
-              assignedAtMilliseconds,
-              taskId,
-            ]
-          );
-          updated++;
-        } catch (e) {
-          errors++;
-          console.error(`sync-logistics-driver-vehicles-to-adam task ${taskId}:`, e);
-        }
-      }
-
       res.json({
-        success: true,
-        message: `Sync driver-veicolo completata su ${allVehicleTaskIds.length} task veicolo`,
-        vehicle_task_count: allVehicleTaskIds.length,
-        adam_updates_attempted: updated,
-        adam_update_errors: errors,
+        ...result,
         synced_by: username,
       });
     } catch (error: any) {
       console.error("POST /api/sync-logistics-driver-vehicles-to-adam:", error);
       res.status(500).json({ success: false, message: error.message });
-    } finally {
-      if (connection) {
-        try {
-          await connection.end();
-        } catch {
-          /* ignore */
-        }
-      }
     }
   });
 
@@ -3991,14 +3876,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "driver_removed_from_selection"
         );
         message = "Driver rimosso completamente (nessuna task)";
+      } else if (hasTasks && timelineData?.drivers_assignments) {
+        const { markLogisticsRemovedLeftoverTaskInPlace } = await import(
+          "../shared/logistics-removed-leftover"
+        );
+        const leftoverEntry = timelineData.drivers_assignments.find(
+          (c: any) => Number(c.driver?.id) === idNum
+        );
+        for (const task of leftoverEntry?.tasks || []) {
+          markLogisticsRemovedLeftoverTaskInPlace(task);
+        }
+        timelineData.metadata = timelineData.metadata || {};
+        timelineData.metadata.last_updated = getRomeTimestamp();
+        timelineData.metadata.date = workDate;
+        await workspaceFiles.saveLogisticsTimeline(
+          workDate,
+          timelineData,
+          false,
+          currentUsername,
+          "driver_removed_leftover_kept"
+        );
+        message = "Driver rimosso dalla selezione (task mantenute)";
       } else {
         message = "Driver rimosso dalla selezione (task mantenute)";
       }
+
+      const { runLogisticsDriverVehiclesAdamSync } = await import(
+        "./services/adam-logistics-vehicle-service"
+      );
+      const adamSync = await runLogisticsDriverVehiclesAdamSync(workDate, currentUsername);
 
       res.json({
         success: true,
         message,
         removedFromTimeline: !hasTasks,
+        adam_sync: adamSync,
       });
     } catch (error: any) {
       console.error("remove-driver-from-selected:", error);
@@ -4052,18 +3964,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
 
       const selectedResult = await workspaceFiles.loadSelectedLogisticsDrivers(workDate);
-      let ids: number[] = selectedResult?.drivers?.map((d: any) => d.id) ?? [];
-      if (!ids.includes(Number(driverId))) {
-        const rows = await pgDailyAssignmentsService.loadLgDriversByIds([Number(driverId)], workDate);
-        if (!rows.length) {
-          return res.status(404).json({
-            success: false,
-            message: "Driver non trovato in lg_drivers per questa data",
-          });
-        }
-        ids = [...ids, Number(driverId)];
+      const ids: number[] = selectedResult?.drivers?.map((d: any) => d.id) ?? [];
+      const alreadySelected = ids.includes(Number(driverId));
+      const driverRowsForValidation = await pgDailyAssignmentsService.loadLgDriversByIds(
+        [Number(driverId)],
+        workDate
+      );
+      if (!driverRowsForValidation.length) {
+        return res.status(404).json({
+          success: false,
+          message: "Driver non trovato in lg_drivers per questa data",
+        });
       }
-      const driverRowsForValidation = await pgDailyAssignmentsService.loadLgDriversByIds([Number(driverId)], workDate);
       const currentEndTime = driverRowsForValidation[0]?.end_time || "20:00";
       if (isValidHHmm(currentEndTime) && toMinutesHHmm(startTime) >= toMinutesHHmm(currentEndTime)) {
         return res.status(400).json({
@@ -4074,17 +3986,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await pgDailyAssignmentsService.updateLgDriverField(Number(driverId), workDate, "start_time", startTime);
 
-      await workspaceFiles.saveSelectedLogisticsDrivers(
-        workDate,
-        {
-          drivers: ids.map((id) => ({ id })),
-          total_selected: ids.length,
-          metadata: { date: workDate },
-        },
-        true,
-        currentUsername,
-        "START_TIME"
-      );
+      if (alreadySelected) {
+        await workspaceFiles.saveSelectedLogisticsDrivers(
+          workDate,
+          {
+            drivers: ids.map((id) => ({ id })),
+            total_selected: ids.length,
+            metadata: { date: workDate },
+          },
+          true,
+          currentUsername,
+          "START_TIME"
+        );
+      }
 
       try {
         const timelineData = await workspaceFiles.loadLogisticsTimeline(workDate);
@@ -4128,18 +4042,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
 
       const selectedResult = await workspaceFiles.loadSelectedLogisticsDrivers(workDate);
-      let ids: number[] = selectedResult?.drivers?.map((d: any) => d.id) ?? [];
-      if (!ids.includes(Number(driverId))) {
-        const rows = await pgDailyAssignmentsService.loadLgDriversByIds([Number(driverId)], workDate);
-        if (!rows.length) {
-          return res.status(404).json({
-            success: false,
-            message: "Driver non trovato in lg_drivers per questa data",
-          });
-        }
-        ids = [...ids, Number(driverId)];
+      const ids: number[] = selectedResult?.drivers?.map((d: any) => d.id) ?? [];
+      const alreadySelected = ids.includes(Number(driverId));
+      const driverRowsForValidation = await pgDailyAssignmentsService.loadLgDriversByIds(
+        [Number(driverId)],
+        workDate
+      );
+      if (!driverRowsForValidation.length) {
+        return res.status(404).json({
+          success: false,
+          message: "Driver non trovato in lg_drivers per questa data",
+        });
       }
-      const driverRowsForValidation = await pgDailyAssignmentsService.loadLgDriversByIds([Number(driverId)], workDate);
       const currentStartTime = driverRowsForValidation[0]?.start_time || "10:00";
       if (isValidHHmm(currentStartTime) && toMinutesHHmm(endTime) <= toMinutesHHmm(currentStartTime)) {
         return res.status(400).json({
@@ -4150,17 +4064,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await pgDailyAssignmentsService.updateLgDriverField(Number(driverId), workDate, "end_time", endTime);
 
-      await workspaceFiles.saveSelectedLogisticsDrivers(
-        workDate,
-        {
-          drivers: ids.map((id) => ({ id })),
-          total_selected: ids.length,
-          metadata: { date: workDate },
-        },
-        true,
-        currentUsername,
-        "END_TIME"
-      );
+      if (alreadySelected) {
+        await workspaceFiles.saveSelectedLogisticsDrivers(
+          workDate,
+          {
+            drivers: ids.map((id) => ({ id })),
+            total_selected: ids.length,
+            metadata: { date: workDate },
+          },
+          true,
+          currentUsername,
+          "END_TIME"
+        );
+      }
 
       try {
         const timelineData = await workspaceFiles.loadLogisticsTimeline(workDate);
@@ -4198,6 +4114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assigned_vehicle_name,
         assigned_vehicle_pms_code,
         replaceDriverId,
+        start_time: requestedStartTime,
       } = req.body;
       if (driverId == null) {
         return res.status(400).json({ success: false, error: "driverId richiesto" });
@@ -4220,10 +4137,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (existingFromSelected?.end_time) {
         driverData.end_time = existingFromSelected.end_time;
       }
+      if (requestedStartTime && isValidHHmm(String(requestedStartTime))) {
+        driverData.start_time = requestedStartTime;
+      }
 
       const selectedDriverIds = new Set(
         (selectedDriversData?.drivers || []).map((d: any) => d.id).filter((id: any) => id != null)
       );
+      const {
+        clearLogisticsRemovedLeftoverTaskInPlace,
+        isLogisticsRemovedLeftoverTask,
+        markLogisticsRemovedLeftoverTaskInPlace,
+        markUnselectedLogisticsAssignmentsLeftover,
+        resolveLogisticsLaneStaffId,
+      } = await import("../shared/logistics-removed-leftover");
 
       let timelineData: any = await workspaceFiles.loadLogisticsTimeline(workDate);
       if (!timelineData) {
@@ -4234,28 +4161,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       }
       timelineData.drivers_assignments = timelineData.drivers_assignments || [];
+      markUnselectedLogisticsAssignmentsLeftover(
+        timelineData.drivers_assignments,
+        selectedDriverIds
+      );
 
+      const requestedReplaceId =
+        replaceDriverId != null && Number.isFinite(Number(replaceDriverId))
+          ? Number(replaceDriverId)
+          : null;
+      const replaceLane =
+        requestedReplaceId != null ? resolveLogisticsLaneStaffId(requestedReplaceId) : null;
       const alreadyRow = timelineData.drivers_assignments.some(
         (da: any) => da.driver?.id === Number(driverId)
       );
-      if (alreadyRow) {
+      const liveWithTasks = timelineData.drivers_assignments.some(
+        (da: any) =>
+          Number(da.driver?.id) === Number(driverId) &&
+          selectedDriverIds.has(Number(driverId)) &&
+          (da.tasks || []).some((task: any) => !isLogisticsRemovedLeftoverTask(task))
+      );
+      if (liveWithTasks) {
         return res.status(400).json({
           success: false,
           error: "Il driver è già presente nella timeline",
         });
       }
 
-      const requestedReplaceId =
-        replaceDriverId != null && Number.isFinite(Number(replaceDriverId))
-          ? Number(replaceDriverId)
+      const driverToReplace =
+        replaceLane != null
+          ? timelineData.drivers_assignments.find(
+              (da: any) => Number(da.driver?.id) === replaceLane.driverId
+            )
           : null;
-      const driverToReplace = requestedReplaceId != null
-        ? timelineData.drivers_assignments.find(
-            (da: any) => da.driver?.id === requestedReplaceId
-          )
-        : timelineData.drivers_assignments.find(
-            (da: any) => !selectedDriverIds.has(da.driver?.id)
-          );
+      if (requestedReplaceId != null && !driverToReplace) {
+        return res.status(404).json({
+          success: false,
+          error: "Driver da sostituire non trovato in timeline",
+        });
+      }
 
       let replacedDriverId: number | null = null;
       const driverPayload = {
@@ -4268,19 +4212,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
         end_time: driverData.end_time || "20:00",
       };
 
-      if (driverToReplace) {
-        replacedDriverId = driverToReplace.driver?.id ?? null;
-        const taskCount = driverToReplace.tasks?.length || 0;
-        driverToReplace.driver = { ...driverPayload };
-        if (taskCount > 0) {
+      if (driverToReplace && replaceLane) {
+        replacedDriverId = replaceLane.driverId;
+        const replaceId = Number(replacedDriverId);
+        const newId = Number(driverId);
+        const existingNewRow =
+          newId !== replaceId
+            ? timelineData.drivers_assignments.find(
+                (da: any) => Number(da.driver?.id) === newId && da !== driverToReplace
+              )
+            : null;
+
+        if (newId === replaceId) {
+          for (const task of driverToReplace.tasks || []) {
+            if (!replaceLane.leftoverLane || isLogisticsRemovedLeftoverTask(task)) {
+              clearLogisticsRemovedLeftoverTaskInPlace(task);
+            }
+          }
+        } else {
+          if (existingNewRow?.tasks?.length && !selectedDriverIds.has(newId)) {
+            for (const task of existingNewRow.tasks) {
+              markLogisticsRemovedLeftoverTaskInPlace(task);
+            }
+          }
+          const currentTasks = Array.isArray(driverToReplace.tasks) ? driverToReplace.tasks : [];
+          const leftoverTasks = currentTasks.filter((task: any) =>
+            isLogisticsRemovedLeftoverTask(task)
+          );
+          const liveTasks = currentTasks.filter((task: any) => !isLogisticsRemovedLeftoverTask(task));
+          const isMixed = leftoverTasks.length > 0 && liveTasks.length > 0;
+          const attachTasksToNewDriver = (tasks: any[]) => {
+            if (existingNewRow) {
+              existingNewRow.tasks = [...(existingNewRow.tasks || []), ...tasks];
+            } else {
+              timelineData.drivers_assignments.push({
+                driver: { ...driverPayload },
+                tasks,
+              });
+            }
+          };
+          if (isMixed && replaceLane.leftoverLane) {
+            driverToReplace.tasks = liveTasks;
+            for (const task of leftoverTasks) {
+              clearLogisticsRemovedLeftoverTaskInPlace(task);
+            }
+            attachTasksToNewDriver(leftoverTasks);
+          } else if (isMixed && !replaceLane.leftoverLane) {
+            driverToReplace.tasks = leftoverTasks;
+            attachTasksToNewDriver(liveTasks);
+          } else {
+            driverToReplace.driver = { ...driverPayload };
+            for (const task of driverToReplace.tasks || []) {
+              clearLogisticsRemovedLeftoverTaskInPlace(task);
+            }
+          }
+        }
+
+        const rowsToRecalc = [driverToReplace, existingNewRow].filter(Boolean);
+        for (const row of rowsToRecalc) {
+          if (!row?.tasks?.length) continue;
           try {
-            await hydrateTasksFromLogisticsContainers(driverToReplace, workDate);
-            await recalculateLogisticsDriverTimes(driverToReplace, workDate);
+            await hydrateTasksFromLogisticsContainers(row, workDate);
+            await recalculateLogisticsDriverTimes(row, workDate);
           } catch (err) {
             console.warn("⚠️ Ricalcolo tempi logistics driver fallito:", err);
           }
         }
-      } else {
+      } else if (!alreadyRow) {
         const insertIndex = (selectedDriversData?.drivers || []).findIndex(
           (d: any) => d.id === Number(driverId)
         );

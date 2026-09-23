@@ -7,6 +7,7 @@ import * as mysql from "mysql2/promise";
 import { databaseConfig } from "../../config/database";
 import pool from "../../shared/pg-db";
 import { formatHmTime } from "../../shared/logistics-task-windows";
+import { pickCleanerPhone } from "../../shared/cleaner-phone";
 import { attachLogisticsTaskWindowFields } from "./logistics-task-window-fields";
 import { enrichLogisticsTimelineStructureSofabeds } from "./adam-structure-sofabeds";
 import { enrichLogisticsTimelineStructureKeys } from "./adam-structure-keys";
@@ -19,6 +20,7 @@ export interface CleanerContextForTask {
   cleanerName: string | null;
   cleanerLastname: string | null;
   cleanerAlias: string | null;
+  cleanerPhone: string | null;
   cleanerStartTime: string | null;
   cleanerEndTime: string | null;
   cleanerTaskStartTime: string | null;
@@ -35,6 +37,7 @@ export function attachCleanerContextFields(
   if (context.cleanerName) task.cleaner_name = context.cleanerName;
   if (context.cleanerLastname) task.cleaner_lastname = context.cleanerLastname;
   if (context.cleanerAlias) task.cleaner_alias = context.cleanerAlias;
+  if (context.cleanerPhone) task.cleaner_phone = context.cleanerPhone;
 }
 
 function withoutBagPolicy(task: any): any {
@@ -105,6 +108,8 @@ export async function loadCleanerContextByTaskIds(
           h.sequence AS cleanerSequence,
           u.name AS cleanerName,
           u.lastname AS cleanerLastname,
+          u.phone AS cleanerPhone,
+          u.mobile AS cleanerMobile,
           u.tw_start AS cleanerStartTime,
           h.start_time AS cleanerTaskStartTime,
           h.end_time AS cleanerTaskEndTime
@@ -135,6 +140,10 @@ export async function loadCleanerContextByTaskIds(
             cleanerLastname:
               row.cleanerLastname != null ? String(row.cleanerLastname).trim() || null : null,
             cleanerAlias: null,
+            cleanerPhone: pickCleanerPhone({
+              phone: row.cleanerPhone,
+              mobile: row.cleanerMobile,
+            }),
             cleanerStartTime: formatHmTime(row.cleanerStartTime),
             cleanerEndTime: null,
             cleanerTaskStartTime: formatHmTime(row.cleanerTaskStartTime),

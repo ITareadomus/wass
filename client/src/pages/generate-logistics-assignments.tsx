@@ -54,6 +54,10 @@ import { isTaskLocked } from "@/lib/taskValidation";
 import { isEquivalentStraordinariaTask } from "@/lib/housekeeping-intervention-type";
 import { buildSequenceSummaryGroupsFromDriverAssignments } from "@/lib/sequence-summary";
 import {
+  logisticsLaneStaffId,
+  splitLogisticsAssignmentLanes,
+} from "@shared/logistics-removed-leftover";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -451,10 +455,31 @@ export default function GenerateLogisticsAssignments() {
   const [showMissingLogisticsKindTaskCodesList, setShowMissingLogisticsKindTaskCodesList] = useState(false);
   const [logisticsTaskLists, setLogisticsTaskLists] = useState<LogisticsTaskLists>(EMPTY_LOGISTICS_TASK_LISTS);
   const [logisticsDrivers, setLogisticsDrivers] = useState<
-    Array<{ id: number; name?: string; lastname?: string; role?: string; premium?: boolean; start_time?: string | null }>
+    Array<{
+      id: number;
+      name?: string;
+      lastname?: string;
+      role?: string;
+      premium?: boolean;
+      start_time?: string | null;
+      isRemoved?: boolean;
+      leftoverLane?: boolean;
+    }>
   >([]);
   const [logisticsDriversAssignments, setLogisticsDriversAssignments] = useState<
-    Array<{ driver: { id: number; name?: string; lastname?: string; role?: string; premium?: boolean; start_time?: string | null }; tasks: any[] }>
+    Array<{
+      driver: {
+        id: number;
+        name?: string;
+        lastname?: string;
+        role?: string;
+        premium?: boolean;
+        start_time?: string | null;
+        isRemoved?: boolean;
+        leftoverLane?: boolean;
+      };
+      tasks: any[];
+    }>
   >([]);
   const [isLoadingDragDrop, setIsLoadingDragDrop] = useState(false);
   const [isDraggingTimelineTask, setIsDraggingTimelineTask] = useState(false);
@@ -561,28 +586,49 @@ export default function GenerateLogisticsAssignments() {
       const selDrivers = sel.drivers || [];
       const fromTl = tl.drivers_assignments || [];
       const selectedIds = new Set(selDrivers.map((d: { id: number }) => d.id));
+      const mergedByDriver = new Map<number, { driver: any; tasks: any[] }>();
+      for (const row of fromTl) {
+        const driverId = Number(row?.driver?.id);
+        if (!Number.isFinite(driverId)) continue;
+        const existing = mergedByDriver.get(driverId);
+        const tasks = Array.isArray(row.tasks) ? row.tasks : [];
+        if (existing) {
+          existing.tasks = [...existing.tasks, ...tasks];
+        } else {
+          mergedByDriver.set(driverId, {
+            ...row,
+            driver: { ...row.driver },
+            tasks: [...tasks],
+          });
+        }
+      }
+      const mergedTl = [...mergedByDriver.values()];
 
       const mergedSelected = selDrivers.map((d: { id: number; name?: string; lastname?: string }) => {
-        const hit = fromTl.find((x: { driver?: { id: number } }) => x.driver?.id === d.id);
-        return hit ? { ...hit, driver: { ...hit.driver, ...d } } : { driver: d, tasks: [] };
+        const hit = mergedTl.find((x: { driver?: { id: number } }) => x.driver?.id === d.id);
+        return hit
+          ? { ...hit, driver: { ...hit.driver, ...d, isRemoved: false } }
+          : { driver: d, tasks: [] };
       });
 
-      const orphanRows = fromTl.filter(
+      const orphanRows = mergedTl.filter(
         (x: { driver?: { id: number }; tasks?: unknown[] }) =>
           x.driver?.id != null &&
           !selectedIds.has(x.driver.id) &&
           (x.tasks?.length || 0) > 0
       );
 
-      const assignments = [
+      const assignments = splitLogisticsAssignmentLanes([
         ...mergedSelected,
         ...orphanRows.map((row: { driver: { id: number }; tasks: unknown[] }) => ({
           ...row,
           driver: { ...row.driver, isRemoved: true as const },
         })),
-      ];
+      ]);
 
-      setLogisticsDrivers(assignments.map((row: { driver: (typeof selDrivers)[number] & { isRemoved?: boolean } }) => row.driver));
+      setLogisticsDrivers(
+        assignments.map((row: { driver: (typeof selDrivers)[number] & { isRemoved?: boolean; leftoverLane?: boolean } }) => row.driver)
+      );
       setLogisticsDriversAssignments(assignments);
     } catch (e) {
       console.error("loadLogisticsTimelineState", e);
@@ -1112,7 +1158,7 @@ export default function GenerateLogisticsAssignments() {
       displayedDriversAssignments,
       format(selectedDate, "yyyy-MM-dd")
     );
-    const order = displayedDrivers.map((driver) => driver.id);
+    const order = displayedDrivers.map((driver) => logisticsLaneStaffId(driver));
     if (order.length === 0) return groups;
 
     const byId = new Map(groups.map((group) => [group.id, group]));
@@ -1290,7 +1336,6 @@ export default function GenerateLogisticsAssignments() {
               destIndex += 1;
             }
             await reloadLogisticsPage();
-            toast({ title: "Riordinata", variant: "success" });
             break;
           }
 
@@ -1685,7 +1730,7 @@ export default function GenerateLogisticsAssignments() {
               staffLabel="Driver"
               isDragDisabled={isTimelineReadOnly || isHypothesisPreview || isLoadingDragDrop}
               loadingDriverIds={
-                isLoadingDragDrop ? logisticsDrivers.map((driver) => driver.id) : []
+                isLoadingDragDrop ? logisticsDrivers.map((driver) => logisticsLaneStaffId(driver)) : []
               }
               workDate={format(selectedDate, "yyyy-MM-dd")}
               draggingOverDriverId={draggingOverDriverId}

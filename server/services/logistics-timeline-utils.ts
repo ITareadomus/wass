@@ -184,28 +184,12 @@ export function snapshotLogisticsTimelineSchedule(
   return JSON.stringify(snapshot);
 }
 
-/** Logistics-only recalc: route travel + fixed service window (15m). */
-export async function recalculateLogisticsDriverTimes(
+function applyLogisticsScheduleToTaskList(
   entry: any,
-  workDate?: string,
-  priorityWindows: PriorityWindows | null = null
-): Promise<any> {
-  const dateToUse = workDate || new Date().toISOString().slice(0, 10);
-  const driver = entry.driver || {};
-  const startTime = await getDriverStartTime(driver.id, dateToUse);
-  if (startTime) {
-    entry.driver.start_time = startTime;
-  }
-
-  // Preserve array order: DnD mutations splice entry.tasks directly; sorting by stale
-  // sequence values would undo manual reorders before times are recalculated.
-  const tasks: any[] = Array.isArray(entry.tasks) ? [...entry.tasks] : [];
-  if (tasks.length === 0) {
-    entry.tasks = [];
-    entry.return_travel_time = 0;
-    return entry;
-  }
-
+  tasks: any[],
+  dateToUse: string,
+  priorityWindows: PriorityWindows | null
+): void {
   const driverStartMin = parseHmToMinutes(entry.driver?.start_time, 10 * 60) ?? 10 * 60;
   const scheduleInputs: LogisticsScheduleTaskInput[] = tasks.map((task, index) => {
     if (index > 0 && task.manual_start_time) {
@@ -252,7 +236,49 @@ export async function recalculateLogisticsDriverTimes(
     task.sequence = row.sequence;
     task.followup = i > 0;
   }
+}
 
+/** Logistics-only recalc: route travel + fixed service window (15m). */
+export async function recalculateLogisticsDriverTimes(
+  entry: any,
+  workDate?: string,
+  priorityWindows: PriorityWindows | null = null
+): Promise<any> {
+  const dateToUse = workDate || new Date().toISOString().slice(0, 10);
+  const driver = entry.driver || {};
+  const startTime = await getDriverStartTime(driver.id, dateToUse);
+  if (startTime) {
+    entry.driver.start_time = startTime;
+  }
+
+  // Preserve array order: DnD mutations splice entry.tasks directly; sorting by stale
+  // sequence values would undo manual reorders before times are recalculated.
+  const tasks: any[] = Array.isArray(entry.tasks) ? [...entry.tasks] : [];
+  if (tasks.length === 0) {
+    entry.tasks = [];
+    entry.return_travel_time = 0;
+    return entry;
+  }
+
+  const { isLogisticsRemovedLeftoverTask } = await import("../../shared/logistics-removed-leftover");
+  const leftoverTasks = tasks.filter((task) => isLogisticsRemovedLeftoverTask(task));
+  const liveTasks = tasks.filter((task) => !isLogisticsRemovedLeftoverTask(task));
+  if (leftoverTasks.length > 0 && liveTasks.length > 0) {
+    applyLogisticsScheduleToTaskList(entry, liveTasks, dateToUse, priorityWindows);
+    applyLogisticsScheduleToTaskList(
+      { driver: { ...entry.driver }, tasks: leftoverTasks },
+      leftoverTasks,
+      dateToUse,
+      priorityWindows
+    );
+    entry.tasks = [...liveTasks, ...leftoverTasks];
+    entry.return_travel_time = estimateLogisticsReturnToDepotMinutes(
+      liveTasks[liveTasks.length - 1]
+    );
+    return entry;
+  }
+
+  applyLogisticsScheduleToTaskList(entry, tasks, dateToUse, priorityWindows);
   entry.tasks = tasks;
   const lastTask = tasks[tasks.length - 1];
   entry.return_travel_time = estimateLogisticsReturnToDepotMinutes(lastTask);

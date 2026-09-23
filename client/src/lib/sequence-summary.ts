@@ -20,6 +20,7 @@ import {
   selectDriverAccessBundles,
   type StructureAccessBundle,
 } from "@shared/structure-access-keys";
+import { logisticsLaneStaffId } from "@shared/logistics-removed-leftover";
 
 export type SequenceSummaryEntry = {
   sequence: number;
@@ -32,6 +33,7 @@ export type SequenceSummaryEntry = {
   checkoutTime?: string | null;
   checkinTime?: string | null;
   cleanerLabel?: string | null;
+  cleanerPhone?: string | null;
   cleanerId?: number | null;
   cleanerSequence?: number | null;
   sofabedLabel?: string | null;
@@ -48,11 +50,14 @@ export type SequenceSummaryEntry = {
 
 export type SequenceSummaryGroup = {
   id: number;
+  driverId?: number;
+  leftoverLane?: boolean;
   label: string;
   vehicleName?: string;
   vehiclePlate?: string;
   warehouseDepartureTime?: string | null;
   warehouseReturnTime?: string | null;
+  isRemoved?: boolean;
   tasks: SequenceSummaryEntry[];
 };
 
@@ -158,6 +163,15 @@ function resolveTaskCleanerLabel(task: any): string | null {
   if (Number.isFinite(cleanerId)) return `ID ${cleanerId}`;
 
   return null;
+}
+
+function resolveTaskCleanerPhone(task: any): string | null {
+  const phone = String(
+    task?.cleaner_phone ?? task?.cleanerPhone ?? task?.phone ?? task?.mobile ?? ""
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+  return phone || null;
 }
 
 function resolveTaskCleanerSequence(task: any): number | null {
@@ -275,6 +289,7 @@ function mapTaskToSummaryEntry(
     checkoutTime: resolveCheckTime(task, "checkout_time", "checkoutTime"),
     checkinTime: resolveCheckTime(task, "checkin_time", "checkinTime"),
     cleanerLabel: resolveTaskCleanerLabel(task),
+    cleanerPhone: resolveTaskCleanerPhone(task),
     cleanerId: Number.isFinite(cleanerIdRaw) ? cleanerIdRaw : null,
     cleanerSequence: resolveTaskCleanerSequence(task),
     sofabedLabel: formatSofabedSummaryLabel(
@@ -426,6 +441,8 @@ export function buildSequenceSummaryGroupsFromDriverAssignments(
       vehicle_pms_code?: string | null;
       start_time?: string | null;
       startTime?: string | null;
+      isRemoved?: boolean;
+      leftoverLane?: boolean;
     };
     tasks?: any[];
     return_travel_time?: number | null;
@@ -446,12 +463,15 @@ export function buildSequenceSummaryGroupsFromDriverAssignments(
       workDate
     );
     groups.push({
-      id: row.driver.id,
+      id: logisticsLaneStaffId(row.driver),
+      driverId: row.driver.id,
+      leftoverLane: row.driver.leftoverLane === true,
       label: resolveDriverLabel(row.driver),
       vehicleName: resolveDriverVehicleName(row.driver),
       vehiclePlate: resolveDriverVehiclePlate(row.driver),
       warehouseDepartureTime: warehouseTimes.warehouseDepartureTime,
       warehouseReturnTime: warehouseTimes.warehouseReturnTime,
+      isRemoved: row.driver.isRemoved === true,
       tasks: sortedTasks.map((task, index) => mapTaskToSummaryEntry(task, index + 1, workDate)),
     });
   }
