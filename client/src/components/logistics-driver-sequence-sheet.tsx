@@ -69,38 +69,28 @@ function SheetCheckInOut({
 
 function SheetCleanerCell({
   cleanerLabel,
-  cleanerPhone,
   cleanerSequence,
 }: {
   cleanerLabel?: string | null;
-  cleanerPhone?: string | null;
   cleanerSequence?: number | null;
 }) {
   const label = String(cleanerLabel ?? "").trim();
-  const phone = String(cleanerPhone ?? "").replace(/\s+/g, " ").trim();
   const sequence =
     cleanerSequence != null && Number.isFinite(cleanerSequence) && cleanerSequence > 0
       ? cleanerSequence
       : null;
 
-  if (!label && !phone && sequence == null) return <span className="text-muted-foreground">—</span>;
+  if (!label && sequence == null) return <span className="text-muted-foreground">—</span>;
 
   return (
-    <span className="sheet-cleaner-cell inline-flex flex-col items-center justify-center gap-0.5 leading-tight">
-      <span className="inline-flex items-center gap-1 whitespace-nowrap">
-        {label && <span className="font-medium">{label}</span>}
-        {sequence != null && (
-          <LogisticsSequenceBadge
-            sequence={sequence}
-            size="inline"
-            className="cleaner-sequence-badge text-foreground/90 print:border print:border-black print:bg-white print:text-black print:shadow-none"
-          />
-        )}
-      </span>
-      {phone && (
-        <span className="tabular-nums text-[10px] font-medium print:text-[7px] print:text-black">
-          {phone}
-        </span>
+    <span className="sheet-cleaner-cell inline-flex max-w-full flex-wrap items-center justify-center gap-1 whitespace-nowrap">
+      {label && <span className="sheet-cleaner-name min-w-0 font-medium">{label}</span>}
+      {sequence != null && (
+        <LogisticsSequenceBadge
+          sequence={sequence}
+          size="inline"
+          className="cleaner-sequence-badge text-foreground/90 print:border print:border-black print:bg-white print:text-black print:shadow-none"
+        />
       )}
     </span>
   );
@@ -363,8 +353,11 @@ export default function LogisticsDriverSequenceSheet({
                   <span className="print:hidden">Check-out / Check-in</span>
                   <span className="hidden print:inline">Out/In</span>
                 </th>
-                <th className="driver-sheet-col-emphasis h-9 min-w-[120px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                <th className="driver-sheet-col-emphasis h-9 min-w-[88px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   Cleaner
+                </th>
+                <th className="h-9 min-w-[88px] border-r border-border/60 px-2 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
+                  Telefono
                 </th>
                 <th className="h-9 min-w-[100px] border-r border-border/60 px-2 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:min-w-0 print:px-1 print:py-1 print:text-[7px] print:text-black">
                   Divani
@@ -467,13 +460,15 @@ export default function LogisticsDriverSequenceSheet({
                       </div>
                     </td>
                     <td className="driver-sheet-col-emphasis border-r border-border/40 px-2 py-2 text-center align-middle">
-                      <div className="flex justify-center">
+                      <div className="sheet-cleaner-wrap flex min-w-0 max-w-full justify-center">
                         <SheetCleanerCell
                           cleanerLabel={entry.cleanerLabel}
-                          cleanerPhone={entry.cleanerPhone}
                           cleanerSequence={entry.cleanerSequence}
                         />
                       </div>
+                    </td>
+                    <td className="border-r border-border/40 px-2 py-2 text-center align-middle whitespace-nowrap print:min-w-0 print:whitespace-normal print:px-1 print:py-1">
+                      {entry.cleanerPhone || "—"}
                     </td>
                     <td className="border-r border-border/40 px-2 py-2 align-top whitespace-nowrap print:min-w-0 print:whitespace-normal print:px-1 print:py-1">
                       {entry.sofabedLabel || "—"}

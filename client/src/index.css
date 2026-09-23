@@ -1063,7 +1063,7 @@
     border-bottom: none !important;
   }
 
-  /* Seq | Tipo | Codice | Cliente | Indirizzo | Fin.cleaner | Out/In | Cleaner | Divani | Chiavi | Note */
+  /* Seq | Tipo | Codice | Cliente | Indirizzo | Fin.cleaner | Out/In | Cleaner | Telefono | Divani | Chiavi | Note */
   [data-print-driver-sheet] th:nth-child(1),
   [data-print-driver-sheet] td:nth-child(1) { width: 4% !important; }
   [data-print-driver-sheet] th:nth-child(2),
@@ -1071,21 +1071,23 @@
   [data-print-driver-sheet] th:nth-child(3),
   [data-print-driver-sheet] td:nth-child(3) { width: 8% !important; }
   [data-print-driver-sheet] th:nth-child(4),
-  [data-print-driver-sheet] td:nth-child(4) { width: 9% !important; }
+  [data-print-driver-sheet] td:nth-child(4) { width: 8% !important; }
   [data-print-driver-sheet] th:nth-child(5),
-  [data-print-driver-sheet] td:nth-child(5) { width: 13% !important; }
+  [data-print-driver-sheet] td:nth-child(5) { width: 12% !important; }
   [data-print-driver-sheet] th:nth-child(6),
   [data-print-driver-sheet] td:nth-child(6) { width: 7% !important; }
   [data-print-driver-sheet] th:nth-child(7),
   [data-print-driver-sheet] td:nth-child(7) { width: 7% !important; }
   [data-print-driver-sheet] th:nth-child(8),
-  [data-print-driver-sheet] td:nth-child(8) { width: 8% !important; }
+  [data-print-driver-sheet] td:nth-child(8) { width: 7% !important; }
   [data-print-driver-sheet] th:nth-child(9),
-  [data-print-driver-sheet] td:nth-child(9) { width: 6% !important; }
+  [data-print-driver-sheet] td:nth-child(9) { width: 8% !important; }
   [data-print-driver-sheet] th:nth-child(10),
   [data-print-driver-sheet] td:nth-child(10) { width: 6% !important; }
   [data-print-driver-sheet] th:nth-child(11),
-  [data-print-driver-sheet] td:nth-child(11) { width: 28% !important; }
+  [data-print-driver-sheet] td:nth-child(11) { width: 5% !important; }
+  [data-print-driver-sheet] th:nth-child(12),
+  [data-print-driver-sheet] td:nth-child(12) { width: 24% !important; }
 
   [data-print-driver-sheet] col {
     width: auto !important;
@@ -1230,9 +1232,37 @@
   }
 
   [data-print-driver-sheet] h1 .whitespace-nowrap,
-  [data-print-driver-sheet] .cleaner-sequence-badge,
-  [data-print-driver-sheet] .sheet-cleaner-cell {
+  [data-print-driver-sheet] .cleaner-sequence-badge {
     white-space: nowrap !important;
+  }
+
+  [data-print-driver-sheet] td:nth-child(8),
+  [data-print-driver-sheet] .sheet-cleaner-wrap {
+    overflow: hidden !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  [data-print-driver-sheet] .sheet-cleaner-cell {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    align-items: center !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    white-space: normal !important;
+    column-gap: 2px !important;
+    row-gap: 1px !important;
+  }
+
+  [data-print-driver-sheet] .sheet-cleaner-name {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+    line-height: 1.05 !important;
   }
 
   [data-print-driver-sheet] .cleaner-sequence-badge {

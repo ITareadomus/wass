@@ -33,6 +33,7 @@ export type SequenceSummaryEntry = {
   checkoutTime?: string | null;
   checkinTime?: string | null;
   cleanerLabel?: string | null;
+  cleanerNickname?: string | null;
   cleanerPhone?: string | null;
   cleanerId?: number | null;
   cleanerSequence?: number | null;
@@ -165,6 +166,13 @@ function resolveTaskCleanerLabel(task: any): string | null {
   return null;
 }
 
+function resolveTaskCleanerNickname(task: any): string | null {
+  const alias = String(
+    task?.cleaner_alias ?? task?.assigned_cleaner_alias ?? task?.cleanerAlias ?? ""
+  ).trim();
+  return alias || null;
+}
+
 function resolveTaskCleanerPhone(task: any): string | null {
   const phone = String(
     task?.cleaner_phone ?? task?.cleanerPhone ?? task?.phone ?? task?.mobile ?? ""
@@ -289,6 +297,7 @@ function mapTaskToSummaryEntry(
     checkoutTime: resolveCheckTime(task, "checkout_time", "checkoutTime"),
     checkinTime: resolveCheckTime(task, "checkin_time", "checkinTime"),
     cleanerLabel: resolveTaskCleanerLabel(task),
+    cleanerNickname: resolveTaskCleanerNickname(task),
     cleanerPhone: resolveTaskCleanerPhone(task),
     cleanerId: Number.isFinite(cleanerIdRaw) ? cleanerIdRaw : null,
     cleanerSequence: resolveTaskCleanerSequence(task),

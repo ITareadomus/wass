@@ -1471,10 +1471,12 @@ const displayClickableInputClass =
   const cardLogisticsTaskKind =
     operationsScope === "logistics"
       ? resolveLogisticsTaskKind({
-          logisticsTaskKind:
-            cardLogisticsKindOverride?.kind ?? cardTaskAny.logistics_task_kind,
-          logisticsTaskKindSource:
-            cardLogisticsKindOverride?.source ?? cardTaskAny.logistics_task_kind_source,
+          logisticsTaskKind: cardLogisticsKindOverride
+            ? cardLogisticsKindOverride.kind
+            : cardTaskAny.logistics_task_kind,
+          logisticsTaskKindSource: cardLogisticsKindOverride
+            ? cardLogisticsKindOverride.source
+            : cardTaskAny.logistics_task_kind_source,
           cleanerId: cardTaskAny.cleaner_id ?? null,
           cleanerSequence: cardTaskAny.cleaner_sequence ?? null,
           premium: task.premium,
@@ -2843,26 +2845,26 @@ const displayClickableInputClass =
       : null) ?? null;
   const effectiveLogisticsSequence = Number(logisticsTimelineSequence ?? fallbackTimelineSequence);
   const isSingleKeyStructure = Number(effectiveStructureAlertKeys) === 1;
+  const housekeepingDetailsResolved = resolvedHousekeepingTaskKey === currentDetailsTaskKey;
+  const housekeepingKindCleanerId = housekeepingDetailsResolved
+    ? logisticsHousekeepingCleanerId
+    : (displayTaskAny.cleaner_id ?? null);
+  const housekeepingKindCleanerSequence = housekeepingDetailsResolved
+    ? logisticsHousekeepingSequence
+    : (displayTaskAny.cleaner_sequence ?? null);
   const effectiveLogisticsTaskKind =
     isLogisticsDetails || isHousekeepingTimelineDetails
       ? resolveLogisticsTaskKind({
-        cleanerId:
-          logisticsHousekeepingCleanerId ??
-          cleanerId ??
-          displayTaskAny.assignedCleaner ??
-          displayTaskAny.cleaner_id ??
-          null,
-        cleanerSequence:
-          logisticsHousekeepingSequence ??
-          displayTaskAny.sequence ??
-          displayTaskAny.cleaner_sequence ??
-          null,
+        cleanerId: housekeepingKindCleanerId,
+        cleanerSequence: housekeepingKindCleanerSequence,
         premium: displayTask.premium,
         paxIn: displayTaskAny.pax_in,
-        logisticsTaskKind:
-          displayLogisticsKindOverride?.kind ?? displayTaskAny.logistics_task_kind,
-        logisticsTaskKindSource:
-          displayLogisticsKindOverride?.source ?? displayTaskAny.logistics_task_kind_source,
+        logisticsTaskKind: displayLogisticsKindOverride
+          ? displayLogisticsKindOverride.kind
+          : displayTaskAny.logistics_task_kind,
+        logisticsTaskKindSource: displayLogisticsKindOverride
+          ? displayLogisticsKindOverride.source
+          : displayTaskAny.logistics_task_kind_source,
       })
     : null;
 

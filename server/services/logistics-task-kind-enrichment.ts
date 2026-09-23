@@ -37,7 +37,7 @@ export function attachCleanerContextFields(
   if (context.cleanerName) task.cleaner_name = context.cleanerName;
   if (context.cleanerLastname) task.cleaner_lastname = context.cleanerLastname;
   if (context.cleanerAlias) task.cleaner_alias = context.cleanerAlias;
-  if (context.cleanerPhone) task.cleaner_phone = context.cleanerPhone;
+  task.cleaner_phone = context.cleanerPhone ?? null;
 }
 
 function withoutBagPolicy(task: any): any {
@@ -126,32 +126,55 @@ export async function loadCleanerContextByTaskIds(
     );
 
     const list = Array.isArray(rows) ? rows : [];
-    return new Map(
-      list.map((row: any) => {
-        const taskId = Number(row.taskId);
-        const cleanerId = Number(row.cleanerId);
-        const sequence = Number(row.cleanerSequence);
-        return [
-          taskId,
-          {
-            cleanerId: Number.isFinite(cleanerId) && cleanerId > 0 ? cleanerId : null,
-            cleanerSequence: Number.isFinite(sequence) && sequence > 0 ? sequence : null,
-            cleanerName: row.cleanerName != null ? String(row.cleanerName).trim() || null : null,
-            cleanerLastname:
-              row.cleanerLastname != null ? String(row.cleanerLastname).trim() || null : null,
-            cleanerAlias: null,
-            cleanerPhone: pickCleanerPhone({
-              phone: row.cleanerPhone,
-              mobile: row.cleanerMobile,
-            }),
-            cleanerStartTime: formatHmTime(row.cleanerStartTime),
-            cleanerEndTime: null,
-            cleanerTaskStartTime: formatHmTime(row.cleanerTaskStartTime),
-            cleanerTaskEndTime: formatHmTime(row.cleanerTaskEndTime),
-          },
-        ] as const;
-      })
+    const contextByTaskId = new Map<number, CleanerContextForTask>();
+    for (const row of list) {
+      const taskId = Number(row.taskId);
+      const cleanerId = Number(row.cleanerId);
+      const sequence = Number(row.cleanerSequence);
+      if (!Number.isFinite(taskId)) continue;
+      contextByTaskId.set(taskId, {
+        cleanerId: Number.isFinite(cleanerId) && cleanerId > 0 ? cleanerId : null,
+        cleanerSequence: Number.isFinite(sequence) && sequence > 0 ? sequence : null,
+        cleanerName: row.cleanerName != null ? String(row.cleanerName).trim() || null : null,
+        cleanerLastname:
+          row.cleanerLastname != null ? String(row.cleanerLastname).trim() || null : null,
+        cleanerAlias: null,
+        cleanerPhone: pickCleanerPhone({
+          phone: row.cleanerPhone,
+          mobile: row.cleanerMobile,
+        }),
+        cleanerStartTime: formatHmTime(row.cleanerStartTime),
+        cleanerEndTime: null,
+        cleanerTaskStartTime: formatHmTime(row.cleanerTaskStartTime),
+        cleanerTaskEndTime: formatHmTime(row.cleanerTaskEndTime),
+      });
+    }
+
+    const cleanerIds = Array.from(
+      new Set(
+        Array.from(contextByTaskId.values())
+          .map((context) => context.cleanerId)
+          .filter((id): id is number => id != null && id > 0)
+      )
     );
+    if (cleanerIds.length > 0) {
+      const aliasResult = await pool.query(
+        `SELECT cleaner_id, alias FROM aliases WHERE cleaner_id = ANY($1::int[])`,
+        [cleanerIds]
+      );
+      const aliasByCleanerId = new Map<number, string>();
+      for (const row of aliasResult.rows) {
+        const cleanerId = Number(row.cleaner_id);
+        const alias = row.alias != null ? String(row.alias).trim() : "";
+        if (Number.isFinite(cleanerId) && alias) aliasByCleanerId.set(cleanerId, alias);
+      }
+      for (const context of contextByTaskId.values()) {
+        if (context.cleanerId == null) continue;
+        context.cleanerAlias = aliasByCleanerId.get(context.cleanerId) ?? null;
+      }
+    }
+
+    return contextByTaskId;
   } finally {
     if (connection) {
       try {
