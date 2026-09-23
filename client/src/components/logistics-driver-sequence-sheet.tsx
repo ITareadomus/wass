@@ -69,28 +69,38 @@ function SheetCheckInOut({
 
 function SheetCleanerCell({
   cleanerLabel,
+  cleanerPhone,
   cleanerSequence,
 }: {
   cleanerLabel?: string | null;
+  cleanerPhone?: string | null;
   cleanerSequence?: number | null;
 }) {
   const label = String(cleanerLabel ?? "").trim();
+  const phone = String(cleanerPhone ?? "").replace(/\s+/g, " ").trim();
   const sequence =
     cleanerSequence != null && Number.isFinite(cleanerSequence) && cleanerSequence > 0
       ? cleanerSequence
       : null;
 
-  if (!label && sequence == null) return <span className="text-muted-foreground">—</span>;
+  if (!label && !phone && sequence == null) return <span className="text-muted-foreground">—</span>;
 
   return (
-    <span className="sheet-cleaner-cell inline-flex items-center gap-1 whitespace-nowrap">
-      {label && <span className="font-medium">{label}</span>}
-      {sequence != null && (
-        <LogisticsSequenceBadge
-          sequence={sequence}
-          size="inline"
-          className="cleaner-sequence-badge text-foreground/90 print:border print:border-black print:bg-white print:text-black print:shadow-none"
-        />
+    <span className="sheet-cleaner-cell inline-flex flex-col items-center justify-center gap-0.5 leading-tight">
+      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+        {label && <span className="font-medium">{label}</span>}
+        {sequence != null && (
+          <LogisticsSequenceBadge
+            sequence={sequence}
+            size="inline"
+            className="cleaner-sequence-badge text-foreground/90 print:border print:border-black print:bg-white print:text-black print:shadow-none"
+          />
+        )}
+      </span>
+      {phone && (
+        <span className="tabular-nums text-[10px] font-medium print:text-[7px] print:text-black">
+          {phone}
+        </span>
       )}
     </span>
   );
@@ -460,6 +470,7 @@ export default function LogisticsDriverSequenceSheet({
                       <div className="flex justify-center">
                         <SheetCleanerCell
                           cleanerLabel={entry.cleanerLabel}
+                          cleanerPhone={entry.cleanerPhone}
                           cleanerSequence={entry.cleanerSequence}
                         />
                       </div>

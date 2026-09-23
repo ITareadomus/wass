@@ -689,11 +689,6 @@ export default function Convocazioni() {
             const timelineData = await timelineResponse.json();
             const timelineDateFromFile = timelineData.metadata?.date;
             if (timelineDateFromFile === dateStr) {
-              if (isDrivers && timelineData.drivers_assignments) {
-                for (const row of timelineData.drivers_assignments) {
-                  if (row.driver?.id) preselectedIds.add(row.driver.id);
-                }
-              }
               if (!isDrivers && timelineData.cleaners_assignments) {
                 for (const row of timelineData.cleaners_assignments) {
                   if (row.cleaner?.id) preselectedIds.add(row.cleaner.id);
@@ -996,7 +991,7 @@ export default function Convocazioni() {
 
   const handleSaveSelection = async (): Promise<boolean> => {
     const label = isDrivers ? "driver" : "cleaner";
-    if (selectedCleaners.size === 0) {
+    if (!isDrivers && selectedCleaners.size === 0) {
       toast({
         variant: "destructive",
         title: `⚠️ Nessun ${label} selezionato`,
@@ -1079,8 +1074,14 @@ export default function Convocazioni() {
         }
         toast({
           variant: "success",
-          title: `${selectedData.length} driver salvati con successo`,
-          description: `Salvati su PG e sincronizzati su ADAM per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
+          title:
+            selectedData.length === 0
+              ? "Nessun driver convocato"
+              : `${selectedData.length} driver salvati con successo`,
+          description:
+            selectedData.length === 0
+              ? `Convocazioni svuotate e task veicolo liberati su ADAM per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`
+              : `Salvati su PG e sincronizzati su ADAM per il ${format(selectedDate, "dd/MM/yyyy", { locale: it })}`,
         });
       } else {
         const timelineResponse = await fetch(withScope(`/api/timeline?date=${dateStr}`));
@@ -1731,7 +1732,7 @@ export default function Convocazioni() {
               }}
               size="lg"
               disabled={
-                selectedCleaners.size === 0 ||
+                (!isDrivers && selectedCleaners.size === 0) ||
                 isSaving ||
                 (isDrivers && !allSelectedDriversHaveVehicles)
               }

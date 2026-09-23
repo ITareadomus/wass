@@ -54,7 +54,7 @@ export function LogisticsHypothesisSwitcher({
             onClick={() => onApply(selected)}
             data-testid="button-apply-selected-hypothesis"
           >
-            {busy ? "Applico..." : "Usa questa"}
+            {busy ? "Applico..." : "Conferma ipotesi"}
           </Button>
         </div>
       </div>

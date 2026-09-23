@@ -16,6 +16,7 @@ export interface CleanerContextForTask {
   cleanerName: string | null;
   cleanerLastname: string | null;
   cleanerAlias: string | null;
+  cleanerPhone: string | null;
   cleanerStartTime: string | null;
   cleanerEndTime: string | null;
   cleanerTaskStartTime: string | null;
@@ -32,6 +33,7 @@ export function attachCleanerContextFields(
   if (context.cleanerName) task.cleaner_name = context.cleanerName;
   if (context.cleanerLastname) task.cleaner_lastname = context.cleanerLastname;
   if (context.cleanerAlias) task.cleaner_alias = context.cleanerAlias;
+  if (context.cleanerPhone) task.cleaner_phone = context.cleanerPhone;
 }
 
 function withoutBagPolicy(task: any): any {
@@ -106,23 +108,36 @@ export async function loadCleanerContextByTaskIds(
     [workDate, taskIds]
   );
 
-  return new Map(
-    result.rows.map((row: any) => [
-      Number(row.taskId),
-      {
-        cleanerId: row.cleanerId != null ? Number(row.cleanerId) : null,
-        cleanerSequence: row.cleanerSequence != null ? Number(row.cleanerSequence) : null,
-        cleanerName: row.cleanerName != null ? String(row.cleanerName).trim() || null : null,
-        cleanerLastname:
-          row.cleanerLastname != null ? String(row.cleanerLastname).trim() || null : null,
-        cleanerAlias: row.cleanerAlias != null ? String(row.cleanerAlias).trim() || null : null,
-        cleanerStartTime: formatHmTime(row.cleanerStartTime),
-        cleanerEndTime: formatHmTime(row.cleanerEndTime),
-        cleanerTaskStartTime: formatHmTime(row.cleanerTaskStartTime),
-        cleanerTaskEndTime: formatHmTime(row.cleanerTaskEndTime),
-      },
-    ])
+  const contexts = result.rows.map((row: any) => ({
+    taskId: Number(row.taskId),
+    context: {
+      cleanerId: row.cleanerId != null ? Number(row.cleanerId) : null,
+      cleanerSequence: row.cleanerSequence != null ? Number(row.cleanerSequence) : null,
+      cleanerName: row.cleanerName != null ? String(row.cleanerName).trim() || null : null,
+      cleanerLastname:
+        row.cleanerLastname != null ? String(row.cleanerLastname).trim() || null : null,
+      cleanerAlias: row.cleanerAlias != null ? String(row.cleanerAlias).trim() || null : null,
+      cleanerPhone: null as string | null,
+      cleanerStartTime: formatHmTime(row.cleanerStartTime),
+      cleanerEndTime: formatHmTime(row.cleanerEndTime),
+      cleanerTaskStartTime: formatHmTime(row.cleanerTaskStartTime),
+      cleanerTaskEndTime: formatHmTime(row.cleanerTaskEndTime),
+    },
+  }));
+
+  const { loadCleanerPhonesByIds } = await import("./adam-cleaner-phones");
+  const phones = await loadCleanerPhonesByIds(
+    contexts
+      .map((row) => row.context.cleanerId)
+      .filter((id): id is number => id != null)
   );
+  for (const row of contexts) {
+    if (row.context.cleanerId != null) {
+      row.context.cleanerPhone = phones.get(row.context.cleanerId) ?? null;
+    }
+  }
+
+  return new Map(contexts.map((row) => [row.taskId, row.context]));
 }
 
 export async function enrichDriverTasksWithLogisticsKind(

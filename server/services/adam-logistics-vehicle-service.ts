@@ -1,4 +1,7 @@
 import type { Connection } from "mysql2/promise";
+import * as mysql from "mysql2/promise";
+import { format } from "date-fns";
+import { databaseConfig } from "../../config/database";
 
 export type LogisticsVehicleRow = {
   id: number;
@@ -135,4 +138,187 @@ export async function listVehicleHousekeepingTaskIdsForDate(
   return (Array.isArray(rows) ? rows : [])
     .map((r: any) => Number(r?.task_id))
     .filter((n: number) => Number.isFinite(n));
+}
+
+export type VehicleDriverBindingPending = {
+  structureId: number;
+  driverId: number;
+};
+
+export type LogisticsDriverVehiclesAdamSyncResult = {
+  success: boolean;
+  message: string;
+  vehicle_task_count: number;
+  adam_updates_attempted: number;
+  adam_update_errors: number;
+  warnings: string[];
+};
+
+/**
+ * Costruisce il mapping task veicolo → driver dalle assegnazioni PG.
+ * Senza binding (convocazioni vuote / driver rimosso) il map resta vuoto:
+ * il sync ADAM deve comunque girare e azzerare cleaned_by_us.
+ */
+export function collectVehicleDriverBindings(
+  vehicleAssignments: Record<string, any> | null | undefined
+): {
+  taskToDriver: Map<number, number>;
+  pendingStructureResolve: VehicleDriverBindingPending[];
+} {
+  const taskToDriver = new Map<number, number>();
+  const pendingStructureResolve: VehicleDriverBindingPending[] = [];
+
+  for (const [driverIdStr, assignment] of Object.entries(vehicleAssignments || {})) {
+    const driverId = Number(driverIdStr);
+    if (!Number.isFinite(driverId) || !assignment || typeof assignment !== "object") continue;
+    const structureId = normalizeVehicleStructureId(
+      assignment.vehicle_id != null ? Number(assignment.vehicle_id) : null
+    );
+    if (!structureId) continue;
+
+    const taskId =
+      assignment.vehicle_task_id != null && Number.isFinite(Number(assignment.vehicle_task_id))
+        ? Number(assignment.vehicle_task_id)
+        : null;
+    if (taskId != null) {
+      taskToDriver.set(taskId, driverId);
+    } else {
+      pendingStructureResolve.push({ structureId, driverId });
+    }
+  }
+
+  return { taskToDriver, pendingStructureResolve };
+}
+
+export function applyResolvedVehicleStructureBindings(
+  pendingStructureResolve: VehicleDriverBindingPending[],
+  structureToTask: Map<number, number>,
+  taskToDriver: Map<number, number>
+): void {
+  for (const { structureId, driverId } of pendingStructureResolve) {
+    const taskId = structureToTask.get(structureId);
+    if (taskId != null) taskToDriver.set(taskId, driverId);
+  }
+}
+
+/**
+ * Allinea i task veicolo del giorno su ADAM a vehicle_assignments PG.
+ * Lista vuota = cleaned_by_us NULL su tutti i task veicolo della data.
+ */
+export async function syncLogisticsDriverVehiclesToAdam(
+  connection: Connection,
+  params: {
+    workDate: string;
+    vehicleAssignments: Record<string, any> | null | undefined;
+    adamUpdatedBy: string;
+    nowRome: string;
+  }
+): Promise<LogisticsDriverVehiclesAdamSyncResult> {
+  const { workDate, vehicleAssignments, adamUpdatedBy, nowRome } = params;
+  const { taskToDriver, pendingStructureResolve } = collectVehicleDriverBindings(vehicleAssignments);
+  const warnings: string[] = [];
+
+  if (pendingStructureResolve.length > 0) {
+    const uniqueStructureIds = [...new Set(pendingStructureResolve.map((item) => item.structureId))];
+    const { map, warnings: resolveWarnings } = await resolveVehicleStructureIdsToTaskIds(
+      connection,
+      workDate,
+      uniqueStructureIds
+    );
+    applyResolvedVehicleStructureBindings(pendingStructureResolve, map, taskToDriver);
+    warnings.push(...resolveWarnings);
+  }
+
+  const allVehicleTaskIds = await listVehicleHousekeepingTaskIdsForDate(connection, workDate);
+  let updated = 0;
+  let errors = 0;
+
+  for (const taskId of allVehicleTaskIds) {
+    const cleanedBy = taskToDriver.get(taskId) ?? null;
+    const assignedAtUs = cleanedBy != null ? nowRome : null;
+    const assignedAtMilliseconds = cleanedBy != null ? Date.now() : null;
+    try {
+      await connection.execute(
+        `UPDATE app_housekeeping
+         SET
+           cleaned_by_us = ?,
+           sequence = NULL,
+           updated_by = ?,
+           updated_at = ?,
+           assigned_at_us = ?,
+           assigned_at_milliseconds = ?,
+           collaboration = 0,
+           collaboration_by = NULL,
+           collaboration_at = NULL,
+           collaboration_bypass = 0,
+           helpwork = 0,
+           helpwork_by = 0,
+           helpwork_at = NULL,
+           startwork = 0,
+           startwork_at = NULL,
+           startreport = 0,
+           startreport_at = NULL,
+           extratimes = ''
+         WHERE id = ?`,
+        [cleanedBy, adamUpdatedBy, nowRome, assignedAtUs, assignedAtMilliseconds, taskId]
+      );
+      updated++;
+    } catch (error) {
+      errors++;
+      console.error(`sync-logistics-driver-vehicles-to-adam task ${taskId}:`, error);
+    }
+  }
+
+  const assignedCount = taskToDriver.size;
+  const message =
+    assignedCount === 0
+      ? `Liberati ${allVehicleTaskIds.length} task veicolo su ADAM`
+      : `Sync driver-veicolo completata su ${allVehicleTaskIds.length} task veicolo`;
+
+  return {
+    success: true,
+    message,
+    vehicle_task_count: allVehicleTaskIds.length,
+    adam_updates_attempted: updated,
+    adam_update_errors: errors,
+    warnings,
+  };
+}
+
+export async function runLogisticsDriverVehiclesAdamSync(
+  workDate: string,
+  username: string
+): Promise<LogisticsDriverVehiclesAdamSyncResult> {
+  const { pgDailyAssignmentsService } = await import("./pg-daily-assignments-service");
+  const { pgUsersService } = await import("./pg-users-service");
+
+  const vehicleAssignments =
+    await pgDailyAssignmentsService.loadSelectedLogisticsDriverVehicleAssignments(workDate);
+  const userRecord = await pgUsersService.getUserByUsername(username);
+  const adamUpdatedBy = userRecord?.adam_id ? `E${userRecord.adam_id}` : username;
+
+  let connection: Connection | null = null;
+  try {
+    connection = await mysql.createConnection({
+      host: databaseConfig.mysql.host,
+      port: databaseConfig.mysql.port,
+      user: databaseConfig.mysql.user,
+      password: databaseConfig.mysql.password,
+      database: databaseConfig.mysql.database,
+    });
+    return await syncLogisticsDriverVehiclesToAdam(connection, {
+      workDate,
+      vehicleAssignments,
+      adamUpdatedBy,
+      nowRome: format(new Date(), "yyyy-MM-dd HH:mm:ss"),
+    });
+  } finally {
+    if (connection) {
+      try {
+        await connection.end();
+      } catch {
+        /* ignore */
+      }
+    }
+  }
 }

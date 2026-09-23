@@ -78,6 +78,15 @@ import {
   taskDndId,
   type AppDndItem,
 } from "@/lib/dnd";
+import {
+  collectLiveLogisticsDriverIds,
+  filterLogisticsDriversAvailableToAssign,
+} from "@shared/logistics-available-drivers";
+import {
+  logisticsDriverLaneKey,
+  logisticsLaneStaffId,
+  resolveLogisticsLaneStaffId,
+} from "@shared/logistics-removed-leftover";
 
 type PriorityWindows = {
   hpStart: string;
@@ -119,6 +128,7 @@ export interface LogisticsDriverRow {
   show_plus_one?: boolean;
   /** Presente se il driver ha task in timeline ma non è più nei convocati */
   isRemoved?: boolean;
+  leftoverLane?: boolean;
 }
 
 interface LogisticsTimelineViewProps {
@@ -666,9 +676,10 @@ export default function LogisticsTimelineView({
   const assignmentByDriver = new Map<number, any[]>();
   const returnTravelByDriver = new Map<number, number>();
   for (const row of driversAssignments) {
-    assignmentByDriver.set(row.driver.id, row.tasks || []);
+    const laneId = logisticsLaneStaffId(row.driver);
+    assignmentByDriver.set(laneId, row.tasks || []);
     if (row.return_travel_time != null && Number.isFinite(Number(row.return_travel_time))) {
-      returnTravelByDriver.set(row.driver.id, Number(row.return_travel_time));
+      returnTravelByDriver.set(laneId, Number(row.return_travel_time));
     }
   }
 
@@ -998,7 +1009,7 @@ export default function LogisticsTimelineView({
     };
   };
 
-  const loadAvailableDrivers = useCallback(async () => {
+  const loadAvailableDrivers = useCallback(async (replaceDriverId: number | null = null) => {
     setIsLoadingAvailableDrivers(true);
     try {
       try {
@@ -1023,13 +1034,11 @@ export default function LogisticsTimelineView({
 
       const driversData = await driversResponse.json();
       const dateDrivers = driversData.drivers || [];
-
-      const selectedActiveIds = new Set(drivers.filter((d) => !d.isRemoved).map((d) => d.id));
-      const timelineDriverIds = new Set(driversAssignments.map((row) => row.driver.id));
-
-      const available = dateDrivers.filter(
-        (c: any) =>
-          c.active !== false && !selectedActiveIds.has(c.id) && !timelineDriverIds.has(c.id)
+      const liveIds = collectLiveLogisticsDriverIds(drivers, driversAssignments);
+      const available = filterLogisticsDriversAvailableToAssign(
+        dateDrivers,
+        liveIds,
+        replaceDriverId
       );
 
       available.sort((a: any, b: any) => {
@@ -1051,7 +1060,7 @@ export default function LogisticsTimelineView({
     async (replaceDriverId: number | null = null) => {
       setDriverToReplace(replaceDriverId);
       setAddDriverOpen(true);
-      await loadAvailableDrivers();
+      await loadAvailableDrivers(replaceDriverId);
     },
     [loadAvailableDrivers]
   );
@@ -1065,6 +1074,7 @@ export default function LogisticsTimelineView({
         driverId: payload.driverId,
         date: workDate,
         modified_by: username,
+        start_time: payload.startTime,
         assigned_vehicle_id: payload.vehicleId,
         assigned_vehicle_name: payload.vehicleName,
         assigned_vehicle_pms_code: payload.vehiclePmsCode,
@@ -1389,7 +1399,11 @@ export default function LogisticsTimelineView({
   };
 
   const openDriverDetails = (driver: LogisticsDriverRow) => {
-    const latest = drivers.find((d) => d.id === driver.id) || driver;
+    const latest =
+      drivers.find(
+        (d) =>
+          d.id === driver.id && Boolean(d.leftoverLane) === Boolean(driver.leftoverLane)
+      ) || driver;
     setSelectedDriverForDetails(latest);
     setDriverDetailsOpen(true);
     void loadDriverAliases();
@@ -1400,7 +1414,7 @@ export default function LogisticsTimelineView({
 
     if (driver.isRemoved) {
       if (!isReadOnly) {
-        void handleOpenAddDriverDialog(driver.id);
+        void handleOpenAddDriverDialog(logisticsLaneStaffId(driver));
       }
       return;
     }
@@ -1937,7 +1951,9 @@ export default function LogisticsTimelineView({
               </div>
             ) : (
               drivers.map((driver) => {
-                const rawTasks = [...(assignmentByDriver.get(driver.id) || [])].sort(
+                const staffId = logisticsLaneStaffId(driver);
+                const laneKey = logisticsDriverLaneKey(driver);
+                const rawTasks = [...(assignmentByDriver.get(staffId) || [])].sort(
                   (a, b) => Number(a?.sequence ?? 0) - Number(b?.sequence ?? 0)
                 );
                 const rawByTaskId = new Map<number, any>();
@@ -1951,11 +1967,11 @@ export default function LogisticsTimelineView({
                 const driverPlate = getDriverPlate(driver);
                 // Durante il drag: nascondi travel/checkout così i task possono riordinarsi in modo ottimistico
                 const hideRouteSpacers =
-                  activeDragDriverId === driver.id ||
-                  draggingOverDriverId === driver.id;
+                  activeDragDriverId === staffId ||
+                  draggingOverDriverId === staffId;
                 return (
                   <div
-                    key={driver.id}
+                    key={laneKey}
                     className="mb-0.5 flex h-[50px] min-w-0"
                   >
                     <div
@@ -1964,13 +1980,13 @@ export default function LogisticsTimelineView({
                         "cursor-pointer hover:bg-muted/35 transition-colors",
                         filteredDriverIdForMap === driver.id &&
                           "ring-2 ring-amber-400 border-amber-500 dark:ring-amber-500/80 dark:border-amber-500",
-                        driver.isRemoved && "opacity-70"
+                        driver.isRemoved && "opacity-80 border-red-400 bg-red-50 dark:bg-red-950/40"
                       )}
                       style={{ width: `${driverColumnWidth}px` }}
                       onClick={(e) => handleDriverHeaderClick(driver, e)}
                       title={
                         driver.isRemoved
-                          ? "Driver rimosso - Click per sostituire"
+                          ? "Driver rimosso - Click per sostituire o rimettere"
                           : "Dettagli driver (doppio click: filtro mappa)"
                       }
                     >
@@ -2023,9 +2039,9 @@ export default function LogisticsTimelineView({
                     <DndDroppableSortableContainer
                       scope="logistics"
                       type="timeline"
-                      staffId={driver.id}
+                      staffId={staffId}
                       itemIds={tasks.map((task) =>
-                        taskDndId("logistics", getTaskDndKey(task), driver.id, "timeline")
+                        taskDndId("logistics", getTaskDndKey(task), staffId, "timeline")
                       )}
                       insertIndex={tasks.length}
                       disabled={isReadOnly || suppressTaskDrag || isLoadingOverlay}
@@ -2036,7 +2052,10 @@ export default function LogisticsTimelineView({
                       onPointerMove={handleTimelinePointerMove}
                       onPointerUp={stopTimelinePan}
                       onPointerCancel={stopTimelinePan}
-                      className="timeline-center-scroll relative min-w-0 min-h-[45px] flex-1 border-l border-border bg-background"
+                      className={cn(
+                        "timeline-center-scroll relative min-w-0 min-h-[45px] flex-1 border-l border-border bg-background",
+                        driver.isRemoved && "border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/25"
+                      )}
                     >
                       {(() => {
                         return (
@@ -2064,6 +2083,13 @@ export default function LogisticsTimelineView({
                               <LogisticsClockNowLine leftPx={clockNowLineLeftPx} />
                             )}
                           </div>
+                          {driver.isRemoved && (
+                            <div className="absolute inset-0 z-20 pointer-events-none flex items-center pl-2">
+                              <span className="bg-red-600 text-white font-bold text-[10px] px-1.5 py-0.5 rounded shadow-sm">
+                                RIMOSSO
+                              </span>
+                            </div>
+                          )}
                           <div
                             className="relative z-10 flex items-center h-full min-h-[45px] px-0 gap-0"
                             style={{ width: timelineScaledWidth, minWidth: "100%" }}
@@ -2074,7 +2100,7 @@ export default function LogisticsTimelineView({
                               const lastRawTask =
                                 rawTasks.length > 0 ? rawTasks[rawTasks.length - 1] : null;
                               const returnTravelMinutes =
-                                returnTravelByDriver.get(driver.id) ??
+                                returnTravelByDriver.get(staffId) ??
                                 (lastRawTask
                                   ? estimateLogisticsReturnToDepotMinutes(lastRawTask)
                                   : 0);
@@ -2088,21 +2114,21 @@ export default function LogisticsTimelineView({
                               // non è nel SortableContext (cross-driver o assign da container).
                               const isExternalAssignTargetRow =
                                 hideRouteSpacers &&
-                                draggingOverDriverId === driver.id &&
+                                draggingOverDriverId === staffId &&
                                 activeDragDriverId == null &&
                                 lastValidDragIndex != null;
                               const isCrossDriverTargetRow =
                                 (hideRouteSpacers &&
-                                  draggingOverDriverId === driver.id &&
+                                  draggingOverDriverId === staffId &&
                                   activeDragDriverId != null &&
-                                  activeDragDriverId !== driver.id &&
+                                  activeDragDriverId !== staffId &&
                                   lastValidDragIndex != null) ||
                                 isExternalAssignTargetRow;
                               const isCrossDriverSourceRow =
                                 hideRouteSpacers &&
-                                activeDragDriverId === driver.id &&
+                                activeDragDriverId === staffId &&
                                 draggingOverDriverId != null &&
-                                draggingOverDriverId !== driver.id;
+                                draggingOverDriverId !== staffId;
                               const crossDriverInsertWidthPx = Math.max(
                                 15 * timelinePxPerMinute,
                                 COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX,
@@ -2111,7 +2137,7 @@ export default function LogisticsTimelineView({
                                 isCrossDriverTargetRow &&
                                 lastValidDragIndex === atIndex ? (
                                   <div
-                                    key={`cross-insert-${driver.id}-${atIndex}`}
+                                    key={`cross-insert-${staffId}-${atIndex}`}
                                     className="flex-shrink-0"
                                     style={{
                                       width: `${crossDriverInsertWidthPx}px`,
@@ -2158,7 +2184,7 @@ export default function LogisticsTimelineView({
                                 const gridStartMinutes = timelineStartMinutes;
                                 const previewMinutes =
                                   ENABLE_FIRST_LOGISTICS_TASK_TIME_SHIFT &&
-                                  firstTaskTimeShiftPreview?.driverId === driver.id
+                                  firstTaskTimeShiftPreview?.driverId === staffId
                                     ? firstTaskTimeShiftPreview.startMinutes
                                     : null;
                                 const taskStartMinutes =
@@ -2185,7 +2211,7 @@ export default function LogisticsTimelineView({
                                 timelineWidth
                               );
                               return (
-                                <Fragment key={`${task.id}-${driver.id}-frag`}>
+                                <Fragment key={`${task.id}-${laneKey}-frag`}>
                                   {seq === 1 && initialIdleOffsetPx > 0 && (
                                     <div
                                       className="pointer-events-none flex-shrink-0"
@@ -2240,7 +2266,7 @@ export default function LogisticsTimelineView({
                                       initialIndex: index,
                                       from: {
                                         type: "timeline",
-                                        staffId: driver.id,
+                                        staffId,
                                       },
                                     };
                                     const firstTaskId = raw?.task_id || task.id;
@@ -2264,20 +2290,20 @@ export default function LogisticsTimelineView({
                                     disabled={isSavingFirstTaskTime}
                                     onPreview={(startMinutes) =>
                                       setFirstTaskTimeShiftPreview({
-                                        driverId: driver.id,
+                                        driverId: staffId,
                                         startMinutes,
                                       })
                                     }
                                     onCommit={(nextStart) =>
                                       persistFirstLogisticsTaskStart(
-                                        driver.id,
+                                        staffId,
                                         firstTaskId,
                                         nextStart,
                                       )
                                     }
                                     onReset={() =>
                                       persistFirstLogisticsTaskStart(
-                                        driver.id,
+                                        staffId,
                                         firstTaskId,
                                         null,
                                       )
@@ -2285,8 +2311,8 @@ export default function LogisticsTimelineView({
                                     onCancel={() => setFirstTaskTimeShiftPreview(null)}
                                   >
                                   <SortableTaskCard
-                                    key={`${task.id}-${driver.id}`}
-                                    dndId={taskDndId("logistics", taskKey, driver.id, "timeline")}
+                                    key={`${task.id}-${laneKey}`}
+                                    dndId={taskDndId("logistics", taskKey, staffId, "timeline")}
                                     dndData={dndData}
                                     draggingOpacity={0}
                                     hideWhileDragging
@@ -2696,16 +2722,22 @@ export default function LogisticsTimelineView({
                   Sostituendo{" "}
                   <strong>
                     {(() => {
-                      const rem = drivers.find((d) => d.id === driverToReplace);
+                      const remLane = resolveLogisticsLaneStaffId(driverToReplace);
+                      const rem = drivers.find(
+                        (d) =>
+                          d.id === remLane.driverId &&
+                          Boolean(d.leftoverLane) === remLane.leftoverLane
+                      );
                       return rem
-                        ? `${rem.name ?? ""} ${rem.lastname ?? ""}`.trim() || `ID ${driverToReplace}`
-                        : `ID ${driverToReplace}`;
+                        ? `${rem.name ?? ""} ${rem.lastname ?? ""}`.trim() ||
+                            `ID ${remLane.driverId}`
+                        : `ID ${remLane.driverId}`;
                     })()}
-                  </strong>{" "}
-                  — le sue task verranno assegnate al nuovo driver.
+                  </strong>
+                  .
                 </>
               ) : (
-                "Seleziona un driver disponibile da aggiungere alla timeline."
+                "Seleziona un driver da aggiungere."
               )}
             </DialogDescription>
           </DialogHeader>
@@ -2726,6 +2758,15 @@ export default function LogisticsTimelineView({
             ) : (
               availableDrivers.map((d: any) => {
                 const isAvailable = d.available !== false;
+                const leftoverRemoved = driversAssignments.some(
+                  (row) =>
+                    Number(row.driver?.id) === Number(d.id) &&
+                    row.driver?.isRemoved &&
+                    (row.tasks?.length || 0) > 0
+                );
+                const isPutBack =
+                  driverToReplace != null &&
+                  Number(d.id) === resolveLogisticsLaneStaffId(driverToReplace).driverId;
                 return (
                   <div
                     key={d.id}
@@ -2751,6 +2792,11 @@ export default function LogisticsTimelineView({
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap justify-end">
+                      {(isPutBack || leftoverRemoved) && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-600/15 text-red-800 dark:text-red-200 border-red-500/40">
+                          {isPutBack ? "Rimettere" : "Task residue"}
+                        </span>
+                      )}
                       {!isAvailable && (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-gray-500/30 text-gray-800 dark:bg-gray-500/40 dark:text-gray-200 border-gray-600 dark:border-gray-400">
                           Non disponibile

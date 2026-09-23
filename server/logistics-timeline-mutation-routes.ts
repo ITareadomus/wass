@@ -6,6 +6,12 @@ import {
   recalculateLogisticsDriverEntry,
 } from "./services/logistics-timeline-utils";
 import { enrichDriverTasksWithLogisticsKind } from "./services/logistics-task-kind-enrichment";
+import {
+  clearLogisticsRemovedLeftoverTaskInPlace,
+  isLogisticsRemovedLeftoverTask,
+  markLogisticsRemovedLeftoverTaskInPlace,
+  resolveLogisticsLaneStaffId,
+} from "../shared/logistics-removed-leftover";
 
 type Deps = {
   getCurrentUsername: (req?: any) => string;
@@ -133,7 +139,8 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
         timelineData.metadata.modified_by.push(currentUsername);
       }
 
-      const normalizedDriverId = Number(driverId);
+      const destLane = resolveLogisticsLaneStaffId(Number(driverId));
+      const normalizedDriverId = destLane.driverId;
       let driverEntry = timelineData.drivers_assignments.find((d: any) => d.driver.id === normalizedDriverId);
       if (!driverEntry) {
         const driversData = (await workspaceFiles.loadSelectedLogisticsDrivers(workDate)) || { drivers: [] };
@@ -183,7 +190,11 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
         alias: fullTaskData.alias || null,
         customer_name: fullTaskData.customer_name || fullTaskData.type || null,
         customer_reference: fullTaskData.customer_reference || null,
-        reasons: [...(fullTaskData.reasons || []), "manually_moved_to_timeline"],
+        reasons: [
+          ...(fullTaskData.reasons || []).filter((r: string) => r !== "lg_removed_leftover"),
+          "manually_moved_to_timeline",
+          ...(destLane.leftoverLane ? ["lg_removed_leftover"] : []),
+        ],
         manually_moved: true,
         priority: priority || sourceContainerType || "low_priority",
         start_time: null,
@@ -193,9 +204,18 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
         travel_time: 0,
       };
 
+      const leftoverTasks = driverEntry.tasks.filter((task: any) =>
+        isLogisticsRemovedLeftoverTask(task)
+      );
+      const liveTasks = driverEntry.tasks.filter((task: any) => !isLogisticsRemovedLeftoverTask(task));
+      const laneTasks = destLane.leftoverLane ? leftoverTasks : liveTasks;
+      const otherTasks = destLane.leftoverLane ? liveTasks : leftoverTasks;
       const targetIndex =
-        insertAt !== undefined ? Math.max(0, Math.min(insertAt, driverEntry.tasks.length)) : driverEntry.tasks.length;
-      driverEntry.tasks.splice(targetIndex, 0, taskForTimeline);
+        insertAt !== undefined ? Math.max(0, Math.min(insertAt, laneTasks.length)) : laneTasks.length;
+      laneTasks.splice(targetIndex, 0, taskForTimeline);
+      driverEntry.tasks = destLane.leftoverLane
+        ? [...otherTasks, ...laneTasks]
+        : [...laneTasks, ...otherTasks];
       driverEntry.tasks.forEach((t: any, i: number) => {
         t.sequence = i + 1;
         t.followup = i > 0;
@@ -432,34 +452,41 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       if (!timelineData) {
         return res.status(404).json({ success: false, message: "Timeline non trovata" });
       }
-      const normalizedDriverId = Number(driverId);
+      const lane = resolveLogisticsLaneStaffId(Number(driverId));
+      const normalizedDriverId = lane.driverId;
       const driverEntry = timelineData.drivers_assignments.find(
         (d: any) => Number(d.driver?.id) === normalizedDriverId
       );
       if (!driverEntry) {
         return res.status(404).json({ success: false, message: "Driver non trovato" });
       }
-      driverEntry.tasks = [...driverEntry.tasks].sort(
-        (left: any, right: any) => Number(left?.sequence ?? 0) - Number(right?.sequence ?? 0)
+      const leftoverTasks = driverEntry.tasks.filter((task: any) =>
+        isLogisticsRemovedLeftoverTask(task)
       );
-      const actualFrom = driverEntry.tasks.findIndex(
+      const liveTasks = driverEntry.tasks.filter((task: any) => !isLogisticsRemovedLeftoverTask(task));
+      const laneTasks = lane.leftoverLane ? leftoverTasks : liveTasks;
+      const otherTasks = lane.leftoverLane ? liveTasks : leftoverTasks;
+      const actualFrom = laneTasks.findIndex(
         (t: any) => String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
       );
       if (actualFrom === -1) {
         return res.status(404).json({ success: false, message: "Task non trovata" });
       }
-      if (Boolean(driverEntry.tasks[actualFrom]?.is_finished)) {
+      if (Boolean(laneTasks[actualFrom]?.is_finished)) {
         return res.status(423).json({
           success: false,
           error: "TASK_FINISHED",
           message: "Task già completata: impossibile spostare",
         });
       }
-      if (toIndex < 0 || toIndex > driverEntry.tasks.length) {
+      if (toIndex < 0 || toIndex > laneTasks.length) {
         return res.status(400).json({ success: false, message: "toIndex non valido" });
       }
-      const [task] = driverEntry.tasks.splice(actualFrom, 1);
-      driverEntry.tasks.splice(toIndex, 0, task);
+      const [task] = laneTasks.splice(actualFrom, 1);
+      laneTasks.splice(toIndex, 0, task);
+      driverEntry.tasks = lane.leftoverLane
+        ? [...otherTasks, ...laneTasks]
+        : [...laneTasks, ...otherTasks];
       driverEntry.tasks.forEach((t: any, i: number) => {
         t.sequence = i + 1;
         t.followup = i > 0;
@@ -520,17 +547,21 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
         };
       }
 
-      const normalizedSourceDriverId = Number(sourceDriverId);
-      const normalizedDestDriverId = Number(destDriverId);
+      const sourceLane = resolveLogisticsLaneStaffId(Number(sourceDriverId));
+      const destLane = resolveLogisticsLaneStaffId(Number(destDriverId));
+      const normalizedSourceDriverId = sourceLane.driverId;
+      const normalizedDestDriverId = destLane.driverId;
 
       let taskToMove: any = null;
       const sourceEntry = timelineData.drivers_assignments.find(
         (d: any) => Number(d.driver?.id) === normalizedSourceDriverId
       );
       if (sourceEntry) {
-        const ti = sourceEntry.tasks.findIndex(
-          (t: any) => String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode)
-        );
+        const ti = sourceEntry.tasks.findIndex((t: any) => {
+          const sameTask =
+            String(t.task_id) === String(taskId) || String(t.logistic_code) === String(logisticCode);
+          return sameTask && isLogisticsRemovedLeftoverTask(t) === sourceLane.leftoverLane;
+        });
         if (ti !== -1) {
           taskToMove = sourceEntry.tasks.splice(ti, 1)[0];
           sourceEntry.tasks.forEach((t: any, i: number) => {
@@ -569,11 +600,23 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
         (r: string) =>
           !["auto_assignment", "early_out_assignment", "high_priority_assignment", "low_priority_assignment"].includes(r)
       );
+      if (destLane.leftoverLane) {
+        markLogisticsRemovedLeftoverTaskInPlace(taskToMove);
+      } else {
+        clearLogisticsRemovedLeftoverTaskInPlace(taskToMove);
+      }
       taskToMove.manually_moved = true;
 
+      const destLeftover = destEntry.tasks.filter((task: any) => isLogisticsRemovedLeftoverTask(task));
+      const destLive = destEntry.tasks.filter((task: any) => !isLogisticsRemovedLeftoverTask(task));
+      const destLaneTasks = destLane.leftoverLane ? destLeftover : destLive;
+      const destOtherTasks = destLane.leftoverLane ? destLive : destLeftover;
       const targetIndex =
-        destIndex !== undefined ? Math.max(0, Math.min(destIndex, destEntry.tasks.length)) : destEntry.tasks.length;
-      destEntry.tasks.splice(targetIndex, 0, taskToMove);
+        destIndex !== undefined ? Math.max(0, Math.min(destIndex, destLaneTasks.length)) : destLaneTasks.length;
+      destLaneTasks.splice(targetIndex, 0, taskToMove);
+      destEntry.tasks = destLane.leftoverLane
+        ? [...destOtherTasks, ...destLaneTasks]
+        : [...destLaneTasks, ...destOtherTasks];
       destEntry.tasks.forEach((t: any, i: number) => {
         t.sequence = i + 1;
         t.followup = i > 0;
@@ -630,7 +673,12 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
           message: "sourceDriverId e destDriverId sono obbligatori",
         });
       }
-      if (Number(sourceDriverId) === Number(destDriverId)) {
+      const sourceLane = resolveLogisticsLaneStaffId(Number(sourceDriverId));
+      const destLane = resolveLogisticsLaneStaffId(Number(destDriverId));
+      if (
+        sourceLane.driverId === destLane.driverId &&
+        sourceLane.leftoverLane === destLane.leftoverLane
+      ) {
         return res.status(400).json({
           success: false,
           message: "Non puoi scambiare le task con lo stesso driver",
@@ -652,8 +700,8 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
       timelineData.drivers_assignments = timelineData.drivers_assignments || [];
       timelineData.meta = timelineData.meta || { total_drivers: 0, used_drivers: 0, assigned_tasks: 0 };
 
-      const srcId = Number(sourceDriverId);
-      const dstId = Number(destDriverId);
+      const srcId = sourceLane.driverId;
+      const dstId = destLane.driverId;
 
       let sourceEntry = timelineData.drivers_assignments.find((d: any) => d.driver?.id === srcId);
       let destEntry = timelineData.drivers_assignments.find((d: any) => d.driver?.id === dstId);
@@ -715,10 +763,66 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
         }
       }
 
-      const sourceTasks = sourceEntry.tasks || [];
-      const destTasks = destEntry.tasks || [];
-      sourceEntry.tasks = destTasks;
-      destEntry.tasks = sourceTasks;
+      if (sourceEntry === destEntry) {
+        const leftoverTasks = (sourceEntry.tasks || []).filter((task: any) =>
+          isLogisticsRemovedLeftoverTask(task)
+        );
+        const liveTasks = (sourceEntry.tasks || []).filter(
+          (task: any) => !isLogisticsRemovedLeftoverTask(task)
+        );
+        for (const task of leftoverTasks) {
+          if (destLane.leftoverLane) {
+            markLogisticsRemovedLeftoverTaskInPlace(task);
+          } else {
+            clearLogisticsRemovedLeftoverTaskInPlace(task);
+          }
+        }
+        for (const task of liveTasks) {
+          if (sourceLane.leftoverLane) {
+            markLogisticsRemovedLeftoverTaskInPlace(task);
+          } else {
+            clearLogisticsRemovedLeftoverTaskInPlace(task);
+          }
+        }
+        sourceEntry.tasks = [...leftoverTasks, ...liveTasks];
+      } else {
+      const sourceLeftover = (sourceEntry.tasks || []).filter((task: any) =>
+        isLogisticsRemovedLeftoverTask(task)
+      );
+      const sourceLive = (sourceEntry.tasks || []).filter(
+        (task: any) => !isLogisticsRemovedLeftoverTask(task)
+      );
+      const destLeftover = (destEntry.tasks || []).filter((task: any) =>
+        isLogisticsRemovedLeftoverTask(task)
+      );
+      const destLive = (destEntry.tasks || []).filter(
+        (task: any) => !isLogisticsRemovedLeftoverTask(task)
+      );
+      const sourceLaneTasks = sourceLane.leftoverLane ? sourceLeftover : sourceLive;
+      const destLaneTasks = destLane.leftoverLane ? destLeftover : destLive;
+      const sourceKept = sourceLane.leftoverLane ? sourceLive : sourceLeftover;
+      const destKept = destLane.leftoverLane ? destLive : destLeftover;
+      for (const task of destLaneTasks) {
+        if (sourceLane.leftoverLane) {
+          markLogisticsRemovedLeftoverTaskInPlace(task);
+        } else {
+          clearLogisticsRemovedLeftoverTaskInPlace(task);
+        }
+      }
+      for (const task of sourceLaneTasks) {
+        if (destLane.leftoverLane) {
+          markLogisticsRemovedLeftoverTaskInPlace(task);
+        } else {
+          clearLogisticsRemovedLeftoverTaskInPlace(task);
+        }
+      }
+      sourceEntry.tasks = sourceLane.leftoverLane
+        ? [...sourceKept, ...destLaneTasks]
+        : [...destLaneTasks, ...sourceKept];
+      destEntry.tasks = destLane.leftoverLane
+        ? [...destKept, ...sourceLaneTasks]
+        : [...sourceLaneTasks, ...destKept];
+      }
 
       const markTasks = (tasks: any[]) => {
         tasks.forEach((task: any) => {
@@ -798,7 +902,8 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
     try {
       const { date, driverId, taskId, startTime, modified_by } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
-      const driverIdNum = Number(driverId);
+      const lane = resolveLogisticsLaneStaffId(Number(driverId));
+      const driverIdNum = lane.driverId;
       const clearOverride = startTime === null || startTime === "";
 
       if (!Number.isFinite(driverIdNum) || !taskId) {
@@ -826,10 +931,12 @@ export function registerLogisticsTimelineMutationRoutes(app: Express, deps: Deps
         return res.status(404).json({ success: false, error: "Driver non trovato" });
       }
 
-      driverEntry.tasks = [...driverEntry.tasks].sort(
-        (left: any, right: any) => Number(left?.sequence ?? 0) - Number(right?.sequence ?? 0)
-      );
-      const firstTask = driverEntry.tasks[0];
+      const laneTasks = driverEntry.tasks
+        .filter((task: any) => isLogisticsRemovedLeftoverTask(task) === lane.leftoverLane)
+        .sort(
+          (left: any, right: any) => Number(left?.sequence ?? 0) - Number(right?.sequence ?? 0)
+        );
+      const firstTask = laneTasks[0];
       if (String(firstTask?.task_id ?? firstTask?.id ?? "") !== String(taskId)) {
         return res.status(400).json({
           success: false,
