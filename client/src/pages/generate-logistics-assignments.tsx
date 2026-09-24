@@ -20,6 +20,11 @@ import {
   nudgeLogisticsProgramPoll,
 } from "@/lib/logistics-program-poll";
 import type { LogisticsAssignedSyncNotice } from "@shared/logistics-assigned-sync-diff";
+import {
+  appendLogisticsAdamSyncNotice,
+  readLogisticsAdamSyncHistory,
+  writeLogisticsAdamSyncHistory,
+} from "@/lib/logistics-adam-sync-history";
 import { ensureProgramPollClock, flushProgramPollTick } from "@/lib/program-poll-clock";
 import {
   CalendarIcon,
@@ -492,7 +497,15 @@ export default function GenerateLogisticsAssignments() {
   const [activeDragDriverId, setActiveDragDriverId] = useState<number | null>(null);
   /** Estrazione / refresh da ADAM al cambio data (come checkAndAutoLoadSavedAssignments + extractData su HK) */
   const [isExtractingLogistics, setIsExtractingLogistics] = useState(false);
-  const [adamSyncNotice, setAdamSyncNotice] = useState<LogisticsAssignedSyncNotice | null>(null);
+  const selectedWorkDateKey = format(selectedDate, "yyyy-MM-dd");
+  const [adamSyncHistory, setAdamSyncHistory] = useState<LogisticsAssignedSyncNotice[]>(() =>
+    readLogisticsAdamSyncHistory(format(selectedDate, "yyyy-MM-dd"))
+  );
+  const adamSyncHistoryDateRef = useRef(selectedWorkDateKey);
+  if (adamSyncHistoryDateRef.current !== selectedWorkDateKey) {
+    adamSyncHistoryDateRef.current = selectedWorkDateKey;
+    setAdamSyncHistory(readLogisticsAdamSyncHistory(selectedWorkDateKey));
+  }
   const [extractionStep, setExtractionStep] = useState("Inizializzazione...");
   /** Allinea titolo e riga "Step x/2" al loader housekeeping */
   const [logisticsLoaderKind, setLogisticsLoaderKind] = useState<
@@ -981,7 +994,7 @@ export default function GenerateLogisticsAssignments() {
     isBlocked: () => logisticsProgramBlockedRef.current || isDraggingRef.current,
     onSynced: async (workDate: string, notice: LogisticsAssignedSyncNotice | null) => {
       if (format(selectedDate, "yyyy-MM-dd") !== workDate) return;
-      setAdamSyncNotice(notice?.tasks.length ? notice : null);
+      setAdamSyncHistory((current) => appendLogisticsAdamSyncNotice(current, notice));
       await reloadLogisticsPage({ preserveSchedule: true });
     },
     onError: (message: string) => {
@@ -1001,7 +1014,7 @@ export default function GenerateLogisticsAssignments() {
       isDraggingRef.current,
     onSynced: async (workDate: string, notice: LogisticsAssignedSyncNotice | null) => {
       if (format(selectedDate, "yyyy-MM-dd") !== workDate) return;
-      setAdamSyncNotice(notice?.tasks.length ? notice : null);
+      setAdamSyncHistory((current) => appendLogisticsAdamSyncNotice(current, notice));
       await reloadLogisticsPage({ preserveSchedule: true });
     },
     onError: (message: string) => {
@@ -1023,8 +1036,9 @@ export default function GenerateLogisticsAssignments() {
   }, []);
 
   useEffect(() => {
-    setAdamSyncNotice(null);
-  }, [selectedDate]);
+    if (adamSyncHistoryDateRef.current !== selectedWorkDateKey) return;
+    writeLogisticsAdamSyncHistory(selectedWorkDateKey, adamSyncHistory);
+  }, [adamSyncHistory, selectedWorkDateKey]);
 
   useEffect(() => {
     nudgeLogisticsProgramPoll();
@@ -1665,7 +1679,7 @@ export default function GenerateLogisticsAssignments() {
                   activeDragDriverId={activeDragDriverId}
                   lastValidDragIndex={lastValidDragIndex}
                   onRefresh={reloadLogisticsPage}
-                  adamSyncNotice={adamSyncNotice}
+                  adamSyncHistory={adamSyncHistory}
                   className={!showContainers ? "rounded-tr-none" : undefined}
                 />
                 <TimelineFloatingPanel
