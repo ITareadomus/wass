@@ -18,6 +18,15 @@ import {
   priorityToContainerFormat,
   PrioritySettingsError,
 } from "../shared/taskPriorityClassification";
+import {
+  applyWassCleaningTimeOverride,
+  hasManualCleaningSplit,
+  hasManualCleaningTime,
+  withManualCleaningSplitReason,
+  withManualCleaningTimeReason,
+  WASS_CLEANING_SPLIT_MANUAL_REASON,
+  type ManualCleaningTimeOverride,
+} from "../shared/wass-cleaning-time";
 
 const isTrue = (v: any) => v === true || v === 1 || v === "1" || v === "true";
 const OFFICE_SCOPE_ENABLED = false;
@@ -6707,9 +6716,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const collaboration = await taskCollaborationService.getCollaboration(workDate, taskId);
       
-      // Recupera alias e nominativi per i collaboratori
+      // Recupera alias, nominativi e quota di lavoro per i collaboratori
       const { query } = await import("../shared/pg-db");
-      const [aliasesResult, cleanersResult] = await Promise.all([
+      const [aliasesResult, cleanersResult, assignmentsResult] = await Promise.all([
         query(
           `SELECT cleaner_id, alias FROM aliases WHERE cleaner_id = ANY($1)`,
           [collaboration.cleanerIds]
@@ -6721,8 +6730,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
              AND work_date = $2`,
           [collaboration.cleanerIds, workDate]
         ),
+        query(
+          `SELECT cleaner_id, cleaning_time, base_cleaning_time, reasons
+           FROM daily_assignments_current
+           WHERE work_date = $1 AND task_id = $2`,
+          [workDate, taskId]
+        ),
       ]);
-      
+
       const aliasMap = new Map(aliasesResult.rows.map(r => [r.cleaner_id, r.alias]));
       const cleanerNameMap = new Map(
         cleanersResult.rows.map((r: any) => [
@@ -6730,12 +6745,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `${String(r.name ?? "").trim()} ${String(r.lastname ?? "").trim()}`.trim(),
         ])
       );
-      
+      const assignmentByCleaner = new Map(
+        assignmentsResult.rows.map((r: any) => [Number(r.cleaner_id), r])
+      );
+
       const collaborators = collaboration.cleanerIds.map(id => ({
         id,
         alias: String(aliasMap.get(id) ?? "").trim() || cleanerNameMap.get(id) || `Cleaner ${id}`,
-        isPrimary: id === collaboration.primaryCleanerId
+        isPrimary: id === collaboration.primaryCleanerId,
+        cleaningTime: Number(assignmentByCleaner.get(Number(id))?.cleaning_time ?? 0) || 0,
       }));
+
+      // Durata del task (nominale) vs lavoro effettivamente distribuito: divergono
+      // solo quando le quote sono state sbilanciate a mano.
+      const firstRow = assignmentsResult.rows[0];
+      const baseCleaningTime = Number(firstRow?.base_cleaning_time ?? 0) || 0;
+      const assignedTotalMinutes = collaborators.reduce((sum, c) => sum + c.cleaningTime, 0);
 
       res.json({
         success: true,
@@ -6743,7 +6768,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         taskId,
         collaborators,
         primaryCleanerId: collaboration.primaryCleanerId,
-        count: collaboration.count
+        count: collaboration.count,
+        baseCleaningTime,
+        assignedTotalMinutes,
+        hasManualSplit: hasManualCleaningSplit(firstRow),
       });
     } catch (error: any) {
       console.error("Errore nel caricamento collaborazione:", error);
@@ -6898,12 +6926,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           LIMIT 1
         `, [workDate, Number(cleanerId), effectiveCleaningTime, baseCleaningTime, newSequence, taskId]);
 
-        // 8. Aggiorna cleaning_time per tutti i collaboratori esistenti
+        // 8. Aggiorna cleaning_time per tutti i collaboratori esistenti.
+        // Cambiando il numero di collaboratori si torna alla divisione equa.
         await client.query(
-          `UPDATE daily_assignments_current 
-           SET cleaning_time = $1, base_cleaning_time = $2
+          `UPDATE daily_assignments_current
+           SET cleaning_time = $1,
+               base_cleaning_time = $2,
+               reasons = array_remove(COALESCE(reasons, '{}'), $5)
            WHERE work_date = $3 AND task_id = $4`,
-          [effectiveCleaningTime, baseCleaningTime, workDate, taskId]
+          [effectiveCleaningTime, baseCleaningTime, workDate, taskId, WASS_CLEANING_SPLIT_MANUAL_REASON]
         );
 
         // 9. Ricalcola orari per tutti i cleaners coinvolti
@@ -7035,6 +7066,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       const { recomputeSchedule, validateOverlap } = await import("./schedule/recompute");
 
+      const pool = (await import("../shared/pg-db")).default;
       const client = await pool.connect();
 
       try {
@@ -7285,6 +7317,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
 
+      const pool = (await import("../shared/pg-db")).default;
+      const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
+      const { validateOverlap } = await import("./schedule/recompute");
       const client = await pool.connect();
 
       try {
@@ -7342,18 +7377,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Aggiorna cleaning_time al valore base
           await client.query(
             `UPDATE daily_assignments_current 
-             SET cleaning_time = base_cleaning_time
+             SET cleaning_time = base_cleaning_time,
+                 reasons = array_remove(COALESCE(reasons, '{}'), $3)
              WHERE work_date = $1 AND task_id = $2`,
-            [workDate, taskId]
+            [workDate, taskId, WASS_CLEANING_SPLIT_MANUAL_REASON]
           );
         } else if (remainingCount > 1) {
-          // Ricalcola durata effettiva per i rimanenti
+          // Ricalcola durata effettiva per i rimanenti: togliere un collaboratore
+          // riporta la task alla divisione equa del totale.
           const newEffectiveTime = Math.ceil(baseCleaningTime / remainingCount);
           await client.query(
             `UPDATE daily_assignments_current 
-             SET cleaning_time = $1
+             SET cleaning_time = $1,
+                 reasons = array_remove(COALESCE(reasons, '{}'), $4)
              WHERE work_date = $2 AND task_id = $3`,
-            [newEffectiveTime, workDate, taskId]
+            [newEffectiveTime, workDate, taskId, WASS_CLEANING_SPLIT_MANUAL_REASON]
           );
         }
 
@@ -7455,6 +7493,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/tasks/:taskId/collaborators/cleaning-time - Sbilancia la quota di un
+  // singolo collaboratore. Resta solo su WASS: ADAM conosce solo il totale.
+  app.post("/api/tasks/:taskId/collaborators/cleaning-time", async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId, 10);
+      const { date, cleanerId, cleaningTime } = req.body ?? {};
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      const minutes = Number(cleaningTime);
+
+      if (isNaN(taskId)) {
+        return res.status(400).json({ success: false, error: "taskId deve essere un numero" });
+      }
+      if (!cleanerId || isNaN(Number(cleanerId))) {
+        return res.status(400).json({ success: false, error: "cleanerId richiesto" });
+      }
+      if (!Number.isFinite(minutes) || minutes <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: "La durata della pulizia deve essere maggiore di 0 minuti",
+        });
+      }
+
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+
+      const perCleanerMinutes = Math.round(minutes);
+      const pool = (await import("../shared/pg-db")).default;
+      const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
+      const client = await pool.connect();
+
+      try {
+        await client.query('BEGIN');
+        await acquireTimelineWriteLock(client, workDate, resolveScopeFromReq(req));
+
+        const collaboration = await taskCollaborationService.getCollaboration(workDate, taskId);
+        if (collaboration.count < 2) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ success: false, error: "La task non è in collaborazione" });
+        }
+        if (!collaboration.cleanerIds.includes(Number(cleanerId))) {
+          await client.query('ROLLBACK');
+          return res.status(404).json({
+            success: false,
+            error: "Il cleaner non è un collaboratore di questa task",
+          });
+        }
+
+        const rowsResult = await client.query(
+          `SELECT cleaner_id, cleaning_time, base_cleaning_time, reasons
+           FROM daily_assignments_current
+           WHERE work_date = $1 AND task_id = $2`,
+          [workDate, taskId]
+        );
+        if (rowsResult.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(404).json({ success: false, error: "Task non trovata in timeline" });
+        }
+
+        // Le quote sbilanciate non vanno più ricalcolate come totale/collaboratori,
+        // e la durata non va più ripresa da ADAM.
+        for (const row of rowsResult.rows) {
+          const nextReasons = withManualCleaningSplitReason(
+            withManualCleaningTimeReason(row.reasons)
+          );
+          const isEdited = Number(row.cleaner_id) === Number(cleanerId);
+          await client.query(
+            `UPDATE daily_assignments_current
+             SET reasons = $1${isEdited ? ', cleaning_time = $5' : ''}
+             WHERE work_date = $2 AND task_id = $3 AND cleaner_id = $4`,
+            isEdited
+              ? [nextReasons, workDate, taskId, row.cleaner_id, perCleanerMinutes]
+              : [nextReasons, workDate, taskId, row.cleaner_id]
+          );
+        }
+
+        const totalResult = await client.query(
+          `SELECT COALESCE(SUM(cleaning_time), 0)::int as assigned_total
+           FROM daily_assignments_current
+           WHERE work_date = $1 AND task_id = $2`,
+          [workDate, taskId]
+        );
+        const assignedTotalMinutes = totalResult.rows[0]?.assigned_total ?? 0;
+
+        // Solo la corsia del cleaner modificato cambia lunghezza.
+        const tasksResult = await client.query(
+          `SELECT task_id, logistic_code, cleaner_id,
+                  sequence, cleaning_time, address, lat, lng,
+                  start_time, end_time, travel_time, priority,
+                  checkout_time, checkin_time
+           FROM daily_assignments_current
+           WHERE work_date = $1 AND cleaner_id = $2
+           ORDER BY sequence`,
+          [workDate, Number(cleanerId)]
+        );
+
+        if (tasksResult.rows.length > 0) {
+          const cleanerStartTime = await getCleanerStartTime(Number(cleanerId), workDate) || '10:00';
+          const cleanerEndTime = await getCleanerEndTime(Number(cleanerId), workDate) || '20:00';
+          const cleanerData = {
+            cleaner: { id: Number(cleanerId), start_time: cleanerStartTime, end_time: cleanerEndTime },
+            tasks: tasksResult.rows.map((r: any) => ({
+              task_id: r.task_id,
+              logistic_code: r.logistic_code,
+              sequence: r.sequence,
+              cleaning_time: r.cleaning_time,
+              address: r.address,
+              lat: r.lat,
+              lng: r.lng,
+              start_time: r.start_time,
+              end_time: r.end_time,
+              travel_time: r.travel_time,
+              priority: r.priority ?? null,
+              checkout_time: r.checkout_time ?? null,
+              checkin_time: r.checkin_time ?? null,
+            })),
+          };
+
+          const updatedCleanerData = await recalculateCleanerTimes(cleanerData, workDate);
+          for (const task of updatedCleanerData.tasks || []) {
+            await client.query(
+              `UPDATE daily_assignments_current
+               SET start_time = $1, end_time = $2, travel_time = $3
+               WHERE work_date = $4 AND cleaner_id = $5 AND task_id = $6`,
+              [task.start_time, task.end_time, task.travel_time, workDate, Number(cleanerId), task.task_id]
+            );
+          }
+        }
+
+        await client.query('COMMIT');
+
+        console.log(
+          `✅ Quota collaboratore aggiornata: task ${taskId}, cleaner ${cleanerId} → ${perCleanerMinutes} min (totale assegnato ${assignedTotalMinutes})`
+        );
+        res.json({
+          success: true,
+          taskId,
+          cleanerId: Number(cleanerId),
+          cleaningTime: perCleanerMinutes,
+          assignedTotalMinutes,
+          baseCleaningTime: rowsResult.rows[0]?.base_cleaning_time ?? null,
+        });
+      } catch (error: any) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error: any) {
+      console.error("Errore nell'aggiornamento quota collaboratore:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // POST /api/tasks/:taskId/collaborators/dissolve - Dissolvi TUTTA la collaborazione e riporta task nei containers
   app.post("/api/tasks/:taskId/collaborators/dissolve", async (req, res) => {
     try {
@@ -7489,10 +7679,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let priority: string;
       let originalDuration: number;
       let affectedCleaners: number[];
+      let dissolveManualOverride: ManualCleaningTimeOverride | null = null;
       
       try {
         const taskDataResult = await preClient.query(
-          `SELECT task_id, logistic_code, base_cleaning_time, cleaning_time, priority
+          `SELECT task_id, logistic_code, base_cleaning_time, cleaning_time, priority, reasons
            FROM daily_assignments_current 
            WHERE work_date = $1 AND task_id = $2 
            LIMIT 1`,
@@ -7506,8 +7697,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const taskData = taskDataResult.rows[0];
         logisticCode = taskData.logistic_code;
         priority = taskData.priority || 'high_priority';
-        originalDuration = taskData.base_cleaning_time || taskData.cleaning_time;
         affectedCleaners = existingCollaboration.cleanerIds;
+
+        // La durata è una proprietà dell'appartamento: lo sbilanciamento delle quote
+        // riguarda solo come il lavoro era distribuito fra quei cleaner, quindi la
+        // task rientra nei containers con la sua durata originale.
+        originalDuration = taskData.base_cleaning_time || taskData.cleaning_time;
+
+        if (hasManualCleaningTime(taskData)) {
+          const frozen = Number(originalDuration) || 0;
+          dissolveManualOverride = {
+            cleaningTime: frozen,
+            baseCleaningTime: frozen,
+            reasons: withManualCleaningTimeReason(taskData.reasons),
+          };
+        }
       } finally {
         preClient.release();
       }
@@ -7605,7 +7809,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Dopo COMMIT: refresh containers da ADAM (fuori dalla transazione)
       console.log(`🔄 Dissolve: Refresh containers da ADAM per ${workDate}...`);
-      const refreshResult = await refreshContainersFromAdam(workDate, 'dissolve_collaboration');
+      const extraManualOverrides = dissolveManualOverride
+        ? new Map<number, ManualCleaningTimeOverride>([[taskId, dissolveManualOverride]])
+        : undefined;
+      const refreshResult = await refreshContainersFromAdam(
+        workDate,
+        'dissolve_collaboration',
+        resolveScopeFromReq(req),
+        extraManualOverrides ? { extraManualOverrides } : {}
+      );
       
       if (!refreshResult.success) {
         console.warn(`⚠️ Dissolve: Refresh containers fallito, la task potrebbe non apparire nei containers`);
@@ -7757,7 +7969,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Singolo update (comportamento originale)
-      const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime, paxIn, paxOut, operationId, customerNote, date, modified_by, skipAdam } = req.body;
+      const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime, cleaningTimeModified, paxIn, paxOut, operationId, customerNote, date, modified_by, skipAdam } = req.body;
       const normalizedCustomerNote =
         customerNote === undefined || customerNote === null ? undefined : String(customerNote).trim();
 
@@ -7925,6 +8137,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         return false;
       };
+      // Durata pulizia manuale: il valore in arrivo è il totale dell'appartamento,
+      // la quota del singolo cleaner la calcola applyWassCleaningTimeOverride.
+      let wassCleaningTotalMinutes: number | null = null;
+      let wassCleaningCollabCount = 1;
+      if (cleaningTimeModified === true) {
+        const minutes = Number(cleaningTime);
+        if (!Number.isFinite(minutes) || minutes <= 0) {
+          return res.status(400).json({
+            success: false,
+            error: "La durata della pulizia deve essere maggiore di 0 minuti",
+          });
+        }
+        wassCleaningTotalMinutes = Math.round(minutes);
+        let copies = 0;
+        for (const entry of timelineData?.cleaners_assignments || []) {
+          for (const candidate of entry.tasks || []) {
+            if (!taskMatchesEditTarget(candidate)) continue;
+            copies += 1;
+            const n = Number(candidate.collaborator_count) || 0;
+            if (n > wassCleaningCollabCount) wassCleaningCollabCount = n;
+          }
+        }
+        if (copies > wassCleaningCollabCount) wassCleaningCollabCount = copies;
+      }
       const updateTask = (task: any) => {
         if (taskMatchesEditTarget(task)) {
           // Traccia le modifiche prima di applicarle
@@ -7952,11 +8188,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             newValues.push(String(checkinTime));
             task.checkin_time = checkinTime;
           }
-          if (cleaningTime !== undefined && task.cleaning_time !== cleaningTime) {
+          if (wassCleaningTotalMinutes != null) {
             editedFields.push('cleaning_time');
-            oldValues.push(String(task.cleaning_time ?? 'null'));
-            newValues.push(String(cleaningTime));
-            task.cleaning_time = cleaningTime;
+            oldValues.push(String(task.base_cleaning_time ?? task.cleaning_time ?? 'null'));
+            newValues.push(String(wassCleaningTotalMinutes));
+            applyWassCleaningTimeOverride(
+              task,
+              wassCleaningTotalMinutes,
+              wassCleaningCollabCount
+            );
           }
           if (paxIn !== undefined && task.pax_in !== paxIn) {
             editedFields.push('pax_in');
@@ -10562,13 +10802,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           error: "Si può spostare solo il primo appartamento del cleaner",
         });
       }
-      if (isReadonlyPreassignedTask(firstTask)) {
-        return res.status(423).json({
-          success: false,
-          error: "PREASSIGNED_READONLY",
-          message: "Task pre-assegnata readonly: operazione non consentita",
-        });
-      }
+      // I task readonly possono usare lo scatto da 30 minuti: sposta solo l'orario
+      // di inizio in WASS, non il cleaner e non i dati ADAM.
 
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const isLocked = await pgDailyAssignmentsService.isTaskLocked(workDate, Number(taskId));
