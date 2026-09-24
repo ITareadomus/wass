@@ -2544,6 +2544,9 @@ export default function LogisticsTimelineView({
         <DialogContent className="max-h-[80vh] max-w-lg overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Cambiamenti da ADAM</DialogTitle>
+            <DialogDescription>
+              Ci sono state delle modifiche al programma Housekeeping che potrebbero comportare dei cambiamenti al programma della Logistica
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {adamSyncNotice?.tasks.map((task) => (
