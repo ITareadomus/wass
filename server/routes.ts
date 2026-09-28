@@ -1984,6 +1984,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/structure-access-bundles", async (req, res) => {
+    try {
+      const logisticCode = String(req.query.logisticCode ?? "").trim();
+      if (!logisticCode) {
+        return res.status(400).json({ success: false, error: "logisticCode richiesto" });
+      }
+      const { loadDialogAccessBundles } = await import("./services/adam-structure-keys");
+      const bundles = await loadDialogAccessBundles(logisticCode);
+      res.json({ bundles });
+    } catch (error: any) {
+      console.error("GET /api/structure-access-bundles:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint per leggere i containers correnti da PostgreSQL
   // Il frontend dovrebbe usare questo endpoint invece di leggere direttamente containers.json
   app.get("/api/containers", async (req, res) => {

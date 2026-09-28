@@ -102,9 +102,9 @@ export default function MapSection({
   const getMapMarkerTitle = (task: Task): string => {
     const adamCode = String(task.name ?? "").trim();
     const clientAlias = String((task as any).alias ?? "").trim();
-    const address = String(task.address ?? "").trim();
+    const aptCode = String(task.apt_code ?? "").trim();
     const line1 = clientAlias ? `${adamCode} - ${clientAlias}` : adamCode;
-    return address ? `${line1}\n${address}` : line1;
+    return aptCode ? `${line1}\n${aptCode}` : line1;
   };
 
   // Carica i cleaners
@@ -744,6 +744,10 @@ export default function MapSection({
                 </div>
                 <div>
                   <span className="font-semibold">Indirizzo:</span> {selectedTask.address?.toUpperCase()}
+                </div>
+                <div>
+                  <span className="font-semibold">Codice Appartamento:</span>{" "}
+                  {String(selectedTask.apt_code ?? "").trim() || "NON MIGRATO"}
                 </div>
                 <div>
                   <span className="font-semibold">Durata pulizie:</span> {selectedTask.duration.replace(".", ":")} ore

@@ -334,6 +334,7 @@ function timelineTaskToTask(t: any, driverId: number): Task {
     status: "pending",
     scheduledTime: t.start_time ?? null,
     address: t.address != null ? String(t.address) : undefined,
+    apt_code: t.apt_code != null ? String(t.apt_code).trim() || undefined : undefined,
     lat: t.lat != null ? String(t.lat) : undefined,
     lng: t.lng != null ? String(t.lng) : undefined,
     premium: Boolean(t.premium),

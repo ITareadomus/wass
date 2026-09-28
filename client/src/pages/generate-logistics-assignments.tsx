@@ -112,6 +112,7 @@ interface LogisticsTask {
   logistic_code?: string | null;
   client_id?: number | null;
   address?: string | null;
+  apt_code?: string | null;
   alias?: string | null;
   customer_name?: string | null;
   customer_reference?: string | null;
@@ -206,6 +207,7 @@ function convertLogisticsRawToTask(
     status: "pending",
     scheduledTime: null,
     address: raw.address != null ? String(raw.address) : undefined,
+    apt_code: raw.apt_code != null ? String(raw.apt_code).trim() || undefined : undefined,
     lat: raw.lat != null ? String(raw.lat) : undefined,
     lng: raw.lng != null ? String(raw.lng) : undefined,
     premium: Boolean(raw.premium),
@@ -276,6 +278,7 @@ function convertLogisticsTimelineTaskToMapTask(task: any, driverId: number): Tas
     status: "pending",
     scheduledTime: task?.start_time ?? null,
     address: task?.address != null ? String(task.address) : undefined,
+    apt_code: task?.apt_code != null ? String(task.apt_code).trim() || undefined : undefined,
     lat: task?.lat != null ? String(task.lat) : undefined,
     lng: task?.lng != null ? String(task.lng) : undefined,
     premium: Boolean(task?.premium),
@@ -414,6 +417,7 @@ function timelineRowToTaskType(t: any, fallbackPriority: TaskType["priority"]): 
     status: "pending",
     scheduledTime: t.start_time ?? null,
     address: t.address != null ? String(t.address) : undefined,
+    apt_code: t.apt_code != null ? String(t.apt_code).trim() || undefined : undefined,
     premium: Boolean(t.premium),
     straordinaria: isEquivalentStraordinariaTask(t),
     locked: Boolean(t.locked),

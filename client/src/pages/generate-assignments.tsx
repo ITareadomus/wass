@@ -121,6 +121,7 @@ interface RawTask {
   premium: boolean;
   straordinaria?: boolean;
   address: string;
+  apt_code?: string | null;
   lat: string;
   lng: string;
   cleaning_time: number;
@@ -1282,6 +1283,7 @@ export default function GenerateAssignments() {
       status: "pending",
       scheduledTime: null,
       address: rawTask.address,
+      apt_code: rawTask.apt_code != null ? String(rawTask.apt_code).trim() || undefined : undefined,
       lat: rawTask.lat,
       lng: rawTask.lng,
       premium: rawTask.premium,
@@ -1549,6 +1551,10 @@ export default function GenerateAssignments() {
             status: "pending" as const,
             scheduledTime: null,
             address: timelineAssignment.address,
+            apt_code:
+              timelineAssignment.apt_code != null
+                ? String(timelineAssignment.apt_code).trim() || undefined
+                : undefined,
             lat: timelineAssignment.lat,
             lng: timelineAssignment.lng,
             premium: timelineAssignment.premium,
@@ -1587,6 +1593,10 @@ export default function GenerateAssignments() {
             travelTime: timelineAssignment.travel_time || 0,
             manual_start_time: (timelineAssignment as any).manual_start_time ?? null,
             address: timelineAssignment.address || baseTask.address,
+            apt_code:
+              (timelineAssignment.apt_code != null && String(timelineAssignment.apt_code).trim()) ||
+              (baseTask as any).apt_code ||
+              undefined,
             lat: timelineAssignment.lat || baseTask.lat,
             lng: timelineAssignment.lng || baseTask.lng,
             premium: timelineAssignment.premium !== undefined ? timelineAssignment.premium : baseTask.premium,

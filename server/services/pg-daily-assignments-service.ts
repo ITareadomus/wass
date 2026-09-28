@@ -4,6 +4,7 @@ import { taskCollaborationService } from './pg-task-collaboration-service';
 import { formatInTimeZone } from 'date-fns-tz';
 import { databaseConfig } from '../../config/database';
 import { isDevelopmentEnvironment } from '../../shared/work-date-access';
+import { attachAptCodesFromStructures } from './adam-structure-apt-code';
 
 const ROME_TZ = 'Europe/Rome';
 
@@ -1502,6 +1503,8 @@ export class PgDailyAssignmentsService {
         tasks: ca.tasks.sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
       }));
 
+      await attachAptCodesFromStructures(cleaners_assignments.flatMap((ca) => ca.tasks));
+
       const totalTasks = cleaners_assignments.reduce((sum, ca) => sum + ca.tasks.length, 0);
       const usedCleaners = cleaners_assignments.filter(ca => ca.tasks.length > 0).length;
 
@@ -2227,6 +2230,7 @@ export class PgDailyAssignmentsService {
         ...da,
         tasks: da.tasks.sort((a, b) => (a.sequence || 0) - (b.sequence || 0)),
       }));
+      await attachAptCodesFromStructures(drivers_assignments.flatMap((da) => da.tasks));
       const totalTasks = drivers_assignments.reduce((sum, da) => sum + da.tasks.length, 0);
       return {
         drivers_assignments,
@@ -2522,6 +2526,11 @@ export class PgDailyAssignmentsService {
       // Build structure matching create_containers.py format
       this.annotateActiveDuplicateMetadata(tasksByPriority);
       this.sortContainerBucketsLockedLast(tasksByPriority);
+      await attachAptCodesFromStructures([
+        ...tasksByPriority.early_out,
+        ...tasksByPriority.high_priority,
+        ...tasksByPriority.low_priority,
+      ]);
 
       const containers = {
         early_out: {
@@ -2733,6 +2742,11 @@ export class PgDailyAssignmentsService {
 
       this.annotateActiveDuplicateMetadata(tasksByPriority);
       this.sortContainerBucketsLockedLast(tasksByPriority);
+      await attachAptCodesFromStructures([
+        ...tasksByPriority.early_out,
+        ...tasksByPriority.high_priority,
+        ...tasksByPriority.low_priority,
+      ]);
 
       const containers = {
         early_out: { tasks: tasksByPriority.early_out, count: tasksByPriority.early_out.length },

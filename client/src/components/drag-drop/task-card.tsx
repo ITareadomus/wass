@@ -30,6 +30,7 @@ import {
   splitCleaningTimeAcrossCollaborators,
 } from "@shared/wass-cleaning-time";
 import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
+import { StructureAccessKeyTypeField } from "@/components/structure-access-key-type";
 import {
   DIALOG_SECTION_CORNER_BADGE_WRAP_CLASS,
   LOGISTICS_KIND_BADGE_LABEL,
@@ -2788,13 +2789,13 @@ const displayClickableInputClass =
   const shouldShowCheckInOutArrows = !isShortHousekeepingTimelineTask;
   const shouldShowTooltipTimes = isShortHousekeepingTimelineTask;
   const shouldShowTooltipCustomerRef = isShortHousekeepingTimelineTask;
-  const cardTooltipAddressLabel =
-    String(displayTask.address ?? "").trim().toUpperCase() || "INDIRIZZO NON DISPONIBILE";
+  const cardTooltipAptCode = String((displayTask as any).apt_code ?? "").trim();
+  const cardTooltipPrimary = cardTooltipAptCode || "CODICE NON DISPONIBILE";
   const cardTooltipClientAlias = String(displayTask.alias ?? "").trim();
   const cardTooltipAddressLine =
     operationsScope === "logistics" && isInTimeline && cardTooltipClientAlias
-      ? `${cardTooltipAddressLabel} - ${cardTooltipClientAlias}`
-      : cardTooltipAddressLabel;
+      ? `${cardTooltipPrimary} - ${cardTooltipClientAlias}`
+      : cardTooltipPrimary;
 
   // Verifica violazioni temporali (considerando le date!)
   // Card timeline: sempre la task che rappresenta (task), non quella nel dialog (displayTask).
@@ -3273,7 +3274,7 @@ const displayClickableInputClass =
               </div>
             </div>
 
-            {/* Seconda riga: Indirizzo | Durata pulizia */}
+            {/* Seconda riga: Indirizzo | Codice Appartamento | Durata pulizia */}
             <div className="grid grid-cols-2 gap-3 items-start">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Indirizzo</p>
@@ -3285,6 +3286,23 @@ const displayClickableInputClass =
                   onFocus={(e) => e.currentTarget.blur()}
                 />
               </div>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Codice Appartamento</p>
+                <Input
+                  value={String((displayTask as any).apt_code ?? "").trim() || "NON MIGRATO"}
+                  readOnly
+                  className={displayInputClass}
+                  tabIndex={-1}
+                  onFocus={(e) => e.currentTarget.blur()}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 items-start">
+              <StructureAccessKeyTypeField
+                logisticCode={String(
+                  (displayTask as any).logistic_code ?? displayTask.name ?? ""
+                )}
+              />
               <div className="self-start">
                 <p className={cn("text-sm font-semibold text-muted-foreground flex items-center gap-1", !isLogisticsTimelineDetails && "mb-1")}>
                   Durata pulizia

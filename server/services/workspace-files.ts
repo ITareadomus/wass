@@ -42,6 +42,7 @@ function getNormalizedTask(task: any): any {
   if (task.client_id !== undefined) normalizedTask.client_id = task.client_id;
   if (task.premium !== undefined) normalizedTask.premium = task.premium;
   if (task.address !== undefined) normalizedTask.address = task.address;
+  if (task.apt_code !== undefined) normalizedTask.apt_code = task.apt_code;
   if (task.lat !== undefined) normalizedTask.lat = task.lat;
   if (task.lng !== undefined) normalizedTask.lng = task.lng;
   if (task.cleaning_time !== undefined) {
