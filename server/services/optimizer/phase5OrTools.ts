@@ -7,6 +7,7 @@
 import { spawn } from 'child_process';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { extractJsonObjectFromStdout } from '../extract-json-from-stdout';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -125,7 +126,7 @@ function parseOutput(stdout: string): Phase5NeighborhoodBatchResult {
   const empty: Phase5NeighborhoodBatchResult = { applyRelocationIndices: [], applySwapIndices: [] };
   let data: { status: string; applyRelocationIndices?: number[]; applySwapIndices?: number[] };
   try {
-    data = JSON.parse(stdout);
+    data = extractJsonObjectFromStdout(stdout);
   } catch {
     return empty;
   }

@@ -1,3 +1,6 @@
+import { pointInLatLngPolygon } from "@shared/logistics-zone-edit";
+import { prepareDrawableZoneShapes } from "@shared/logistics-zone-geometry";
+
 type LatLng = { lat: number; lng: number };
 type Pt = { x: number; y: number };
 
@@ -362,4 +365,109 @@ export function buildNonOverlappingZonePolygons(
     }
   }
   return polygons;
+}
+
+function shoelaceArea(path: LatLng[]): number {
+  let area = 0;
+  for (let index = 0; index < path.length; index += 1) {
+    const current = path[index];
+    const next = path[(index + 1) % path.length];
+    area += current.lng * next.lat - next.lng * current.lat;
+  }
+  return Math.abs(area);
+}
+
+function approxMeters(left: LatLng, right: LatLng): number {
+  const dy = (left.lat - right.lat) * METERS_PER_DEG_LAT;
+  const dx = (left.lng - right.lng) * metersPerDegLng(left.lat);
+  return Math.hypot(dx, dy);
+}
+
+function perpendicularMeters(point: LatLng, start: LatLng, end: LatLng): number {
+  const length = approxMeters(start, end);
+  if (length < 1) return approxMeters(point, start);
+  const sx = (end.lng - start.lng) * metersPerDegLng(start.lat);
+  const sy = (end.lat - start.lat) * METERS_PER_DEG_LAT;
+  const px = (point.lng - start.lng) * metersPerDegLng(start.lat);
+  const py = (point.lat - start.lat) * METERS_PER_DEG_LAT;
+  const t = Math.max(0, Math.min(1, (px * sx + py * sy) / (sx * sx + sy * sy)));
+  return Math.hypot(px - sx * t, py - sy * t);
+}
+
+function simplifyRing(path: LatLng[], epsilonMeters: number): LatLng[] {
+  if (path.length <= 8) return path;
+  const start = path[0];
+  const end = path[path.length - 1];
+  let maxDist = 0;
+  let maxIndex = 0;
+  for (let index = 1; index < path.length - 1; index += 1) {
+    const distance = perpendicularMeters(path[index], start, end);
+    if (distance > maxDist) {
+      maxDist = distance;
+      maxIndex = index;
+    }
+  }
+  if (maxDist <= epsilonMeters) return [start, end];
+  const left = simplifyRing(path.slice(0, maxIndex + 1), epsilonMeters);
+  const right = simplifyRing(path.slice(maxIndex), epsilonMeters);
+  return [...left.slice(0, -1), ...right];
+}
+
+/** Keeps the zone outline but drops the extra Voronoi vertices. */
+export function simplifyZonePath(path: LatLng[], epsilonMeters = 36): LatLng[] {
+  if (path.length <= 8) return path;
+  const ring = [...path, path[0]];
+  const simplified = simplifyRing(ring, epsilonMeters);
+  const open =
+    simplified.length > 1 &&
+    Math.abs(simplified[0].lat - simplified[simplified.length - 1].lat) < 1e-9 &&
+    Math.abs(simplified[0].lng - simplified[simplified.length - 1].lng) < 1e-9
+      ? simplified.slice(0, -1)
+      : simplified;
+  return open.length >= 3 ? open : path;
+}
+
+/** One drawable outline per zone: the largest Voronoi piece, or a padded box. */
+export function initialEditableZonePaths(
+  zones: Array<{ id: string; points: LatLng[] }>,
+): Map<string, LatLng[]> {
+  const polygons = buildNonOverlappingZonePolygons(zones);
+  const best = new Map<string, { path: LatLng[]; area: number }>();
+  for (const polygon of polygons) {
+    const area = shoelaceArea(polygon.path);
+    const current = best.get(polygon.id);
+    if (!current || area > current.area) {
+      best.set(polygon.id, { path: polygon.path, area });
+    }
+  }
+
+  const paths = new Map<string, LatLng[]>();
+  for (const zone of zones) {
+    const unique = uniquePoints(zone.points);
+    if (unique.length === 0) continue;
+    const computed = best.get(zone.id)?.path;
+    const coversAll =
+      computed != null &&
+      computed.length >= 3 &&
+      unique.every((point) => pointInLatLngPolygon(point, computed));
+    if (coversAll && computed) {
+      paths.set(zone.id, simplifyZonePath(computed));
+      continue;
+    }
+    const pad = 0.0025;
+    const lats = unique.map((point) => point.lat);
+    const lngs = unique.map((point) => point.lng);
+    paths.set(zone.id, [
+      { lat: Math.min(...lats) - pad, lng: Math.min(...lngs) - pad },
+      { lat: Math.min(...lats) - pad, lng: Math.max(...lngs) + pad },
+      { lat: Math.max(...lats) + pad, lng: Math.max(...lngs) + pad },
+      { lat: Math.max(...lats) + pad, lng: Math.min(...lngs) - pad },
+    ]);
+  }
+  const drawable = prepareDrawableZoneShapes(
+    Object.fromEntries([...paths.entries()].map(([id, path]) => [Number(id), path])),
+  );
+  return new Map(
+    Object.entries(drawable).map(([id, path]) => [id, path]),
+  );
 }

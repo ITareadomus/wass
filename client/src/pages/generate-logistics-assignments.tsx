@@ -72,6 +72,7 @@ import type {
   LogisticsPreferredStartsPayload,
   LogisticsZoneDriverAssignmentsPayload,
   LogisticsZoneStartPlan,
+  LogisticsZoneTaskIdsPayload,
 } from "@shared/logistics-zone-start-plan";
 import {
   mergeHypothesisPreviewAssignments,
@@ -790,6 +791,7 @@ export default function GenerateLogisticsAssignments() {
   const executeLogisticsOptimizer = useCallback(async (options?: {
     preferredStarts?: LogisticsPreferredStartsPayload;
     zoneDriverIds?: LogisticsZoneDriverAssignmentsPayload;
+    zoneTaskIds?: LogisticsZoneTaskIdsPayload;
     skipAutoConvoke?: boolean;
   }) => {
     const dateStr = format(selectedDate, "yyyy-MM-dd");
@@ -809,6 +811,7 @@ export default function GenerateLogisticsAssignments() {
           skipAutoConvoke: options?.skipAutoConvoke === true,
           preferredStarts: options?.preferredStarts ?? {},
           zoneDriverIds: options?.zoneDriverIds ?? {},
+          zoneTaskIds: options?.zoneTaskIds ?? {},
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -1779,12 +1782,13 @@ export default function GenerateLogisticsAssignments() {
             setShowStartChoiceDialog(false);
             setZoneStartPlan(null);
           }}
-          onConfirm={(preferredStarts, zoneDriverIds) => {
+          onConfirm={(preferredStarts, zoneDriverIds, zoneTaskIds) => {
             setShowStartChoiceDialog(false);
             setZoneStartPlan(null);
             void executeLogisticsOptimizer({
               preferredStarts,
               zoneDriverIds,
+              zoneTaskIds,
               skipAutoConvoke: true,
             });
           }}

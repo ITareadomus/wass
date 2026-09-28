@@ -17,6 +17,7 @@ import {
   partitionExclusiveWorkZones,
   type ExclusiveWorkZoneSpec,
 } from "./exclusive-work-zones";
+import { calculateCentroid } from "./groups/geo-utils";
 import { findBestFeasibleSequence } from "./route-sequencer";
 import { simulateRouteTiming, simulateRouteTimingAllowingViolations } from "./route-timing";
 import { classifyTaskNodeUrgency } from "./task-urgency";
@@ -847,11 +848,63 @@ function applyDriverIdByZoneIndex(args: {
   return next;
 }
 
+function centroidForTaskIds(
+  taskIds: TaskId[],
+  taskById: ReadonlyMap<TaskId, TaskNode>
+): { lat: number; lng: number } {
+  const points = taskIds
+    .map((taskId) => taskById.get(taskId))
+    .filter((task): task is TaskNode => task != null)
+    .map((task) => task.location)
+    .filter(
+      (location) => Number.isFinite(Number(location.lat)) && Number.isFinite(Number(location.lng))
+    );
+  if (points.length === 0) return { lat: 0, lng: 0 };
+  return calculateCentroid(points);
+}
+
+function applyTaskIdsByZoneIndex(args: {
+  zones: ExclusiveWorkZoneSpec[];
+  taskIdsByZoneIndex?: ReadonlyMap<number, number[]>;
+  validTaskIds: Set<number>;
+  taskById: ReadonlyMap<TaskId, TaskNode>;
+}): ExclusiveWorkZoneSpec[] {
+  const override = args.taskIdsByZoneIndex;
+  if (!override || override.size === 0) return args.zones;
+
+  const claimed = new Set<number>();
+  const next = args.zones.map((zone) => ({ ...zone, taskIds: [] as TaskId[] }));
+  for (const zone of next) {
+    if (!override.has(zone.zoneIndex)) continue;
+    for (const taskId of override.get(zone.zoneIndex) ?? []) {
+      if (!args.validTaskIds.has(taskId) || claimed.has(taskId)) continue;
+      claimed.add(taskId);
+      zone.taskIds.push(taskId);
+    }
+  }
+
+  for (const zone of args.zones) {
+    for (const taskId of zone.taskIds) {
+      if (claimed.has(taskId) || !args.validTaskIds.has(taskId)) continue;
+      const target = next.find((entry) => entry.zoneIndex === zone.zoneIndex) ?? next[0];
+      if (!target) continue;
+      target.taskIds.push(taskId);
+      claimed.add(taskId);
+    }
+  }
+
+  return next.map((zone) => ({
+    ...zone,
+    centroid: centroidForTaskIds(zone.taskIds, args.taskById),
+  }));
+}
+
 export function generateLogisticsRoutingHypotheses(
   input: RoutingProblemInput,
   options?: {
     preferredStartByDriverId?: ReadonlyMap<number, number>;
     driverIdByZoneIndex?: ReadonlyMap<number, number>;
+    taskIdsByZoneIndex?: ReadonlyMap<number, number[]>;
   }
 ): LogisticsRoutingHypothesis[] {
   const partitioned = partitionExclusiveWorkZones(input);
@@ -859,7 +912,12 @@ export function generateLogisticsRoutingHypotheses(
   const taskById = new Map(input.tasks.map((task) => [task.taskId, task]));
   const driverById = new Map(input.drivers.map((driver) => [driver.id, driver]));
   const zones = applyDriverIdByZoneIndex({
-    zones: baseZones,
+    zones: applyTaskIdsByZoneIndex({
+      zones: baseZones,
+      taskIdsByZoneIndex: options?.taskIdsByZoneIndex,
+      validTaskIds: new Set(input.tasks.map((task) => task.taskId)),
+      taskById,
+    }),
     driverIdByZoneIndex: options?.driverIdByZoneIndex,
     validDriverIds: new Set(input.drivers.map((driver) => driver.id)),
   });

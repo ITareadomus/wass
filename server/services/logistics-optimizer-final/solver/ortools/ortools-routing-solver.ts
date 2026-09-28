@@ -11,6 +11,7 @@ import {
   type OrToolsRawSolution,
   type OrToolsRoutingPayload,
 } from "./ortools-adapter";
+import { extractJsonObjectFromStdout } from "../../../extract-json-from-stdout";
 import {
   buildRequiredDriverNotSelectedSolution,
   buildRequiredInfeasibleSolution,
@@ -59,7 +60,7 @@ function runPythonScript(
       clearTimeout(timer);
       if (code !== 0) {
         try {
-          const data = extractOrToolsJson(stdout);
+          const data = extractJsonObjectFromStdout<OrToolsRawSolution>(stdout);
           if (data.status === "infeasible") {
             resolve(JSON.stringify(data));
             return;
@@ -87,42 +88,17 @@ function runPythonScript(
   });
 }
 
-/**
- * On Windows, ortools may print native "load ...dll..." lines on stdout before
- * the JSON result. Extract the last parseable JSON object from the stream.
- */
-function extractOrToolsJson(stdout: string): OrToolsRawSolution {
-  const text = String(stdout ?? "").trim();
-  if (!text) {
-    throw new Error("Il motore OR-Tools non ha prodotto alcun output.");
-  }
-
-  try {
-    return JSON.parse(text) as OrToolsRawSolution;
-  } catch {
-    // continue with extraction
-  }
-
-  let searchFrom = text.length;
-  while (searchFrom > 0) {
-    const start = text.lastIndexOf("{", searchFrom - 1);
-    if (start < 0) break;
-    const candidate = text.slice(start);
-    try {
-      return JSON.parse(candidate) as OrToolsRawSolution;
-    } catch {
-      searchFrom = start;
-    }
-  }
-
-  const preview = text.replace(/\s+/g, " ").slice(0, 240);
-  throw new Error(
-    `Il motore OR-Tools non ha restituito un risultato leggibile. Dettaglio: ${preview}`
-  );
-}
-
 function parseRawSolution(stdout: string): OrToolsRawSolution {
-  return extractOrToolsJson(stdout);
+  try {
+    return extractJsonObjectFromStdout<OrToolsRawSolution>(stdout);
+  } catch (error) {
+    const preview = String(stdout ?? "").replace(/\s+/g, " ").slice(0, 240);
+    throw new Error(
+      error instanceof Error && error.message === "empty stdout"
+        ? "Il motore OR-Tools non ha prodotto alcun output."
+        : `Il motore OR-Tools non ha restituito un risultato leggibile. Dettaglio: ${preview}`
+    );
+  }
 }
 
 function defaultScriptPath(): string {

@@ -28,6 +28,9 @@ export type LogisticsPreferredStartsPayload = Record<string, number>;
 /** zoneIndex → driverId after optional swaps. */
 export type LogisticsZoneDriverAssignmentsPayload = Record<string, number>;
 
+/** zoneIndex → task ids after the user redraws the exclusive zones. */
+export type LogisticsZoneTaskIdsPayload = Record<string, number[]>;
+
 export function parsePreferredStartByDriverId(
   raw: unknown
 ): Map<number, number> {
@@ -52,6 +55,26 @@ export function parseZoneDriverByZoneIndex(raw: unknown): Map<number, number> {
     if (!Number.isFinite(zoneIndex) || zoneIndex < 0) continue;
     if (!Number.isFinite(driverId) || driverId <= 0) continue;
     map.set(zoneIndex, driverId);
+  }
+  return map;
+}
+
+export function parseZoneTaskIdsByZoneIndex(raw: unknown): Map<number, number[]> {
+  const map = new Map<number, number[]>();
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return map;
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const zoneIndex = Number(key);
+    if (!Number.isFinite(zoneIndex) || zoneIndex < 0) continue;
+    if (!Array.isArray(value)) continue;
+    const taskIds: number[] = [];
+    const seen = new Set<number>();
+    for (const item of value) {
+      const taskId = typeof item === "number" ? item : Number(item);
+      if (!Number.isFinite(taskId) || taskId <= 0 || seen.has(taskId)) continue;
+      seen.add(taskId);
+      taskIds.push(taskId);
+    }
+    map.set(zoneIndex, taskIds);
   }
   return map;
 }

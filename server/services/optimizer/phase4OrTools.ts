@@ -7,6 +7,7 @@
 import { spawn } from 'child_process';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { extractJsonObjectFromStdout } from '../extract-json-from-stdout';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -117,7 +118,7 @@ function runPythonScript(
 function parseOutput(stdout: string, taskIds: number[]): Phase4RepairBatchResult {
   let data: { status: string; assignments?: { taskId: number; cleanerId: number }[] };
   try {
-    data = JSON.parse(stdout);
+    data = extractJsonObjectFromStdout(stdout);
   } catch {
     return { assignments: [], unassigned: [...taskIds] };
   }

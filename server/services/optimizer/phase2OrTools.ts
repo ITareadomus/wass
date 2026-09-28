@@ -14,6 +14,7 @@
 import { spawn } from 'child_process';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { extractJsonObjectFromStdout } from '../extract-json-from-stdout';
 import {
   GroupCandidate,
   TaskForPhase2,
@@ -203,7 +204,7 @@ function runPythonScript(
         if (stdout) console.error('[Phase2 OR-Tools] stdout (last 1500 chars):', stdout.slice(-1500));
         // Python may still print JSON to stdout before exit(1) (e.g. status "error" or "infeasible")
         try {
-          const data = JSON.parse(stdout) as { status?: string; message?: string };
+          const data = extractJsonObjectFromStdout<{ status?: string; message?: string }>(stdout);
           if (data.status === 'infeasible') {
             reject(new Error(`Phase 2 OR-Tools infeasible${data.message ? `: ${data.message}` : ''}`));
             return;
@@ -243,9 +244,10 @@ function parseOutput(
   };
 
   try {
-    data = JSON.parse(stdout);
-  } catch {
-    throw new Error('Phase 2 OR-Tools invalid JSON output');
+    data = extractJsonObjectFromStdout(stdout);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'invalid JSON output';
+    throw new Error(`Phase 2 OR-Tools invalid JSON output (${detail})`);
   }
 
   if (data.status === 'infeasible') {

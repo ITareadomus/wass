@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeftRight, Check, ChevronsUpDown, MapPin } from "lucide-react";
-import { LogisticsZoneStartMap } from "@/components/dialogs/logistics-zone-start-map";
+import { LogisticsZoneStartMap, type ZoneShapePath } from "@/components/dialogs/logistics-zone-start-map";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -9,12 +9,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { getPersonnelHexColor } from "@/lib/cleaner-colors";
+import { assignTasksToZonePolygons } from "@shared/logistics-zone-edit";
 import type {
   LogisticsDriverZoneStartChoice,
   LogisticsPreferredStartsPayload,
   LogisticsZoneDriverAssignmentsPayload,
   LogisticsZoneStartPlan,
   LogisticsZoneStartTaskOption,
+  LogisticsZoneTaskIdsPayload,
 } from "@shared/logistics-zone-start-plan";
 
 type DriverStartDraft = {
@@ -29,6 +31,61 @@ type DriverStartDraft = {
 
 function taskSearchText(task: LogisticsZoneStartTaskOption): string {
   return [task.logisticCode, task.address, task.priority].filter(Boolean).join(" ").toLowerCase();
+}
+
+function collectKnownTasks(
+  drafts: DriverStartDraft[],
+  unassignedTasks: LogisticsZoneStartTaskOption[],
+): LogisticsZoneStartTaskOption[] {
+  const seen = new Set<number>();
+  const tasks: LogisticsZoneStartTaskOption[] = [];
+  for (const task of [...drafts.flatMap((draft) => draft.tasks), ...unassignedTasks]) {
+    if (seen.has(task.taskId)) continue;
+    seen.add(task.taskId);
+    tasks.push(task);
+  }
+  return tasks;
+}
+
+function previousZoneByTaskId(drafts: DriverStartDraft[]): Map<number, number> {
+  const previous = new Map<number, number>();
+  for (const draft of drafts) {
+    for (const task of draft.tasks) {
+      previous.set(task.taskId, draft.zoneIndex);
+    }
+  }
+  return previous;
+}
+
+function applyZoneAssignmentsToDrafts(
+  drafts: DriverStartDraft[],
+  allTasks: LogisticsZoneStartTaskOption[],
+  zoneByTaskId: Map<number, number | null>,
+): { drafts: DriverStartDraft[]; unassignedTasks: LogisticsZoneStartTaskOption[] } {
+  const tasksByZone = new Map<number, LogisticsZoneStartTaskOption[]>();
+  const unassignedTasks: LogisticsZoneStartTaskOption[] = [];
+  for (const task of allTasks) {
+    const zoneIndex = zoneByTaskId.get(task.taskId);
+    if (zoneIndex == null) {
+      unassignedTasks.push(task);
+      continue;
+    }
+    const list = tasksByZone.get(zoneIndex) ?? [];
+    list.push(task);
+    tasksByZone.set(zoneIndex, list);
+  }
+  return {
+    drafts: drafts.map((draft) => {
+      const tasks = tasksByZone.get(draft.zoneIndex) ?? [];
+      const selectedStillThere = tasks.some((task) => task.taskId === draft.selectedTaskId);
+      return {
+        ...draft,
+        tasks,
+        selectedTaskId: selectedStillThere ? draft.selectedTaskId : null,
+      };
+    }),
+    unassignedTasks,
+  };
 }
 
 function StartAptCombobox({
@@ -112,10 +169,23 @@ export function LogisticsStartChoiceDialog({
   onConfirm: (
     preferredStarts: LogisticsPreferredStartsPayload,
     zoneDriverIds: LogisticsZoneDriverAssignmentsPayload,
+    zoneTaskIds: LogisticsZoneTaskIdsPayload,
   ) => void;
 }) {
   const [drafts, setDrafts] = useState<DriverStartDraft[]>([]);
+  const [unassignedTasks, setUnassignedTasks] = useState<LogisticsZoneStartTaskOption[]>([]);
+  const [zoneShapes, setZoneShapes] = useState<Record<number, ZoneShapePath[]>>({});
   const [swapNonce, setSwapNonce] = useState(0);
+  const [mapFullscreen, setMapFullscreen] = useState(false);
+  const [scratchDrawnZoneIndices, setScratchDrawnZoneIndices] = useState<number[]>([]);
+  const zoneShapesRef = useRef(zoneShapes);
+  const draftsRef = useRef(drafts);
+  const unassignedRef = useRef(unassignedTasks);
+  const scratchDrawnZoneIndicesRef = useRef<Set<number>>(new Set());
+  zoneShapesRef.current = zoneShapes;
+  draftsRef.current = drafts;
+  unassignedRef.current = unassignedTasks;
+  scratchDrawnZoneIndicesRef.current = new Set(scratchDrawnZoneIndices);
 
   useEffect(() => {
     if (!open) return;
@@ -130,8 +200,45 @@ export function LogisticsStartChoiceDialog({
         selectedTaskId: null,
       })),
     );
+    setUnassignedTasks([]);
+    unassignedRef.current = [];
+    setZoneShapes({});
+    setScratchDrawnZoneIndices([]);
+    scratchDrawnZoneIndicesRef.current = new Set();
     setSwapNonce(0);
+    setMapFullscreen(false);
   }, [open, plan]);
+
+  const applyShapesToDrafts = (shapes: Record<number, ZoneShapePath[]>, preferredZoneIndex?: number) => {
+    const currentDrafts = draftsRef.current;
+    const allTasks = collectKnownTasks(currentDrafts, unassignedRef.current);
+    const applied = applyZoneAssignmentsToDrafts(
+      currentDrafts,
+      allTasks,
+      assignTasksToZonePolygons(
+        allTasks,
+        previousZoneByTaskId(currentDrafts),
+        Object.entries(shapes).map(([key, shapePath]) => ({
+          zoneIndex: Number(key),
+          path: shapePath,
+        })),
+        preferredZoneIndex,
+      ),
+    );
+    draftsRef.current = applied.drafts;
+    unassignedRef.current = applied.unassignedTasks;
+    setDrafts(applied.drafts);
+    setUnassignedTasks(applied.unassignedTasks);
+  };
+
+  const scratchDrawnShapes = useMemo(() => {
+    const next: Record<number, ZoneShapePath[]> = {};
+    for (const zoneIndex of scratchDrawnZoneIndices) {
+      const path = zoneShapes[zoneIndex];
+      if (path && path.length >= 3) next[zoneIndex] = path;
+    }
+    return next;
+  }, [scratchDrawnZoneIndices, zoneShapes]);
 
   const selectedTaskIds = useMemo(() => {
     return new Set(
@@ -182,16 +289,43 @@ export function LogisticsStartChoiceDialog({
     setSwapNonce((value) => value + 1);
   };
 
+  const handleZoneShapeChange = (zoneIndex: number, path: ZoneShapePath[]) => {
+    const nextShapes = { ...zoneShapesRef.current, [zoneIndex]: path };
+    zoneShapesRef.current = nextShapes;
+    setZoneShapes(nextShapes);
+    applyShapesToDrafts(nextShapes, zoneIndex);
+  };
+
+  const handleScratchZoneDrawn = (zoneIndex: number, path: ZoneShapePath[]) => {
+    const nextShapes: Record<number, ZoneShapePath[]> = {};
+    for (const drawnIndex of scratchDrawnZoneIndicesRef.current) {
+      const existing = zoneShapesRef.current[drawnIndex];
+      if (drawnIndex !== zoneIndex && existing && existing.length >= 3) {
+        nextShapes[drawnIndex] = existing;
+      }
+    }
+    nextShapes[zoneIndex] = path;
+    const nextDrawn = new Set([...scratchDrawnZoneIndicesRef.current, zoneIndex]);
+    scratchDrawnZoneIndicesRef.current = nextDrawn;
+    setScratchDrawnZoneIndices([...nextDrawn]);
+    zoneShapesRef.current = nextShapes;
+    setZoneShapes(nextShapes);
+    applyShapesToDrafts(nextShapes, zoneIndex);
+  };
+
   const handleConfirm = () => {
+    if (unassignedTasks.length > 0) return;
     const preferredStarts: LogisticsPreferredStartsPayload = {};
     const zoneDriverIds: LogisticsZoneDriverAssignmentsPayload = {};
+    const zoneTaskIds: LogisticsZoneTaskIdsPayload = {};
     for (const draft of drafts) {
       zoneDriverIds[String(draft.zoneIndex)] = draft.driverId;
+      zoneTaskIds[String(draft.zoneIndex)] = draft.tasks.map((task) => task.taskId);
       if (draft.selectedTaskId != null) {
         preferredStarts[String(draft.driverId)] = draft.selectedTaskId;
       }
     }
-    onConfirm(preferredStarts, zoneDriverIds);
+    onConfirm(preferredStarts, zoneDriverIds, zoneTaskIds);
   };
 
   const canSwap = drafts.length >= 2;
@@ -200,19 +334,48 @@ export function LogisticsStartChoiceDialog({
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen) onCancel();
+        if (!nextOpen) {
+          setMapFullscreen(false);
+          onCancel();
+        }
       }}
     >
-      <DialogContent className="max-h-[92vh] w-[min(96vw,1180px)] max-w-[1180px] overflow-hidden border-custom-blue">
-        <DialogHeader>
+      <DialogContent
+        className={cn(
+          "overflow-hidden border-custom-blue",
+          mapFullscreen
+            ? "left-0 top-0 flex h-[100dvh] max-h-none w-screen max-w-none translate-x-0 translate-y-0 gap-0 rounded-none p-0"
+            : "max-h-[92vh] w-[min(96vw,1180px)] max-w-[1180px]",
+        )}
+        onEscapeKeyDown={(event) => {
+          if (!mapFullscreen) return;
+          event.preventDefault();
+          setMapFullscreen(false);
+        }}
+        onPointerDownOutside={(event) => {
+          if (mapFullscreen) event.preventDefault();
+        }}
+        onInteractOutside={(event) => {
+          if (mapFullscreen) event.preventDefault();
+        }}
+      >
+        <DialogHeader className={mapFullscreen ? "sr-only" : undefined}>
           <DialogTitle>Scegli il primo appartamento per ogni autista</DialogTitle>
           <DialogDescription>
-            A destra vedi le zone geografiche colorate per autista. Puoi scambiarle e, se vuoi, fissare da quale apt parte
-            ciascuno: il punto scelto si evidenzia in giallo sulla mappa.
+            A destra usa «Modifica zone» per spostare i bordi o «Disegna da zero» per aprire una mappa nuova: tutti gli
+            apt partono grigi e resta solo la zona che tracci tu (le automatiche spariscono). Le zone possono
+            sovrapporsi: gli apt coperti restano di quella che stai modificando.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid min-h-0 max-h-[68vh] gap-4 overflow-y-auto lg:grid-cols-[minmax(280px,0.95fr)_minmax(420px,1.15fr)] lg:overflow-hidden">
-          <div className="space-y-4 pr-1 lg:max-h-full lg:overflow-y-auto">
+        <div
+          className={cn(
+            "grid min-h-0 gap-4",
+            mapFullscreen
+              ? "h-full min-h-0 flex-1 overflow-hidden lg:grid-cols-1"
+              : "max-h-[68vh] overflow-y-auto lg:grid-cols-[minmax(280px,0.95fr)_minmax(420px,1.15fr)] lg:overflow-hidden",
+          )}
+        >
+          <div className={cn("space-y-4 pr-1 lg:max-h-full lg:overflow-y-auto", mapFullscreen && "hidden")}>
             {drafts.map((driver) => (
               <div key={driver.driverId} className="space-y-2 rounded-md border-2 border-custom-blue p-3">
                 <div className="flex items-start justify-between gap-2">
@@ -225,7 +388,9 @@ export function LogisticsStartChoiceDialog({
                       />
                       <p className="truncate text-sm font-semibold">{driver.driverName}</p>
                     </div>
-                    <p className="mt-1 text-xs text-custom-blue">{driver.zoneLabel}</p>
+                    <p className="mt-1 text-xs text-custom-blue">
+                      {driver.zoneLabel} · {driver.tasks.length} apt
+                    </p>
                   </div>
                   {canSwap ? (
                     <div className="flex min-w-[176px] items-center gap-1">
@@ -275,10 +440,27 @@ export function LogisticsStartChoiceDialog({
               </div>
             ))}
           </div>
-          <div className="min-h-[280px] h-[42vh] lg:h-full lg:min-h-[360px]">
+          <div
+            className={cn(
+              "min-h-[280px]",
+              mapFullscreen ? "h-full min-h-0" : "h-[42vh] lg:h-full lg:min-h-[360px]",
+            )}
+          >
             <LogisticsZoneStartMap
               drivers={mapDrivers}
+              unassignedTasks={unassignedTasks}
               selectedTaskIds={selectedTaskIds}
+              zoneShapes={zoneShapes}
+              scratchDrawnShapes={scratchDrawnShapes}
+              fullscreen={mapFullscreen}
+              onFullscreenChange={setMapFullscreen}
+              onZoneShapesReady={(shapes) => {
+                zoneShapesRef.current = shapes;
+                setZoneShapes(shapes);
+                applyShapesToDrafts(shapes);
+              }}
+              onZoneShapeChange={handleZoneShapeChange}
+              onScratchZoneDrawn={handleScratchZoneDrawn}
               onSelectTask={(driverId, taskId) =>
                 setDrafts((current) =>
                   current.map((draft) => (draft.driverId === driverId ? { ...draft, selectedTaskId: taskId } : draft)),
@@ -287,9 +469,11 @@ export function LogisticsStartChoiceDialog({
             />
           </div>
         </div>
-        <DialogFooter className="gap-2 sm:justify-between">
+        <DialogFooter className={cn("gap-2 sm:justify-between", mapFullscreen && "hidden")}>
           <p className="text-xs text-custom-blue">
-            Clicca un punto sulla mappa per fissare il primo apt. I colori coincidono con quelli della timeline.
+            {unassignedTasks.length > 0
+              ? `Ingloba tutti gli apt nelle zone per continuare. ${unassignedTasks.length} fuori zona.`
+              : "Clicca un punto per fissare il primo apt. I colori coincidono con quelli della timeline."}
           </p>
           <div className="flex gap-2">
             <Button type="button" variant="outline" className="border-2 border-custom-blue" onClick={onCancel}>
@@ -298,8 +482,9 @@ export function LogisticsStartChoiceDialog({
             <Button
               type="button"
               variant="outline"
-              className="border-2 border-custom-blue bg-primary text-primary-foreground hover:bg-primary/90"
+              className="border-2 border-custom-blue bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               onClick={handleConfirm}
+              disabled={unassignedTasks.length > 0}
             >
               Continua
             </Button>

@@ -28,6 +28,7 @@ import { generateLogisticsRoutingHypotheses, type LogisticsRoutingHypothesis } f
 import {
   parsePreferredStartByDriverId,
   parseZoneDriverByZoneIndex,
+  parseZoneTaskIdsByZoneIndex,
 } from "../../../shared/logistics-zone-start-plan";
 import {
   shouldSolveAsExclusiveWorkZones,
@@ -50,6 +51,8 @@ export interface RunLogisticsRoutingOptions extends BuildLogisticsRoutingInputOp
   preferredStartByDriverId?: Map<number, number> | Record<string, number>;
   /** zoneIndex → driver id after optional zone swaps. */
   driverIdByZoneIndex?: Map<number, number> | Record<string, number>;
+  /** zoneIndex → task ids after the user redraws exclusive zones. */
+  taskIdsByZoneIndex?: Map<number, number[]> | Record<string, number[]>;
 }
 
 export class GreedySolverNotAllowedForApplyError extends Error {
@@ -129,10 +132,16 @@ export async function runLogisticsRouting(
         ? Object.fromEntries(options.driverIdByZoneIndex)
         : options.driverIdByZoneIndex
     );
+    const taskIdsByZoneIndex = parseZoneTaskIdsByZoneIndex(
+      options.taskIdsByZoneIndex instanceof Map
+        ? Object.fromEntries(options.taskIdsByZoneIndex)
+        : options.taskIdsByZoneIndex
+    );
     hypotheses = generateLogisticsRoutingHypotheses(input, {
       preferredStartByDriverId:
         preferredStartByDriverId.size > 0 ? preferredStartByDriverId : undefined,
       driverIdByZoneIndex: driverIdByZoneIndex.size > 0 ? driverIdByZoneIndex : undefined,
+      taskIdsByZoneIndex: taskIdsByZoneIndex.size > 0 ? taskIdsByZoneIndex : undefined,
     });
     solverSolution = hypotheses[0]?.solution ?? {
       schemaVersion: "logistics-routing-solution/v1",

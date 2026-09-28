@@ -440,6 +440,36 @@ describe("exclusive work zones", () => {
     }
   });
 
+  it("uses the exclusive zones drawn by the user instead of the computed clusters", () => {
+    const tasks = [
+      makeTask(1, 45.51, 9.19),
+      makeTask(2, 45.508, 9.188),
+      makeTask(3, 45.43, 9.17),
+      makeTask(4, 45.432, 9.172),
+    ];
+    const input = buildRoutingProblemInputFromSource(buildSource(tasks, 2));
+    const zones = partitionExclusiveWorkZones(input);
+    expect(zones).toHaveLength(2);
+    const swappedTaskIds = new Map<number, number[]>([
+      [zones[0].zoneIndex, [...zones[1].taskIds]],
+      [zones[1].zoneIndex, [...zones[0].taskIds]],
+    ]);
+    const hypotheses = generateLogisticsRoutingHypotheses(input, {
+      taskIdsByZoneIndex: swappedTaskIds,
+    });
+    expect(hypotheses).toHaveLength(3);
+    for (const hypothesis of hypotheses) {
+      for (const zone of zones) {
+        const customTaskIds = swappedTaskIds.get(zone.zoneIndex) ?? [];
+        const route = hypothesis.solution.routes.find((entry) => entry.driverId === zone.driverId);
+        const stopIds = new Set(route?.stops.map((stop) => stop.taskId) ?? []);
+        expect([...customTaskIds].sort((left, right) => left - right)).toEqual(
+          [...stopIds].sort((left, right) => left - right)
+        );
+      }
+    }
+  });
+
   it("starts every hypothesis from the driver start chosen by the user", () => {
     const tasks = [
       makeTask(1, 45.51, 9.19),
