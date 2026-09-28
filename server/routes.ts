@@ -7840,8 +7840,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint per aggiornare i dettagli di una task (checkout, checkin, durata)
-  // skipAdam: se true, aggiorna SOLO PostgreSQL e non propaga su ADAM
+  // Endpoint per aggiornare i dettagli di una task (checkout, checkin, durata).
+  // I campi appartamento vanno subito su ADAM; la durata pulizia resta solo su WASS.
   // Supporta sia aggiornamenti singoli che batch (array di updates)
   app.post("/api/update-task-details", async (req, res) => {
     try {
@@ -7969,12 +7969,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Singolo update (comportamento originale)
-      const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime, cleaningTimeModified, paxIn, paxOut, operationId, customerNote, date, modified_by, skipAdam } = req.body;
+      const { taskId, logisticCode, checkoutDate, checkoutTime, checkinDate, checkinTime, cleaningTime, cleaningTimeModified, paxIn, paxOut, operationId, customerNote, date, modified_by } = req.body;
       const normalizedCustomerNote =
         customerNote === undefined || customerNote === null ? undefined : String(customerNote).trim();
 
       if (!taskId && !logisticCode) {
         return res.status(400).json({ success: false, error: "taskId o logisticCode richiesto" });
+      }
+
+      const touchesHousekeepingFields =
+        checkoutDate !== undefined ||
+        checkoutTime !== undefined ||
+        checkinDate !== undefined ||
+        checkinTime !== undefined ||
+        paxIn !== undefined ||
+        operationId !== undefined ||
+        cleaningTimeModified === true;
+      if (isLogisticsScopeRequest(req) && touchesHousekeepingFields) {
+        return res.status(403).json({
+          success: false,
+          error: "Dalla logistica non si possono modificare check-in, check-out, pax-in, tipologia intervento e durata pulizia",
+        });
       }
 
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
@@ -8076,7 +8091,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return history;
       };
 
-      if (taskId && normalizedCustomerNote !== undefined && !skipAdam) {
+      if (taskId && normalizedCustomerNote !== undefined) {
         try {
           const mysql = await import('mysql2/promise');
           const connection = await mysql.createConnection({
@@ -8118,6 +8133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let newValues: string[] = [];
       let updatedContainerTask: any | null = null;
       let updatedContainerSourceType: 'early_out' | 'high_priority' | 'low_priority' | null = null;
+      let deferredDestinationSave: { date: string; data: any } | null = null;
 
       // Funzione helper per aggiornare una task - SOLO i campi forniti
       // Traccia anche le modifiche per la history
@@ -8210,12 +8226,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             newValues.push(String(paxOut));
             task.pax_out = paxOut;
           }
-          if (operationId !== undefined && task.operation_id !== operationId) {
-            editedFields.push('operation_id');
-            oldValues.push(String(task.operation_id ?? 'null'));
-            newValues.push(String(operationId));
-            task.operation_id = operationId;
-            task.straordinaria = operationId === CONTINUAZIONE_PS_OPERATION_ID || Boolean(task.straordinaria);
+          if (operationId !== undefined) {
+            if (task.operation_id !== operationId) {
+              editedFields.push('operation_id');
+              oldValues.push(String(task.operation_id ?? 'null'));
+              newValues.push(String(operationId));
+              task.operation_id = operationId;
+              task.straordinaria = operationId === CONTINUAZIONE_PS_OPERATION_ID || Boolean(task.straordinaria);
+            }
+            const operationConfirmed = operationId != null && operationId !== "";
+            if (Boolean(task.confirmed_operation) !== operationConfirmed) {
+              task.confirmed_operation = operationConfirmed;
+            }
           }
           if (normalizedCustomerNote !== undefined && String(task.customer_note ?? '').trim() !== normalizedCustomerNote) {
             const previousTaskNote = String(task.customer_note ?? '').trim();
@@ -8287,7 +8309,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
           targetContainersData.containers[destinationPriority].tasks.push(taskForDestination);
           recalculateContainersSummary(targetContainersData);
-          await workspaceFiles.saveContainers(destinationDate, targetContainersData, 'system', 'manual', scopeValue);
+          deferredDestinationSave = { date: destinationDate, data: targetContainersData };
         }
         recalculateContainersSummary(containersData);
       }
@@ -8361,73 +8383,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
         newValue: newValues.join(', ')
       } : undefined;
 
-      // Salva containers (PostgreSQL)
-      await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', scopeValue);
-      
-      // Salva timeline con tracking delle modifiche (skipRevision=false per creare revision in PostgreSQL)
-      await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'task_edit', editOptions, scopeValue);
+      // Durata pulizia: solo WASS. Gli altri campi del dettaglio vanno su ADAM
+      // prima del salvataggio PostgreSQL: se MySQL fallisce, i container restano invariati.
+      const adamUpdates: string[] = [];
+      const adamValues: any[] = [];
+      if (checkoutDate !== undefined) {
+        adamUpdates.push('checkout = ?');
+        adamValues.push(checkoutDate);
+      }
+      if (checkoutTime !== undefined) {
+        adamUpdates.push('checkout_time = ?');
+        adamValues.push(checkoutTime);
+      }
+      if (checkinDate !== undefined) {
+        adamUpdates.push('checkin = ?');
+        adamValues.push(checkinDate);
+      }
+      if (checkinTime !== undefined) {
+        adamUpdates.push('checkin_time = ?');
+        adamValues.push(checkinTime);
+      }
+      if (paxIn !== undefined) {
+        adamUpdates.push('checkin_pax = ?');
+        adamValues.push(paxIn);
+      }
+      if (operationId !== undefined) {
+        adamUpdates.push('operation_id = ?');
+        adamValues.push(operationId);
+      }
+      if (customerNoteChanged) {
+        adamUpdates.push('notes = ?');
+        adamValues.push(normalizedCustomerNote);
+      }
 
-      // CRITICAL: Propaga le modifiche al database ADAM (app_housekeeping)
-      // SOLO se skipAdam non è true
-      if (taskId && !skipAdam) {
+      if (taskId && adamUpdates.length > 0) {
+        let connection: any = null;
         try {
+          const { pgUsersService } = await import("./services/pg-users-service");
+          const userRecord = await pgUsersService.getUserByUsername(String(currentUsername || "system"));
+          const adamUpdatedBy = userRecord?.adam_id ? `E${userRecord.adam_id}` : String(currentUsername || "system");
+          const nowRome = format(new Date(), "yyyy-MM-dd HH:mm:ss");
+          adamUpdates.push("updated_by = ?");
+          adamValues.push(adamUpdatedBy);
+          adamUpdates.push("updated_at = ?");
+          adamValues.push(nowRome);
+
           const mysql = await import('mysql2/promise');
-          const connection = await mysql.createConnection({
+          connection = await mysql.createConnection({
             host: databaseConfig.mysql.host,
             port: databaseConfig.mysql.port,
             user: databaseConfig.mysql.user,
             password: databaseConfig.mysql.password,
             database: databaseConfig.mysql.database,
           });
-
-          // Costruisci query UPDATE dinamica (aggiorna solo i campi forniti)
-          const updates: string[] = [];
-          const values: any[] = [];
-
-          if (checkoutDate !== undefined) {
-            updates.push('checkout = ?');
-            values.push(checkoutDate);
-          }
-          if (checkoutTime !== undefined) {
-            updates.push('checkout_time = ?');
-            values.push(checkoutTime);
-          }
-          if (checkinDate !== undefined) {
-            updates.push('checkin = ?');
-            values.push(checkinDate);
-          }
-          if (checkinTime !== undefined) {
-            updates.push('checkin_time = ?');
-            values.push(checkinTime);
-          }
-          if (paxIn !== undefined) {
-            updates.push('checkin_pax = ?');
-            values.push(paxIn);
-          }
-          if (operationId !== undefined) {
-            updates.push('operation_id = ?');
-            values.push(operationId);
-          }
-          if (customerNoteChanged) {
-            updates.push('notes = ?');
-            values.push(normalizedCustomerNote);
-          }
-
-          if (updates.length > 0) {
-            values.push(taskId); // WHERE id = ?
-            
-            // Aggiorna SOLO app_housekeeping
-            const query = `UPDATE app_housekeeping SET ${updates.join(', ')} WHERE id = ?`;
-            await connection.execute(query, values);
-            console.log(`✅ Task ${logisticCode} aggiornata su app_housekeeping`);
-
-            await connection.end();
-          }
+          adamValues.push(taskId);
+          await connection.execute(
+            `UPDATE app_housekeeping SET ${adamUpdates.join(', ')} WHERE id = ?`,
+            adamValues
+          );
+          console.log(`✅ Task ${logisticCode} aggiornata su app_housekeeping`);
         } catch (dbError: any) {
           console.error('⚠️ Errore aggiornamento database ADAM:', dbError.message);
-          // Non bloccare la risposta, PostgreSQL è comunque salvato
+          return res.status(500).json({
+            success: false,
+            error: `Impossibile aggiornare ADAM: ${dbError.message}`,
+          });
+        } finally {
+          if (connection) {
+            try {
+              await connection.end();
+            } catch {
+              /* ignore */
+            }
+          }
         }
       }
+
+      if (deferredDestinationSave) {
+        await workspaceFiles.saveContainers(
+          deferredDestinationSave.date,
+          deferredDestinationSave.data,
+          'system',
+          'manual',
+          scopeValue
+        );
+      }
+
+      // Salva containers (PostgreSQL)
+      await workspaceFiles.saveContainers(workDate, containersData, 'system', 'manual', scopeValue);
+      
+      // Salva timeline con tracking delle modifiche (skipRevision=false per creare revision in PostgreSQL)
+      await workspaceFiles.saveTimeline(workDate, timelineData, false, currentUsername, 'task_edit', editOptions, scopeValue);
 
       console.log(`✅ Task ${logisticCode} aggiornata con successo`);
       res.json({ success: true, message: "Task aggiornata con successo" });
@@ -8558,17 +8604,11 @@ app.post("/api/transfer-to-adam", async (req, res) => {
   };
 
   try {
-    const { date, username: reqUsername, pendingTaskEdits = {} } = req.body;
+    const { date, username: reqUsername } = req.body;
     const workDate = date || format(new Date(), "yyyy-MM-dd");
     const username = reqUsername || "system";
 
     if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
-
-    if (Object.keys(pendingTaskEdits).length > 0) {
-      console.log(
-        `💾 Ricevute ${Object.keys(pendingTaskEdits).length} task modificate (già salvate dal frontend)`
-      );
-    }
 
     // === Carica timeline da PostgreSQL ===
     const timelineData = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
