@@ -3721,7 +3721,7 @@ const displayClickableInputClass =
                     {operationsScope === "logistics" && cardLogisticsSequenceLabel && (
                       <LogisticsSequenceBadge
                         sequence={cardLogisticsSequenceLabel}
-                        className="absolute -top-1.5 -right-1.5 z-[65]"
+                        className="absolute -top-1.5 -right-1.5 z-[36]"
                       />
                     )}
                     {operationsScope === "logistics" &&
@@ -3745,7 +3745,7 @@ const displayClickableInputClass =
                       <>
                     {/* Selection indicator (top-left) */}
                     {isMultiSelectMode && !isInTimeline && (
-                      <div className="absolute -top-1.5 -left-1 z-[60]">
+                      <div className="absolute -top-1.5 -left-1 z-[35]">
                         <div
                           className={[
                             "w-4 h-4 rounded-full flex items-center justify-center",
@@ -3789,7 +3789,7 @@ const displayClickableInputClass =
                       )
                     )}
                     {(isPreAssigned || isLocked) && (
-                      <div className="absolute -top-1.5 -right-1.5 z-[70]">
+                      <div className="absolute -top-1.5 -right-1.5 z-[38]">
                         <div
                           className={[
                             "w-4 h-4 rounded-full flex items-center justify-center text-white border-2 shadow-md",
