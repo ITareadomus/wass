@@ -613,37 +613,6 @@ export default function LogisticsTimelineView({
       setShowAdamTransferDialog(false);
 
       const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-      const pendingEdits = JSON.parse(sessionStorage.getItem("pending_task_edits") || "{}");
-
-      if (Object.keys(pendingEdits).length > 0) {
-        for (const [, edit] of Object.entries(pendingEdits)) {
-          try {
-            const taskEdit = edit as any;
-            const updateResponse = await fetch("/api/update-task-details", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                taskId: taskEdit.taskId,
-                logisticCode: taskEdit.logisticCode,
-                checkoutDate: taskEdit.checkoutDate,
-                checkoutTime: taskEdit.checkoutTime,
-                checkinDate: taskEdit.checkinDate,
-                checkinTime: taskEdit.checkinTime,
-                cleaningTime: taskEdit.cleaningTime,
-                paxIn: taskEdit.paxIn,
-                paxOut: taskEdit.paxOut,
-                operationId: taskEdit.operationId,
-                date: workDate,
-                modified_by: currentUser.username || "system",
-                scope: "logistics",
-              }),
-            });
-            await updateResponse.json();
-          } catch (editError) {
-            console.warn("Salvataggio task pendente prima del transfer:", editError);
-          }
-        }
-      }
 
       toast({
         title: "Trasferimento in corso…",
@@ -673,7 +642,6 @@ export default function LogisticsTimelineView({
       const result = await response.json();
 
       if (result.success) {
-        sessionStorage.removeItem("pending_task_edits");
         try {
           const lr = await fetch(
             `/api/logistics-last-adam-transfer?date=${encodeURIComponent(workDate)}`
