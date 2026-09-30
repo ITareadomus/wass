@@ -1398,7 +1398,7 @@ export default function Convocazioni() {
               />
             </div>
 
-            <div className="space-y-2.5 flex-1 min-h-0 overflow-y-auto">
+            <div className="convocazioni-roster-scroll flex-1 min-h-0 space-y-2.5 overflow-y-auto">
               {visibleRoster
                 .filter((cleaner) =>
                   `${cleaner.name} ${cleaner.lastname}`

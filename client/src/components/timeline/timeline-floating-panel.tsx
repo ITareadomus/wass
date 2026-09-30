@@ -47,6 +47,10 @@ interface TimelineFloatingPanelProps {
   fitContentWidth?: boolean;
   /** Offset verticale del tab rispetto al centro (px). Utile per impilare più tab a destra. */
   toggleVerticalOffset?: number;
+  /** Azione in testata, a sinistra del pulsante di chiusura. */
+  headerAction?: ReactNode;
+  /** Nasconde il tab laterale quando il pannello è chiuso. */
+  hideClosedToggle?: boolean;
 }
 
 export default function TimelineFloatingPanel({
@@ -69,6 +73,8 @@ export default function TimelineFloatingPanel({
   fitContent = false,
   fitContentWidth = false,
   toggleVerticalOffset = 0,
+  headerAction,
+  hideClosedToggle = false,
 }: TimelineFloatingPanelProps) {
   const [closedToggleTop, setClosedToggleTop] = useState<number | null>(null);
   const suppressClosedToggleClickRef = useRef(false);
@@ -172,7 +178,7 @@ export default function TimelineFloatingPanel({
 
   return (
     <>
-      {!isOpen && (
+      {!isOpen && !hideClosedToggle && (
         <button
           type="button"
           onClick={(event) => {
@@ -226,6 +232,9 @@ export default function TimelineFloatingPanel({
               onPointerCancel={onPointerEnd}
               title={dragTitle}
             />
+            {headerAction ? (
+              <div className="absolute right-11 top-2 z-40">{headerAction}</div>
+            ) : null}
             <button
               type="button"
               onClick={() => {

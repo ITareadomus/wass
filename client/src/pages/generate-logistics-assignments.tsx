@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, type PointerEvent as ReactPointerEvent } from "react";
 import { DndContext, MeasuringStrategy } from "@dnd-kit/core";
 import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +34,8 @@ import {
   BarChart3,
   ChevronUp,
   ChevronDown,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
 import {
@@ -105,6 +107,53 @@ function getCurrentUsername(): string {
 const getDefaultTimelineMapPanel = () => getDefaultTimelineFloatingPanel("right");
 const getDefaultTimelineStatsPanel = () =>
   getDefaultTimelineFloatingPanel("right", { width: 320, height: 320 });
+
+const LOGISTICS_MAP_LAYOUT_KEY = "logistics_map_layout";
+const LOGISTICS_DOCKED_MAP_MIN_WIDTH = 1280;
+const LOGISTICS_DOCKED_MAP_WIDTH_KEY = "logistics_docked_map_width";
+const DOCKED_MAP_MIN_PX = 280;
+const DOCKED_MAP_MAX_PX = 840;
+
+function readDockedMapWidth(): number {
+  try {
+    const value = Number(localStorage.getItem(LOGISTICS_DOCKED_MAP_WIDTH_KEY));
+    if (Number.isFinite(value)) {
+      return Math.min(DOCKED_MAP_MAX_PX, Math.max(DOCKED_MAP_MIN_PX, value));
+    }
+  } catch {
+    /* larghezza di default */
+  }
+  return 420;
+}
+
+const mapLayoutToggleClass =
+  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-background text-foreground shadow-md transition-colors hover:bg-accent";
+
+type LogisticsMapLayout = "floating" | "docked";
+
+function readLogisticsMapLayout(): LogisticsMapLayout {
+  try {
+    return localStorage.getItem(LOGISTICS_MAP_LAYOUT_KEY) === "docked" ? "docked" : "floating";
+  } catch {
+    return "floating";
+  }
+}
+
+function useMinWidth(minWidth: number): boolean {
+  const [matches, setMatches] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia(`(min-width: ${minWidth}px)`).matches : true
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia(`(min-width: ${minWidth}px)`);
+    const onChange = () => setMatches(media.matches);
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, [minWidth]);
+
+  return matches;
+}
 
 /** Task logistics da API / PostgreSQL (snake_case) */
 interface LogisticsTask {
@@ -440,8 +489,58 @@ export default function GenerateLogisticsAssignments() {
   // Logistics: all'apertura sempre la data odierna (non condivide la data salvata di housekeeping)
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [searchTask, setSearchTask] = useState("");
+  const [mapLayout, setMapLayoutState] = useState<LogisticsMapLayout>(readLogisticsMapLayout);
+  const [dockedMapWidth, setDockedMapWidth] = useState(readDockedMapWidth);
+  const isWideEnoughForDockedMap = useMinWidth(LOGISTICS_DOCKED_MAP_MIN_WIDTH);
+  const useDockedMap = mapLayout === "docked" && isWideEnoughForDockedMap;
   const timelineMapPanel = useTimelineFloatingPanel("right", getDefaultTimelineMapPanel);
   const timelineStatsPanel = useTimelineFloatingPanel("right", getDefaultTimelineStatsPanel);
+
+  const setMapLayout = useCallback((next: LogisticsMapLayout) => {
+    setMapLayoutState(next);
+    try {
+      localStorage.setItem(LOGISTICS_MAP_LAYOUT_KEY, next);
+    } catch {
+      /* preferenza non persistita */
+    }
+    timelineMapPanel.setIsOpen(true);
+  }, [timelineMapPanel.setIsOpen]);
+
+  const toggleStatistics = useCallback(() => {
+    timelineStatsPanel.setIsOpen(!timelineStatsPanel.isOpen);
+  }, [timelineStatsPanel.isOpen, timelineStatsPanel.setIsOpen]);
+
+  const toggleMap = useCallback(() => {
+    timelineMapPanel.setIsOpen(!timelineMapPanel.isOpen);
+  }, [timelineMapPanel.isOpen, timelineMapPanel.setIsOpen]);
+
+  const resizeDockedMap = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = dockedMapWidth;
+    const onMove = (moveEvent: PointerEvent) => {
+      const next = Math.min(
+        DOCKED_MAP_MAX_PX,
+        Math.max(DOCKED_MAP_MIN_PX, startWidth - (moveEvent.clientX - startX))
+      );
+      setDockedMapWidth(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setDockedMapWidth((width) => {
+        try {
+          localStorage.setItem(LOGISTICS_DOCKED_MAP_WIDTH_KEY, String(width));
+        } catch {
+          /* larghezza non persistita */
+        }
+        return width;
+      });
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, [dockedMapWidth]);
 
   useEffect(() => {
     registerTimelineMapPanelOpener(() => timelineMapPanel.setIsOpen(true));
@@ -1652,8 +1751,8 @@ export default function GenerateLogisticsAssignments() {
               </div>
           )}
 
-          <div className="mt-0 grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <div className="xl:col-span-3">
+          <div className={cn("mt-0 flex items-start gap-3", useDockedMap && timelineMapPanel.isOpen && "print:block")}>
+            <div className="relative z-20 min-w-0 flex-1">
               {!showContainers && (
                 <div className="mt-[17px] flex justify-end">
                   <button
@@ -1685,11 +1784,16 @@ export default function GenerateLogisticsAssignments() {
                   onRefresh={reloadLogisticsPage}
                   adamSyncHistory={adamSyncHistory}
                   className={!showContainers ? "rounded-tr-none" : undefined}
+                  onOpenStatistics={toggleStatistics}
+                  onOpenMap={toggleMap}
+                  statisticsOpen={timelineStatsPanel.isOpen}
+                  mapOpen={timelineMapPanel.isOpen}
                 />
                 <TimelineFloatingPanel
                   side="right"
                   toggleVerticalOffset={52}
                   fitContent
+                  hideClosedToggle
                   isOpen={timelineStatsPanel.isOpen}
                   onOpenChange={timelineStatsPanel.setIsOpen}
                   panel={timelineStatsPanel.panel}
@@ -1709,8 +1813,10 @@ export default function GenerateLogisticsAssignments() {
                     stats={assignmentStatistics}
                   />
                 </TimelineFloatingPanel>
+                {!useDockedMap && (
                 <TimelineFloatingPanel
                   side="right"
+                  hideClosedToggle
                   isOpen={timelineMapPanel.isOpen}
                   onOpenChange={timelineMapPanel.setIsOpen}
                   panel={timelineMapPanel.panel}
@@ -1725,6 +1831,17 @@ export default function GenerateLogisticsAssignments() {
                   onPointerMove={timelineMapPanel.handlePointerMove}
                   onPointerEnd={timelineMapPanel.handlePointerEnd}
                   contentClassName="border-custom-blue"
+                  headerAction={
+                    <button
+                      type="button"
+                      className={mapLayoutToggleClass}
+                      title="Fissa la mappa a destra"
+                      aria-label="Fissa la mappa a destra"
+                      onClick={() => setMapLayout("docked")}
+                    >
+                      <Pin className="h-4 w-4" />
+                    </button>
+                  }
                 >
                   <MapSection
                     tasks={mapTasks}
@@ -1737,8 +1854,45 @@ export default function GenerateLogisticsAssignments() {
                     mapMinHeight={0}
                   />
                 </TimelineFloatingPanel>
+                )}
               </div>
             </div>
+            {useDockedMap && timelineMapPanel.isOpen && (
+              <aside
+                className="sticky top-4 flex h-[calc(100vh-2rem)] shrink-0 self-start print:!hidden relative"
+                style={{ width: dockedMapWidth }}
+              >
+                <div
+                  className="absolute inset-y-0 -left-2 z-30 flex w-4 cursor-ew-resize items-center justify-center"
+                  title="Trascina per ridimensionare la mappa"
+                  aria-label="Ridimensiona la mappa"
+                  onPointerDown={resizeDockedMap}
+                >
+                  <span className="h-10 w-1 rounded-full bg-custom-blue/70" />
+                </div>
+                <MapSection
+                  tasks={mapTasks}
+                  workDate={format(selectedDate, "yyyy-MM-dd")}
+                  personnelColorScope="logistics"
+                  compact
+                  className="h-full min-h-0 w-full border-custom-blue"
+                  bodyClassName="flex min-h-0 flex-1 flex-col"
+                  mapClassName="h-full min-h-0 flex-1"
+                  mapMinHeight={0}
+                  headerExtra={
+                    <button
+                      type="button"
+                      className={mapLayoutToggleClass}
+                      title="Torna alla mappa fluttuante"
+                      aria-label="Torna alla mappa fluttuante"
+                      onClick={() => setMapLayout("floating")}
+                    >
+                      <PinOff className="h-4 w-4" />
+                    </button>
+                  }
+                />
+              </aside>
+            )}
           </div>
 
           {showSequenceSummary && (

@@ -1,6 +1,6 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
 import { formatClockFromMinutes } from "@shared/clock-display";
-import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, UserMinus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap, Lock, Unlock, AlertCircle } from "lucide-react";
+import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, UserMinus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap, Lock, Unlock, AlertCircle, BarChart3, Map as MapIcon } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { useMutation } from "@tanstack/react-query";
@@ -82,6 +82,10 @@ interface TimelineViewProps {
   onOperationalDayToggle?: (started: boolean) => void;
   isOperationalDaySwitchDisabled?: boolean;
   className?: string;
+  onOpenStatistics?: () => void;
+  onOpenMap?: () => void;
+  statisticsOpen?: boolean;
+  mapOpen?: boolean;
 }
 
 interface Cleaner {
@@ -254,6 +258,10 @@ export default function TimelineView({
   onOperationalDayToggle,
   isOperationalDaySwitchDisabled = false,
   className,
+  onOpenStatistics,
+  onOpenMap,
+  statisticsOpen = false,
+  mapOpen = false,
 }: TimelineViewProps) {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
@@ -2384,57 +2392,87 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
       
           <div className="px-4 py-4 border-b border-border">
             <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-            <div>
+            <div className="flex items-center gap-2 min-w-0">
               <h2 className="text-xl font-bold text-foreground flex items-center">
                 <CalendarIcon className="w-5 h-5 mr-2 text-custom-blue" />
                 {isOfficeScope ? "Timeline Ufficio" : "Timeline Housekeeping"} - {allCleanersToShow.length} Cleaners
               </h2>
-            </div>
-            <div className="flex items-center gap-3 print:hidden">
               {!isOfficeScope && (
-                <>
-                  <div className="flex items-center gap-2">
-                    <Label
-                      htmlFor="execution-status-colors-switch"
-                      className="cursor-pointer whitespace-nowrap text-sm font-medium leading-none text-custom-blue"
-                    >
-                      Colori stato
-                    </Label>
-                    <Switch
-                      id="execution-status-colors-switch"
-                      checked={showExecutionStatusColors}
-                      onCheckedChange={(checked) => setShowExecutionStatusColors(Boolean(checked))}
-                      className="h-6 w-11 border-2 border-custom-blue data-[state=unchecked]:bg-sky-200 data-[state=checked]:bg-[hsl(199,89%,48%)] dark:data-[state=unchecked]:bg-sky-900/50 dark:data-[state=checked]:bg-[hsl(217,91%,53%)]"
-                      title={
-                        showExecutionStatusColors
-                          ? "Mostra i task colorati in base a in corso / completato"
-                          : "Mostra i task con il colore normale"
-                      }
-                      data-testid="switch-execution-status-colors"
-                    />
-                  </div>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-yellow-500 hover:text-yellow-600 hover:bg-yellow-500/10"
+                      className="h-8 w-8 shrink-0 text-yellow-500 hover:text-yellow-600 hover:bg-yellow-500/10"
                       aria-label="Info visualizzazione task brevi"
                     >
                       <AlertCircle className="w-4 h-4" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent
-                    align="end"
+                    align="start"
                     className="w-80 text-sm leading-relaxed"
                   >
                     Sui task sotto l&apos;ora, check-out/in e codice cliente restano
                     nascosti: passa il cursore sulla card per vederli.
                   </PopoverContent>
                 </Popover>
-                </>
               )}
+            </div>
+            <div className="flex items-center gap-3 print:hidden">
+              {!isOfficeScope && (
+                <div className="flex items-center gap-2">
+                  <Label
+                    htmlFor="execution-status-colors-switch"
+                    className="cursor-pointer whitespace-nowrap text-sm font-medium leading-none text-custom-blue"
+                  >
+                    Colori stato
+                  </Label>
+                  <Switch
+                    id="execution-status-colors-switch"
+                    checked={showExecutionStatusColors}
+                    onCheckedChange={(checked) => setShowExecutionStatusColors(Boolean(checked))}
+                    className="h-6 w-11 border-2 border-custom-blue data-[state=unchecked]:bg-sky-200 data-[state=checked]:bg-[hsl(199,89%,48%)] dark:data-[state=unchecked]:bg-sky-900/50 dark:data-[state=checked]:bg-[hsl(217,91%,53%)]"
+                    title={
+                      showExecutionStatusColors
+                        ? "Mostra i task colorati in base a in corso / completato"
+                        : "Mostra i task con il colore normale"
+                    }
+                    data-testid="switch-execution-status-colors"
+                  />
+                </div>
+              )}
+              <Button
+                type="button"
+                onClick={() => onOpenStatistics?.()}
+                variant="outline"
+                size="sm"
+                aria-pressed={statisticsOpen}
+                title={statisticsOpen ? "Chiudi statistiche" : "Apri statistiche"}
+                className={cn(
+                  "flex items-center gap-2 border-2 border-custom-blue",
+                  statisticsOpen && "bg-custom-blue-light"
+                )}
+              >
+                <BarChart3 className="w-4 h-4" />
+                Statistiche
+              </Button>
+              <Button
+                type="button"
+                onClick={() => onOpenMap?.()}
+                variant="outline"
+                size="sm"
+                aria-pressed={mapOpen}
+                title={mapOpen ? "Chiudi mappa" : "Apri mappa"}
+                className={cn(
+                  "flex items-center gap-2 border-2 border-custom-blue",
+                  mapOpen && "bg-custom-blue-light"
+                )}
+              >
+                <MapIcon className="w-4 h-4" />
+                Mappa
+              </Button>
               <Button
                 onClick={() => setLocation(isOfficeScope ? '/convocazioni?kind=office' : '/convocazioni')}
                 variant="outline"
@@ -2456,7 +2494,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               >
                 {isResetting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {!isResetting && <RotateCcw className="w-4 h-4" />}
-                Reset Assegnazioni
+                Reset
               </Button>
             </div>
           </div>

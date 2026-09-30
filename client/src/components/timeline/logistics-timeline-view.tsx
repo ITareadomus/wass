@@ -13,6 +13,8 @@ import {
   Bike,
   ChevronLeft,
   ChevronRight,
+  BarChart3,
+  Map as MapIcon,
 } from "lucide-react";
 import {
   useCallback,
@@ -149,6 +151,10 @@ interface LogisticsTimelineViewProps {
   onRefresh: () => Promise<void>;
   adamSyncHistory?: LogisticsAssignedSyncNotice[];
   className?: string;
+  onOpenStatistics?: () => void;
+  onOpenMap?: () => void;
+  statisticsOpen?: boolean;
+  mapOpen?: boolean;
 }
 
 /** Tasto shift orario prima fermata (come HK). Mettere `true` per riattivarlo. */
@@ -419,6 +425,10 @@ export default function LogisticsTimelineView({
   onRefresh,
   adamSyncHistory = [],
   className,
+  onOpenStatistics,
+  onOpenMap,
+  statisticsOpen = false,
+  mapOpen = false,
 }: LogisticsTimelineViewProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -1753,6 +1763,36 @@ export default function LogisticsTimelineView({
               <span />
             )}
             <div className="flex justify-self-end gap-3 print:hidden">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-pressed={statisticsOpen}
+                title={statisticsOpen ? "Chiudi statistiche" : "Apri statistiche"}
+                className={cn(
+                  "flex items-center gap-2 border-2 border-custom-blue",
+                  statisticsOpen && "bg-custom-blue-light"
+                )}
+                onClick={() => onOpenStatistics?.()}
+              >
+                <BarChart3 className="w-4 h-4 shrink-0" aria-hidden />
+                Statistiche
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-pressed={mapOpen}
+                title={mapOpen ? "Chiudi mappa" : "Apri mappa"}
+                className={cn(
+                  "flex items-center gap-2 border-2 border-custom-blue",
+                  mapOpen && "bg-custom-blue-light"
+                )}
+                onClick={() => onOpenMap?.()}
+              >
+                <MapIcon className="w-4 h-4 shrink-0" aria-hidden />
+                Mappa
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
