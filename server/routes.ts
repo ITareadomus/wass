@@ -11315,22 +11315,43 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
   app.post("/api/logistics-optimizer-final/zone-plan", async (req, res) => {
     try {
-      const { date } = req.body || {};
+      const { date, deliveryQuotas: deliveryQuotasBody } = req.body || {};
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       const { planLogisticsZoneStarts } = await import(
         "./services/logistics-optimizer-final/zone-start-plan"
       );
+      const deliveryQuotas = new Map<number, number | null>();
+      if (deliveryQuotasBody && typeof deliveryQuotasBody === "object" && !Array.isArray(deliveryQuotasBody)) {
+        for (const [key, value] of Object.entries(deliveryQuotasBody as Record<string, unknown>)) {
+          const driverId = Number(key);
+          if (!Number.isFinite(driverId) || driverId <= 0) continue;
+          if (value == null || value === "") {
+            deliveryQuotas.set(driverId, null);
+            continue;
+          }
+          const count = typeof value === "number" ? value : Number(value);
+          if (!Number.isInteger(count) || count < 0) {
+            return res.status(400).json({
+              success: false,
+              error: "Numero consegne non valido",
+              message: "Inserisci un numero intero di consegne, oppure lascia il campo vuoto.",
+            });
+          }
+          deliveryQuotas.set(driverId, count);
+        }
+      }
 
       console.log(`🚀 POST /api/logistics-optimizer-final/zone-plan - ${workDate}`);
       const plan = await planLogisticsZoneStarts(workDate, {
         performedBy: getCurrentUsername(req),
+        deliveryQuotas: deliveryQuotas.size > 0 ? deliveryQuotas : null,
       });
       return res.json({
         success: true,
         plan,
       });
     } catch (error: any) {
-      if (error?.name === "RoutingInputValidationError") {
+      if (error?.name === "DeliveryQuotaError" || error?.name === "RoutingInputValidationError") {
         return res.status(400).json({
           success: false,
           error: error.message,

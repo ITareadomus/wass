@@ -67,6 +67,7 @@ import {
 } from "@/components/ui/dialog";
 import { AssignmentLoadingDialog } from "@/components/dialogs/assignment-loading-dialog";
 import { LogisticsHypothesisSwitcher } from "@/components/dialogs/logistics-hypothesis-switcher";
+import { LogisticsDeliveryQuotaDialog } from "@/components/dialogs/logistics-delivery-quota-dialog";
 import { LogisticsStartChoiceDialog } from "@/components/dialogs/logistics-start-choice-dialog";
 import type {
   LogisticsPreferredStartsPayload,
@@ -449,6 +450,7 @@ export default function GenerateLogisticsAssignments() {
   const [applyingHypothesisId, setApplyingHypothesisId] = useState<string | null>(null);
   const [zoneStartPlan, setZoneStartPlan] = useState<LogisticsZoneStartPlan | null>(null);
   const [showStartChoiceDialog, setShowStartChoiceDialog] = useState(false);
+  const [showDeliveryQuotaDialog, setShowDeliveryQuotaDialog] = useState(false);
   const [isPlanningZoneStarts, setIsPlanningZoneStarts] = useState(false);
   const [showMissingLogisticsKindWarningDialog, setShowMissingLogisticsKindWarningDialog] = useState(false);
   const [missingLogisticsKindTaskCount, setMissingLogisticsKindTaskCount] = useState(0);
@@ -900,9 +902,78 @@ export default function GenerateLogisticsAssignments() {
     [selectedDate, toast, reloadLogisticsPage, clearHypothesisPreview]
   );
 
+  const deliveryQuotaDrivers = useMemo(
+    () =>
+      logisticsDrivers
+        .filter((driver) => !driver.isRemoved && !driver.leftoverLane)
+        .map((driver) => ({
+          driverId: driver.id,
+          driverName:
+            [driver.name, driver.lastname]
+              .map((part) => String(part ?? "").trim())
+              .filter((part) => part.length > 0)
+              .join(" ") || `Autista ${driver.id}`,
+        })),
+    [logisticsDrivers],
+  );
+
+  const deliveryQuotaTotal = useMemo(() => {
+    const tasks = [
+      ...logisticsTaskLists.early_out,
+      ...logisticsTaskLists.high_priority,
+      ...logisticsTaskLists.low_priority,
+    ];
+    return tasks.filter((task) => {
+      if (task.locked) return false;
+      const lat = Number(task.lat);
+      const lng = Number(task.lng);
+      return Number.isFinite(lat) && Number.isFinite(lng);
+    }).length;
+  }, [logisticsTaskLists]);
+
+  const requestZonePlan = useCallback(async (deliveryQuotas: Record<string, number | null> | null) => {
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    setIsPlanningZoneStarts(true);
+    setIsRunningLogisticsOptimizer(true);
+    try {
+      const zoneRes = await fetch("/api/logistics-optimizer-final/zone-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: dateStr,
+          deliveryQuotas,
+        }),
+      });
+      const zoneData = await zoneRes.json().catch(() => ({}));
+      if (!zoneRes.ok || !zoneData?.success || !zoneData?.plan) {
+        throw new Error(
+          zoneData?.message || zoneData?.error || "Impossibile dividere i giri per autista"
+        );
+      }
+      const plan = zoneData.plan as LogisticsZoneStartPlan;
+      if (!Array.isArray(plan.drivers) || plan.drivers.length === 0) {
+        await executeLogisticsOptimizer({ skipAutoConvoke: true });
+        return;
+      }
+      setZoneStartPlan(plan);
+      setShowStartChoiceDialog(true);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Errore sconosciuto";
+      toast({
+        variant: "destructive",
+        title: "Divisione dei giri",
+        description: msg,
+      });
+    } finally {
+      setIsPlanningZoneStarts(false);
+      setIsRunningLogisticsOptimizer(false);
+    }
+  }, [selectedDate, executeLogisticsOptimizer, toast]);
+
   const handleRunLogisticsOptimizer = useCallback(async () => {
     const dateStr = format(selectedDate, "yyyy-MM-dd");
     setIsRunningLogisticsOptimizer(true);
+    let continueWithZonePlan = false;
     try {
       const precheckRes = await fetch(
         `/api/logistics-optimizer-final/precheck?date=${encodeURIComponent(dateStr)}`,
@@ -929,25 +1000,11 @@ export default function GenerateLogisticsAssignments() {
         return;
       }
 
-      setIsPlanningZoneStarts(true);
-      const zoneRes = await fetch("/api/logistics-optimizer-final/zone-plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: dateStr }),
-      });
-      const zoneData = await zoneRes.json().catch(() => ({}));
-      if (!zoneRes.ok || !zoneData?.success || !zoneData?.plan) {
-        throw new Error(
-          zoneData?.message || zoneData?.error || "Impossibile dividere i giri per autista"
-        );
-      }
-      const plan = zoneData.plan as LogisticsZoneStartPlan;
-      if (!Array.isArray(plan.drivers) || plan.drivers.length === 0) {
-        await executeLogisticsOptimizer({ skipAutoConvoke: true });
+      if (deliveryQuotaDrivers.length >= 2 && deliveryQuotaTotal > 0) {
+        setShowDeliveryQuotaDialog(true);
         return;
       }
-      setZoneStartPlan(plan);
-      setShowStartChoiceDialog(true);
+      continueWithZonePlan = true;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Errore sconosciuto";
       toast({
@@ -959,7 +1016,10 @@ export default function GenerateLogisticsAssignments() {
       setIsPlanningZoneStarts(false);
       setIsRunningLogisticsOptimizer(false);
     }
-  }, [selectedDate, executeLogisticsOptimizer, toast]);
+    if (continueWithZonePlan) {
+      await requestZonePlan(null);
+    }
+  }, [selectedDate, deliveryQuotaDrivers.length, deliveryQuotaTotal, requestZonePlan, toast]);
 
   const selectedHypothesis = useMemo(
     () =>
@@ -1533,7 +1593,7 @@ export default function GenerateLogisticsAssignments() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  disabled={isRunningLogisticsOptimizer || isHypothesisPreview}
+                  disabled={isRunningLogisticsOptimizer || isHypothesisPreview || showDeliveryQuotaDialog}
                   onClick={() => void handleRunLogisticsOptimizer()}
                   className="flex items-center gap-2 rounded-none px-3 text-black hover:bg-custom-blue/80 dark:text-white"
                   data-testid="button-run-logistics-optimizer"
@@ -1773,6 +1833,17 @@ export default function GenerateLogisticsAssignments() {
                 ? "Attendere, sto suddividendo gli appartamenti tra gli autisti."
                 : "Attendere, sto calcolando i giri per zona e le anteprime in timeline. Non chiudere la pagina."
           }
+        />
+
+        <LogisticsDeliveryQuotaDialog
+          open={showDeliveryQuotaDialog}
+          drivers={deliveryQuotaDrivers}
+          total={deliveryQuotaTotal}
+          onCancel={() => setShowDeliveryQuotaDialog(false)}
+          onConfirm={(deliveryQuotas) => {
+            setShowDeliveryQuotaDialog(false);
+            void requestZonePlan(deliveryQuotas);
+          }}
         />
 
         <LogisticsStartChoiceDialog

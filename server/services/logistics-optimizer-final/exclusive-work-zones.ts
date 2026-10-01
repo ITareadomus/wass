@@ -401,10 +401,69 @@ export function resolveExclusiveZoneCount(taskCount: number, driverCount: number
   return Math.min(driverCount, taskCount);
 }
 
+function resizeAssignedZonesToDriverQuotas(
+  zones: Array<{ zoneTasks: TaskNode[]; centroid: { lat: number; lng: number } }>,
+  driverIdByZoneIndex: Map<number, number>,
+  countsByDriverId: Map<number, number>,
+): void {
+  const targets = zones.map((zone, index) => {
+    const driverId = driverIdByZoneIndex.get(index);
+    if (driverId == null || !countsByDriverId.has(driverId)) return zone.zoneTasks.length;
+    return countsByDriverId.get(driverId) ?? zone.zoneTasks.length;
+  });
+  const totalTasks = zones.reduce((sum, zone) => sum + zone.zoneTasks.length, 0);
+  const targetSum = targets.reduce((sum, value) => sum + value, 0);
+  if (targetSum !== totalTasks) return;
+
+  for (let move = 0; move < totalTasks; move += 1) {
+    let overIndex = -1;
+    let underIndex = -1;
+    let overAmount = 0;
+    let underAmount = 0;
+    for (let index = 0; index < zones.length; index += 1) {
+      const over = zones[index].zoneTasks.length - targets[index];
+      const under = targets[index] - zones[index].zoneTasks.length;
+      if (over > overAmount) {
+        overAmount = over;
+        overIndex = index;
+      }
+      if (under > underAmount) {
+        underAmount = under;
+        underIndex = index;
+      }
+    }
+    if (overIndex < 0 || underIndex < 0 || overAmount <= 0 || underAmount <= 0) break;
+
+    const destination = zones[underIndex];
+    const locatedDestination = destination.zoneTasks.filter(hasFiniteCoordinates);
+    const destinationCentroid =
+      locatedDestination.length > 0
+        ? calculateCentroid(locatedDestination.map((task) => task.location))
+        : destination.centroid;
+    const origin = zones[overIndex].zoneTasks;
+    let bestPosition = 0;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < origin.length; index += 1) {
+      const task = origin[index];
+      const distance = hasFiniteCoordinates(task)
+        ? geographicDistance(task.location, destinationCentroid)
+        : Number.POSITIVE_INFINITY;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestPosition = index;
+      }
+    }
+    const [moved] = origin.splice(bestPosition, 1);
+    if (!moved) break;
+    destination.zoneTasks.push(moved);
+  }
+}
+
 function clusterExclusiveZones(args: {
   tasks: TaskNode[];
   drivers: DriverNode[];
   travelMatrixMin: number[][];
+  targetTaskCountsByDriverId?: Map<number, number>;
 }): ExclusiveWorkZoneSpec[] {
   const { tasks, drivers, travelMatrixMin } = args;
   const located = tasks.filter(hasFiniteCoordinates);
@@ -498,6 +557,10 @@ function clusterExclusiveZones(args: {
     driverAssignments.map((assignment) => [assignment.territoryIndex, assignment.assignedDriverId])
   );
 
+  if (args.targetTaskCountsByDriverId && args.targetTaskCountsByDriverId.size > 0) {
+    resizeAssignedZonesToDriverQuotas(nonEmpty, driverByZone, args.targetTaskCountsByDriverId);
+  }
+
   const labels = geographicZoneLabels(nonEmpty.length);
 
   return nonEmpty.map((entry, zoneIndex) => {
@@ -523,6 +586,7 @@ export function computeExclusiveWorkZones(args: {
   drivers: DriverNode[];
   travelMatrixMin: number[][];
   territoryAssignment?: RoutingProblemInput["metadata"]["dailyTerritoryAssignment"];
+  targetTaskCountsByDriverId?: Map<number, number>;
 }): ExclusiveWorkZonePartition | null {
   if (args.tasks.length === 0 || args.drivers.length === 0) return null;
 
@@ -530,6 +594,7 @@ export function computeExclusiveWorkZones(args: {
     tasks: args.tasks,
     drivers: args.drivers,
     travelMatrixMin: args.travelMatrixMin,
+    targetTaskCountsByDriverId: args.targetTaskCountsByDriverId,
   });
 
   if (zones.length === 0) return null;
@@ -542,13 +607,17 @@ export function computeExclusiveWorkZones(args: {
   };
 }
 
-export function partitionExclusiveWorkZones(input: RoutingProblemInput): ExclusiveWorkZoneSpec[] {
+export function partitionExclusiveWorkZones(
+  input: RoutingProblemInput,
+  targetTaskCountsByDriverId?: Map<number, number>,
+): ExclusiveWorkZoneSpec[] {
   return (
     computeExclusiveWorkZones({
       tasks: input.tasks,
       drivers: input.drivers,
       travelMatrixMin: input.travelMatrixMin,
       territoryAssignment: input.metadata.dailyTerritoryAssignment,
+      targetTaskCountsByDriverId,
     })?.zones ?? []
   );
 }

@@ -1,3 +1,4 @@
+import { resolveDeliveryQuotas } from "../../../shared/logistics-delivery-quotas";
 import { formatLogisticsDriverDisplayName } from "../../../shared/logistics-zone-start-plan";
 import type { LogisticsZoneStartPlan } from "../../../shared/logistics-zone-start-plan";
 import {
@@ -40,8 +41,18 @@ function taskOption(task: TaskNode) {
   };
 }
 
-export function buildZoneStartPlanFromInput(input: RoutingProblemInput): LogisticsZoneStartPlan {
-  const partitioned = partitionExclusiveWorkZones(input);
+export class DeliveryQuotaError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DeliveryQuotaError";
+  }
+}
+
+export function buildZoneStartPlanFromInput(
+  input: RoutingProblemInput,
+  targetTaskCountsByDriverId?: Map<number, number>,
+): LogisticsZoneStartPlan {
+  const partitioned = partitionExclusiveWorkZones(input, targetTaskCountsByDriverId);
   const zones = partitioned.length > 0 ? partitioned : fallbackSingleZone(input);
   const taskById = new Map(input.tasks.map((task) => [task.taskId, task]));
   const driverById = new Map(input.drivers.map((driver) => [driver.id, driver]));
@@ -79,12 +90,36 @@ export function buildZoneStartPlanFromInput(input: RoutingProblemInput): Logisti
 
 export async function planLogisticsZoneStarts(
   workDate: string,
-  options: BuildLogisticsRoutingInputOptions = {}
+  options: BuildLogisticsRoutingInputOptions & {
+    /** null o assente = l'algoritmo divide in parti uguali. */
+    deliveryQuotas?: Map<number, number | null> | null;
+  } = {}
 ): Promise<LogisticsZoneStartPlan> {
   const input = await buildLogisticsRoutingInput(workDate, options);
   const inputValidation = validateRoutingProblemInput(input, { mode: "solver" });
   if (!inputValidation.valid) {
     throw new RoutingInputValidationError(inputValidation);
   }
-  return buildZoneStartPlanFromInput(input);
+
+  let targetTaskCountsByDriverId: Map<number, number> | undefined;
+  if (options.deliveryQuotas && options.deliveryQuotas.size > 0) {
+    const resolution = resolveDeliveryQuotas({
+      total: input.tasks.length,
+      drivers: input.drivers.map((driver) => ({
+        driverId: driver.id,
+        driverName: driver.displayName || `Autista ${driver.id}`,
+        quota: options.deliveryQuotas?.has(driver.id)
+          ? (options.deliveryQuotas.get(driver.id) ?? null)
+          : null,
+      })),
+    });
+    if (resolution.error) {
+      throw new DeliveryQuotaError(resolution.error);
+    }
+    if (resolution.counts) {
+      targetTaskCountsByDriverId = resolution.counts;
+    }
+  }
+
+  return buildZoneStartPlanFromInput(input, targetTaskCountsByDriverId);
 }

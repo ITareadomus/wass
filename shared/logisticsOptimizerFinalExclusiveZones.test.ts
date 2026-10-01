@@ -494,4 +494,22 @@ describe("exclusive work zones", () => {
       }
     }
   });
+
+  it("sizes zones from delivery quotas before drawing them", () => {
+    const tasks = [
+      ...Array.from({ length: 6 }, (_, index) => makeTask(index + 1, 45.51, 9.19 + index * 0.001)),
+      ...Array.from({ length: 4 }, (_, index) => makeTask(index + 7, 45.43, 9.17 + index * 0.001)),
+    ];
+    const input = buildRoutingProblemInputFromSource(buildSource(tasks, 2));
+    const plan = buildZoneStartPlanFromInput(
+      input,
+      new Map<number, number>([
+        [7, 2],
+        [8, 8],
+      ]),
+    );
+    const counts = new Map(plan.drivers.map((driver) => [driver.driverId, driver.tasks.length]));
+    expect(counts.get(7)).toBe(2);
+    expect(counts.get(8)).toBe(8);
+  });
 });

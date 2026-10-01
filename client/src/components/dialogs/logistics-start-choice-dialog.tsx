@@ -263,29 +263,29 @@ export function LogisticsStartChoiceDialog({
 
   const swapZone = (fromDriverId: number, toDriverId: number) => {
     if (fromDriverId === toDriverId) return;
-    setDrafts((current) => {
-      const fromIndex = current.findIndex((draft) => draft.driverId === fromDriverId);
-      const toIndex = current.findIndex((draft) => draft.driverId === toDriverId);
-      if (fromIndex < 0 || toIndex < 0) return current;
-      const next = current.map((draft) => ({ ...draft }));
-      const from = next[fromIndex];
-      const to = next[toIndex];
-      next[fromIndex] = {
-        ...from,
-        zoneIndex: to.zoneIndex,
-        zoneLabel: to.zoneLabel,
-        tasks: to.tasks,
-        selectedTaskId: to.selectedTaskId,
-      };
-      next[toIndex] = {
-        ...to,
-        zoneIndex: from.zoneIndex,
-        zoneLabel: from.zoneLabel,
-        tasks: from.tasks,
-        selectedTaskId: from.selectedTaskId,
-      };
-      return next;
-    });
+    const current = draftsRef.current;
+    const fromIndex = current.findIndex((draft) => draft.driverId === fromDriverId);
+    const toIndex = current.findIndex((draft) => draft.driverId === toDriverId);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const next = current.map((draft) => ({ ...draft }));
+    const from = next[fromIndex];
+    const to = next[toIndex];
+    next[fromIndex] = {
+      ...from,
+      zoneIndex: to.zoneIndex,
+      zoneLabel: to.zoneLabel,
+      tasks: to.tasks,
+      selectedTaskId: to.selectedTaskId,
+    };
+    next[toIndex] = {
+      ...to,
+      zoneIndex: from.zoneIndex,
+      zoneLabel: from.zoneLabel,
+      tasks: from.tasks,
+      selectedTaskId: from.selectedTaskId,
+    };
+    draftsRef.current = next;
+    setDrafts(next);
     setSwapNonce((value) => value + 1);
   };
 
@@ -362,9 +362,8 @@ export function LogisticsStartChoiceDialog({
         <DialogHeader className={mapFullscreen ? "sr-only" : undefined}>
           <DialogTitle>Scegli il primo appartamento per ogni autista</DialogTitle>
           <DialogDescription>
-            A destra usa «Modifica zone» per spostare i bordi o «Disegna da zero» per aprire una mappa nuova: tutti gli
-            apt partono grigi e resta solo la zona che tracci tu (le automatiche spariscono). Le zone possono
-            sovrapporsi: gli apt coperti restano di quella che stai modificando.
+            Le zone sono già divise in base alle consegne scelte. Qui fissi solo il primo appartamento, oppure lo lasci
+            all&apos;algoritmo. A destra puoi ancora spostare i bordi delle zone.
           </DialogDescription>
         </DialogHeader>
         <div
@@ -428,13 +427,13 @@ export function LogisticsStartChoiceDialog({
                   <StartAptCombobox
                     tasks={driver.tasks}
                     selectedTaskId={driver.selectedTaskId}
-                    onSelect={(taskId) =>
-                      setDrafts((current) =>
-                        current.map((draft) =>
-                          draft.driverId === driver.driverId ? { ...draft, selectedTaskId: taskId } : draft,
-                        ),
-                      )
-                    }
+                    onSelect={(taskId) => {
+                      const next = draftsRef.current.map((draft) =>
+                        draft.driverId === driver.driverId ? { ...draft, selectedTaskId: taskId } : draft,
+                      );
+                      draftsRef.current = next;
+                      setDrafts(next);
+                    }}
                   />
                 </div>
               </div>
@@ -461,11 +460,13 @@ export function LogisticsStartChoiceDialog({
               }}
               onZoneShapeChange={handleZoneShapeChange}
               onScratchZoneDrawn={handleScratchZoneDrawn}
-              onSelectTask={(driverId, taskId) =>
-                setDrafts((current) =>
-                  current.map((draft) => (draft.driverId === driverId ? { ...draft, selectedTaskId: taskId } : draft)),
-                )
-              }
+              onSelectTask={(driverId, taskId) => {
+                const next = draftsRef.current.map((draft) =>
+                  draft.driverId === driverId ? { ...draft, selectedTaskId: taskId } : draft,
+                );
+                draftsRef.current = next;
+                setDrafts(next);
+              }}
             />
           </div>
         </div>
