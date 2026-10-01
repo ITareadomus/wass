@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect, useMemo, type Dispatch, type SetStateAction } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -71,8 +71,6 @@ const getDefaultConvocazioniStatsPanel = () =>
   getDefaultTimelineFloatingPanel("right", { width: 320, height: 320 });
 const getDefaultConvocazioniDriversPanel = () =>
   getDefaultTimelineFloatingPanel("right", { width: 320, height: 420 });
-const getDefaultConvocazioniVehiclesPanel = () =>
-  getDefaultTimelineFloatingPanel("right", { width: 300, height: 360 });
 
 function ConvocazioniRosterStatsPanelContent({
   roster,
@@ -208,71 +206,6 @@ function driverVehiclePanelLabel(driver: Cleaner): string {
   const alias = String(driver.alias ?? "").trim();
   if (alias) return alias;
   return `${driver.name} ${driver.lastname}`.trim();
-}
-
-function ConvocazioniVehiclesPanelContent({
-  selectedDrivers,
-  selectedVehicleByDriver,
-  setSelectedVehicleByDriver,
-  availableVehicles,
-  assignedVehicleIds,
-}: {
-  selectedDrivers: Cleaner[];
-  selectedVehicleByDriver: Record<number, string>;
-  setSelectedVehicleByDriver: Dispatch<SetStateAction<Record<number, string>>>;
-  availableVehicles: LogisticsVehicleOption[];
-  assignedVehicleIds: Set<number>;
-}) {
-  return (
-    <div className="flex flex-col">
-      <div className="shrink-0 border-b border-border px-4 py-3">
-        <h3 className="flex items-center font-semibold text-foreground">
-          <Truck className="mr-2 h-5 w-5 text-custom-blue" />
-          Veicoli
-        </h3>
-      </div>
-      <div className="p-4">
-        {selectedDrivers.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Nessun driver selezionato.</p>
-        ) : (
-          <div className="grid w-fit max-w-full grid-cols-[auto_9.5rem] items-start gap-x-2 gap-y-2.5">
-            {selectedDrivers.map((driver) => {
-              const currentVehicleId = Number(selectedVehicleByDriver[driver.id] ?? "");
-              const selectableVehicles = availableVehicles.filter((vehicle) => {
-                if (vehicle.id === currentVehicleId) return true;
-                return !assignedVehicleIds.has(vehicle.id);
-              });
-              const driverLabel = driverVehiclePanelLabel(driver);
-              return (
-                <Fragment key={driver.id}>
-                  <div className="max-w-[9rem] break-words text-xs font-medium leading-snug text-slate-800 dark:text-slate-200">
-                    {driverLabel}
-                  </div>
-                  <select
-                    value={selectedVehicleByDriver[driver.id] ?? ""}
-                    onChange={(e) =>
-                      setSelectedVehicleByDriver((prev) => ({
-                        ...prev,
-                        [driver.id]: e.target.value,
-                      }))
-                    }
-                    className="h-7 w-full rounded border border-slate-300 bg-background px-2 text-xs dark:border-slate-700"
-                  >
-                    <option value="">Seleziona veicolo</option>
-                    {selectableVehicles.map((vehicle) => (
-                      <option key={vehicle.id} value={vehicle.id}>
-                        {vehicle.name}
-                      </option>
-                    ))}
-                  </select>
-                </Fragment>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
 }
 
 function priorityUiFromLogisticsTask(raw: any): "early-out" | "high" | "low" {
@@ -493,7 +426,7 @@ export default function Convocazioni() {
   });
   const convocazioniStatsPanel = useTimelineFloatingPanel("right", getDefaultConvocazioniStatsPanel);
   const convocazioniDriversPanel = useTimelineFloatingPanel("right", getDefaultConvocazioniDriversPanel);
-  const convocazioniVehiclesPanel = useTimelineFloatingPanel("right", getDefaultConvocazioniVehiclesPanel);
+  const [vehiclePicker, setVehiclePicker] = useState<{ driverId: number; draft: string } | null>(null);
   const [selectedCleaners, setSelectedCleaners] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -921,6 +854,17 @@ export default function Convocazioni() {
     });
   }, [isDrivers, selectedDrivers, selectedVehicleByDriver]);
 
+  const openVehiclePicker = (driverId: number) => {
+    setVehiclePicker({
+      driverId,
+      draft: selectedVehicleByDriver[driverId] ?? "",
+    });
+  };
+
+  const vehiclePickerDriver = vehiclePicker
+    ? driversRoster.find((item) => item.id === vehiclePicker.driverId)
+    : undefined;
+
   const toggleCleanerSelection = (cleanerId: number, isAvailable: boolean) => {
     // Se il cleaner è già selezionato, lo deseleziona
     if (selectedCleaners.has(cleanerId)) {
@@ -955,6 +899,7 @@ export default function Convocazioni() {
     // (+1) istantaneo: mostra quando convochi
     setCleaners(prev => prev.map(c => c.id === cleanerId ? { ...c, show_plus_one: true } : c));
     setFilteredCleaners(prev => prev.map(c => c.id === cleanerId ? { ...c, show_plus_one: true } : c));
+    if (isDrivers) openVehiclePicker(cleanerId);
   };
 
   const handleConfirmUnavailable = () => {
@@ -985,6 +930,7 @@ export default function Convocazioni() {
       });
       setCleaners(prev => prev.map(c => c.id === id ? { ...c, show_plus_one: true } : c));
       setFilteredCleaners(prev => prev.map(c => c.id === id ? { ...c, show_plus_one: true } : c));
+      if (isDrivers) openVehiclePicker(id);
     }
     setConfirmDialog({ open: false, cleanerId: null });
   };
@@ -1379,6 +1325,56 @@ export default function Convocazioni() {
                   <span className="font-bold text-yellow-500 dark:text-yellow-400">{notConvocatiDaDueGiorniCount}</span>
                   {showOnlyNotConvocatiDaDueGiorni && " (clicca per mostrare tutti)"}
                 </button>
+                {(isHousekeeping || isDrivers) && (
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-label={convocazioniStatsPanel.isOpen ? "Chiudi statistiche task" : "Apri statistiche task"}
+                      aria-pressed={convocazioniStatsPanel.isOpen}
+                      title={convocazioniStatsPanel.isOpen ? "Chiudi statistiche task" : "Apri statistiche task"}
+                      onClick={() => convocazioniStatsPanel.setIsOpen(!convocazioniStatsPanel.isOpen)}
+                      className={cn(
+                        "border-2 border-custom-blue px-2",
+                        convocazioniStatsPanel.isOpen && "bg-custom-blue-light",
+                      )}
+                    >
+                      <BarChart3 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-label={
+                        convocazioniDriversPanel.isOpen
+                          ? isDrivers
+                            ? "Chiudi statistiche driver"
+                            : "Chiudi statistiche cleaners"
+                          : isDrivers
+                            ? "Apri statistiche driver"
+                            : "Apri statistiche cleaners"
+                      }
+                      aria-pressed={convocazioniDriversPanel.isOpen}
+                      title={
+                        convocazioniDriversPanel.isOpen
+                          ? isDrivers
+                            ? "Chiudi statistiche driver"
+                            : "Chiudi statistiche cleaners"
+                          : isDrivers
+                            ? "Apri statistiche driver"
+                            : "Apri statistiche cleaners"
+                      }
+                      onClick={() => convocazioniDriversPanel.setIsOpen(!convocazioniDriversPanel.isOpen)}
+                      className={cn(
+                        "border-2 border-custom-blue px-2",
+                        convocazioniDriversPanel.isOpen && "bg-custom-blue-light",
+                      )}
+                    >
+                      <Users className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
         </div>
@@ -1578,6 +1574,22 @@ export default function Convocazioni() {
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
+                    {isDrivers && selectedCleaners.has(cleaner.id) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 border-2 border-custom-blue px-2"
+                        title="Cambia veicolo"
+                        aria-label="Cambia veicolo"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openVehiclePicker(cleaner.id);
+                        }}
+                      >
+                        <Truck className="h-4 w-4" />
+                      </Button>
+                    )}
                     <div className={`flex items-center gap-1 bg-background border-2 rounded-lg px-3 py-1 ${borderColor}`}>
                       <span className="text-xs font-semibold text-foreground mr-2">Start Time:</span>
                       <Button
@@ -1715,6 +1727,68 @@ export default function Convocazioni() {
                 </Button>
                 <Button 
                   onClick={handleConfirmUnavailable}
+                  className="bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
+                >
+                  Conferma
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog
+            open={vehiclePicker != null}
+            onOpenChange={(open) => {
+              if (!open) setVehiclePicker(null);
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Veicolo</DialogTitle>
+                <DialogDescription>
+                  {vehiclePickerDriver
+                    ? `Scegli il furgone per ${driverVehiclePanelLabel(vehiclePickerDriver)}.`
+                    : "Scegli il furgone per questo autista."}
+                </DialogDescription>
+              </DialogHeader>
+              <select
+                value={vehiclePicker?.draft ?? ""}
+                onChange={(event) =>
+                  setVehiclePicker((current) =>
+                    current ? { ...current, draft: event.target.value } : current,
+                  )
+                }
+                className="h-9 w-full rounded border border-slate-300 bg-background px-2 text-sm dark:border-slate-700"
+              >
+                <option value="">Seleziona veicolo</option>
+                {availableVehicles
+                  .filter((vehicle) => {
+                    if (!vehiclePicker) return false;
+                    const currentId = Number(selectedVehicleByDriver[vehiclePicker.driverId] ?? "");
+                    if (vehicle.id === currentId) return true;
+                    return !assignedVehicleIds.has(vehicle.id);
+                  })
+                  .map((vehicle) => (
+                    <option key={vehicle.id} value={vehicle.id}>
+                      {vehicle.name}
+                    </option>
+                  ))}
+              </select>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setVehiclePicker(null)}
+                  className="border-2 border-custom-blue"
+                >
+                  Annulla
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (!vehiclePicker) return;
+                    setSelectedVehicleByDriver((prev) => ({
+                      ...prev,
+                      [vehiclePicker.driverId]: vehiclePicker.draft,
+                    }));
+                    setVehiclePicker(null);
+                  }}
                   className="bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
                 >
                   Conferma
@@ -1890,6 +1964,7 @@ export default function Convocazioni() {
               <TimelineFloatingPanel
                 side="right"
                 fitContent
+                hideClosedToggle
                 toggleVerticalOffset={-26}
                 isOpen={convocazioniStatsPanel.isOpen}
                 onOpenChange={convocazioniStatsPanel.setIsOpen}
@@ -1913,6 +1988,7 @@ export default function Convocazioni() {
               <TimelineFloatingPanel
                 side="right"
                 fitContent
+                hideClosedToggle
                 toggleVerticalOffset={26}
                 isOpen={convocazioniDriversPanel.isOpen}
                 onOpenChange={convocazioniDriversPanel.setIsOpen}
@@ -1942,6 +2018,7 @@ export default function Convocazioni() {
               <TimelineFloatingPanel
                 side="right"
                 fitContent
+                hideClosedToggle
                 toggleVerticalOffset={-52}
                 isOpen={convocazioniStatsPanel.isOpen}
                 onOpenChange={convocazioniStatsPanel.setIsOpen}
@@ -1965,6 +2042,7 @@ export default function Convocazioni() {
               <TimelineFloatingPanel
                 side="right"
                 fitContent
+                hideClosedToggle
                 isOpen={convocazioniDriversPanel.isOpen}
                 onOpenChange={convocazioniDriversPanel.setIsOpen}
                 panel={convocazioniDriversPanel.panel}
@@ -1983,33 +2061,6 @@ export default function Convocazioni() {
                   roster={driversRoster}
                   title="Driver"
                   variant="drivers"
-                />
-              </TimelineFloatingPanel>
-              <TimelineFloatingPanel
-                side="right"
-                fitContent
-                fitContentWidth
-                isOpen={convocazioniVehiclesPanel.isOpen}
-                onOpenChange={convocazioniVehiclesPanel.setIsOpen}
-                panel={convocazioniVehiclesPanel.panel}
-                onResetPanel={convocazioniVehiclesPanel.resetPanel}
-                toggleVerticalOffset={52}
-                toggleAriaLabel="Mostra veicoli"
-                toggleTitle="Mostra veicoli"
-                toggleIcon={<Truck className="h-4 w-4" />}
-                dragTitle="Trascina veicoli"
-                closeAriaLabel="Nascondi veicoli"
-                closeTitle="Nascondi veicoli"
-                onPointerDown={convocazioniVehiclesPanel.handlePointerDown}
-                onPointerMove={convocazioniVehiclesPanel.handlePointerMove}
-                onPointerEnd={convocazioniVehiclesPanel.handlePointerEnd}
-              >
-                <ConvocazioniVehiclesPanelContent
-                  selectedDrivers={selectedDrivers}
-                  selectedVehicleByDriver={selectedVehicleByDriver}
-                  setSelectedVehicleByDriver={setSelectedVehicleByDriver}
-                  availableVehicles={availableVehicles}
-                  assignedVehicleIds={assignedVehicleIds}
                 />
               </TimelineFloatingPanel>
               </>
