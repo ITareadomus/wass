@@ -1,6 +1,7 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
 import { formatClockFromMinutes } from "@shared/clock-display";
 import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, UserMinus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap, Lock, Unlock, AlertCircle, BarChart3, Map as MapIcon } from "lucide-react";
+import { TimelineActionHistoryButton } from "@/components/timeline/timeline-action-history-button";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { useMutation } from "@tanstack/react-query";
@@ -2443,6 +2444,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   />
                 </div>
               )}
+              <TimelineActionHistoryButton workDate={workDate} variant="housekeeping" scope={scopeValue} />
               <Button
                 type="button"
                 onClick={() => onOpenStatistics?.()}

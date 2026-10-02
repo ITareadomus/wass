@@ -16,6 +16,7 @@ import {
   BarChart3,
   Map as MapIcon,
 } from "lucide-react";
+import { TimelineActionHistoryButton } from "@/components/timeline/timeline-action-history-button";
 import {
   useCallback,
   useEffect,
@@ -1763,6 +1764,7 @@ export default function LogisticsTimelineView({
               <span />
             )}
             <div className="flex justify-self-end gap-3 print:hidden">
+              <TimelineActionHistoryButton workDate={workDate} variant="logistics" />
               <Button
                 type="button"
                 variant="outline"

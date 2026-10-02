@@ -4765,6 +4765,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/timeline-action-history", async (req, res) => {
+    try {
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const revisions = await pgDailyAssignmentsService.getTimelineActionHistory(dateParam, resolveScopeFromReq(req), 5);
+      res.json({
+        success: true,
+        date: dateParam,
+        revisions: revisions.map((row) => ({
+          revision: row.revision,
+          created_at: row.created_at,
+          created_by: row.created_by,
+          modification_type: row.modification_type,
+          changes: row.changes,
+          detail: row.detail,
+          detailTier: row.detailTier,
+        })),
+      });
+    } catch (error: any) {
+      console.error("Errore nel caricamento cronologia timeline:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/logistics-timeline-action-history", async (req, res) => {
+    try {
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const revisions = await pgDailyAssignmentsService.getLogisticsTimelineActionHistory(dateParam, 5);
+      res.json({
+        success: true,
+        date: dateParam,
+        revisions,
+      });
+    } catch (error: any) {
+      console.error("Errore nel caricamento cronologia timeline logistica:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Endpoint per verificare la history su PostgreSQL
   app.get("/api/pg-history", async (req, res) => {
     try {

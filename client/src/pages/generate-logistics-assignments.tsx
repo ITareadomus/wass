@@ -516,7 +516,8 @@ export default function GenerateLogisticsAssignments() {
       /* preferenza non persistita */
     }
     timelineMapPanel.setIsOpen(true);
-  }, [timelineMapPanel.setIsOpen]);
+    if (next === "floating") timelineStatsPanel.setIsOpen(false);
+  }, [timelineMapPanel.setIsOpen, timelineStatsPanel.setIsOpen]);
 
   const toggleStatistics = useCallback(() => {
     timelineStatsPanel.setIsOpen(!timelineStatsPanel.isOpen);
@@ -525,6 +526,14 @@ export default function GenerateLogisticsAssignments() {
   const toggleMap = useCallback(() => {
     timelineMapPanel.setIsOpen(!timelineMapPanel.isOpen);
   }, [timelineMapPanel.isOpen, timelineMapPanel.setIsOpen]);
+
+  const dockedMapVisible = useDockedMap && timelineMapPanel.isOpen;
+  const dockedMapWasVisible = useRef(false);
+  useEffect(() => {
+    if (dockedMapVisible) timelineStatsPanel.setIsOpen(true);
+    else if (dockedMapWasVisible.current) timelineStatsPanel.setIsOpen(false);
+    dockedMapWasVisible.current = dockedMapVisible;
+  }, [dockedMapVisible, timelineStatsPanel.setIsOpen]);
 
   const resizeDockedMap = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -1804,6 +1813,7 @@ export default function GenerateLogisticsAssignments() {
                   statisticsOpen={timelineStatsPanel.isOpen}
                   mapOpen={timelineMapPanel.isOpen}
                 />
+                {!dockedMapVisible && (
                 <TimelineFloatingPanel
                   side="right"
                   toggleVerticalOffset={52}
@@ -1828,6 +1838,7 @@ export default function GenerateLogisticsAssignments() {
                     stats={assignmentStatistics}
                   />
                 </TimelineFloatingPanel>
+                )}
                 {!useDockedMap && (
                 <TimelineFloatingPanel
                   side="right"
@@ -1875,40 +1886,50 @@ export default function GenerateLogisticsAssignments() {
             {useDockedMap && timelineMapPanel.isOpen && (
               <aside
                 className={cn(
-                  "sticky top-0 flex h-[calc(100vh-1rem)] shrink-0 self-start print:!hidden",
+                  "sticky top-0 flex shrink-0 flex-col self-start print:!hidden",
                   !showContainers && "mt-[17px]",
                 )}
                 style={{ width: dockedMapWidth }}
               >
-                <div
-                  className="absolute inset-y-0 -left-2 z-30 flex w-4 cursor-ew-resize items-center justify-center"
-                  title="Trascina per ridimensionare la mappa"
-                  aria-label="Ridimensiona la mappa"
-                  onPointerDown={resizeDockedMap}
-                >
-                  <span className="h-10 w-1 rounded-full bg-custom-blue/70" />
+                <div className="relative h-[calc(100vh-1rem)] shrink-0">
+                  <div
+                    className="absolute inset-y-0 -left-2 z-30 flex w-4 cursor-ew-resize items-center justify-center"
+                    title="Trascina per ridimensionare la mappa"
+                    aria-label="Ridimensiona la mappa"
+                    onPointerDown={resizeDockedMap}
+                  >
+                    <span className="h-10 w-1 rounded-full bg-custom-blue/70" />
+                  </div>
+                  <MapSection
+                    tasks={mapTasks}
+                    workDate={format(selectedDate, "yyyy-MM-dd")}
+                    personnelColorScope="logistics"
+                    compact
+                    className="h-full min-h-0 w-full border-custom-blue"
+                    bodyClassName="flex min-h-0 flex-1 flex-col"
+                    mapClassName="h-full min-h-0 flex-1"
+                    mapMinHeight={0}
+                    headerExtra={
+                      <button
+                        type="button"
+                        className={mapLayoutToggleClass}
+                        title="Torna alla mappa fluttuante"
+                        aria-label="Torna alla mappa fluttuante"
+                        onClick={() => setMapLayout("floating")}
+                      >
+                        <PinOff className="h-4 w-4" />
+                      </button>
+                    }
+                  />
                 </div>
-                <MapSection
-                  tasks={mapTasks}
-                  workDate={format(selectedDate, "yyyy-MM-dd")}
-                  personnelColorScope="logistics"
-                  compact
-                  className="h-full min-h-0 w-full border-custom-blue"
-                  bodyClassName="flex min-h-0 flex-1 flex-col"
-                  mapClassName="h-full min-h-0 flex-1"
-                  mapMinHeight={0}
-                  headerExtra={
-                    <button
-                      type="button"
-                      className={mapLayoutToggleClass}
-                      title="Torna alla mappa fluttuante"
-                      aria-label="Torna alla mappa fluttuante"
-                      onClick={() => setMapLayout("floating")}
-                    >
-                      <PinOff className="h-4 w-4" />
-                    </button>
-                  }
-                />
+                {timelineStatsPanel.isOpen && (
+                  <div className="mt-2 rounded-lg border-2 border-custom-blue bg-card shadow-sm">
+                    <AssignmentTaskStatisticsPanel
+                      variant="logistics"
+                      stats={assignmentStatistics}
+                    />
+                  </div>
+                )}
               </aside>
             )}
           </div>
