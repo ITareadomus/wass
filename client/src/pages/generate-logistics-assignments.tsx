@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, type PointerEvent as ReactPointerEvent } from "react";
 import { DndContext, MeasuringStrategy } from "@dnd-kit/core";
 import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
+import { getStoredUserRole, isLogisticaRole } from "@/lib/auth-role";
 import { useToast } from "@/hooks/use-toast";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import TaskCardDragOverlay from "@/components/drag-drop/task-card-drag-overlay";
@@ -90,6 +91,15 @@ import {
   type DndDropOperation,
   type DndInsertTarget,
 } from "@/lib/dnd";
+
+function readSharedWorkDate(): Date {
+  const savedDate = localStorage.getItem("selected_work_date");
+  if (!savedDate) return new Date();
+  const [year, month, day] = savedDate.split("-").map(Number);
+  if (!year || !month || !day) return new Date();
+  const parsed = new Date(year, month - 1, day);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
 
 function getCurrentUsername(): string {
   try {
@@ -486,8 +496,10 @@ function timelineRowToTaskType(t: any, fallbackPriority: TaskType["priority"]): 
 
 export default function GenerateLogisticsAssignments() {
   const { toast } = useToast();
-  // Logistics: all'apertura sempre la data odierna (non condivide la data salvata di housekeeping)
-  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+  // Chi vede solo la logistica apre sempre oggi. Gli altri usano la stessa data di housekeeping.
+  const [selectedDate, setSelectedDate] = useState<Date>(() =>
+    isLogisticaRole(getStoredUserRole()) ? new Date() : readSharedWorkDate()
+  );
   const [searchTask, setSearchTask] = useState("");
   const [mapLayout, setMapLayoutState] = useState<LogisticsMapLayout>(readLogisticsMapLayout);
   const [dockedMapWidth, setDockedMapWidth] = useState(readDockedMapWidth);
@@ -624,8 +636,11 @@ export default function GenerateLogisticsAssignments() {
   const isTimelineReadOnly = isWorkDateHistoricallyLocked(selectedDate);
 
   useEffect(() => {
-    // Solo per logistics: non sovrascrivere selected_work_date di housekeeping
-    localStorage.setItem("selected_logistics_work_date", format(selectedDate, "yyyy-MM-dd"));
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    localStorage.setItem("selected_logistics_work_date", dateStr);
+    if (isLogisticaRole(getStoredUserRole())) return;
+    localStorage.setItem("selected_work_date", dateStr);
+    window.dispatchEvent(new Event("selected-work-date-change"));
   }, [selectedDate]);
 
   useEffect(() => {
@@ -1859,7 +1874,10 @@ export default function GenerateLogisticsAssignments() {
             </div>
             {useDockedMap && timelineMapPanel.isOpen && (
               <aside
-                className="sticky top-4 flex h-[calc(100vh-2rem)] shrink-0 self-start print:!hidden relative"
+                className={cn(
+                  "sticky top-0 flex h-[calc(100vh-1rem)] shrink-0 self-start print:!hidden",
+                  !showContainers && "mt-[17px]",
+                )}
                 style={{ width: dockedMapWidth }}
               >
                 <div

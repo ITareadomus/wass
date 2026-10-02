@@ -2969,7 +2969,10 @@ export default function GenerateAssignments() {
             </div>
             {useDockedMap && timelineMapPanel.isOpen && (
               <aside
-                className="sticky top-4 flex h-[calc(100vh-2rem)] shrink-0 self-start print:!hidden relative"
+                className={cn(
+                  "sticky top-0 flex h-[calc(100vh-1rem)] shrink-0 self-start print:!hidden",
+                  !showContainers && "mt-[17px]",
+                )}
                 style={{ width: dockedMapWidth }}
               >
                 <div
