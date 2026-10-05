@@ -187,6 +187,41 @@ const normalizeDate = (dateStr: any): string => {
   return "";
 };
 
+const ITALIAN_MONTHS_SHORT = [
+  "gen",
+  "feb",
+  "mar",
+  "apr",
+  "mag",
+  "giu",
+  "lug",
+  "ago",
+  "set",
+  "ott",
+  "nov",
+  "dic",
+] as const;
+
+/** "30 set", senza anno. Vuoto se la data non è leggibile. */
+function formatDayMonthLabel(dateStr: unknown): string {
+  const normalized = normalizeDate(dateStr);
+  if (!normalized) return "";
+  const [, monthStr, dayStr] = normalized.split("-");
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  const monthLabel = ITALIAN_MONTHS_SHORT[month - 1];
+  if (!monthLabel || !day) return "";
+  return `${day} ${monthLabel}`;
+}
+
+/** Data accanto all'orario solo se check-in/out non cade nella giornata di lavoro. */
+function offDayDateLabel(dateStr: unknown, workDate: string | null | undefined): string | null {
+  const normalized = normalizeDate(dateStr);
+  const work = String(workDate ?? "").trim().slice(0, 10);
+  if (!normalized || !/^\d{4}-\d{2}-\d{2}$/.test(work) || normalized === work) return null;
+  return formatDayMonthLabel(normalized) || null;
+}
+
 // Normalizza ora nel formato HH:MM per il picker HTML5
 const normalizeTime = (timeStr: any): string => {
   if (!timeStr) return "";
@@ -2642,36 +2677,20 @@ const displayClickableInputClass =
       ? "Manca la tipologia logistica (delivery, pick-up o entrambi). Impostala prima di assegnare."
       : null;
 
-  // Verifica se il check-in è per una data futura (rispetto alla data selezionata)
-  // Include anche i casi dove l'orario non è migrato ma la data è futura
-  const isFutureCheckin = (() => {
-    const taskObj = taskWithPendingEdits as any;
-    const checkinDate = taskObj.checkin_date;
+  const checkoutOffDayLabel = offDayDateLabel(
+    (taskWithPendingEdits as any).checkout_date,
+    effectiveWorkDate
+  );
+  const checkinOffDayLabel = offDayDateLabel(
+    (taskWithPendingEdits as any).checkin_date,
+    effectiveWorkDate
+  );
 
-    if (!checkinDate) return false;
-
-    // Ottieni la data selezionata da localStorage
-    const selectedWorkDate = effectiveWorkDate;
-    if (!selectedWorkDate) return false;
-
-    const [year, month, day] = selectedWorkDate.split('-').map(Number);
-    const selectedDate = new Date(year, month - 1, day);
-    selectedDate.setHours(0, 0, 0, 0);
-
-    const normalizedCheckinDate = normalizeDate(checkinDate);
-    if (!normalizedCheckinDate) return false;
-    const checkin = new Date(normalizedCheckinDate);
-    checkin.setHours(0, 0, 0, 0);
-
-    return checkin > selectedDate;
-  })();
-
-  
   const checkoutTime = (taskWithPendingEdits as any).checkout_time as string | undefined;
   const checkinTime = (taskWithPendingEdits as any).checkin_time as string | undefined;
 
   const hasCheckout = Boolean(checkoutTime);
-  const hasCheckinRow = Boolean(checkinTime) || isFutureCheckin; // riga check-in o calendario
+  const hasCheckinRow = Boolean(checkinTime) || Boolean(checkinOffDayLabel);
   const rowsCount = (hasCheckout ? 1 : 0) + (hasCheckinRow ? 1 : 0);
 
   const hasSingleRow = rowsCount === 1;
@@ -3639,9 +3658,11 @@ const displayClickableInputClass =
                     {shouldShowCheckInOutArrows &&
                       ((taskWithPendingEdits as any).checkout_time ||
                         (taskWithPendingEdits as any).checkin_time ||
-                        isFutureCheckin) && (() => {
+                        checkoutOffDayLabel ||
+                        checkinOffDayLabel) && (() => {
                         const hasCheckout = Boolean((taskWithPendingEdits as any).checkout_time);
-                        const hasCheckin = Boolean((taskWithPendingEdits as any).checkin_time) || isFutureCheckin;
+                        const hasCheckin =
+                          Boolean((taskWithPendingEdits as any).checkin_time) || Boolean(checkinOffDayLabel);
 
                         const linesCount = (hasCheckout ? 1 : 0) + (hasCheckin ? 1 : 0);
                         const isSingleLine = linesCount === 1;
@@ -3673,33 +3694,54 @@ const displayClickableInputClass =
                           >
                             {hasCheckout && (
                               <div className="flex items-center gap-0.5 leading-none">
-                                <span className="font-black text-[15px] leading-none text-[#257537]">↑</span>
-                                <span className="text-[11px] leading-none text-[#137537] font-bold">
+                                <span
+                                  className={cn(
+                                    "font-black leading-none",
+                                    checkoutOffDayLabel
+                                      ? "text-[11px] text-gray-500 dark:text-gray-400"
+                                      : "text-[15px] text-[#257537]"
+                                  )}
+                                >
+                                  ↑
+                                </span>
+                                <span
+                                  className={cn(
+                                    "text-[11px] leading-none font-bold",
+                                    checkoutOffDayLabel
+                                      ? "text-gray-500 dark:text-gray-400"
+                                      : "text-[#137537]"
+                                  )}
+                                >
                                   {(taskWithPendingEdits as any).checkout_time}
+                                  {checkoutOffDayLabel ? ` ${checkoutOffDayLabel}` : ""}
                                 </span>
                               </div>
                             )}
                             {hasCheckin && (
                               <div className="flex items-center gap-0.5 leading-none">
-                                {isFutureCheckin ? (
-                                  <>
-                                    <CalendarIcon className="w-3.5 h-3.5 text-red-600" strokeWidth={2.5} />
-                                    {(taskWithPendingEdits as any).checkin_time && (
-                                      <span className="text-red-600 text-[11px] leading-none font-bold">
-                                        {(taskWithPendingEdits as any).checkin_time}
-                                      </span>
-                                    )}
-                                  </>
-                                ) : (
-                                  (taskWithPendingEdits as any).checkin_time && (
-                                    <>
-                                      <span className="text-red-600 font-black text-[15px] leading-none">↓</span>
-                                      <span className="text-red-600 text-[11px] leading-none font-bold">
-                                        {(taskWithPendingEdits as any).checkin_time}
-                                      </span>
-                                    </>
-                                  )
-                                )}
+                                <span
+                                  className={cn(
+                                    "font-black leading-none",
+                                    checkinOffDayLabel
+                                      ? "text-[11px] text-gray-500 dark:text-gray-400"
+                                      : "text-[15px] text-red-600"
+                                  )}
+                                >
+                                  ↓
+                                </span>
+                                <span
+                                  className={cn(
+                                    "text-[11px] leading-none font-bold",
+                                    checkinOffDayLabel
+                                      ? "text-gray-500 dark:text-gray-400"
+                                      : "text-red-600"
+                                  )}
+                                >
+                                  {(taskWithPendingEdits as any).checkin_time}
+                                  {checkinOffDayLabel
+                                    ? `${(taskWithPendingEdits as any).checkin_time ? " " : ""}${checkinOffDayLabel}`
+                                    : ""}
+                                </span>
                               </div>
                             )}
                           </div>
@@ -3733,28 +3775,34 @@ const displayClickableInputClass =
                     {shouldShowTooltipTimes &&
                       ((taskWithPendingEdits as any).checkout_time ||
                         (taskWithPendingEdits as any).checkin_time ||
-                        isFutureCheckin) && (
+                        checkoutOffDayLabel ||
+                        checkinOffDayLabel) && (
                       <div className="flex items-center gap-3 text-sm">
                         {(taskWithPendingEdits as any).checkout_time && (
-                          <div className="flex items-center gap-1">
-                            <span className="text-green-500">↑</span>
+                          <div
+                            className={cn(
+                              "flex items-center gap-1",
+                              checkoutOffDayLabel && "text-gray-500 dark:text-gray-400"
+                            )}
+                          >
+                            <span className={checkoutOffDayLabel ? "text-gray-500 dark:text-gray-400" : "text-green-500"}>↑</span>
                             <span>{(taskWithPendingEdits as any).checkout_time}</span>
+                            {checkoutOffDayLabel && <span>{checkoutOffDayLabel}</span>}
                           </div>
                         )}
-                        {isFutureCheckin ? (
-                          <div className="flex items-center gap-1 text-red-500">
-                            <CalendarIcon className="w-3.5 h-3.5" strokeWidth={2.5} />
+                        {((taskWithPendingEdits as any).checkin_time || checkinOffDayLabel) && (
+                          <div
+                            className={cn(
+                              "flex items-center gap-1",
+                              checkinOffDayLabel ? "text-gray-500 dark:text-gray-400" : "text-red-500"
+                            )}
+                          >
+                            <span>↓</span>
                             {(taskWithPendingEdits as any).checkin_time && (
                               <span>{(taskWithPendingEdits as any).checkin_time}</span>
                             )}
+                            {checkinOffDayLabel && <span>{checkinOffDayLabel}</span>}
                           </div>
-                        ) : (
-                          (taskWithPendingEdits as any).checkin_time && (
-                            <div className="flex items-center gap-1">
-                              <span className="text-red-500">↓</span>
-                              <span>{(taskWithPendingEdits as any).checkin_time}</span>
-                            </div>
-                          )
                         )}
                       </div>
                     )}
