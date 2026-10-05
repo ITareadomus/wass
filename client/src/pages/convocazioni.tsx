@@ -25,6 +25,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from 'wouter';
 import { isTaskLocked } from "@/lib/taskValidation";
+import { CleanerTriadMark } from "@/components/triad-mark";
 
 const OFFICE_SCOPE_ENABLED = false;
 
@@ -1403,9 +1404,6 @@ export default function Convocazioni() {
                 )
                 .map((cleaner) => {
                   const isAvailable = cleaner.available !== false;
-                  const isPremium = cleaner.role === "Premium";
-                  const isFormatore = cleaner.role === "Formatore";
-                  const canDoStraordinaria = cleaner.role === "Straordinario";
                   const selectedVehicleIdRaw = selectedVehicleByDriver[cleaner.id];
                   const selectedVehicleId = selectedVehicleIdRaw ? Number(selectedVehicleIdRaw) : null;
                   const selectedVehicleName = selectedVehicleId
@@ -1494,34 +1492,12 @@ export default function Convocazioni() {
                                 </span>
                               )}
                             </>
+                          ) : cleaner.role === "Ufficio" ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-500/30 text-sky-800 dark:bg-sky-500/40 dark:text-sky-200 border-sky-600 dark:border-sky-400">
+                              Ufficio
+                            </span>
                           ) : (
-                            <>
-                              {isFormatore && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-500/30 text-orange-800 dark:bg-orange-500/40 dark:text-orange-200 border-orange-600 dark:border-orange-400">
-                                  Formatore
-                                </span>
-                              )}
-                              {canDoStraordinaria && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-500/30 text-red-800 dark:bg-red-500/40 dark:text-red-200 border-red-600 dark:border-red-400">
-                                  Straordinario
-                                </span>
-                              )}
-                              {cleaner.role === "Ufficio" && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-500/30 text-sky-800 dark:bg-sky-500/40 dark:text-sky-200 border-sky-600 dark:border-sky-400">
-                                  Ufficio
-                                </span>
-                              )}
-                              {isPremium && !canDoStraordinaria && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-500/30 text-yellow-800 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-600 dark:border-yellow-400">
-                                  Premium
-                                </span>
-                              )}
-                              {!isPremium && !isFormatore && !canDoStraordinaria && cleaner.role !== "Ufficio" && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-500/30 text-green-800 dark:bg-green-500/40 dark:text-green-200 border-green-600 dark:border-green-400">
-                                  Standard
-                                </span>
-                              )}
-                            </>
+                            <CleanerTriadMark role={cleaner.role || "Standard"} />
                           )}
                         </div>
                       </div>

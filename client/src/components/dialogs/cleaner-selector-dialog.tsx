@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RefreshCw, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CleanerTriadMark } from "@/components/triad-mark";
 
 interface Cleaner {
   id: number;
@@ -311,30 +312,12 @@ export function CleanerSelectorDialog({
                                 Non disponibile
                               </span>
                             )}
-                            {cleaner.role === "Formatore" && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-200 border-orange-300 dark:border-orange-700">
-                                Formatore
-                              </span>
-                            )}
-                            {cleaner.role === "Standard" && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-200 border-green-300 dark:border-green-700">
-                                Standard
-                              </span>
-                            )}
-                            {cleaner.role === "Straordinario" && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 border-red-300 dark:border-red-700">
-                                Straordinario
-                              </span>
-                            )}
-                            {cleaner.role === "Premium" && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
-                                Premium
-                              </span>
-                            )}
-                            {cleaner.role === "Ufficio" && (
+                            {cleaner.role === "Ufficio" ? (
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
                                 Ufficio
                               </span>
+                            ) : (
+                              <CleanerTriadMark role={cleaner.role || "Standard"} />
                             )}
                           </div>
                         </label>
@@ -395,30 +378,12 @@ export function CleanerSelectorDialog({
                                 Non disponibile
                               </span>
                             )}
-                            {cleaner.role === "Formatore" && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-200 border-orange-300 dark:border-orange-700">
-                                Formatore
-                              </span>
-                            )}
-                            {cleaner.role === "Standard" && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-200 border-green-300 dark:border-green-700">
-                                Standard
-                              </span>
-                            )}
-                            {cleaner.role === "Straordinario" && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 border-red-300 dark:border-red-700">
-                                Straordinario
-                              </span>
-                            )}
-                            {cleaner.role === "Premium" && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
-                                Premium
-                              </span>
-                            )}
-                            {cleaner.role === "Ufficio" && (
+                            {cleaner.role === "Ufficio" ? (
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
                                 Ufficio
                               </span>
+                            ) : (
+                              <CleanerTriadMark role={cleaner.role || "Standard"} />
                             )}
                           </div>
                         </label>
