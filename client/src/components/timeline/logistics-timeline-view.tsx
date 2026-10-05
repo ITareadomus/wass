@@ -2317,28 +2317,12 @@ export default function LogisticsTimelineView({
                                       showStartCap={seq === 1 && travelTime > 0}
                                     />
                                   )}
-                                  {!hideRouteSpacers &&
-                                    displayWait > 0 &&
-                                    waitingGapWidthPx > 0 &&
-                                    raw?.checkout_time && (
+                                  {!hideRouteSpacers && displayWait > 0 && waitingGapWidthPx > 0 && (
                                     <div
-                                      className="flex items-center justify-center flex-shrink-0 py-3 bg-amber-100/50 dark:bg-amber-900/20 border-y border-dashed border-amber-400"
+                                      className="pointer-events-none flex-shrink-0"
                                       style={{ width: `${waitingGapWidthPx}px`, minHeight: "50px" }}
-                                      title={`Attesa checkout: ${displayWait} min`}
-                                    >
-                                      <svg
-                                        width="16"
-                                        height="16"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        className="text-amber-600 dark:text-amber-400 flex-shrink-0"
-                                      >
-                                        <circle cx="12" cy="12" r="10" />
-                                        <polyline points="12,6 12,12 16,14" />
-                                      </svg>
-                                    </div>
+                                      aria-hidden
+                                    />
                                   )}
                                   {renderCrossDriverInsertSlot(index)}
                                   {(() => {

@@ -195,6 +195,31 @@ describe("getLogisticsTimelineViolationMessages", () => {
     expect(messages.some((m) => m.includes("Check-in"))).toBe(true);
   });
 
+  it("avvisa se il servizio è prima del checkout, senza bloccare l'appartamento", () => {
+    const messages = getLogisticsTimelineViolationMessages(
+      {
+        start_time: "12:00",
+        end_time: "12:15",
+        checkout_time: "15:00",
+        checkout_date: "2026-06-18",
+      },
+      "2026-06-18"
+    );
+    expect(messages.some((m) => m.includes("Checkout alle 15:00"))).toBe(true);
+    expect(messages.some((m) => m.includes("12:00"))).toBe(true);
+    expect(
+      getLogisticsTimelineViolationShortLabels(
+        {
+          start_time: "12:00",
+          end_time: "12:15",
+          checkout_time: "15:00",
+          checkout_date: "2026-06-18",
+        },
+        "2026-06-18"
+      )
+    ).toContain("checkout alle 15:00");
+  });
+
   it("describes checkout wait over 15 minutes", () => {
     const messages = getLogisticsTimelineViolationMessages(
       {

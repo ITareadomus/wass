@@ -108,21 +108,17 @@ export interface CheckoutScheduleResult {
 }
 
 /**
- * Arrivo prima del checkout: attesa fino al checkout, start al checkout.
- * Attesa > LOGISTICS_MAX_CHECKOUT_WAIT_MIN → violazione (non fattibile in optimizer).
+ * Il servizio parte all'arrivo anche se il checkout è più tardi.
+ * Lo scarto non diventa un'attesa in timeline: resta un avviso sul task.
  */
 export function resolveCheckoutSchedule(
   arrivalMin: number,
-  checkoutMin: number
+  _checkoutMin: number
 ): CheckoutScheduleResult {
-  if (arrivalMin >= checkoutMin) {
-    return { startMin: arrivalMin, checkoutWaitMinutes: 0, checkoutWaitExceeded: false };
-  }
-  const checkoutWaitMinutes = checkoutMin - arrivalMin;
   return {
-    startMin: checkoutMin,
-    checkoutWaitMinutes,
-    checkoutWaitExceeded: checkoutWaitMinutes > LOGISTICS_MAX_CHECKOUT_WAIT_MIN,
+    startMin: arrivalMin,
+    checkoutWaitMinutes: 0,
+    checkoutWaitExceeded: false,
   };
 }
 
@@ -426,7 +422,7 @@ export function getLogisticsTimelineViolationMessages(
 
   if (violations.startBeforeCheckout) {
     messages.push(
-      `Check-out: l'inizio del servizio logistica (${startLabel}) è prima del check-out (${formatTimeLabel(task.checkout_time)}).`
+      `Checkout alle ${formatTimeLabel(task.checkout_time)}, mentre l'appartamento è in programma alle ${startLabel}.`
     );
   }
 
@@ -515,7 +511,7 @@ export function getLogisticsTimelineViolationShortLabels(
   const violations = getLogisticsTimelineViolations(task, workDate);
 
   if (violations.startBeforeCheckout) {
-    labels.push("checkout violato");
+    labels.push(`checkout alle ${formatTimeLabel(task.checkout_time)}`);
   }
   if (violations.checkoutWaitExceeded) {
     labels.push("attesa checkout eccessiva");
@@ -585,15 +581,6 @@ export function computeLogisticsCheckoutWaitGap(args: {
 }): number {
   if (!isCheckoutApplicableOnWorkDate(args.checkoutTime, args.checkoutDate, args.workDate)) {
     return 0;
-  }
-
-  const fromField = Number(args.checkoutWaitMinutes ?? 0);
-  if (fromField > 0) return fromField;
-
-  const startMin = parseHmToMinutes(args.startTime, null);
-  const checkoutMin = parseHmToMinutes(args.checkoutTime, null);
-  if (startMin != null && checkoutMin != null && startMin < checkoutMin) {
-    return checkoutMin - startMin;
   }
 
   if (args.sequence >= 2 && args.prevEndTime && args.startTime) {
