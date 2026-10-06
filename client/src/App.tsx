@@ -12,6 +12,8 @@ import HomeGate from "@/pages/home-gate";
 import Login from "@/pages/login";
 import Settings from "@/pages/settings";
 import SystemSettings from "@/pages/system-settings";
+import HousekeepingTutorial from "@/pages/housekeeping-tutorial";
+import HousekeepingStepTutorial from "@/pages/housekeeping-step-tutorial";
 import NotFound from "@/pages/not-found";
 import { useEffect, useState } from "react";
 import { WassSiteHeader } from "@/components/wass-site-header";
@@ -213,6 +215,12 @@ function Router() {
       </Route>
       <Route path="/settings">
         {() => <ProtectedRoute component={SystemSettings} />}
+      </Route>
+      <Route path="/tutorial/passi">
+        {() => <ProtectedRoute component={HousekeepingStepTutorial} />}
+      </Route>
+      <Route path="/tutorial">
+        {() => <ProtectedRoute component={HousekeepingTutorial} />}
       </Route>
       <Route component={NotFound} />
     </Switch>

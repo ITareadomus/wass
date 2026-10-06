@@ -31,6 +31,8 @@ export function isLogisticaPathAllowed(pathname: string, search = ""): boolean {
     return true;
   }
 
+  if (pathname === "/tutorial" || pathname.startsWith("/tutorial/")) return true;
+
   if (pathname === "/convocazioni") {
     const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
     return params.get("kind") === "drivers";
