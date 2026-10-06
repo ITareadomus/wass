@@ -11,7 +11,12 @@ import {
   Pencil,
   Save,
   Bike,
+  ChevronLeft,
+  ChevronRight,
+  BarChart3,
+  Map as MapIcon,
 } from "lucide-react";
+import { TimelineActionHistoryButton } from "@/components/timeline/timeline-action-history-button";
 import {
   useCallback,
   useEffect,
@@ -145,8 +150,12 @@ interface LogisticsTimelineViewProps {
   /** Indice di insert durante drag cross-autista (per spacer di preview). */
   lastValidDragIndex?: number | null;
   onRefresh: () => Promise<void>;
-  adamSyncNotice?: LogisticsAssignedSyncNotice | null;
+  adamSyncHistory?: LogisticsAssignedSyncNotice[];
   className?: string;
+  onOpenStatistics?: () => void;
+  onOpenMap?: () => void;
+  statisticsOpen?: boolean;
+  mapOpen?: boolean;
 }
 
 /** Tasto shift orario prima fermata (come HK). Mettere `true` per riattivarlo. */
@@ -332,6 +341,7 @@ function timelineTaskToTask(t: any, driverId: number): Task {
     status: "pending",
     scheduledTime: t.start_time ?? null,
     address: t.address != null ? String(t.address) : undefined,
+    apt_code: t.apt_code != null ? String(t.apt_code).trim() || undefined : undefined,
     lat: t.lat != null ? String(t.lat) : undefined,
     lng: t.lng != null ? String(t.lng) : undefined,
     premium: Boolean(t.premium),
@@ -414,18 +424,37 @@ export default function LogisticsTimelineView({
   activeDragDriverId = null,
   lastValidDragIndex = null,
   onRefresh,
-  adamSyncNotice = null,
+  adamSyncHistory = [],
   className,
+  onOpenStatistics,
+  onOpenMap,
+  statisticsOpen = false,
+  mapOpen = false,
 }: LogisticsTimelineViewProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showAdamSyncChanges, setShowAdamSyncChanges] = useState(false);
-  const adamSyncClock = adamSyncNotice ? formatAdamSyncClock(adamSyncNotice.syncedAt) : "";
+  const [adamSyncIndex, setAdamSyncIndex] = useState(0);
+  const latestAdamSyncAt = adamSyncHistory[adamSyncHistory.length - 1]?.syncedAt ?? "";
 
   useEffect(() => {
-    if (!adamSyncNotice?.tasks.length) setShowAdamSyncChanges(false);
-  }, [adamSyncNotice]);
+    if (!latestAdamSyncAt) {
+      setShowAdamSyncChanges(false);
+      setAdamSyncIndex(0);
+      return;
+    }
+    setAdamSyncIndex(adamSyncHistory.length - 1);
+  }, [latestAdamSyncAt, adamSyncHistory.length]);
+
+  const selectedAdamSyncNotice =
+    adamSyncHistory[Math.min(adamSyncIndex, Math.max(0, adamSyncHistory.length - 1))] ?? null;
+  const adamSyncClock = selectedAdamSyncNotice
+    ? formatAdamSyncClock(selectedAdamSyncNotice.syncedAt)
+    : "";
+  const canBrowseOlderAdamSync = adamSyncIndex > 0;
+  const canBrowseNewerAdamSync =
+    adamSyncHistory.length > 0 && adamSyncIndex < adamSyncHistory.length - 1;
   const [showRemoveDriversDialog, setShowRemoveDriversDialog] = useState(false);
   const [driverIdsToRemove, setDriverIdsToRemove] = useState<number[]>([]);
   const [addDriverOpen, setAddDriverOpen] = useState(false);
@@ -595,37 +624,6 @@ export default function LogisticsTimelineView({
       setShowAdamTransferDialog(false);
 
       const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-      const pendingEdits = JSON.parse(sessionStorage.getItem("pending_task_edits") || "{}");
-
-      if (Object.keys(pendingEdits).length > 0) {
-        for (const [, edit] of Object.entries(pendingEdits)) {
-          try {
-            const taskEdit = edit as any;
-            const updateResponse = await fetch("/api/update-task-details", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                taskId: taskEdit.taskId,
-                logisticCode: taskEdit.logisticCode,
-                checkoutDate: taskEdit.checkoutDate,
-                checkoutTime: taskEdit.checkoutTime,
-                checkinDate: taskEdit.checkinDate,
-                checkinTime: taskEdit.checkinTime,
-                cleaningTime: taskEdit.cleaningTime,
-                paxIn: taskEdit.paxIn,
-                paxOut: taskEdit.paxOut,
-                operationId: taskEdit.operationId,
-                date: workDate,
-                modified_by: currentUser.username || "system",
-                scope: "logistics",
-              }),
-            });
-            await updateResponse.json();
-          } catch (editError) {
-            console.warn("Salvataggio task pendente prima del transfer:", editError);
-          }
-        }
-      }
 
       toast({
         title: "Trasferimento in corso…",
@@ -655,7 +653,6 @@ export default function LogisticsTimelineView({
       const result = await response.json();
 
       if (result.success) {
-        sessionStorage.removeItem("pending_task_edits");
         try {
           const lr = await fetch(
             `/api/logistics-last-adam-transfer?date=${encodeURIComponent(workDate)}`
@@ -1730,21 +1727,74 @@ export default function LogisticsTimelineView({
               <CalendarIcon className="w-5 h-5 mr-2 text-custom-blue" />
               Timeline Logistica - {drivers.length} Driver
             </h2>
-            {adamSyncNotice && adamSyncNotice.tasks.length > 0 ? (
-              <button
-                type="button"
-                className="print:hidden justify-self-center inline-flex items-center gap-1.5 rounded-md border border-yellow-400 bg-yellow-200 px-3 py-1 text-center text-sm font-semibold text-yellow-950 shadow-sm hover:bg-yellow-300 dark:border-yellow-600 dark:bg-yellow-800/50 dark:text-yellow-50 dark:hover:bg-yellow-800/70"
-                onClick={() => setShowAdamSyncChanges(true)}
-              >
-                <span aria-hidden="true">⚠️</span>
-                <span>
-                  {`${adamSyncClock ? `${adamSyncClock} ` : ""}Sync from ADAM, ci sono dei cambiamenti ai task assegnati`}
-                </span>
-              </button>
+            {selectedAdamSyncNotice && selectedAdamSyncNotice.tasks.length > 0 ? (
+              <div className="print:hidden justify-self-center inline-flex items-center gap-1">
+                <button
+                  type="button"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-yellow-400 bg-yellow-200 text-yellow-950 shadow-sm hover:bg-yellow-300 disabled:cursor-default disabled:opacity-40 dark:border-yellow-600 dark:bg-yellow-800/50 dark:text-yellow-50 dark:hover:bg-yellow-800/70"
+                  aria-label="Sync precedente"
+                  disabled={!canBrowseOlderAdamSync}
+                  onClick={() => setAdamSyncIndex((index) => Math.max(0, index - 1))}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-yellow-400 bg-yellow-200 px-3 py-1 text-center text-sm font-semibold text-yellow-950 shadow-sm hover:bg-yellow-300 dark:border-yellow-600 dark:bg-yellow-800/50 dark:text-yellow-50 dark:hover:bg-yellow-800/70"
+                  onClick={() => setShowAdamSyncChanges(true)}
+                >
+                  <span aria-hidden="true">⚠️</span>
+                  <span>
+                    {`${adamSyncClock ? `${adamSyncClock} ` : ""}Sync from ADAM, ci sono dei cambiamenti ai task assegnati`}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-yellow-400 bg-yellow-200 text-yellow-950 shadow-sm hover:bg-yellow-300 disabled:cursor-default disabled:opacity-40 dark:border-yellow-600 dark:bg-yellow-800/50 dark:text-yellow-50 dark:hover:bg-yellow-800/70"
+                  aria-label="Sync successiva"
+                  disabled={!canBrowseNewerAdamSync}
+                  onClick={() =>
+                    setAdamSyncIndex((index) => Math.min(adamSyncHistory.length - 1, index + 1))
+                  }
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
             ) : (
               <span />
             )}
             <div className="flex justify-self-end gap-3 print:hidden">
+              <TimelineActionHistoryButton workDate={workDate} variant="logistics" />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-pressed={statisticsOpen}
+                title={statisticsOpen ? "Chiudi statistiche" : "Apri statistiche"}
+                className={cn(
+                  "flex items-center gap-2 border-2 border-custom-blue",
+                  statisticsOpen && "bg-custom-blue-light"
+                )}
+                onClick={() => onOpenStatistics?.()}
+              >
+                <BarChart3 className="w-4 h-4 shrink-0" aria-hidden />
+                Statistiche
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-pressed={mapOpen}
+                title={mapOpen ? "Chiudi mappa" : "Apri mappa"}
+                className={cn(
+                  "flex items-center gap-2 border-2 border-custom-blue",
+                  mapOpen && "bg-custom-blue-light"
+                )}
+                onClick={() => onOpenMap?.()}
+              >
+                <MapIcon className="w-4 h-4 shrink-0" aria-hidden />
+                Mappa
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -2267,28 +2317,12 @@ export default function LogisticsTimelineView({
                                       showStartCap={seq === 1 && travelTime > 0}
                                     />
                                   )}
-                                  {!hideRouteSpacers &&
-                                    displayWait > 0 &&
-                                    waitingGapWidthPx > 0 &&
-                                    raw?.checkout_time && (
+                                  {!hideRouteSpacers && displayWait > 0 && waitingGapWidthPx > 0 && (
                                     <div
-                                      className="flex items-center justify-center flex-shrink-0 py-3 bg-amber-100/50 dark:bg-amber-900/20 border-y border-dashed border-amber-400"
+                                      className="pointer-events-none flex-shrink-0"
                                       style={{ width: `${waitingGapWidthPx}px`, minHeight: "50px" }}
-                                      title={`Attesa checkout: ${displayWait} min`}
-                                    >
-                                      <svg
-                                        width="16"
-                                        height="16"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        className="text-amber-600 dark:text-amber-400 flex-shrink-0"
-                                      >
-                                        <circle cx="12" cy="12" r="10" />
-                                        <polyline points="12,6 12,12 16,14" />
-                                      </svg>
-                                    </div>
+                                      aria-hidden
+                                    />
                                   )}
                                   {renderCrossDriverInsertSlot(index)}
                                   {(() => {
@@ -2543,13 +2577,42 @@ export default function LogisticsTimelineView({
       <Dialog open={showAdamSyncChanges} onOpenChange={setShowAdamSyncChanges}>
         <DialogContent className="max-h-[80vh] max-w-lg overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Cambiamenti da ADAM</DialogTitle>
+            <DialogTitle>Cambiamenti da ADAM{adamSyncClock ? ` · ${adamSyncClock}` : ""}</DialogTitle>
             <DialogDescription>
               Ci sono state delle modifiche al programma Housekeeping che potrebbero comportare dei cambiamenti al programma della Logistica
             </DialogDescription>
           </DialogHeader>
+          {adamSyncHistory.length > 1 ? (
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!canBrowseOlderAdamSync}
+                onClick={() => setAdamSyncIndex((index) => Math.max(0, index - 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Precedente
+              </Button>
+              <span className="text-sm font-medium text-muted-foreground">
+                {adamSyncIndex + 1} di {adamSyncHistory.length}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!canBrowseNewerAdamSync}
+                onClick={() =>
+                  setAdamSyncIndex((index) => Math.min(adamSyncHistory.length - 1, index + 1))
+                }
+              >
+                Successiva
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : null}
           <div className="space-y-4">
-            {adamSyncNotice?.tasks.map((task) => (
+            {selectedAdamSyncNotice?.tasks.map((task) => (
               <div key={`${task.taskId}-${task.removed ? "removed" : "updated"}`}>
                 <p className="text-sm font-semibold text-foreground">Task {task.logisticCode}</p>
                 <ul className="mt-1 space-y-1">

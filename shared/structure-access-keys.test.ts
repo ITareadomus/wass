@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatStructureAccessTypeLabel,
   parseStructureAccessBundles,
+  resolveStructureAccessBundlePresentation,
   resolveStructureAccessKeyKind,
   selectDriverAccessBundles,
 } from "./structure-access-keys";
@@ -129,5 +130,64 @@ describe("resolveStructureAccessKeyKind / formatStructureAccessTypeLabel", () =>
         choices: [],
       })
     ).toBe("Smart");
+  });
+});
+
+describe("structure keys per il dialog", () => {
+  it("scarta choice senza nome e type fuori da 0-3", () => {
+    const bundles = parseStructureAccessBundles(
+      [
+        {
+          keys_id: 12,
+          keys_number: "1",
+          keys_label: "Autista",
+          keys_type: 3,
+          choices: [
+            { name: "Portone", type: 0 },
+            { type: 2 },
+            { name: "Sconosciuta", type: 9 },
+          ],
+        },
+      ],
+      KEY_TYPES
+    );
+    expect(bundles[0].choices).toEqual([
+      { name: "Portone", type: 0, typeLabel: "Classica", value: null },
+      { name: "Sconosciuta", type: null, typeLabel: null, value: null },
+    ]);
+  });
+
+  it("deduplica, tiene i mazzi autist e ordina per numero, id e label", () => {
+    const bundles = parseStructureAccessBundles(
+      [
+        { keys_id: 3, keys_number: "10", keys_label: "Autisti", keys_type: 2, choices: [{ name: "A", type: 0 }] },
+        { keys_id: 3, keys_number: "10", keys_label: "Autisti", keys_type: 2, choices: [{ name: "A", type: 0 }] },
+        { keys_id: 2, keys_number: "2", keys_label: "Autista", keys_type: 1, choices: [{ name: "B", type: 1 }] },
+        { keys_id: 9, keys_number: "1", keys_label: "Cleaner", keys_type: 1 },
+      ],
+      KEY_TYPES
+    );
+    const selected = selectDriverAccessBundles(bundles);
+    expect(selected.map((bundle) => bundle.keysNumber)).toEqual(["2", "10"]);
+    expect(selected.every((bundle) => /autist/i.test(bundle.keysLabel ?? ""))).toBe(true);
+  });
+
+  it("sceglie il simbolo smart prima di kbox, altrimenti Classico", () => {
+    expect(resolveStructureAccessBundlePresentation("Smart KBox")).toEqual({
+      kind: "smart",
+      label: "Smart",
+    });
+    expect(resolveStructureAccessBundlePresentation("K-Box")).toEqual({
+      kind: "kbox",
+      label: "KBox",
+    });
+    expect(resolveStructureAccessBundlePresentation("Keybox")).toEqual({
+      kind: "kbox",
+      label: "KBox",
+    });
+    expect(resolveStructureAccessBundlePresentation(null)).toEqual({
+      kind: "classico",
+      label: "Classico",
+    });
   });
 });

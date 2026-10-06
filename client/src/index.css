@@ -434,6 +434,47 @@
     display: none;
   }
 
+  .convocazioni-page .convocazioni-roster-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(215 20% 65%) hsl(210 40% 96%);
+    -ms-overflow-style: auto;
+  }
+
+  .convocazioni-page .convocazioni-roster-scroll::-webkit-scrollbar {
+    display: block;
+    width: 8px;
+  }
+
+  .convocazioni-page .convocazioni-roster-scroll::-webkit-scrollbar-track {
+    background: hsl(210 40% 96%);
+    border-radius: 4px;
+  }
+
+  .convocazioni-page .convocazioni-roster-scroll::-webkit-scrollbar-thumb {
+    background: hsl(215 20% 65%);
+    border-radius: 4px;
+  }
+
+  .convocazioni-page .convocazioni-roster-scroll::-webkit-scrollbar-thumb:hover {
+    background: hsl(215 25% 55%);
+  }
+
+  .dark .convocazioni-page .convocazioni-roster-scroll {
+    scrollbar-color: hsl(215 20% 45%) hsl(217 32% 17%);
+  }
+
+  .dark .convocazioni-page .convocazioni-roster-scroll::-webkit-scrollbar-track {
+    background: hsl(217 32% 17%);
+  }
+
+  .dark .convocazioni-page .convocazioni-roster-scroll::-webkit-scrollbar-thumb {
+    background: hsl(215 20% 45%);
+  }
+
+  .dark .convocazioni-page .convocazioni-roster-scroll::-webkit-scrollbar-thumb:hover {
+    background: hsl(215 25% 55%);
+  }
+
   .timeline-center-scroll.is-panning {
     cursor: grabbing;
   }

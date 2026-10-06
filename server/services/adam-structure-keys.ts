@@ -9,6 +9,23 @@ import {
 
 export type { StructureAccessBundle };
 
+const BUNDLE_CACHE_TTL_MS = 10 * 60 * 1000;
+const bundleCache = new Map<string, { bundles: StructureAccessBundle[]; expiresAt: number }>();
+
+function readBundleCache(code: string): StructureAccessBundle[] | undefined {
+  const hit = bundleCache.get(code);
+  if (!hit) return undefined;
+  if (hit.expiresAt <= Date.now()) {
+    bundleCache.delete(code);
+    return undefined;
+  }
+  return hit.bundles;
+}
+
+function rememberBundles(code: string, bundles: StructureAccessBundle[]) {
+  bundleCache.set(code, { bundles, expiresAt: Date.now() + BUNDLE_CACHE_TTL_MS });
+}
+
 async function loadActiveStructureKeyTypes(
   connection: mysql.Connection
 ): Promise<StructureKeyTypeLookup[]> {
@@ -35,6 +52,14 @@ export async function loadStructureAccessBundlesByLogisticCodes(
   const out = new Map<string, StructureAccessBundle[]>();
   if (codes.length === 0) return out;
 
+  const missing: string[] = [];
+  for (const code of codes) {
+    const cached = readBundleCache(code);
+    if (cached) out.set(code, cached);
+    else missing.push(code);
+  }
+  if (missing.length === 0) return out;
+
   let connection: mysql.Connection | null = null;
   try {
     connection = await mysql.createConnection({
@@ -46,7 +71,7 @@ export async function loadStructureAccessBundlesByLogisticCodes(
     });
 
     const keyTypes = await loadActiveStructureKeyTypes(connection);
-    const placeholders = codes.map(() => "?").join(",");
+    const placeholders = missing.map(() => "?").join(",");
     const [rows] = await connection.execute(
       `
         SELECT logistic_code, structure_keys
@@ -55,19 +80,23 @@ export async function loadStructureAccessBundlesByLogisticCodes(
           AND structure_keys IS NOT NULL
           AND structure_keys <> ''
       `,
-      codes
+      missing
     );
 
+    const found = new Set<string>();
     for (const row of rows as any[]) {
       const code = String(row?.logistic_code ?? "").trim();
-      if (!code) continue;
+      if (!code || found.has(code)) continue;
+      found.add(code);
       const rawKeys = Buffer.isBuffer(row?.structure_keys)
         ? row.structure_keys.toString("utf8")
         : row?.structure_keys;
       const bundles = parseStructureAccessBundles(rawKeys, keyTypes);
-      if (bundles.length > 0) {
-        out.set(code, bundles);
-      }
+      rememberBundles(code, bundles);
+      if (bundles.length > 0) out.set(code, bundles);
+    }
+    for (const code of missing) {
+      if (!found.has(code)) rememberBundles(code, []);
     }
   } catch (error: any) {
     console.warn(
@@ -79,6 +108,23 @@ export async function loadStructureAccessBundlesByLogisticCodes(
   }
 
   return out;
+}
+
+export async function loadDialogAccessBundles(
+  logisticCode: string
+): Promise<StructureAccessBundle[]> {
+  const code = String(logisticCode ?? "").trim();
+  if (!code) return [];
+  const byCode = await loadStructureAccessBundlesByLogisticCodes([code]);
+  return selectDriverAccessBundles(byCode.get(code) ?? []).map((bundle) => ({
+    ...bundle,
+    choices: bundle.choices.map((choice) => ({
+      name: choice.name,
+      type: choice.typeLabel ? choice.type : null,
+      typeLabel: choice.typeLabel,
+      value: null,
+    })),
+  }));
 }
 
 export async function enrichLogisticsTimelineStructureKeys(timeline: any): Promise<void> {

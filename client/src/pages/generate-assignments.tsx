@@ -7,7 +7,7 @@ import {
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
 import MapSection from "@/components/map/map-section";
-import { useState, useEffect, useRef, useCallback, createContext, useContext, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, createContext, useContext, useMemo, type PointerEvent as ReactPointerEvent } from "react";
 
 const DEBUG = false;
 const dlog = (...args: any[]) => DEBUG && console.log(...args);
@@ -17,7 +17,7 @@ import {
   flushProgramPollTick,
   subscribeProgramPoll,
 } from "@/lib/program-poll-clock";
-import { CalendarIcon, Users, RefreshCw, Settings, Search, Map as MapIcon, BarChart3, ChevronUp, ChevronDown } from "lucide-react";
+import { CalendarIcon, Users, RefreshCw, Settings, Search, Map as MapIcon, BarChart3, ChevronUp, ChevronDown, Pin, PinOff } from "lucide-react";
 import TaskCardDragOverlay from "@/components/drag-drop/task-card-drag-overlay";
 import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
 import {
@@ -106,6 +106,52 @@ function fingerprintsDiffer(a: AdamFingerprint, b: AdamFingerprint): boolean {
 }
 
 const OFFICE_SCOPE_ENABLED = false;
+const HOUSEKEEPING_MAP_LAYOUT_KEY = "housekeeping_map_layout";
+const HOUSEKEEPING_DOCKED_MAP_MIN_WIDTH = 1280;
+const HOUSEKEEPING_DOCKED_MAP_WIDTH_KEY = "housekeeping_docked_map_width";
+const DOCKED_MAP_MIN_PX = 280;
+const DOCKED_MAP_MAX_PX = 840;
+
+function readDockedMapWidth(): number {
+  try {
+    const value = Number(localStorage.getItem(HOUSEKEEPING_DOCKED_MAP_WIDTH_KEY));
+    if (Number.isFinite(value)) {
+      return Math.min(DOCKED_MAP_MAX_PX, Math.max(DOCKED_MAP_MIN_PX, value));
+    }
+  } catch {
+    /* larghezza di default */
+  }
+  return 420;
+}
+const mapLayoutToggleClass =
+  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-background text-foreground shadow-md transition-colors hover:bg-accent";
+
+type HousekeepingMapLayout = "floating" | "docked";
+
+function readHousekeepingMapLayout(): HousekeepingMapLayout {
+  try {
+    return localStorage.getItem(HOUSEKEEPING_MAP_LAYOUT_KEY) === "docked" ? "docked" : "floating";
+  } catch {
+    return "floating";
+  }
+}
+
+function useMinWidth(minWidth: number): boolean {
+  const [matches, setMatches] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia(`(min-width: ${minWidth}px)`).matches : true
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia(`(min-width: ${minWidth}px)`);
+    const onChange = () => setMatches(media.matches);
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, [minWidth]);
+
+  return matches;
+}
+
 const getDefaultTimelineMapPanel = () => getDefaultTimelineFloatingPanel("right");
 const getDefaultTimelineStatsPanel = () =>
   getDefaultTimelineFloatingPanel("right", { width: 320, height: 320 });
@@ -121,6 +167,7 @@ interface RawTask {
   premium: boolean;
   straordinaria?: boolean;
   address: string;
+  apt_code?: string | null;
   lat: string;
   lng: string;
   cleaning_time: number;
@@ -468,8 +515,67 @@ export default function GenerateAssignments() {
 
   // Stato per la ricerca di task
   const [searchTask, setSearchTask] = useState("");
+  const [mapLayout, setMapLayoutState] = useState<HousekeepingMapLayout>(readHousekeepingMapLayout);
+  const [dockedMapWidth, setDockedMapWidth] = useState(readDockedMapWidth);
+  const isWideEnoughForDockedMap = useMinWidth(HOUSEKEEPING_DOCKED_MAP_MIN_WIDTH);
+  const useDockedMap = mapLayout === "docked" && isWideEnoughForDockedMap;
   const timelineMapPanel = useTimelineFloatingPanel("right", getDefaultTimelineMapPanel);
   const timelineStatsPanel = useTimelineFloatingPanel("right", getDefaultTimelineStatsPanel);
+
+  const setMapLayout = useCallback((next: HousekeepingMapLayout) => {
+    setMapLayoutState(next);
+    try {
+      localStorage.setItem(HOUSEKEEPING_MAP_LAYOUT_KEY, next);
+    } catch {
+      /* preferenza non persistita */
+    }
+    timelineMapPanel.setIsOpen(true);
+    if (next === "floating") timelineStatsPanel.setIsOpen(false);
+  }, [timelineMapPanel.setIsOpen, timelineStatsPanel.setIsOpen]);
+
+  const toggleStatistics = useCallback(() => {
+    timelineStatsPanel.setIsOpen(!timelineStatsPanel.isOpen);
+  }, [timelineStatsPanel.isOpen, timelineStatsPanel.setIsOpen]);
+
+  const toggleMap = useCallback(() => {
+    timelineMapPanel.setIsOpen(!timelineMapPanel.isOpen);
+  }, [timelineMapPanel.isOpen, timelineMapPanel.setIsOpen]);
+
+  const dockedMapVisible = useDockedMap && timelineMapPanel.isOpen;
+  const dockedMapWasVisible = useRef(false);
+  useEffect(() => {
+    if (dockedMapVisible) timelineStatsPanel.setIsOpen(true);
+    else if (dockedMapWasVisible.current) timelineStatsPanel.setIsOpen(false);
+    dockedMapWasVisible.current = dockedMapVisible;
+  }, [dockedMapVisible, timelineStatsPanel.setIsOpen]);
+
+  const resizeDockedMap = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = dockedMapWidth;
+    const onMove = (moveEvent: PointerEvent) => {
+      const next = Math.min(
+        DOCKED_MAP_MAX_PX,
+        Math.max(DOCKED_MAP_MIN_PX, startWidth - (moveEvent.clientX - startX))
+      );
+      setDockedMapWidth(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setDockedMapWidth((width) => {
+        try {
+          localStorage.setItem(HOUSEKEEPING_DOCKED_MAP_WIDTH_KEY, String(width));
+        } catch {
+          /* larghezza non persistita */
+        }
+        return width;
+      });
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, [dockedMapWidth]);
 
   useEffect(() => {
     registerTimelineMapPanelOpener(() => timelineMapPanel.setIsOpen(true));
@@ -1282,6 +1388,7 @@ export default function GenerateAssignments() {
       status: "pending",
       scheduledTime: null,
       address: rawTask.address,
+      apt_code: rawTask.apt_code != null ? String(rawTask.apt_code).trim() || undefined : undefined,
       lat: rawTask.lat,
       lng: rawTask.lng,
       premium: rawTask.premium,
@@ -1549,6 +1656,10 @@ export default function GenerateAssignments() {
             status: "pending" as const,
             scheduledTime: null,
             address: timelineAssignment.address,
+            apt_code:
+              timelineAssignment.apt_code != null
+                ? String(timelineAssignment.apt_code).trim() || undefined
+                : undefined,
             lat: timelineAssignment.lat,
             lng: timelineAssignment.lng,
             premium: timelineAssignment.premium,
@@ -1587,6 +1698,10 @@ export default function GenerateAssignments() {
             travelTime: timelineAssignment.travel_time || 0,
             manual_start_time: (timelineAssignment as any).manual_start_time ?? null,
             address: timelineAssignment.address || baseTask.address,
+            apt_code:
+              (timelineAssignment.apt_code != null && String(timelineAssignment.apt_code).trim()) ||
+              (baseTask as any).apt_code ||
+              undefined,
             lat: timelineAssignment.lat || baseTask.lat,
             lng: timelineAssignment.lng || baseTask.lng,
             premium: timelineAssignment.premium !== undefined ? timelineAssignment.premium : baseTask.premium,
@@ -2741,8 +2856,8 @@ export default function GenerateAssignments() {
               );
             })()}
 
-          <div className="mt-0 grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div className="xl:col-span-3">
+          <div className={cn("mt-0 flex items-start gap-3", useDockedMap && timelineMapPanel.isOpen && "print:block")}>
+            <div className="relative z-20 min-w-0 flex-1">
               {!showContainers && (
                 <div className="mt-[17px] flex justify-end">
                   <button
@@ -2789,11 +2904,17 @@ export default function GenerateAssignments() {
                   onOperationalDayToggle={(started) => void handleOperationalDayToggle(started)}
                   isOperationalDaySwitchDisabled={isTimelineReadOnly || isSavingOperationalDay}
                   className={!showContainers ? "rounded-tr-none" : undefined}
+                  onOpenStatistics={toggleStatistics}
+                  onOpenMap={toggleMap}
+                  statisticsOpen={timelineStatsPanel.isOpen}
+                  mapOpen={timelineMapPanel.isOpen}
                 />
+                {!dockedMapVisible && (
                 <TimelineFloatingPanel
                   side="right"
                   toggleVerticalOffset={52}
                   fitContent
+                  hideClosedToggle
                   isOpen={timelineStatsPanel.isOpen}
                   onOpenChange={timelineStatsPanel.setIsOpen}
                   panel={timelineStatsPanel.panel}
@@ -2813,8 +2934,11 @@ export default function GenerateAssignments() {
                     stats={assignmentStatistics}
                   />
                 </TimelineFloatingPanel>
+                )}
+                {!useDockedMap && (
                 <TimelineFloatingPanel
                   side="right"
+                  hideClosedToggle
                   isOpen={timelineMapPanel.isOpen}
                   onOpenChange={timelineMapPanel.setIsOpen}
                   panel={timelineMapPanel.panel}
@@ -2829,6 +2953,17 @@ export default function GenerateAssignments() {
                   onPointerMove={timelineMapPanel.handlePointerMove}
                   onPointerEnd={timelineMapPanel.handlePointerEnd}
                   contentClassName="border-custom-blue"
+                  headerAction={
+                    <button
+                      type="button"
+                      className={mapLayoutToggleClass}
+                      title="Fissa la mappa a destra"
+                      aria-label="Fissa la mappa a destra"
+                      onClick={() => setMapLayout("docked")}
+                    >
+                      <Pin className="h-4 w-4" />
+                    </button>
+                  }
                 >
                   <MapSection
                     tasks={allTasksWithAssignments}
@@ -2840,8 +2975,57 @@ export default function GenerateAssignments() {
                     mapMinHeight={0}
                   />
                 </TimelineFloatingPanel>
+                )}
               </div>
             </div>
+            {useDockedMap && timelineMapPanel.isOpen && (
+              <aside
+                className={cn(
+                  "sticky top-0 flex shrink-0 flex-col self-start print:!hidden",
+                  !showContainers && "mt-[17px]",
+                )}
+                style={{ width: dockedMapWidth }}
+              >
+                <div className="relative h-[calc(100vh-1rem)] shrink-0">
+                  <div
+                    className="absolute inset-y-0 -left-2 z-30 flex w-4 cursor-ew-resize items-center justify-center"
+                    title="Trascina per ridimensionare la mappa"
+                    aria-label="Ridimensiona la mappa"
+                    onPointerDown={resizeDockedMap}
+                  >
+                    <span className="h-10 w-1 rounded-full bg-custom-blue/70" />
+                  </div>
+                  <MapSection
+                    tasks={allTasksWithAssignments}
+                    workDate={format(selectedDate, "yyyy-MM-dd")}
+                    compact
+                    className="h-full min-h-0 w-full border-custom-blue"
+                    bodyClassName="flex min-h-0 flex-1 flex-col"
+                    mapClassName="h-full min-h-0 flex-1"
+                    mapMinHeight={0}
+                    headerExtra={
+                      <button
+                        type="button"
+                        className={mapLayoutToggleClass}
+                        title="Torna alla mappa fluttuante"
+                        aria-label="Torna alla mappa fluttuante"
+                        onClick={() => setMapLayout("floating")}
+                      >
+                        <PinOff className="h-4 w-4" />
+                      </button>
+                    }
+                  />
+                </div>
+                {timelineStatsPanel.isOpen && (
+                  <div className="mt-2 rounded-lg border-2 border-custom-blue bg-card shadow-sm">
+                    <AssignmentTaskStatisticsPanel
+                      variant={isOfficeScope ? "office" : "housekeeping"}
+                      stats={assignmentStatistics}
+                    />
+                  </div>
+                )}
+              </aside>
+            )}
           </div>
           {dragSequencePreview && (
             <div className="fixed bottom-4 right-4 z-[9999] bg-slate-900 text-white text-xs px-3 py-2 rounded shadow-lg pointer-events-none">

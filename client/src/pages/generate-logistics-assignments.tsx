@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, type PointerEvent as ReactPointerEvent } from "react";
 import { DndContext, MeasuringStrategy } from "@dnd-kit/core";
 import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
+import { getStoredUserRole, isLogisticaRole } from "@/lib/auth-role";
 import { useToast } from "@/hooks/use-toast";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import TaskCardDragOverlay from "@/components/drag-drop/task-card-drag-overlay";
@@ -20,6 +21,11 @@ import {
   nudgeLogisticsProgramPoll,
 } from "@/lib/logistics-program-poll";
 import type { LogisticsAssignedSyncNotice } from "@shared/logistics-assigned-sync-diff";
+import {
+  appendLogisticsAdamSyncNotice,
+  readLogisticsAdamSyncHistory,
+  writeLogisticsAdamSyncHistory,
+} from "@/lib/logistics-adam-sync-history";
 import { ensureProgramPollClock, flushProgramPollTick } from "@/lib/program-poll-clock";
 import {
   CalendarIcon,
@@ -29,6 +35,8 @@ import {
   BarChart3,
   ChevronUp,
   ChevronDown,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
 import {
@@ -86,6 +94,15 @@ import {
   type DndInsertTarget,
 } from "@/lib/dnd";
 
+function readSharedWorkDate(): Date {
+  const savedDate = localStorage.getItem("selected_work_date");
+  if (!savedDate) return new Date();
+  const [year, month, day] = savedDate.split("-").map(Number);
+  if (!year || !month || !day) return new Date();
+  const parsed = new Date(year, month - 1, day);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
 function getCurrentUsername(): string {
   try {
     const raw = localStorage.getItem("user");
@@ -103,12 +120,60 @@ const getDefaultTimelineMapPanel = () => getDefaultTimelineFloatingPanel("right"
 const getDefaultTimelineStatsPanel = () =>
   getDefaultTimelineFloatingPanel("right", { width: 320, height: 320 });
 
+const LOGISTICS_MAP_LAYOUT_KEY = "logistics_map_layout";
+const LOGISTICS_DOCKED_MAP_MIN_WIDTH = 1280;
+const LOGISTICS_DOCKED_MAP_WIDTH_KEY = "logistics_docked_map_width";
+const DOCKED_MAP_MIN_PX = 280;
+const DOCKED_MAP_MAX_PX = 840;
+
+function readDockedMapWidth(): number {
+  try {
+    const value = Number(localStorage.getItem(LOGISTICS_DOCKED_MAP_WIDTH_KEY));
+    if (Number.isFinite(value)) {
+      return Math.min(DOCKED_MAP_MAX_PX, Math.max(DOCKED_MAP_MIN_PX, value));
+    }
+  } catch {
+    /* larghezza di default */
+  }
+  return 420;
+}
+
+const mapLayoutToggleClass =
+  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-background text-foreground shadow-md transition-colors hover:bg-accent";
+
+type LogisticsMapLayout = "floating" | "docked";
+
+function readLogisticsMapLayout(): LogisticsMapLayout {
+  try {
+    return localStorage.getItem(LOGISTICS_MAP_LAYOUT_KEY) === "docked" ? "docked" : "floating";
+  } catch {
+    return "floating";
+  }
+}
+
+function useMinWidth(minWidth: number): boolean {
+  const [matches, setMatches] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia(`(min-width: ${minWidth}px)`).matches : true
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia(`(min-width: ${minWidth}px)`);
+    const onChange = () => setMatches(media.matches);
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, [minWidth]);
+
+  return matches;
+}
+
 /** Task logistics da API / PostgreSQL (snake_case) */
 interface LogisticsTask {
   task_id?: number | string;
   logistic_code?: string | null;
   client_id?: number | null;
   address?: string | null;
+  apt_code?: string | null;
   alias?: string | null;
   customer_name?: string | null;
   customer_reference?: string | null;
@@ -203,6 +268,7 @@ function convertLogisticsRawToTask(
     status: "pending",
     scheduledTime: null,
     address: raw.address != null ? String(raw.address) : undefined,
+    apt_code: raw.apt_code != null ? String(raw.apt_code).trim() || undefined : undefined,
     lat: raw.lat != null ? String(raw.lat) : undefined,
     lng: raw.lng != null ? String(raw.lng) : undefined,
     premium: Boolean(raw.premium),
@@ -273,6 +339,7 @@ function convertLogisticsTimelineTaskToMapTask(task: any, driverId: number): Tas
     status: "pending",
     scheduledTime: task?.start_time ?? null,
     address: task?.address != null ? String(task.address) : undefined,
+    apt_code: task?.apt_code != null ? String(task.apt_code).trim() || undefined : undefined,
     lat: task?.lat != null ? String(task.lat) : undefined,
     lng: task?.lng != null ? String(task.lng) : undefined,
     premium: Boolean(task?.premium),
@@ -411,6 +478,7 @@ function timelineRowToTaskType(t: any, fallbackPriority: TaskType["priority"]): 
     status: "pending",
     scheduledTime: t.start_time ?? null,
     address: t.address != null ? String(t.address) : undefined,
+    apt_code: t.apt_code != null ? String(t.apt_code).trim() || undefined : undefined,
     premium: Boolean(t.premium),
     straordinaria: isEquivalentStraordinariaTask(t),
     locked: Boolean(t.locked),
@@ -430,11 +498,72 @@ function timelineRowToTaskType(t: any, fallbackPriority: TaskType["priority"]): 
 
 export default function GenerateLogisticsAssignments() {
   const { toast } = useToast();
-  // Logistics: all'apertura sempre la data odierna (non condivide la data salvata di housekeeping)
-  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+  // Chi vede solo la logistica apre sempre oggi. Gli altri usano la stessa data di housekeeping.
+  const [selectedDate, setSelectedDate] = useState<Date>(() =>
+    isLogisticaRole(getStoredUserRole()) ? new Date() : readSharedWorkDate()
+  );
   const [searchTask, setSearchTask] = useState("");
+  const [mapLayout, setMapLayoutState] = useState<LogisticsMapLayout>(readLogisticsMapLayout);
+  const [dockedMapWidth, setDockedMapWidth] = useState(readDockedMapWidth);
+  const isWideEnoughForDockedMap = useMinWidth(LOGISTICS_DOCKED_MAP_MIN_WIDTH);
+  const useDockedMap = mapLayout === "docked" && isWideEnoughForDockedMap;
   const timelineMapPanel = useTimelineFloatingPanel("right", getDefaultTimelineMapPanel);
   const timelineStatsPanel = useTimelineFloatingPanel("right", getDefaultTimelineStatsPanel);
+
+  const setMapLayout = useCallback((next: LogisticsMapLayout) => {
+    setMapLayoutState(next);
+    try {
+      localStorage.setItem(LOGISTICS_MAP_LAYOUT_KEY, next);
+    } catch {
+      /* preferenza non persistita */
+    }
+    timelineMapPanel.setIsOpen(true);
+    if (next === "floating") timelineStatsPanel.setIsOpen(false);
+  }, [timelineMapPanel.setIsOpen, timelineStatsPanel.setIsOpen]);
+
+  const toggleStatistics = useCallback(() => {
+    timelineStatsPanel.setIsOpen(!timelineStatsPanel.isOpen);
+  }, [timelineStatsPanel.isOpen, timelineStatsPanel.setIsOpen]);
+
+  const toggleMap = useCallback(() => {
+    timelineMapPanel.setIsOpen(!timelineMapPanel.isOpen);
+  }, [timelineMapPanel.isOpen, timelineMapPanel.setIsOpen]);
+
+  const dockedMapVisible = useDockedMap && timelineMapPanel.isOpen;
+  const dockedMapWasVisible = useRef(false);
+  useEffect(() => {
+    if (dockedMapVisible) timelineStatsPanel.setIsOpen(true);
+    else if (dockedMapWasVisible.current) timelineStatsPanel.setIsOpen(false);
+    dockedMapWasVisible.current = dockedMapVisible;
+  }, [dockedMapVisible, timelineStatsPanel.setIsOpen]);
+
+  const resizeDockedMap = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = dockedMapWidth;
+    const onMove = (moveEvent: PointerEvent) => {
+      const next = Math.min(
+        DOCKED_MAP_MAX_PX,
+        Math.max(DOCKED_MAP_MIN_PX, startWidth - (moveEvent.clientX - startX))
+      );
+      setDockedMapWidth(next);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setDockedMapWidth((width) => {
+        try {
+          localStorage.setItem(LOGISTICS_DOCKED_MAP_WIDTH_KEY, String(width));
+        } catch {
+          /* larghezza non persistita */
+        }
+        return width;
+      });
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, [dockedMapWidth]);
 
   useEffect(() => {
     registerTimelineMapPanelOpener(() => timelineMapPanel.setIsOpen(true));
@@ -495,7 +624,15 @@ export default function GenerateLogisticsAssignments() {
   const [activeDragDriverId, setActiveDragDriverId] = useState<number | null>(null);
   /** Estrazione / refresh da ADAM al cambio data (come checkAndAutoLoadSavedAssignments + extractData su HK) */
   const [isExtractingLogistics, setIsExtractingLogistics] = useState(false);
-  const [adamSyncNotice, setAdamSyncNotice] = useState<LogisticsAssignedSyncNotice | null>(null);
+  const selectedWorkDateKey = format(selectedDate, "yyyy-MM-dd");
+  const [adamSyncHistory, setAdamSyncHistory] = useState<LogisticsAssignedSyncNotice[]>(() =>
+    readLogisticsAdamSyncHistory(format(selectedDate, "yyyy-MM-dd"))
+  );
+  const adamSyncHistoryDateRef = useRef(selectedWorkDateKey);
+  if (adamSyncHistoryDateRef.current !== selectedWorkDateKey) {
+    adamSyncHistoryDateRef.current = selectedWorkDateKey;
+    setAdamSyncHistory(readLogisticsAdamSyncHistory(selectedWorkDateKey));
+  }
   const [extractionStep, setExtractionStep] = useState("Inizializzazione...");
   /** Allinea titolo e riga "Step x/2" al loader housekeeping */
   const [logisticsLoaderKind, setLogisticsLoaderKind] = useState<
@@ -511,8 +648,11 @@ export default function GenerateLogisticsAssignments() {
   const isTimelineReadOnly = isWorkDateHistoricallyLocked(selectedDate);
 
   useEffect(() => {
-    // Solo per logistics: non sovrascrivere selected_work_date di housekeeping
-    localStorage.setItem("selected_logistics_work_date", format(selectedDate, "yyyy-MM-dd"));
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    localStorage.setItem("selected_logistics_work_date", dateStr);
+    if (isLogisticaRole(getStoredUserRole())) return;
+    localStorage.setItem("selected_work_date", dateStr);
+    window.dispatchEvent(new Event("selected-work-date-change"));
   }, [selectedDate]);
 
   useEffect(() => {
@@ -1044,7 +1184,7 @@ export default function GenerateLogisticsAssignments() {
     isBlocked: () => logisticsProgramBlockedRef.current || isDraggingRef.current,
     onSynced: async (workDate: string, notice: LogisticsAssignedSyncNotice | null) => {
       if (format(selectedDate, "yyyy-MM-dd") !== workDate) return;
-      setAdamSyncNotice(notice?.tasks.length ? notice : null);
+      setAdamSyncHistory((current) => appendLogisticsAdamSyncNotice(current, notice));
       await reloadLogisticsPage({ preserveSchedule: true });
     },
     onError: (message: string) => {
@@ -1064,7 +1204,7 @@ export default function GenerateLogisticsAssignments() {
       isDraggingRef.current,
     onSynced: async (workDate: string, notice: LogisticsAssignedSyncNotice | null) => {
       if (format(selectedDate, "yyyy-MM-dd") !== workDate) return;
-      setAdamSyncNotice(notice?.tasks.length ? notice : null);
+      setAdamSyncHistory((current) => appendLogisticsAdamSyncNotice(current, notice));
       await reloadLogisticsPage({ preserveSchedule: true });
     },
     onError: (message: string) => {
@@ -1086,8 +1226,9 @@ export default function GenerateLogisticsAssignments() {
   }, []);
 
   useEffect(() => {
-    setAdamSyncNotice(null);
-  }, [selectedDate]);
+    if (adamSyncHistoryDateRef.current !== selectedWorkDateKey) return;
+    writeLogisticsAdamSyncHistory(selectedWorkDateKey, adamSyncHistory);
+  }, [adamSyncHistory, selectedWorkDateKey]);
 
   useEffect(() => {
     nudgeLogisticsProgramPoll();
@@ -1697,8 +1838,8 @@ export default function GenerateLogisticsAssignments() {
               </div>
           )}
 
-          <div className="mt-0 grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <div className="xl:col-span-3">
+          <div className={cn("mt-0 flex items-start gap-3", useDockedMap && timelineMapPanel.isOpen && "print:block")}>
+            <div className="relative z-20 min-w-0 flex-1">
               {!showContainers && (
                 <div className="mt-[17px] flex justify-end">
                   <button
@@ -1728,13 +1869,19 @@ export default function GenerateLogisticsAssignments() {
                   activeDragDriverId={activeDragDriverId}
                   lastValidDragIndex={lastValidDragIndex}
                   onRefresh={reloadLogisticsPage}
-                  adamSyncNotice={adamSyncNotice}
+                  adamSyncHistory={adamSyncHistory}
                   className={!showContainers ? "rounded-tr-none" : undefined}
+                  onOpenStatistics={toggleStatistics}
+                  onOpenMap={toggleMap}
+                  statisticsOpen={timelineStatsPanel.isOpen}
+                  mapOpen={timelineMapPanel.isOpen}
                 />
+                {!dockedMapVisible && (
                 <TimelineFloatingPanel
                   side="right"
                   toggleVerticalOffset={52}
                   fitContent
+                  hideClosedToggle
                   isOpen={timelineStatsPanel.isOpen}
                   onOpenChange={timelineStatsPanel.setIsOpen}
                   panel={timelineStatsPanel.panel}
@@ -1754,8 +1901,11 @@ export default function GenerateLogisticsAssignments() {
                     stats={assignmentStatistics}
                   />
                 </TimelineFloatingPanel>
+                )}
+                {!useDockedMap && (
                 <TimelineFloatingPanel
                   side="right"
+                  hideClosedToggle
                   isOpen={timelineMapPanel.isOpen}
                   onOpenChange={timelineMapPanel.setIsOpen}
                   panel={timelineMapPanel.panel}
@@ -1770,6 +1920,17 @@ export default function GenerateLogisticsAssignments() {
                   onPointerMove={timelineMapPanel.handlePointerMove}
                   onPointerEnd={timelineMapPanel.handlePointerEnd}
                   contentClassName="border-custom-blue"
+                  headerAction={
+                    <button
+                      type="button"
+                      className={mapLayoutToggleClass}
+                      title="Fissa la mappa a destra"
+                      aria-label="Fissa la mappa a destra"
+                      onClick={() => setMapLayout("docked")}
+                    >
+                      <Pin className="h-4 w-4" />
+                    </button>
+                  }
                 >
                   <MapSection
                     tasks={mapTasks}
@@ -1782,8 +1943,58 @@ export default function GenerateLogisticsAssignments() {
                     mapMinHeight={0}
                   />
                 </TimelineFloatingPanel>
+                )}
               </div>
             </div>
+            {useDockedMap && timelineMapPanel.isOpen && (
+              <aside
+                className={cn(
+                  "sticky top-0 flex shrink-0 flex-col self-start print:!hidden",
+                  !showContainers && "mt-[17px]",
+                )}
+                style={{ width: dockedMapWidth }}
+              >
+                <div className="relative h-[calc(100vh-1rem)] shrink-0">
+                  <div
+                    className="absolute inset-y-0 -left-2 z-30 flex w-4 cursor-ew-resize items-center justify-center"
+                    title="Trascina per ridimensionare la mappa"
+                    aria-label="Ridimensiona la mappa"
+                    onPointerDown={resizeDockedMap}
+                  >
+                    <span className="h-10 w-1 rounded-full bg-custom-blue/70" />
+                  </div>
+                  <MapSection
+                    tasks={mapTasks}
+                    workDate={format(selectedDate, "yyyy-MM-dd")}
+                    personnelColorScope="logistics"
+                    compact
+                    className="h-full min-h-0 w-full border-custom-blue"
+                    bodyClassName="flex min-h-0 flex-1 flex-col"
+                    mapClassName="h-full min-h-0 flex-1"
+                    mapMinHeight={0}
+                    headerExtra={
+                      <button
+                        type="button"
+                        className={mapLayoutToggleClass}
+                        title="Torna alla mappa fluttuante"
+                        aria-label="Torna alla mappa fluttuante"
+                        onClick={() => setMapLayout("floating")}
+                      >
+                        <PinOff className="h-4 w-4" />
+                      </button>
+                    }
+                  />
+                </div>
+                {timelineStatsPanel.isOpen && (
+                  <div className="mt-2 rounded-lg border-2 border-custom-blue bg-card shadow-sm">
+                    <AssignmentTaskStatisticsPanel
+                      variant="logistics"
+                      stats={assignmentStatistics}
+                    />
+                  </div>
+                )}
+              </aside>
+            )}
           </div>
 
           {showSequenceSummary && (

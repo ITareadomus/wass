@@ -263,7 +263,7 @@ export default function AssignedTasksSequenceSummary({
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="mb-4 mt-4 w-full min-w-0 overflow-hidden">
+      <div className="isolate mb-4 mt-4 w-full min-w-0 overflow-hidden">
         <div className="rounded-lg border-2 border-custom-blue bg-custom-blue-light p-4">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="flex items-center text-xl font-bold text-foreground">

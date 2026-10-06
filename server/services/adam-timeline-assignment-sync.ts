@@ -7,6 +7,12 @@ import {
   hydrateTasksFromContainers,
   recalculateCleanerTimes,
 } from "./housekeeping-recalculate-times";
+import {
+  hasManualCleaningSplit,
+  hasManualCleaningTime,
+  withManualCleaningSplitReason,
+  withManualCleaningTimeReason,
+} from "../../shared/wass-cleaning-time";
 
 export type RefreshSyncMode = "apt" | "assignments";
 
@@ -345,11 +351,17 @@ function cloneTaskPayload(source: any, overrides: Record<string, any> = {}): any
 }
 
 function buildTaskFromAdam(row: AdamAssignmentRow, existing?: any): any {
+  const keepWassDuration = hasManualCleaningTime(existing);
   const source = existing
     ? {
         ...existing,
         ...row,
-        cleaning_time: row.cleaning_time || existing.cleaning_time,
+        cleaning_time: keepWassDuration
+          ? (existing.cleaning_time ?? existing.base_cleaning_time ?? row.cleaning_time)
+          : (row.cleaning_time || existing.cleaning_time),
+        base_cleaning_time: keepWassDuration
+          ? (existing.base_cleaning_time ?? existing.cleaning_time)
+          : existing.base_cleaning_time,
         customer_note: existing.customer_note,
         customer_note_history: existing.customer_note_history,
         reasons: existing.reasons,
@@ -533,6 +545,8 @@ export async function syncTimelineAssignmentsFromAdam(
       primaryCleanerId: number | null;
       sequence: number | null;
       task: any;
+      // Quota di ogni cleaner: serve a non riappiattire uno split sbilanciato a mano.
+      cleaningTimeByCleaner: Map<number, number>;
     };
     const currentByTask = new Map<number, CurrentAssignment>();
     for (const entry of timelineData.cleaners_assignments) {
@@ -541,6 +555,7 @@ export async function syncTimelineAssignmentsFromAdam(
       for (const task of entry.tasks || []) {
         const taskId = Number(task?.task_id);
         if (!Number.isFinite(taskId)) continue;
+        const cleaningTime = Number(task?.cleaning_time ?? 0) || 0;
         const existing = currentByTask.get(taskId);
         if (!existing) {
           currentByTask.set(taskId, {
@@ -549,8 +564,10 @@ export async function syncTimelineAssignmentsFromAdam(
               task?.is_primary === false ? null : cleanerId,
             sequence: Number(task?.sequence) || null,
             task,
+            cleaningTimeByCleaner: new Map([[cleanerId, cleaningTime]]),
           });
         } else {
+          existing.cleaningTimeByCleaner.set(cleanerId, cleaningTime);
           if (!existing.cleanerIds.includes(cleanerId)) {
             existing.cleanerIds.push(cleanerId);
           }
@@ -746,8 +763,7 @@ export async function syncTimelineAssignmentsFromAdam(
         removedUnhandled += 1;
         continue;
       }
-      tasksToReturnToContainers.push(
-        cloneTaskPayload(current.task, {
+      const unassignedPayload = cloneTaskPayload(current.task, {
           start_time: undefined,
           end_time: undefined,
           travel_time: undefined,
@@ -757,8 +773,18 @@ export async function syncTimelineAssignmentsFromAdam(
           collaborator_count: undefined,
           is_primary: undefined,
           base_cleaning_time: undefined,
-        })
-      );
+        });
+      // Come nel dissolve: fuori dalla collaborazione conta la durata dell'appartamento,
+      // non la somma delle quote con cui era stata distribuita.
+      if (hasManualCleaningTime(current.task) || hasManualCleaningSplit(current.task)) {
+        const storedBase = Number(current.task?.base_cleaning_time ?? 0) || 0;
+        const storedCleaning = Number(current.task?.cleaning_time ?? 0) || 0;
+        unassignedPayload.cleaning_time = storedBase || storedCleaning;
+        unassignedPayload.reasons = withManualCleaningTimeReason(
+          unassignedPayload.reasons
+        );
+      }
+      tasksToReturnToContainers.push(unassignedPayload);
       unassigned += 1;
     }
 
@@ -822,10 +848,17 @@ export async function syncTimelineAssignmentsFromAdam(
       // cleaning_time * collaborator count: a prior APT refresh may have
       // overwritten the split with the full duration, and multiplying would
       // double it.
+      // WASS manual override: once the user set cleaning_time, never take
+      // duration_minutes from ADAM again. Collab split still uses the frozen base.
+      const keepWassDuration = hasManualCleaningTime(existingTask);
+      // Quote sbilanciate a mano: ogni cleaner tiene la sua, niente divisione equa.
+      const keepWassSplit = hasManualCleaningSplit(existingTask);
       const adamBase = Number(row.cleaning_time ?? 0) || 0;
       const storedBase = Number(existingTask?.base_cleaning_time ?? 0) || 0;
-      const effectiveBase =
-        adamBase || storedBase || Number(existingTask?.cleaning_time ?? 0) || 0;
+      const storedCleaning = Number(existingTask?.cleaning_time ?? 0) || 0;
+      const effectiveBase = keepWassDuration
+        ? storedBase || storedCleaning
+        : adamBase || storedBase || storedCleaning;
       const splitCleaning = Math.ceil(effectiveBase / collabCount);
 
       if (collabCount > 1) collaborationUpdated += 1;
@@ -845,12 +878,23 @@ export async function syncTimelineAssignmentsFromAdam(
       for (const cleanerId of collaboratorIds) {
         const entry = ensureCleanerEntry(cleanerId);
         const isPrimary = cleanerId === row.primaryCleanerId;
+        const wassShare = current?.cleaningTimeByCleaner.get(cleanerId);
         const copy = cloneTaskPayload(taskPayload, {
-          cleaning_time: splitCleaning,
+          cleaning_time:
+            keepWassSplit && wassShare ? wassShare : splitCleaning,
           base_cleaning_time: effectiveBase || undefined,
           is_primary: isPrimary,
           collaborator_ids: collaboratorIds,
           collaborator_count: collabCount,
+          ...(keepWassDuration || keepWassSplit
+            ? {
+                reasons: keepWassSplit
+                  ? withManualCleaningSplitReason(
+                      withManualCleaningTimeReason(taskPayload.reasons)
+                    )
+                  : withManualCleaningTimeReason(taskPayload.reasons),
+              }
+            : {}),
           // Temporary sort key for primary lane; secondaries appended later by adam order
           _adam_sequence: row.sequence,
           _adam_task_id: row.task_id,

@@ -25,7 +25,12 @@ import {
   resolveHousekeepingWorkProgress,
   type HousekeepingTaskExecutionStatus,
 } from "@shared/housekeeping-task-execution-status";
+import {
+  hasManualCleaningTime,
+  splitCleaningTimeAcrossCollaborators,
+} from "@shared/wass-cleaning-time";
 import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
+import { StructureAccessKeyTypeField } from "@/components/structure-access-key-type";
 import {
   DIALOG_SECTION_CORNER_BADGE_WRAP_CLASS,
   LOGISTICS_KIND_BADGE_LABEL,
@@ -134,45 +139,30 @@ function withMutationScope<T extends Record<string, unknown>>(
 const getTaskNavigationKey = (t: any, listIndex?: number) =>
   `${getTaskKey(t)}::${String((t as any)?.sequence ?? "")}::${String(listIndex ?? "")}`;
 
-// Legge le pending edits da sessionStorage
-const getPendingEdits = (): Record<string, any> => {
-  try {
-    return JSON.parse(sessionStorage.getItem('pending_task_edits') || '{}');
-  } catch {
-    return {};
-  }
+// Minuti del singolo cleaner: in collaborazione è già la quota divisa.
+const getDisplayedCleaningMinutes = (taskObj: any): number => {
+  const direct = Number(taskObj?.cleaning_time ?? taskObj?.cleaningTime);
+  if (Number.isFinite(direct) && direct > 0) return Math.round(direct);
+  const duration = String(taskObj?.duration || "0.0");
+  const [hours, mins] = duration.split(".").map(Number);
+  return (hours || 0) * 60 + (mins || 0);
 };
 
-// Applica le pending edits a una task per la visualizzazione
-const applyPendingEdits = (task: any): any => {
-  const taskKey = getTaskKey(task);
-  const pendingEdits = getPendingEdits();
-  const edits = pendingEdits[taskKey];
-  
-  if (!edits) return task;
-  
-  // CRITICAL: Per operation_id, usa il flag operationIdModified per sapere se è stato modificato
-  // Se operationIdModified è true, usa il valore (anche se null)
-  // Se operationIdModified è false/undefined, usa il valore originale
-  const operationIdToUse = edits.operationIdModified 
-    ? edits.operationId 
-    : task.operation_id;
-  
-  // Crea una copia della task con le modifiche applicate
-  return {
-    ...task,
-    checkout_date: edits.checkoutDate !== undefined ? edits.checkoutDate : task.checkout_date,
-    checkout_time: edits.checkoutTime !== undefined ? edits.checkoutTime : task.checkout_time,
-    checkin_date: edits.checkinDate !== undefined ? edits.checkinDate : task.checkin_date,
-    checkin_time: edits.checkinTime !== undefined ? edits.checkinTime : task.checkin_time,
-    pax_in: edits.paxIn !== undefined ? edits.paxIn : task.pax_in,
-    operation_id: operationIdToUse,
-    // Converti cleaningTime in duration formato "H.MM"
-    duration: edits.cleaningTime !== undefined 
-      ? `${Math.floor(edits.cleaningTime / 60)}.${String(edits.cleaningTime % 60).padStart(2, '0')}`
-      : task.duration,
-    _hasPendingEdits: true, // Flag per indicare che ha modifiche pendenti
-  };
+const getCollaboratorCount = (taskObj: any): number => {
+  const count = Number(taskObj?.collaborator_count);
+  return Number.isFinite(count) && count > 1 ? Math.round(count) : 1;
+};
+
+// Minuti dell'intero appartamento, indipendenti da quanti cleaner ci lavorano.
+const getTotalCleaningMinutes = (taskObj: any): number => {
+  const base = Number(taskObj?.base_cleaning_time);
+  if (Number.isFinite(base) && base > 0) return Math.round(base);
+  return getDisplayedCleaningMinutes(taskObj) * getCollaboratorCount(taskObj);
+};
+
+const formatCleaningHours = (minutes: unknown): string => {
+  const total = Math.max(0, Math.round(Number(minutes) || 0));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 };
 
 // Normalizza data nel formato YYYY-MM-DD per il picker HTML5
@@ -196,6 +186,41 @@ const normalizeDate = (dateStr: any): string => {
   }
   return "";
 };
+
+const ITALIAN_MONTHS_SHORT = [
+  "gen",
+  "feb",
+  "mar",
+  "apr",
+  "mag",
+  "giu",
+  "lug",
+  "ago",
+  "set",
+  "ott",
+  "nov",
+  "dic",
+] as const;
+
+/** "30 set", senza anno. Vuoto se la data non è leggibile. */
+function formatDayMonthLabel(dateStr: unknown): string {
+  const normalized = normalizeDate(dateStr);
+  if (!normalized) return "";
+  const [, monthStr, dayStr] = normalized.split("-");
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  const monthLabel = ITALIAN_MONTHS_SHORT[month - 1];
+  if (!monthLabel || !day) return "";
+  return `${day} ${monthLabel}`;
+}
+
+/** Data accanto all'orario solo se check-in/out non cade nella giornata di lavoro. */
+function offDayDateLabel(dateStr: unknown, workDate: string | null | undefined): string | null {
+  const normalized = normalizeDate(dateStr);
+  const work = String(workDate ?? "").trim().slice(0, 10);
+  if (!normalized || !/^\d{4}-\d{2}-\d{2}$/.test(work) || normalized === work) return null;
+  return formatDayMonthLabel(normalized) || null;
+}
 
 // Normalizza ora nel formato HH:MM per il picker HTML5
 const normalizeTime = (timeStr: any): string => {
@@ -622,6 +647,9 @@ const displayClickableInputClass =
   const isPreAssigned = preAssignedMode === "readonly" || preAssignedMode === "normal";
   const isPreAssignedReadonly = preAssignedMode === "readonly";
   const isTaskReadOnly = isReadOnly || isPreAssignedReadonly || isFinished;
+  // Check-in, check-out, pax-in, tipologia intervento e durata pulizia sono dati
+  // housekeeping: dalla logistica si possono solo leggere.
+  const isHousekeepingFieldsReadOnly = isTaskReadOnly || operationsScope === "logistics";
   
   // Stato per blocco task (card cliccata). Il dialog usa dialogIsLocked, perché
   // con le frecce displayTask cambia mentre `task` resta quello originale.
@@ -978,6 +1006,10 @@ const displayClickableInputClass =
   const [editingCheckinTimeInDialog, setEditingCheckinTimeInDialog] = useState("");
   const [isSavingCheckin, setIsSavingCheckin] = useState(false);
 
+  const [durationDialogOpen, setDurationDialogOpen] = useState(false);
+  const [editingDurationInDialog, setEditingDurationInDialog] = useState("");
+  const [isSavingDuration, setIsSavingDuration] = useState(false);
+
   // Dialog Tipologia intervento
   const [operationDialogOpen, setOperationDialogOpen] = useState(false);
   const [editingOperationIdInDialog, setEditingOperationIdInDialog] = useState("");
@@ -987,15 +1019,23 @@ const displayClickableInputClass =
   const [isCleanerSelectorOpen, setIsCleanerSelectorOpen] = useState(false);
   const [isCollaboratorLoading, setIsCollaboratorLoading] = useState(false);
   
-  // Stato per forzare re-render quando pending edits cambiano
-  const [pendingEditsVersion, setPendingEditsVersion] = useState(0);
-
   // Stato per i collaboratori caricati
   const [taskCollaborators, setTaskCollaborators] = useState<any[]>([]);
   const [isLoadingCollabs, setIsLoadingCollabs] = useState(false);
+  // Durata nominale del task vs lavoro distribuito fra i collaboratori
+  const [collaborationTotals, setCollaborationTotals] = useState<{
+    baseCleaningTime: number;
+    assignedTotalMinutes: number;
+    hasManualSplit: boolean;
+  } | null>(null);
+  const [collaboratorsVersion, setCollaboratorsVersion] = useState(0);
 
-  // CRITICAL: Applica le pending edits alla task per la visualizzazione nella card
-  const taskWithPendingEdits = React.useMemo(() => applyPendingEdits(task), [task, pendingEditsVersion]);
+  // Dialog per sbilanciare la quota di un singolo collaboratore
+  const [shareDialogCleaner, setShareDialogCleaner] = useState<any | null>(null);
+  const [editingShareMinutes, setEditingShareMinutes] = useState("");
+  const [isSavingShare, setIsSavingShare] = useState(false);
+
+  const taskWithPendingEdits = task;
 
   // Determina le task navigabili in base al contesto
   const getNavigableTasks = (): Task[] => {
@@ -1048,8 +1088,7 @@ const displayClickableInputClass =
     const safeIdx = currIdx >= 0 ? currIdx : 0;
     const effId = currIdx >= 0 ? (navigableTasks[currIdx] as any).__key : normalizedTaskId;
     const curr = navigableTasks[safeIdx];
-    // CRITICAL: Applica le pending edits per la visualizzazione immediata
-    const disp = applyPendingEdits(curr || task);
+    const disp = curr || task;
 
     const prev = safeIdx > 0;
     const next = safeIdx < navigableTasks.length - 1;
@@ -1062,7 +1101,7 @@ const displayClickableInputClass =
       canGoPrev: prev,
       canGoNext: next
     };
-  }, [navigableTasks, currentTaskId, task, index, pendingEditsVersion]);
+  }, [navigableTasks, currentTaskId, task, index]);
 
   const dialogTaskKey = getTaskKey(displayTask) || getTaskKey(task);
   const dialogTaskIdRaw =
@@ -1092,6 +1131,16 @@ const displayClickableInputClass =
     isReadOnly ||
     resolvePreAssignedModeFromTask(displayTask) === "readonly" ||
     Boolean((displayTask as any).is_finished ?? (displayTask as any).isFinished);
+  // Eccezione: un task readonly con durata 0 si può comunque valorizzare.
+  // Resta chiuso se la giornata è bloccata o la task è già finita.
+  const canEditZeroDurationOnReadonly =
+    operationsScope !== "logistics" &&
+    getDisplayedCleaningMinutes(displayTask) <= 0 &&
+    !isReadOnly &&
+    resolvePreAssignedModeFromTask(displayTask) === "readonly" &&
+    !Boolean((displayTask as any).is_finished ?? (displayTask as any).isFinished);
+  const canEditDuration =
+    operationsScope !== "logistics" && (!displayTaskReadOnly || canEditZeroDurationOnReadonly);
   const shownDialogLocked =
     dialogLockTaskKey === dialogTaskKey ? dialogIsLocked : displayTaskLocked;
   const shownDialogLockedReason =
@@ -1148,13 +1197,20 @@ const displayClickableInputClass =
         if (cancelled) return;
         if (data.success) {
           setTaskCollaborators(Array.isArray(data.collaborators) ? data.collaborators : []);
+          setCollaborationTotals({
+            baseCleaningTime: Number(data.baseCleaningTime) || 0,
+            assignedTotalMinutes: Number(data.assignedTotalMinutes) || 0,
+            hasManualSplit: data.hasManualSplit === true,
+          });
         } else {
           setTaskCollaborators([]);
+          setCollaborationTotals(null);
         }
       } catch (error) {
         if (!cancelled) {
           console.error("Errore caricamento collaboratori:", error);
           setTaskCollaborators([]);
+          setCollaborationTotals(null);
         }
       } finally {
         if (!cancelled) {
@@ -1167,7 +1223,7 @@ const displayClickableInputClass =
     return () => {
       cancelled = true;
     };
-  }, [isModalOpen, dialogTaskId, effectiveWorkDate]);
+  }, [isModalOpen, dialogTaskId, effectiveWorkDate, collaboratorsVersion]);
 
   console.log('🔍 Stato navigazione:', {
     currentTaskId,
@@ -1402,16 +1458,7 @@ const displayClickableInputClass =
   ]);
 
   // Normalizza confirmed_operation da boolean/number/string a boolean sicuro
-  // CRITICAL: Se l'utente ha modificato operation_id tramite pending edits, considera confermato
-  // Questo distingue tra operation_id=2 di default (sistema) e operation_id=2 scelto manualmente
-  const taskKeyForConfirm = getTaskKey(task);
-  const pendingEditsForTask = getPendingEdits()[taskKeyForConfirm];
-  // Usa il flag operationIdModified per determinare se l'utente ha modificato l'operazione
-  // Se l'utente seleziona "Nessuna operazione" (null), operationIdModified è true ma operationId è null
-  // In quel caso NON è confermato, il punto di domanda rimane
-  const hasPendingOperationEdit = pendingEditsForTask?.operationIdModified === true && pendingEditsForTask?.operationId !== null;
-  
-  const rawConfirmed = (task as any).confirmed_operation; // Usa task originale per confirmed_operation
+  const rawConfirmed = (task as any).confirmed_operation;
   const originalConfirmed = 
     typeof rawConfirmed === "boolean"
       ? rawConfirmed
@@ -1421,8 +1468,7 @@ const displayClickableInputClass =
           ? ["true", "1", "yes"].includes(rawConfirmed.toLowerCase().trim())
           : false;
   
-  // Confermato se: utente ha modificato manualmente operation_id (con valore non-null) O confirmed_operation originale è true
-  const isConfirmedOperation = hasPendingOperationEdit || originalConfirmed;
+  const isConfirmedOperation = originalConfirmed;
 
   // Determina il tipo della CARD dai flag dell'oggetto *task* (non quelli della navigazione nel modale)
 
@@ -1947,72 +1993,56 @@ const displayClickableInputClass =
         return;
       }
 
-      const taskKey = getTaskKey(displayTask);
-      
-      // Gestisce operation_id: "none" = null (scelta esplicita di nessuna operazione)
-      // Altrimenti parseInt, se è un numero valido
-      const operationIdValue = editedOperationId === "none" 
-        ? null 
+      const operationIdValue = editedOperationId === "none"
+        ? null
         : (parseInt(editedOperationId) || null);
-      
-      const pendingEdits = {
-        taskId: taskKey,
-        logisticCode: displayTask.name,
-        checkoutDate: editedCheckoutDate || null,  // null se vuoto
-        checkoutTime: editedCheckoutTime || null,  // null se vuoto
-        checkinDate: editedCheckinDate || null,    // null se vuoto
-        checkinTime: editedCheckinTime || null,    // null se vuoto
-        cleaningTime: parseInt(editedDuration),
-        paxIn: parseInt(editedPaxIn),
-        paxOut: displayTask.pax_out,
-        operationId: operationIdValue,
-        // CRITICAL: Flag per indicare che l'utente ha modificato operation_id
-        // Questo distingue tra "non modificato" e "impostato a null esplicitamente"
-        operationIdModified: editingFields.has('operation'),
-      };
 
-      // Salva in sessionStorage per UI ottimistica
-      const existingEdits = JSON.parse(sessionStorage.getItem('pending_task_edits') || '{}');
-      existingEdits[taskKey] = { ...(existingEdits[taskKey] || {}), ...pendingEdits };
-      sessionStorage.setItem('pending_task_edits', JSON.stringify(existingEdits));
-
-      // CRITICAL: Salva anche su PostgreSQL (ma NON su ADAM) 
-      // ADAM verrà aggiornato solo con "Trasferisci su ADAM"
       const workDate = effectiveWorkDate;
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-      
+      const detailsPayload: Record<string, unknown> = {
+        taskId: (displayTask as any).task_id || displayTask.id,
+        logisticCode: displayTask.name,
+        date: workDate,
+        modified_by: currentUser.username || 'unknown',
+      };
+      if (editingFields.has('checkout')) {
+        detailsPayload.checkoutDate = editedCheckoutDate || null;
+        detailsPayload.checkoutTime = editedCheckoutTime || null;
+      }
+      if (editingFields.has('checkin')) {
+        detailsPayload.checkinDate = editedCheckinDate || null;
+        detailsPayload.checkinTime = editedCheckinTime || null;
+      }
+      if (editingFields.has('paxin')) {
+        detailsPayload.paxIn = parseInt(editedPaxIn);
+      }
+      if (editingFields.has('operation')) {
+        detailsPayload.operationId = operationIdValue;
+      }
+      if (editingFields.has('duration')) {
+        detailsPayload.cleaningTime = parseInt(editedDuration);
+        detailsPayload.cleaningTimeModified = true;
+      }
+
       const response = await fetch('/api/update-task-details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(withMutationScope({
-          taskId: (displayTask as any).task_id || displayTask.id,
-          logisticCode: displayTask.name,
-          checkoutDate: editedCheckoutDate || null,
-          checkoutTime: editedCheckoutTime || null,
-          checkinDate: editedCheckinDate || null,
-          checkinTime: editedCheckinTime || null,
-          cleaningTime: parseInt(editedDuration),
-          paxIn: parseInt(editedPaxIn),
-          operationId: operationIdValue,
-          date: workDate,
-          modified_by: currentUser.username || 'unknown',
-          skipAdam: true  // NON propagare su ADAM, solo PostgreSQL
-        }, operationsScope)),
+        body: JSON.stringify(withMutationScope(detailsPayload, operationsScope)),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Errore nel salvataggio su PostgreSQL');
+        throw new Error(errorData.error || 'Errore nel salvataggio');
       }
 
       toast({
         title: "Modifiche salvate",
-        description: "I campi della task sono stati salvati. Premi 'Trasferisci su ADAM' per sincronizzare.",
+        description: editingFields.has('duration') && editingFields.size === 1
+          ? "Durata salvata solo su WASS."
+          : "I campi della task sono stati salvati su ADAM.",
       });
 
       setEditingFields(new Set());
-      // CRITICAL: Incrementa versione per forzare re-render con i nuovi valori
-      setPendingEditsVersion(v => v + 1);
       setIsModalOpen(false);
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
@@ -2060,31 +2090,6 @@ const displayClickableInputClass =
         (task as any).name ??
         null;
       const dateStr = effectiveWorkDate;
-      const taskKey = getTaskKey(displayTask);
-      const duration = displayTask.duration || "0.0";
-      const [hours, mins] = duration.split(".").map(Number);
-      const cleaningTime = (hours || 0) * 60 + (mins || 0);
-      const operationIdValue = (displayTask as any).operation_id != null
-        ? (displayTask as any).operation_id
-        : (editedOperationId === "none" ? null : (parseInt(editedOperationId, 10) || null));
-      const pendingEdits = {
-        taskId: taskKey,
-        logisticCode: displayTask.name,
-        checkoutDate: (displayTask as any).checkout_date ?? null,
-        checkoutTime: (displayTask as any).checkout_time ?? null,
-        checkinDate: (displayTask as any).checkin_date ?? null,
-        checkinTime: (displayTask as any).checkin_time ?? null,
-        cleaningTime,
-        paxIn: (displayTask as any).pax_in,
-        paxOut: (displayTask as any).pax_out,
-        operationId: operationIdValue,
-        operationIdModified: editingFields.has("operation"),
-        customerNote: normalized,
-      };
-      const existingEdits = JSON.parse(sessionStorage.getItem("pending_task_edits") || "{}");
-      existingEdits[taskKey] = { ...(existingEdits[taskKey] || {}), ...pendingEdits };
-      sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
-
       const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
       const response = await fetch("/api/update-task-details", {
         method: "POST",
@@ -2095,7 +2100,6 @@ const displayClickableInputClass =
           customerNote: normalized,
           date: dateStr,
           modified_by: currentUser.username || "unknown",
-          skipAdam: true,
         }, operationsScope)),
       });
       if (!response.ok) {
@@ -2106,7 +2110,7 @@ const displayClickableInputClass =
       setLogisticsHousekeepingNotes(normalized);
       toast({
         title: "Note del cliente aggiornate",
-        description: "Valore salvato. Premi 'Trasferisci su ADAM' per sincronizzare.",
+        description: "Nota salvata su ADAM.",
       });
       setCustomerNoteDialogOpen(false);
     } catch (error: any) {
@@ -2132,31 +2136,6 @@ const displayClickableInputClass =
     }
     setIsSavingPaxIn(true);
     try {
-      const taskKey = getTaskKey(displayTask);
-      const duration = displayTask.duration || "0.0";
-      const [hours, mins] = duration.split(".").map(Number);
-      const cleaningTime = (hours || 0) * 60 + (mins || 0);
-      const operationIdValue = (displayTask as any).operation_id != null
-        ? (displayTask as any).operation_id
-        : (editedOperationId === "none" ? null : (parseInt(editedOperationId, 10) || null));
-
-      const pendingEdits = {
-        taskId: taskKey,
-        logisticCode: displayTask.name,
-        checkoutDate: (displayTask as any).checkout_date ?? null,
-        checkoutTime: (displayTask as any).checkout_time ?? null,
-        checkinDate: (displayTask as any).checkin_date ?? null,
-        checkinTime: (displayTask as any).checkin_time ?? null,
-        cleaningTime,
-        paxIn: value,
-        paxOut: (displayTask as any).pax_out,
-        operationId: operationIdValue,
-        operationIdModified: editingFields.has("operation"),
-      };
-      const existingEdits = JSON.parse(sessionStorage.getItem("pending_task_edits") || "{}");
-      existingEdits[taskKey] = { ...(existingEdits[taskKey] || {}), ...pendingEdits };
-      sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
-
       const workDate = effectiveWorkDate;
       const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
       const response = await fetch("/api/update-task-details", {
@@ -2165,16 +2144,9 @@ const displayClickableInputClass =
         body: JSON.stringify(withMutationScope({
           taskId: (displayTask as any).task_id || displayTask.id,
           logisticCode: displayTask.name,
-          checkoutDate: (displayTask as any).checkout_date ?? null,
-          checkoutTime: (displayTask as any).checkout_time ?? null,
-          checkinDate: (displayTask as any).checkin_date ?? null,
-          checkinTime: (displayTask as any).checkin_time ?? null,
-          cleaningTime,
           paxIn: value,
-          operationId: operationIdValue,
           date: workDate,
           modified_by: currentUser.username || "unknown",
-          skipAdam: true,
         }, operationsScope)),
       });
       if (!response.ok) {
@@ -2183,10 +2155,12 @@ const displayClickableInputClass =
       }
       toast({
         title: "Pax-In aggiornato",
-        description: "Il valore è stato salvato. Premi 'Trasferisci su ADAM' per sincronizzare.",
+        description: "Valore salvato su ADAM.",
       });
       setPaxInDialogOpen(false);
-      setPendingEditsVersion((v) => v + 1);
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
     } catch (error: any) {
       toast({
         title: "Errore",
@@ -2198,28 +2172,118 @@ const displayClickableInputClass =
     }
   };
 
-  const buildPayloadFromDisplayTask = (overrides: {
-    checkoutDate?: string | null;
-    checkoutTime?: string | null;
-    checkinDate?: string | null;
-    checkinTime?: string | null;
-  }) => {
-    const duration = displayTask.duration || "0.0";
-    const [hours, mins] = duration.split(".").map(Number);
-    const cleaningTime = (hours || 0) * 60 + (mins || 0);
-    const operationIdValue = (displayTask as any).operation_id != null
-      ? (displayTask as any).operation_id
-      : (editedOperationId === "none" ? null : (parseInt(editedOperationId, 10) || null));
-    return {
-      taskKey: getTaskKey(displayTask),
-      duration,
-      cleaningTime,
-      operationIdValue,
-      checkoutDate: overrides.checkoutDate !== undefined ? overrides.checkoutDate : ((displayTask as any).checkout_date ?? null),
-      checkoutTime: overrides.checkoutTime !== undefined ? overrides.checkoutTime : ((displayTask as any).checkout_time ?? null),
-      checkinDate: overrides.checkinDate !== undefined ? overrides.checkinDate : ((displayTask as any).checkin_date ?? null),
-      checkinTime: overrides.checkinTime !== undefined ? overrides.checkinTime : ((displayTask as any).checkin_time ?? null),
-    };
+  const handleOpenDurationDialog = () => {
+    setEditingDurationInDialog(String(getTotalCleaningMinutes(displayTask) || ""));
+    setDurationDialogOpen(true);
+  };
+
+  const handleSaveDuration = async () => {
+    const value = parseInt(editingDurationInDialog, 10);
+    if (isNaN(value) || value <= 0) {
+      toast({
+        title: "Errore di validazione",
+        description: "La durata della pulizia deve essere maggiore di 0 minuti",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSavingDuration(true);
+    try {
+      const durationCollaboratorCount = getCollaboratorCount(displayTask);
+      const workDate = effectiveWorkDate;
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const response = await fetch("/api/update-task-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withMutationScope({
+          taskId: (displayTask as any).task_id || displayTask.id,
+          logisticCode: displayTask.name,
+          cleaningTime: value,
+          cleaningTimeModified: true,
+          date: workDate,
+          modified_by: currentUser.username || "unknown",
+        }, operationsScope)),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Errore nel salvataggio");
+      }
+
+      toast({
+        title: "Durata pulizia aggiornata",
+        description:
+          durationCollaboratorCount > 1
+            ? `${formatCleaningHours(value)} ore in totale, ${formatCleaningHours(
+                splitCleaningTimeAcrossCollaborators(value, durationCollaboratorCount)
+              )} per ciascuno dei ${durationCollaboratorCount} cleaner. Non viene inviata ad ADAM.`
+            : "Valore salvato solo su WASS. Non viene inviato ad ADAM.",
+      });
+      setDurationDialogOpen(false);
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile salvare la durata pulizia",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDuration(false);
+    }
+  };
+
+  const handleOpenShareDialog = (collaborator: any) => {
+    setShareDialogCleaner(collaborator);
+    setEditingShareMinutes(String(Number(collaborator?.cleaningTime) || ""));
+  };
+
+  const handleSaveCollaboratorShare = async () => {
+    const value = parseInt(editingShareMinutes, 10);
+    if (isNaN(value) || value <= 0) {
+      toast({
+        title: "Errore di validazione",
+        description: "La durata del collaboratore deve essere maggiore di 0 minuti",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSavingShare(true);
+    try {
+      const response = await fetch(
+        `/api/tasks/${dialogTaskId}/collaborators/cleaning-time`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(withMutationScope({
+            date: effectiveWorkDate,
+            cleanerId: Number(shareDialogCleaner?.id),
+            cleaningTime: value,
+          }, operationsScope)),
+        }
+      );
+      const result = await response.json().catch(() => ({} as any));
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Errore nel salvataggio");
+      }
+      toast({
+        title: "Durata collaboratore aggiornata",
+        description: `${shareDialogCleaner?.alias || "Cleaner"}: ${formatCleaningHours(value)} ore. Totale distribuito ${formatCleaningHours(result.assignedTotalMinutes)} ore.`,
+      });
+      setShareDialogCleaner(null);
+      setCollaboratorsVersion((v) => v + 1);
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile salvare la durata del collaboratore",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingShare(false);
+    }
   };
 
   const handleOpenCheckoutDialog = () => {
@@ -2241,27 +2305,6 @@ const displayClickableInputClass =
     }
     setIsSavingCheckout(true);
     try {
-      const payload = buildPayloadFromDisplayTask({
-        checkoutDate: date,
-        checkoutTime: time,
-      });
-      const pendingEdits = {
-        taskId: payload.taskKey,
-        logisticCode: displayTask.name,
-        checkoutDate: payload.checkoutDate,
-        checkoutTime: payload.checkoutTime,
-        checkinDate: payload.checkinDate,
-        checkinTime: payload.checkinTime,
-        cleaningTime: payload.cleaningTime,
-        paxIn: (displayTask as any).pax_in,
-        paxOut: (displayTask as any).pax_out,
-        operationId: payload.operationIdValue,
-        operationIdModified: editingFields.has("operation"),
-      };
-      const existingEdits = JSON.parse(sessionStorage.getItem("pending_task_edits") || "{}");
-      existingEdits[payload.taskKey] = { ...(existingEdits[payload.taskKey] || {}), ...pendingEdits };
-      sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
-
       const workDate = effectiveWorkDate;
       const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
       const response = await fetch("/api/update-task-details", {
@@ -2270,16 +2313,10 @@ const displayClickableInputClass =
         body: JSON.stringify(withMutationScope({
           taskId: (displayTask as any).task_id || displayTask.id,
           logisticCode: displayTask.name,
-          checkoutDate: payload.checkoutDate,
-          checkoutTime: payload.checkoutTime,
-          checkinDate: payload.checkinDate,
-          checkinTime: payload.checkinTime,
-          cleaningTime: payload.cleaningTime,
-          paxIn: (displayTask as any).pax_in,
-          operationId: payload.operationIdValue,
+          checkoutDate: date,
+          checkoutTime: time,
           date: workDate,
           modified_by: currentUser.username || "unknown",
-          skipAdam: true,
         }, operationsScope)),
       });
       if (!response.ok) {
@@ -2288,10 +2325,9 @@ const displayClickableInputClass =
       }
       toast({
         title: "Check-out aggiornato",
-        description: "Data e orario salvati. Premi 'Trasferisci su ADAM' per sincronizzare.",
+        description: "Data e orario salvati su ADAM.",
       });
       setCheckoutDialogOpen(false);
-      setPendingEditsVersion((v) => v + 1);
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
       }
@@ -2339,27 +2375,6 @@ const displayClickableInputClass =
     }
     setIsSavingCheckin(true);
     try {
-      const payload = buildPayloadFromDisplayTask({
-        checkinDate: date,
-        checkinTime: time,
-      });
-      const pendingEdits = {
-        taskId: payload.taskKey,
-        logisticCode: displayTask.name,
-        checkoutDate: payload.checkoutDate,
-        checkoutTime: payload.checkoutTime,
-        checkinDate: payload.checkinDate,
-        checkinTime: payload.checkinTime,
-        cleaningTime: payload.cleaningTime,
-        paxIn: (displayTask as any).pax_in,
-        paxOut: (displayTask as any).pax_out,
-        operationId: payload.operationIdValue,
-        operationIdModified: editingFields.has("operation"),
-      };
-      const existingEdits = JSON.parse(sessionStorage.getItem("pending_task_edits") || "{}");
-      existingEdits[payload.taskKey] = { ...(existingEdits[payload.taskKey] || {}), ...pendingEdits };
-      sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
-
       const workDate = effectiveWorkDate;
       const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
       const response = await fetch("/api/update-task-details", {
@@ -2368,16 +2383,10 @@ const displayClickableInputClass =
         body: JSON.stringify(withMutationScope({
           taskId: (displayTask as any).task_id || displayTask.id,
           logisticCode: displayTask.name,
-          checkoutDate: payload.checkoutDate,
-          checkoutTime: payload.checkoutTime,
-          checkinDate: payload.checkinDate,
-          checkinTime: payload.checkinTime,
-          cleaningTime: payload.cleaningTime,
-          paxIn: (displayTask as any).pax_in,
-          operationId: payload.operationIdValue,
+          checkinDate: date,
+          checkinTime: time,
           date: workDate,
           modified_by: currentUser.username || "unknown",
-          skipAdam: true,
         }, operationsScope)),
       });
       if (!response.ok) {
@@ -2386,10 +2395,9 @@ const displayClickableInputClass =
       }
       toast({
         title: "Check-in aggiornato",
-        description: "Data e orario salvati. Premi 'Trasferisci su ADAM' per sincronizzare.",
+        description: "Data e orario salvati su ADAM.",
       });
       setCheckinDialogOpen(false);
-      setPendingEditsVersion((v) => v + 1);
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
       }
@@ -2416,24 +2424,6 @@ const displayClickableInputClass =
       : (parseInt(editingOperationIdInDialog, 10) || null);
     setIsSavingOperation(true);
     try {
-      const payload = buildPayloadFromDisplayTask({});
-      const pendingEdits = {
-        taskId: payload.taskKey,
-        logisticCode: displayTask.name,
-        checkoutDate: payload.checkoutDate,
-        checkoutTime: payload.checkoutTime,
-        checkinDate: payload.checkinDate,
-        checkinTime: payload.checkinTime,
-        cleaningTime: payload.cleaningTime,
-        paxIn: (displayTask as any).pax_in,
-        paxOut: (displayTask as any).pax_out,
-        operationId: operationIdValue,
-        operationIdModified: true,
-      };
-      const existingEdits = JSON.parse(sessionStorage.getItem("pending_task_edits") || "{}");
-      existingEdits[payload.taskKey] = { ...(existingEdits[payload.taskKey] || {}), ...pendingEdits };
-      sessionStorage.setItem("pending_task_edits", JSON.stringify(existingEdits));
-
       const workDate = effectiveWorkDate;
       const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
       const response = await fetch("/api/update-task-details", {
@@ -2442,16 +2432,9 @@ const displayClickableInputClass =
         body: JSON.stringify(withMutationScope({
           taskId: (displayTask as any).task_id || displayTask.id,
           logisticCode: displayTask.name,
-          checkoutDate: payload.checkoutDate,
-          checkoutTime: payload.checkoutTime,
-          checkinDate: payload.checkinDate,
-          checkinTime: payload.checkinTime,
-          cleaningTime: payload.cleaningTime,
-          paxIn: (displayTask as any).pax_in,
           operationId: operationIdValue,
           date: workDate,
           modified_by: currentUser.username || "unknown",
-          skipAdam: true,
         }, operationsScope)),
       });
       if (!response.ok) {
@@ -2460,10 +2443,9 @@ const displayClickableInputClass =
       }
       toast({
         title: "Tipologia intervento aggiornata",
-        description: "Modifica salvata. Premi 'Trasferisci su ADAM' per sincronizzare.",
+        description: "Modifica salvata su ADAM.",
       });
       setOperationDialogOpen(false);
-      setPendingEditsVersion((v) => v + 1);
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
       }
@@ -2607,13 +2589,13 @@ const displayClickableInputClass =
   const shouldShowCheckInOutArrows = !isShortHousekeepingTimelineTask;
   const shouldShowTooltipTimes = isShortHousekeepingTimelineTask;
   const shouldShowTooltipCustomerRef = isShortHousekeepingTimelineTask;
-  const cardTooltipAddressLabel =
-    String(displayTask.address ?? "").trim().toUpperCase() || "INDIRIZZO NON DISPONIBILE";
+  const cardTooltipAptCode = String((displayTask as any).apt_code ?? "").trim();
+  const cardTooltipPrimary = cardTooltipAptCode || "CODICE NON DISPONIBILE";
   const cardTooltipClientAlias = String(displayTask.alias ?? "").trim();
   const cardTooltipAddressLine =
     operationsScope === "logistics" && isInTimeline && cardTooltipClientAlias
-      ? `${cardTooltipAddressLabel} - ${cardTooltipClientAlias}`
-      : cardTooltipAddressLabel;
+      ? `${cardTooltipPrimary} - ${cardTooltipClientAlias}`
+      : cardTooltipPrimary;
 
   // Verifica violazioni temporali (considerando le date!)
   // Card timeline: sempre la task che rappresenta (task), non quella nel dialog (displayTask).
@@ -2695,36 +2677,20 @@ const displayClickableInputClass =
       ? "Manca la tipologia logistica (delivery, pick-up o entrambi). Impostala prima di assegnare."
       : null;
 
-  // Verifica se il check-in è per una data futura (rispetto alla data selezionata)
-  // Include anche i casi dove l'orario non è migrato ma la data è futura
-  const isFutureCheckin = (() => {
-    const taskObj = taskWithPendingEdits as any;
-    const checkinDate = taskObj.checkin_date;
+  const checkoutOffDayLabel = offDayDateLabel(
+    (taskWithPendingEdits as any).checkout_date,
+    effectiveWorkDate
+  );
+  const checkinOffDayLabel = offDayDateLabel(
+    (taskWithPendingEdits as any).checkin_date,
+    effectiveWorkDate
+  );
 
-    if (!checkinDate) return false;
-
-    // Ottieni la data selezionata da localStorage
-    const selectedWorkDate = effectiveWorkDate;
-    if (!selectedWorkDate) return false;
-
-    const [year, month, day] = selectedWorkDate.split('-').map(Number);
-    const selectedDate = new Date(year, month - 1, day);
-    selectedDate.setHours(0, 0, 0, 0);
-
-    const normalizedCheckinDate = normalizeDate(checkinDate);
-    if (!normalizedCheckinDate) return false;
-    const checkin = new Date(normalizedCheckinDate);
-    checkin.setHours(0, 0, 0, 0);
-
-    return checkin > selectedDate;
-  })();
-
-  
   const checkoutTime = (taskWithPendingEdits as any).checkout_time as string | undefined;
   const checkinTime = (taskWithPendingEdits as any).checkin_time as string | undefined;
 
   const hasCheckout = Boolean(checkoutTime);
-  const hasCheckinRow = Boolean(checkinTime) || isFutureCheckin; // riga check-in o calendario
+  const hasCheckinRow = Boolean(checkinTime) || Boolean(checkinOffDayLabel);
   const rowsCount = (hasCheckout ? 1 : 0) + (hasCheckinRow ? 1 : 0);
 
   const hasSingleRow = rowsCount === 1;
@@ -3015,6 +2981,10 @@ const displayClickableInputClass =
     if (!primary) return "";
     return String(primary.alias ?? primary.name ?? (primary.id != null ? `Cleaner ${primary.id}` : "")).trim();
   })();
+  // Le quote per-cleaner esistono solo per le task housekeeping in timeline.
+  const hasCollaborationShares =
+    taskCollaborators.length > 0 &&
+    (collaborationTotals?.assignedTotalMinutes ?? 0) > 0;
   const collaboratorLabels = taskCollaborators
     .map((c: any) => String(c?.alias ?? c?.name ?? (c?.id != null ? `Cleaner ${c.id}` : "")).trim())
     .filter((label: string) => label.length > 0);
@@ -3088,7 +3058,7 @@ const displayClickableInputClass =
               </div>
             </div>
 
-            {/* Seconda riga: Indirizzo | Durata pulizia */}
+            {/* Seconda riga: Indirizzo | Codice Appartamento | Durata pulizia */}
             <div className="grid grid-cols-2 gap-3 items-start">
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Indirizzo</p>
@@ -3100,15 +3070,53 @@ const displayClickableInputClass =
                   onFocus={(e) => e.currentTarget.blur()}
                 />
               </div>
-              <div className="self-start">
-                <p className={cn("text-sm font-semibold text-muted-foreground", !isLogisticsTimelineDetails && "mb-1")}>Durata pulizia</p>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">Codice Appartamento</p>
                 <Input
-                  value={`${(displayTask.duration || "0.0").replace(".", ":")} ore`}
+                  value={String((displayTask as any).apt_code ?? "").trim() || "NON MIGRATO"}
                   readOnly
                   className={displayInputClass}
                   tabIndex={-1}
                   onFocus={(e) => e.currentTarget.blur()}
                 />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 items-start">
+              <StructureAccessKeyTypeField
+                logisticCode={String(
+                  (displayTask as any).logistic_code ?? displayTask.name ?? ""
+                )}
+              />
+              <div className="self-start">
+                <p className={cn("text-sm font-semibold text-muted-foreground flex items-center gap-1", !isLogisticsTimelineDetails && "mb-1")}>
+                  Durata pulizia
+                  {canEditDuration && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                </p>
+                <Input
+                  readOnly
+                  value={`${formatCleaningHours(getDisplayedCleaningMinutes(displayTask))} ore`}
+                  className={
+                    canEditDuration
+                      ? cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
+                      : displayInputClass
+                  }
+                  tabIndex={canEditDuration ? 0 : -1}
+                  onFocus={(e) => {
+                    if (!canEditDuration) e.currentTarget.blur();
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (canEditDuration) handleOpenDurationDialog();
+                  }}
+                />
+                {canEditZeroDurationOnReadonly && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Durata a zero: puoi impostarla anche su questo task in sola lettura.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -3124,7 +3132,7 @@ const displayClickableInputClass =
               <div>
                 <p className={cn("text-sm font-semibold text-muted-foreground flex items-center gap-1", !isLogisticsTimelineDetails && "mb-1")}>
                   Check-out
-                  {!isTaskReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  {!isHousekeepingFieldsReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
                 <Input
                   readOnly
@@ -3142,20 +3150,20 @@ const displayClickableInputClass =
                       : "non migrato"
                   }
                   className={
-                    isTaskReadOnly
+                    isHousekeepingFieldsReadOnly
                       ? displayInputClass
                       : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
                   }
-                  tabIndex={isTaskReadOnly ? -1 : 0}
+                  tabIndex={isHousekeepingFieldsReadOnly ? -1 : 0}
                   onFocus={(e) => {
-                    if (isTaskReadOnly) e.currentTarget.blur();
+                    if (isHousekeepingFieldsReadOnly) e.currentTarget.blur();
                   }}
                   onMouseDown={(e) => {
                     e.preventDefault();
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!isTaskReadOnly) handleOpenCheckoutDialog();
+                    if (!isHousekeepingFieldsReadOnly) handleOpenCheckoutDialog();
                   }}
                 />
               </div>
@@ -3163,7 +3171,7 @@ const displayClickableInputClass =
               <div>
                 <p className={cn("text-sm font-semibold text-muted-foreground flex items-center gap-1", !isLogisticsTimelineDetails && "mb-1")}>
                   Check-in
-                  {!isTaskReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  {!isHousekeepingFieldsReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
                 <Input
                   readOnly
@@ -3181,20 +3189,20 @@ const displayClickableInputClass =
                       : "non migrato"
                   }
                   className={
-                    isTaskReadOnly
+                    isHousekeepingFieldsReadOnly
                       ? displayInputClass
                       : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
                   }
-                  tabIndex={isTaskReadOnly ? -1 : 0}
+                  tabIndex={isHousekeepingFieldsReadOnly ? -1 : 0}
                   onFocus={(e) => {
-                    if (isTaskReadOnly) e.currentTarget.blur();
+                    if (isHousekeepingFieldsReadOnly) e.currentTarget.blur();
                   }}
                   onMouseDown={(e) => {
                     e.preventDefault();
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!isTaskReadOnly) handleOpenCheckinDialog();
+                    if (!isHousekeepingFieldsReadOnly) handleOpenCheckinDialog();
                   }}
                 />
               </div>
@@ -3210,36 +3218,30 @@ const displayClickableInputClass =
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Tipologia intervento
-                  {!isTaskReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  {!isHousekeepingFieldsReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
                 <Input
                   readOnly
                   value={(() => {
-                    const taskKeyDisplay = getTaskKey(displayTask);
-                    const pendingEditsDisplay = getPendingEdits()[taskKeyDisplay];
-                    const userChoseNone =
-                      pendingEditsDisplay?.operationIdModified === true && pendingEditsDisplay?.operationId === null;
-
-                    if (userChoseNone) return "— Nessuna operazione —";
                     if (!isConfirmedOperation) return "non migrato";
                     if ((displayTask as any).operation_id) return getInterventionLabel(displayTask);
                     return "-";
                   })()}
                   className={
-                    isTaskReadOnly
+                    isHousekeepingFieldsReadOnly
                       ? displayInputClass
                       : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
                   }
-                  tabIndex={isTaskReadOnly ? -1 : 0}
+                  tabIndex={isHousekeepingFieldsReadOnly ? -1 : 0}
                   onFocus={(e) => {
-                    if (isTaskReadOnly) e.currentTarget.blur();
+                    if (isHousekeepingFieldsReadOnly) e.currentTarget.blur();
                   }}
                   onMouseDown={(e) => {
                     e.preventDefault();
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!isTaskReadOnly) handleOpenOperationDialog();
+                    if (!isHousekeepingFieldsReadOnly) handleOpenOperationDialog();
                   }}
                 />
               </div>
@@ -3250,26 +3252,26 @@ const displayClickableInputClass =
               <div>
                 <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                   Pax-In
-                  {!isTaskReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  {!isHousekeepingFieldsReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                 </p>
                 <Input
                   readOnly
                   value={String((displayTask as any).pax_in ?? "non migrato")}
                   className={
-                    isTaskReadOnly
+                    isHousekeepingFieldsReadOnly
                       ? displayInputClass
                       : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
                   }
-                  tabIndex={isTaskReadOnly ? -1 : 0}
+                  tabIndex={isHousekeepingFieldsReadOnly ? -1 : 0}
                   onFocus={(e) => {
-                    if (isTaskReadOnly) e.currentTarget.blur();
+                    if (isHousekeepingFieldsReadOnly) e.currentTarget.blur();
                   }}
                   onMouseDown={(e) => {
                     e.preventDefault();
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!isTaskReadOnly) handleOpenPaxInDialog();
+                    if (!isHousekeepingFieldsReadOnly) handleOpenPaxInDialog();
                   }}
                 />
               </div>
@@ -3515,7 +3517,7 @@ const displayClickableInputClass =
                     {operationsScope === "logistics" && cardLogisticsSequenceLabel && (
                       <LogisticsSequenceBadge
                         sequence={cardLogisticsSequenceLabel}
-                        className="absolute -top-1.5 -right-1.5 z-[65]"
+                        className="absolute -top-1.5 -right-1.5 z-[36]"
                       />
                     )}
                     {operationsScope === "logistics" &&
@@ -3539,7 +3541,7 @@ const displayClickableInputClass =
                       <>
                     {/* Selection indicator (top-left) */}
                     {isMultiSelectMode && !isInTimeline && (
-                      <div className="absolute -top-1.5 -left-1 z-[60]">
+                      <div className="absolute -top-1.5 -left-1 z-[35]">
                         <div
                           className={[
                             "w-4 h-4 rounded-full flex items-center justify-center",
@@ -3583,7 +3585,7 @@ const displayClickableInputClass =
                       )
                     )}
                     {(isPreAssigned || isLocked) && (
-                      <div className="absolute -top-1.5 -right-1.5 z-[70]">
+                      <div className="absolute -top-1.5 -right-1.5 z-[38]">
                         <div
                           className={[
                             "w-4 h-4 rounded-full flex items-center justify-center text-white border-2 shadow-md",
@@ -3656,9 +3658,11 @@ const displayClickableInputClass =
                     {shouldShowCheckInOutArrows &&
                       ((taskWithPendingEdits as any).checkout_time ||
                         (taskWithPendingEdits as any).checkin_time ||
-                        isFutureCheckin) && (() => {
+                        checkoutOffDayLabel ||
+                        checkinOffDayLabel) && (() => {
                         const hasCheckout = Boolean((taskWithPendingEdits as any).checkout_time);
-                        const hasCheckin = Boolean((taskWithPendingEdits as any).checkin_time) || isFutureCheckin;
+                        const hasCheckin =
+                          Boolean((taskWithPendingEdits as any).checkin_time) || Boolean(checkinOffDayLabel);
 
                         const linesCount = (hasCheckout ? 1 : 0) + (hasCheckin ? 1 : 0);
                         const isSingleLine = linesCount === 1;
@@ -3690,33 +3694,54 @@ const displayClickableInputClass =
                           >
                             {hasCheckout && (
                               <div className="flex items-center gap-0.5 leading-none">
-                                <span className="font-black text-[15px] leading-none text-[#257537]">↑</span>
-                                <span className="text-[11px] leading-none text-[#137537] font-bold">
+                                <span
+                                  className={cn(
+                                    "font-black leading-none",
+                                    checkoutOffDayLabel
+                                      ? "text-[11px] text-gray-500 dark:text-gray-400"
+                                      : "text-[15px] text-[#257537]"
+                                  )}
+                                >
+                                  ↑
+                                </span>
+                                <span
+                                  className={cn(
+                                    "text-[11px] leading-none font-bold",
+                                    checkoutOffDayLabel
+                                      ? "text-gray-500 dark:text-gray-400"
+                                      : "text-[#137537]"
+                                  )}
+                                >
                                   {(taskWithPendingEdits as any).checkout_time}
+                                  {checkoutOffDayLabel ? ` ${checkoutOffDayLabel}` : ""}
                                 </span>
                               </div>
                             )}
                             {hasCheckin && (
                               <div className="flex items-center gap-0.5 leading-none">
-                                {isFutureCheckin ? (
-                                  <>
-                                    <CalendarIcon className="w-3.5 h-3.5 text-red-600" strokeWidth={2.5} />
-                                    {(taskWithPendingEdits as any).checkin_time && (
-                                      <span className="text-red-600 text-[11px] leading-none font-bold">
-                                        {(taskWithPendingEdits as any).checkin_time}
-                                      </span>
-                                    )}
-                                  </>
-                                ) : (
-                                  (taskWithPendingEdits as any).checkin_time && (
-                                    <>
-                                      <span className="text-red-600 font-black text-[15px] leading-none">↓</span>
-                                      <span className="text-red-600 text-[11px] leading-none font-bold">
-                                        {(taskWithPendingEdits as any).checkin_time}
-                                      </span>
-                                    </>
-                                  )
-                                )}
+                                <span
+                                  className={cn(
+                                    "font-black leading-none",
+                                    checkinOffDayLabel
+                                      ? "text-[11px] text-gray-500 dark:text-gray-400"
+                                      : "text-[15px] text-red-600"
+                                  )}
+                                >
+                                  ↓
+                                </span>
+                                <span
+                                  className={cn(
+                                    "text-[11px] leading-none font-bold",
+                                    checkinOffDayLabel
+                                      ? "text-gray-500 dark:text-gray-400"
+                                      : "text-red-600"
+                                  )}
+                                >
+                                  {(taskWithPendingEdits as any).checkin_time}
+                                  {checkinOffDayLabel
+                                    ? `${(taskWithPendingEdits as any).checkin_time ? " " : ""}${checkinOffDayLabel}`
+                                    : ""}
+                                </span>
                               </div>
                             )}
                           </div>
@@ -3750,28 +3775,34 @@ const displayClickableInputClass =
                     {shouldShowTooltipTimes &&
                       ((taskWithPendingEdits as any).checkout_time ||
                         (taskWithPendingEdits as any).checkin_time ||
-                        isFutureCheckin) && (
+                        checkoutOffDayLabel ||
+                        checkinOffDayLabel) && (
                       <div className="flex items-center gap-3 text-sm">
                         {(taskWithPendingEdits as any).checkout_time && (
-                          <div className="flex items-center gap-1">
-                            <span className="text-green-500">↑</span>
+                          <div
+                            className={cn(
+                              "flex items-center gap-1",
+                              checkoutOffDayLabel && "text-gray-500 dark:text-gray-400"
+                            )}
+                          >
+                            <span className={checkoutOffDayLabel ? "text-gray-500 dark:text-gray-400" : "text-green-500"}>↑</span>
                             <span>{(taskWithPendingEdits as any).checkout_time}</span>
+                            {checkoutOffDayLabel && <span>{checkoutOffDayLabel}</span>}
                           </div>
                         )}
-                        {isFutureCheckin ? (
-                          <div className="flex items-center gap-1 text-red-500">
-                            <CalendarIcon className="w-3.5 h-3.5" strokeWidth={2.5} />
+                        {((taskWithPendingEdits as any).checkin_time || checkinOffDayLabel) && (
+                          <div
+                            className={cn(
+                              "flex items-center gap-1",
+                              checkinOffDayLabel ? "text-gray-500 dark:text-gray-400" : "text-red-500"
+                            )}
+                          >
+                            <span>↓</span>
                             {(taskWithPendingEdits as any).checkin_time && (
                               <span>{(taskWithPendingEdits as any).checkin_time}</span>
                             )}
+                            {checkinOffDayLabel && <span>{checkinOffDayLabel}</span>}
                           </div>
-                        ) : (
-                          (taskWithPendingEdits as any).checkin_time && (
-                            <div className="flex items-center gap-1">
-                              <span className="text-red-500">↓</span>
-                              <span>{(taskWithPendingEdits as any).checkin_time}</span>
-                            </div>
-                          )
                         )}
                       </div>
                     )}
@@ -4101,7 +4132,7 @@ const displayClickableInputClass =
             )}
 
             {/* Pulsante Salva Modifiche */}
-            {editingFields.size > 0 && !isTaskReadOnly && (
+            {editingFields.size > 0 && !isHousekeepingFieldsReadOnly && (
               <div className="pt-4 border-t mt-4 flex gap-2">
                 <Button
                   onClick={handleSaveChanges}
@@ -4162,16 +4193,64 @@ const displayClickableInputClass =
                 </span>
               </div>
               <p>
-                <strong>Durata originale:</strong> {(() => {
-                  const baseTime = (displayTask as any).base_cleaning_time || 0;
-                  const hours = Math.floor(baseTime / 60);
-                  const mins = baseTime % 60;
-                  return `${hours}:${String(mins).padStart(2, '0')} ore`;
-                })()}
+                <strong>Durata originale:</strong>{" "}
+                {formatCleaningHours(
+                  collaborationTotals?.baseCleaningTime || getTotalCleaningMinutes(displayTask)
+                )}{" "}
+                ore
               </p>
-              <p>
-                <strong>Durata per cleaner:</strong> {(displayTask.duration || "0.0").replace(".", ":")} ore
-              </p>
+              {hasCollaborationShares && (
+                <p>
+                  <strong>Durata distribuita:</strong>{" "}
+                  {formatCleaningHours(collaborationTotals!.assignedTotalMinutes)} ore
+                  {collaborationTotals!.assignedTotalMinutes !==
+                    collaborationTotals!.baseCleaningTime && (
+                    <span className="ml-1 text-xs">(somma delle quote)</span>
+                  )}
+                </p>
+              )}
+
+              {/* Quote dei singoli collaboratori: modificabili una per una */}
+              {hasCollaborationShares && (
+                <div className="mt-2 space-y-1">
+                  {taskCollaborators.map((collab: any) => (
+                    <div key={collab.id} className="flex items-center justify-between gap-2">
+                      <span className="truncate">
+                        {collab.alias || `Cleaner ${collab.id}`}
+                        {collab.isPrimary && (
+                          <span className="ml-1 text-blue-600 font-semibold text-xs">(P)</span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={isHousekeepingFieldsReadOnly}
+                        onClick={() => handleOpenShareDialog(collab)}
+                        className={cn(
+                          "flex items-center gap-1 font-semibold",
+                          isHousekeepingFieldsReadOnly
+                            ? "cursor-default"
+                            : "cursor-pointer hover:underline"
+                        )}
+                      >
+                        {formatCleaningHours(collab.cleaningTime)} ore
+                        {!isHousekeepingFieldsReadOnly && <Pencil className="w-3 h-3 opacity-60" />}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {collaborationTotals?.hasManualSplit && (
+                <p className="text-xs mt-2">
+                  Quote sbilanciate a mano: non vengono più divise in parti uguali. Aggiungere o
+                  togliere un collaboratore le riporta alla divisione equa.
+                </p>
+              )}
+              {!collaborationTotals?.hasManualSplit && hasManualCleaningTime(displayTask) && (
+                <p className="text-xs mt-2">
+                  Durata impostata a mano in WASS: i refresh ADAM non la sovrascrivono.
+                </p>
+              )}
               {(displayTask as any).is_primary && (
                 <p className="text-blue-600 font-semibold mt-1">Questo cleaner è il Primary</p>
               )}
@@ -4194,6 +4273,158 @@ const displayClickableInputClass =
           ) : (
             <p className="text-sm text-muted-foreground mt-2">Nessuna collaborazione attiva per questa task.</p>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog quota del singolo collaboratore - solo WASS, non inviata ad ADAM */}
+      <Dialog
+        open={shareDialogCleaner != null}
+        onOpenChange={(open) => !open && setShareDialogCleaner(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-custom-blue" />
+              Durata di {shareDialogCleaner?.alias || "questo cleaner"}
+            </DialogTitle>
+            <DialogDescription>
+              Quanto lavora questo collaboratore su questa task. Gli altri collaboratori non
+              vengono toccati: la durata distribuita diventa la somma delle quote.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm font-semibold text-muted-foreground mb-2 block">
+                Durata di questo cleaner (minuti)
+              </label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={editingShareMinutes}
+                onChange={(e) => setEditingShareMinutes(e.target.value.replace(/\D/g, ""))}
+                placeholder="es. 180"
+                className="w-full"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveCollaboratorShare();
+                }}
+              />
+            </div>
+            <p className="text-xs text-purple-600 dark:text-purple-400">
+              {(() => {
+                const next = parseInt(editingShareMinutes, 10);
+                const others = taskCollaborators
+                  .filter((c: any) => Number(c.id) !== Number(shareDialogCleaner?.id))
+                  .reduce((sum: number, c: any) => sum + (Number(c.cleaningTime) || 0), 0);
+                if (!Number.isFinite(next) || next <= 0) {
+                  return "Gli altri collaboratori mantengono la loro quota attuale.";
+                }
+                return `Durata distribuita: ${formatCleaningHours(others + next)} ore in totale.`;
+              })()}
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setShareDialogCleaner(null)}
+              disabled={isSavingShare}
+            >
+              Annulla
+            </Button>
+            <Button onClick={handleSaveCollaboratorShare} disabled={isSavingShare}>
+              {isSavingShare ? "Salvataggio..." : "Salva"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Modifica Durata pulizia - solo WASS, non inviata ad ADAM */}
+      <Dialog open={durationDialogOpen} onOpenChange={(open) => !open && setDurationDialogOpen(false)}>
+        <DialogContent className="sm:max-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-custom-blue" />
+              Modifica Durata pulizia
+            </DialogTitle>
+            <DialogDescription>
+              Task <strong>#{getTaskKey(displayTask)}</strong> — Inserisci la durata dell'appartamento in minuti. Il valore resta solo su WASS.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm font-semibold text-muted-foreground mb-2 block">
+                Durata totale (minuti)
+              </label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={editingDurationInDialog}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, "");
+                  setEditingDurationInDialog(v);
+                }}
+                placeholder="es. 90"
+                className="w-full"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveDuration();
+                }}
+              />
+            </div>
+            {hasCollaboration && (
+              <p className="text-xs text-purple-600 dark:text-purple-400">
+                {(() => {
+                  const total = parseInt(editingDurationInDialog, 10);
+                  const count = getCollaboratorCount(displayTask);
+                  if (!Number.isFinite(total) || total <= 0) {
+                    return `Durata divisa fra i ${count} cleaner in collaborazione. Non verrà più presa da ADAM.`;
+                  }
+                  const perCleaner = splitCleaningTimeAcrossCollaborators(total, count);
+                  const resplitWarning = collaborationTotals?.hasManualSplit
+                    ? " Le quote sbilanciate a mano tornano alla divisione equa."
+                    : "";
+                  return `${total} minuti in totale → ${formatCleaningHours(perCleaner)} ore a testa su ${count} cleaner. Non verrà più presa da ADAM.${resplitWarning}`;
+                })()}
+              </p>
+            )}
+            {!hasCollaboration && hasManualCleaningTime(displayTask) && (
+              <p className="text-xs text-muted-foreground">
+                Durata già impostata in WASS: i refresh ADAM non la sovrascrivono.
+              </p>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDurationDialogOpen(false)}
+              disabled={isSavingDuration}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSaveDuration}
+              disabled={isSavingDuration}
+              className="border-2 border-custom-blue"
+            >
+              {isSavingDuration ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Salvataggio...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Salva
+                </>
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -4651,13 +4882,20 @@ const displayClickableInputClass =
                   La collaborazione verrà rimossa e la task tornerà nei containers con la durata originale.
                 </p>
                 <div className="bg-purple-50 dark:bg-purple-900/20 rounded p-3 mb-3 text-sm">
-                  <p><strong>Durata originale:</strong> {(() => {
-                    const baseTime = (displayTask as any).base_cleaning_time || 0;
-                    const hours = Math.floor(baseTime / 60);
-                    const mins = baseTime % 60;
-                    return `${hours}:${String(mins).padStart(2, '0')} ore`;
-                  })()}</p>
-                  <p><strong>Durata attuale per cleaner:</strong> {(displayTask.duration || "0.0").replace(".", ":")} ore</p>
+                  <p>
+                    <strong>Durata al rientro:</strong>{" "}
+                    {formatCleaningHours(
+                      collaborationTotals?.baseCleaningTime ||
+                        getTotalCleaningMinutes(displayTask)
+                    )}{" "}
+                    ore
+                  </p>
+                  {collaborationTotals?.hasManualSplit && (
+                    <p className="text-xs">
+                      Lo sbilanciamento delle quote va perso: la task torna con la sua durata
+                      originale.
+                    </p>
+                  )}
                   <p><strong>Cleaners coinvolti:</strong> {(displayTask as any).collaborator_count || 0}</p>
                 </div>
               </div>

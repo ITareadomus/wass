@@ -78,16 +78,51 @@ function extractChoiceValue(choice: Record<string, unknown>): string | null {
 function parseChoice(raw: unknown): StructureAccessChoice | null {
   if (!raw || typeof raw !== "object") return null;
   const choice = raw as Record<string, unknown>;
-  const name = asTrimmedString(choice.name) ?? asTrimmedString(choice.label) ?? "";
+  const name = asTrimmedString(choice.name);
+  if (!name) return null;
   const type = asNullableNumber(choice.type);
-  const value = extractChoiceValue(choice);
-  if (!name && !value && type == null) return null;
+  const typeLabel =
+    type != null && Number.isInteger(type) ? STRUCTURE_ACCESS_CHOICE_TYPE_LABELS[type] ?? null : null;
   return {
-    name: name || (value ? "Accesso" : "Dettaglio"),
-    type,
-    typeLabel: type != null ? STRUCTURE_ACCESS_CHOICE_TYPE_LABELS[type] ?? null : null,
-    value,
+    name,
+    type: typeLabel ? type : null,
+    typeLabel,
+    value: extractChoiceValue(choice),
   };
+}
+
+function bundleSignature(bundle: StructureAccessBundle): string {
+  const keys = bundle.choices
+    .map((choice) => `${choice.name}\u0000${choice.typeLabel ?? ""}`)
+    .join("\u0001");
+  return [
+    bundle.keysId ?? "",
+    bundle.keysNumber ?? "",
+    bundle.keysLabel ?? "",
+    bundle.keysTypeLabel ?? "",
+    keys,
+  ].join("\u0002");
+}
+
+function dedupeStructureAccessBundles(bundles: StructureAccessBundle[]): StructureAccessBundle[] {
+  const seen = new Set<string>();
+  const unique: StructureAccessBundle[] = [];
+  for (const bundle of bundles) {
+    const signature = bundleSignature(bundle);
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    unique.push(bundle);
+  }
+  return unique;
+}
+
+function compareStructureAccessBundles(a: StructureAccessBundle, b: StructureAccessBundle): number {
+  const byNumber = (a.keysNumber ?? "").localeCompare(b.keysNumber ?? "", "it", { numeric: true });
+  if (byNumber !== 0) return byNumber;
+  const aId = a.keysId ?? Number.POSITIVE_INFINITY;
+  const bId = b.keysId ?? Number.POSITIVE_INFINITY;
+  if (aId !== bId) return aId - bId;
+  return (a.keysLabel ?? "").localeCompare(b.keysLabel ?? "", "it", { sensitivity: "base" });
 }
 
 /**
@@ -149,10 +184,33 @@ export function selectDriverAccessBundles(
   bundles: StructureAccessBundle[]
 ): StructureAccessBundle[] {
   if (!Array.isArray(bundles) || bundles.length === 0) return [];
-  const driverBundles = bundles.filter((bundle) =>
+  const unique = dedupeStructureAccessBundles(bundles);
+  const driverBundles = unique.filter((bundle) =>
     /autist/i.test(String(bundle.keysLabel ?? ""))
   );
-  return driverBundles.length > 0 ? driverBundles : bundles;
+  const selected = driverBundles.length > 0 ? driverBundles : unique;
+  return [...selected].sort(compareStructureAccessBundles);
+}
+
+export type StructureAccessBundlePresentation = {
+  kind: "smart" | "kbox" | "classico";
+  label: "Smart" | "KBox" | "Classico";
+};
+
+/** Simbolo UI sulla label del tipo mazzo: prima smart, poi kbox, altrimenti Classico. */
+export function resolveStructureAccessBundlePresentation(
+  typeLabel: string | null | undefined
+): StructureAccessBundlePresentation {
+  const haystack = String(typeLabel ?? "").toLowerCase();
+  if (haystack.includes("smart")) return { kind: "smart", label: "Smart" };
+  if (
+    haystack.includes("keybox") ||
+    haystack.includes("k-box") ||
+    haystack.includes("kbox")
+  ) {
+    return { kind: "kbox", label: "KBox" };
+  }
+  return { kind: "classico", label: "Classico" };
 }
 
 export type StructureAccessKeyKind = "classico" | "smart" | "kbox" | "other";

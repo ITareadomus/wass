@@ -220,7 +220,7 @@ export default function LogisticsDriverSequenceSheet({
     <div
       data-print-driver-sheet
       className={cn(
-        "logistics-driver-sheet-page flex w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-background",
+        "logistics-driver-sheet-page isolate flex w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-background",
         PAGE_BELOW_HEADER_MIN_H,
         "print:min-h-0 print:max-w-none print:overflow-visible"
       )}

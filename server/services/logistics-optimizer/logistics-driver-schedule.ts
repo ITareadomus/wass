@@ -106,6 +106,7 @@ function buildLogisticsScheduleForDriverOnce(args: {
 
     if (isCheckoutApplicableOnWorkDate(task.checkoutTime, task.checkoutDate, workDate)) {
       const checkoutMin = parseHmToMinutes(task.checkoutTime, 0) ?? 0;
+      // Il checkout non ritarda più l'inizio: se è più tardi, il task resta un avviso.
       startMin = resolveCheckoutSchedule(arrivalMin, checkoutMin).startMin;
     }
 

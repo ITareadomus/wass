@@ -1,5 +1,5 @@
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { TaskType as Task } from "@shared/schema";
 import TaskCard from "@/components/drag-drop/task-card";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ interface MapSectionProps {
   mapMinHeight?: string | number;
   compact?: boolean;
   personnelColorScope?: PersonnelColorScope;
+  headerExtra?: ReactNode;
 }
 
 const MILAN_CENTER = { lat: 45.464, lng: 9.19 };
@@ -63,6 +64,7 @@ export default function MapSection({
   mapMinHeight,
   compact = false,
   personnelColorScope = "housekeeping",
+  headerExtra,
 }: MapSectionProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const googleMapRef = useRef<any>(null);
@@ -102,9 +104,9 @@ export default function MapSection({
   const getMapMarkerTitle = (task: Task): string => {
     const adamCode = String(task.name ?? "").trim();
     const clientAlias = String((task as any).alias ?? "").trim();
-    const address = String(task.address ?? "").trim();
+    const aptCode = String(task.apt_code ?? "").trim();
     const line1 = clientAlias ? `${adamCode} - ${clientAlias}` : adamCode;
-    return address ? `${line1}\n${address}` : line1;
+    return aptCode ? `${line1}\n${aptCode}` : line1;
   };
 
   // Carica i cleaners
@@ -677,8 +679,8 @@ export default function MapSection({
 
   return (
     <div className={cn("bg-card rounded-lg border-2 border-border shadow-sm box-border overflow-hidden", compact && "flex flex-col", className)}>
-      <div className={cn("border-b border-border", compact ? "px-3 py-2" : "p-4")}>
-        <h3 className="font-semibold text-foreground flex items-center">
+      <div className={cn("flex items-center justify-between gap-2 border-b border-border", compact ? "px-3 py-2" : "p-4")}>
+        <h3 className="font-semibold text-foreground flex items-center min-w-0">
           <svg 
             className="w-5 h-5 mr-2 text-custom-blue" 
             fill="none" 
@@ -700,6 +702,7 @@ export default function MapSection({
           </svg>
           Mappa Appartamenti
         </h3>
+        {headerExtra}
       </div>
       <div className={cn("relative", compact ? "min-h-0 flex-1 p-2" : "p-4", bodyClassName)}>
         <div 
@@ -719,10 +722,10 @@ export default function MapSection({
 
         {/* TaskCard overlay quando un marker è selezionato */}
         {selectedTask && (
-          <div className="absolute top-4 right-4 z-10 max-w-sm">
-            <div className="bg-background rounded-lg shadow-2xl border-2 border-custom-blue p-4">
-              <div className="flex justify-between items-start mb-2">
-                <h4 className="font-bold text-base">Dettagli Appartamento</h4>
+          <div className="absolute top-2 right-2 z-10 w-64 max-w-[calc(100%-1rem)]">
+            <div className="bg-background rounded-lg shadow-2xl border-2 border-custom-blue p-2.5">
+              <div className="mb-1.5 flex items-start justify-between gap-2">
+                <h4 className="text-sm font-bold leading-tight">Dettagli Appartamento</h4>
                 <button
                   onClick={() => setSelectedTask(null)}
                   className="text-muted-foreground hover:text-foreground"
@@ -730,7 +733,7 @@ export default function MapSection({
                   ✕
                 </button>
               </div>
-              <div className="space-y-2 text-sm">
+              <div className="space-y-1 text-xs leading-snug">
                 <div>
                   <span className="font-semibold">Codice ADAM:</span> {selectedTask.name}
                 </div>
@@ -744,6 +747,10 @@ export default function MapSection({
                 </div>
                 <div>
                   <span className="font-semibold">Indirizzo:</span> {selectedTask.address?.toUpperCase()}
+                </div>
+                <div>
+                  <span className="font-semibold">APT Code:</span>{" "}
+                  {String(selectedTask.apt_code ?? "").trim() || "NON MIGRATO"}
                 </div>
                 <div>
                   <span className="font-semibold">Durata pulizie:</span> {selectedTask.duration.replace(".", ":")} ore

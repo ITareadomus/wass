@@ -4,6 +4,8 @@ import { taskCollaborationService } from './pg-task-collaboration-service';
 import { formatInTimeZone } from 'date-fns-tz';
 import { databaseConfig } from '../../config/database';
 import { isDevelopmentEnvironment } from '../../shared/work-date-access';
+import { attachAptCodesFromStructures } from './adam-structure-apt-code';
+import { diffAssignmentSnapshots, summarizeTimeChange, type AssignmentChange, type AssignmentSnap } from './timeline-revision-diff';
 
 const ROME_TZ = 'Europe/Rome';
 
@@ -1502,6 +1504,8 @@ export class PgDailyAssignmentsService {
         tasks: ca.tasks.sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
       }));
 
+      await attachAptCodesFromStructures(cleaners_assignments.flatMap((ca) => ca.tasks));
+
       const totalTasks = cleaners_assignments.reduce((sum, ca) => sum + ca.tasks.length, 0);
       const usedCleaners = cleaners_assignments.filter(ca => ca.tasks.length > 0).length;
 
@@ -1722,7 +1726,7 @@ export class PgDailyAssignmentsService {
    * Uses the revisions metadata table for reliable revision tracking
    * Includes change tracking fields: edited_fields, old_values, new_values
    */
-  async getHistoryRevisions(workDate: string, scope: string | null = 'housekeeping'): Promise<{ 
+  async getHistoryRevisions(workDate: string, scope: string | null = 'housekeeping', limit?: number): Promise<{ 
     revision: number; 
     created_at: Date; 
     created_by: string; 
@@ -1734,6 +1738,7 @@ export class PgDailyAssignmentsService {
   }[]> {
     try {
       const normalizedScope = this.normalizeScope(scope);
+      const cappedLimit = Number.isFinite(limit) ? Math.min(Math.max(Math.trunc(limit as number), 1), 200) : null;
       const result = await query(`
         SELECT revision, created_at, created_by, task_count, modification_type, 
                edited_fields, old_values, new_values
@@ -1741,7 +1746,8 @@ export class PgDailyAssignmentsService {
         WHERE work_date = $1
           AND (${normalizedScope === 'office' ? "scope = 'office'" : "(scope = 'housekeeping' OR scope IS NULL)"})
         ORDER BY revision DESC
-      `, [workDate]);
+        ${cappedLimit ? "LIMIT $2" : ""}
+      `, cappedLimit ? [workDate, cappedLimit] : [workDate]);
       return result.rows;
     } catch (error) {
       console.error('❌ PG History: Errore nel caricamento revisioni:', error);
@@ -1813,6 +1819,140 @@ export class PgDailyAssignmentsService {
     } catch (error) {
       console.error('❌ PG History: Errore nel recupero ultimo trasferimento ADAM:', error);
       return null;
+    }
+  }
+
+  async getTimelineActionHistory(workDate: string, scope: string | null = 'housekeeping', limit = 5) {
+    const revisions = await this.getHistoryRevisions(workDate, scope, 120);
+    const withChanges = await this.attachAssignmentChanges(workDate, scope, revisions, false);
+    return withChanges.filter(isVisibleHistoryRow).slice(0, limit);
+  }
+
+  async getLogisticsTimelineActionHistory(workDate: string, limit = 5) {
+    const revisions = await this.getLogisticsTimelineRevisions(workDate, 120);
+    const withChanges = await this.attachAssignmentChanges(workDate, null, revisions, true);
+    return withChanges.filter(isVisibleHistoryRow).slice(0, limit);
+  }
+
+  private async attachAssignmentChanges<T extends { revision: number }>(
+    workDate: string,
+    scope: string | null,
+    revisions: T[],
+    logistics: boolean,
+  ): Promise<Array<T & { changes: AssignmentChange[]; detail: string | null; detailTier: string | null }>> {
+    if (revisions.length === 0) return [];
+    const revisionNumbers = revisions.map((row) => Number(row.revision));
+    const oldest = revisionNumbers[revisionNumbers.length - 1];
+    const previousRevision = logistics
+      ? await this.previousLogisticsRevision(workDate, oldest)
+      : await this.previousHousekeepingRevision(workDate, scope, oldest);
+    const revisionIds = previousRevision == null ? revisionNumbers : [...revisionNumbers, previousRevision];
+    const snaps = logistics
+      ? await this.loadLogisticsAssignmentSnaps(workDate, revisionIds)
+      : await this.loadHousekeepingAssignmentSnaps(workDate, scope, revisionIds);
+    await applyStaffAliases(snaps);
+
+    return revisions.map((row, index) => {
+      const beforeRevision = index + 1 < revisionNumbers.length
+        ? revisionNumbers[index + 1]
+        : previousRevision;
+      const before = beforeRevision == null ? null : (snaps.get(beforeRevision) ?? []);
+      const after = snaps.get(revisionNumbers[index]) ?? [];
+      const changes = diffAssignmentSnapshots(before, after);
+      const timeChange = changes.length > 0 ? null : summarizeTimeChange(before, after);
+      return { ...row, changes, detail: timeChange?.text ?? null, detailTier: timeChange?.tier ?? null };
+    });
+  }
+
+  private async previousHousekeepingRevision(workDate: string, scope: string | null, beforeRevision: number): Promise<number | null> {
+    const normalizedScope = this.normalizeScope(scope);
+    const result = await query(
+      `
+      SELECT revision
+      FROM daily_assignments_revisions
+      WHERE work_date = $1 AND revision < $2
+        AND (${normalizedScope === 'office' ? "scope = 'office'" : "(scope = 'housekeeping' OR scope IS NULL)"})
+      ORDER BY revision DESC
+      LIMIT 1
+    `,
+      [workDate, beforeRevision],
+    );
+    const value = Number(result.rows[0]?.revision);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  private async previousLogisticsRevision(workDate: string, beforeRevision: number): Promise<number | null> {
+    const result = await query(
+      `
+      SELECT revision
+      FROM lg_timeline_revision
+      WHERE work_date = $1 AND revision < $2
+      ORDER BY revision DESC
+      LIMIT 1
+    `,
+      [workDate, beforeRevision],
+    );
+    const value = Number(result.rows[0]?.revision);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  private async loadHousekeepingAssignmentSnaps(
+    workDate: string,
+    scope: string | null,
+    revisionIds: number[],
+  ): Promise<Map<number, AssignmentSnap[]>> {
+    if (revisionIds.length === 0) return new Map();
+    const normalizedScope = this.normalizeScope(scope);
+    const result = await query(
+      `
+      SELECT revision, task_id, logistic_code, alias, cleaner_id, cleaner_name, cleaner_lastname, sequence, start_time, end_time, premium, straordinaria
+      FROM daily_assignments_history
+      WHERE work_date = $1 AND revision = ANY($2::int[])
+        AND (${normalizedScope === 'office' ? "scope = 'office'" : "(scope = 'housekeeping' OR scope IS NULL)"})
+    `,
+      [workDate, revisionIds],
+    );
+    return groupAssignmentSnaps(result.rows, 'cleaner_id', 'cleaner_name', 'cleaner_lastname');
+  }
+
+  private async loadLogisticsAssignmentSnaps(
+    workDate: string,
+    revisionIds: number[],
+  ): Promise<Map<number, AssignmentSnap[]>> {
+    if (revisionIds.length === 0) return new Map();
+    const result = await query(
+      `
+      SELECT revision, task_id, logistic_code, alias, driver_id, driver_name, driver_lastname, sequence, start_time, end_time, premium, straordinaria
+      FROM lg_timeline_history
+      WHERE work_date = $1 AND revision = ANY($2::int[])
+    `,
+      [workDate, revisionIds],
+    );
+    return groupAssignmentSnaps(result.rows, 'driver_id', 'driver_name', 'driver_lastname');
+  }
+
+  async getLogisticsTimelineRevisions(workDate: string, limit = 5): Promise<{
+    revision: number;
+    created_at: Date;
+    created_by: string;
+    modification_type: string;
+  }[]> {
+    try {
+      const cappedLimit = Math.min(Math.max(Math.trunc(limit) || 5, 1), 200);
+      const result = await query(
+        `
+        SELECT revision, created_at, created_by, modification_type
+        FROM lg_timeline_revision
+        WHERE work_date = $1
+        ORDER BY revision DESC
+        LIMIT $2
+      `,
+        [workDate, cappedLimit]
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('❌ PG: getLogisticsTimelineRevisions:', error);
+      return [];
     }
   }
 
@@ -2227,6 +2367,7 @@ export class PgDailyAssignmentsService {
         ...da,
         tasks: da.tasks.sort((a, b) => (a.sequence || 0) - (b.sequence || 0)),
       }));
+      await attachAptCodesFromStructures(drivers_assignments.flatMap((da) => da.tasks));
       const totalTasks = drivers_assignments.reduce((sum, da) => sum + da.tasks.length, 0);
       return {
         drivers_assignments,
@@ -2435,7 +2576,13 @@ export class PgDailyAssignmentsService {
         if (row.address) task.address = row.address;
         if (row.lat !== null) task.lat = String(row.lat);
         if (row.lng !== null) task.lng = String(row.lng);
-        if (row.cleaning_time) task.cleaning_time = row.cleaning_time;
+        if (row.cleaning_time != null) {
+          const cleaningMinutes = Number(row.cleaning_time) || 0;
+          task.cleaning_time = cleaningMinutes;
+          const hours = Math.floor(cleaningMinutes / 60);
+          const mins = cleaningMinutes % 60;
+          task.duration = `${hours}.${String(mins).padStart(2, "0")}`;
+        }
         task.checkin_date = normalizeDateToYmd(row.checkin_date) ?? undefined;
         task.checkout_date = normalizeDateToYmd(row.checkout_date) ?? undefined;
         if (row.checkin_time) task.checkin_time = row.checkin_time.substring(0, 5);
@@ -2516,6 +2663,11 @@ export class PgDailyAssignmentsService {
       // Build structure matching create_containers.py format
       this.annotateActiveDuplicateMetadata(tasksByPriority);
       this.sortContainerBucketsLockedLast(tasksByPriority);
+      await attachAptCodesFromStructures([
+        ...tasksByPriority.early_out,
+        ...tasksByPriority.high_priority,
+        ...tasksByPriority.low_priority,
+      ]);
 
       const containers = {
         early_out: {
@@ -2622,7 +2774,13 @@ export class PgDailyAssignmentsService {
         if (row.address) task.address = row.address;
         if (row.lat !== null) task.lat = String(row.lat);
         if (row.lng !== null) task.lng = String(row.lng);
-        if (row.cleaning_time) task.cleaning_time = row.cleaning_time;
+        if (row.cleaning_time != null) {
+          const cleaningMinutes = Number(row.cleaning_time) || 0;
+          task.cleaning_time = cleaningMinutes;
+          const hours = Math.floor(cleaningMinutes / 60);
+          const mins = cleaningMinutes % 60;
+          task.duration = `${hours}.${String(mins).padStart(2, "0")}`;
+        }
         task.checkin_date = normalizeDateToYmd(row.checkin_date) ?? undefined;
         task.checkout_date = normalizeDateToYmd(row.checkout_date) ?? undefined;
         if (row.checkin_time) task.checkin_time = row.checkin_time.substring(0, 5);
@@ -2721,6 +2879,11 @@ export class PgDailyAssignmentsService {
 
       this.annotateActiveDuplicateMetadata(tasksByPriority);
       this.sortContainerBucketsLockedLast(tasksByPriority);
+      await attachAptCodesFromStructures([
+        ...tasksByPriority.early_out,
+        ...tasksByPriority.high_priority,
+        ...tasksByPriority.low_priority,
+      ]);
 
       const containers = {
         early_out: { tasks: tasksByPriority.early_out, count: tasksByPriority.early_out.length },
@@ -4694,6 +4857,82 @@ export class PgDailyAssignmentsService {
       client.release();
     }
   }
+}
+
+const HISTORY_NOISE_WITHOUT_ASSIGNMENT = new Set([
+  "timeline_rehydrate_preassigned",
+  "api_save_timeline",
+  "api_save_logistics_timeline",
+]);
+
+async function applyStaffAliases(snaps: Map<number, AssignmentSnap[]>): Promise<void> {
+  const ids = [...new Set([...snaps.values()].flatMap((list) => list.map((snap) => snap.staffId)))];
+  if (ids.length === 0) return;
+  const result = await query(
+    `SELECT cleaner_id, alias FROM aliases WHERE cleaner_id = ANY($1::int[])`,
+    [ids],
+  );
+  const byId = new Map<number, string>();
+  for (const row of result.rows) {
+    const alias = String(row.alias ?? "").trim();
+    const id = Number(row.cleaner_id);
+    if (alias && Number.isFinite(id)) byId.set(id, alias);
+  }
+  for (const list of snaps.values()) {
+    for (const snap of list) {
+      const alias = byId.get(snap.staffId);
+      if (alias) snap.staffLabel = alias;
+    }
+  }
+}
+
+function taskTier(premium: unknown, straordinaria: unknown): AssignmentSnap["tier"] {
+  const on = (value: unknown) => {
+    if (value === true || value === 1) return true;
+    const text = String(value ?? "").trim().toLowerCase();
+    return text === "true" || text === "t" || text === "1";
+  };
+  if (on(straordinaria)) return "straordinaria";
+  if (on(premium)) return "premium";
+  return "standard";
+}
+
+function isVisibleHistoryRow(row: { modification_type?: string | null; changes: AssignmentChange[]; detail: string | null }): boolean {
+  if (row.changes.length > 0) return true;
+  if (HISTORY_NOISE_WITHOUT_ASSIGNMENT.has(String(row.modification_type || ""))) return false;
+  return Boolean(row.detail);
+}
+
+function groupAssignmentSnaps(
+  rows: any[],
+  staffIdKey: string,
+  staffNameKey: string,
+  staffLastnameKey: string,
+): Map<number, AssignmentSnap[]> {
+  const grouped = new Map<number, AssignmentSnap[]>();
+  for (const row of rows) {
+    const revision = Number(row.revision);
+    const taskId = Number(row.task_id);
+    const staffId = Number(row[staffIdKey]);
+    if (!Number.isFinite(revision) || !Number.isFinite(taskId) || !Number.isFinite(staffId)) continue;
+    const alias = String(row.alias ?? "").trim();
+    const logisticCode = Number(row.logistic_code);
+    const name = `${String(row[staffNameKey] ?? "").trim()} ${String(row[staffLastnameKey] ?? "").trim()}`.trim();
+    const snap: AssignmentSnap = {
+      taskId,
+      label: Number.isFinite(logisticCode) && logisticCode > 0 ? String(logisticCode) : (alias || `#${taskId}`),
+      staffId,
+      staffLabel: name || `ID ${staffId}`,
+      sequence: Number(row.sequence) || 0,
+      startTime: String(row.start_time ?? "").trim(),
+      endTime: String(row.end_time ?? "").trim(),
+      tier: taskTier(row.premium, row.straordinaria),
+    };
+    const list = grouped.get(revision) ?? [];
+    list.push(snap);
+    grouped.set(revision, list);
+  }
+  return grouped;
 }
 
 export const pgDailyAssignmentsService = new PgDailyAssignmentsService();
