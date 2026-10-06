@@ -34,6 +34,13 @@ interface Account {
   role: "admin" | "user" | "viewer" | "logistica";
 }
 
+/** Password da mostrare e modificare: in chiaro, mai l'eventuale hash bcrypt residuo. */
+function accountPassword(account: Pick<Account, "password" | "plain_password">): string {
+  const plain = account.plain_password?.trim();
+  if (plain && !plain.startsWith("$2")) return plain;
+  return account.password;
+}
+
 interface TaskTypeRules {
   standard_cleaner: boolean;
   premium_cleaner: boolean;
@@ -483,7 +490,7 @@ export default function Settings() {
                           <div className="flex items-center gap-2">
                             <p className="text-sm text-muted-foreground">
                               {showPassword[account.id]
-                                ? (account.plain_password || "••••••••")
+                                ? (accountPassword(account) || "••••••••")
                                 : "••••••••"}
                             </p>
                             <Button
@@ -511,7 +518,12 @@ export default function Settings() {
                         </div>
                         <div className="flex gap-2">
                           <Button
-                            onClick={() => setEditingAccount(account)}
+                            onClick={() =>
+                              setEditingAccount({
+                                ...account,
+                                password: accountPassword(account),
+                              })
+                            }
                             variant="outline"
                             size="sm"
                             className="border-2 border-custom-blue"

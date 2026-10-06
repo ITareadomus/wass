@@ -1,5 +1,4 @@
 import pool, { query } from '../../shared/pg-db';
-import bcrypt from 'bcrypt';
 
 export interface User {
   id: number;
@@ -31,6 +30,17 @@ export class PgUsersService {
       // Ensure adam_id column exists (migration for existing tables)
       await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS adam_id INTEGER`);
       await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS plain_password TEXT`);
+      // Le password restano in chiaro. Se `password` è ancora un hash bcrypt
+      // e `plain_password` è leggibile, ripristina il valore in chiaro.
+      await query(`
+        UPDATE users
+        SET password = plain_password,
+            updated_at = NOW()
+        WHERE plain_password IS NOT NULL
+          AND plain_password <> ''
+          AND plain_password !~ '^\\$2[aby]\\$'
+          AND password IS DISTINCT FROM plain_password
+      `);
       console.log('✅ PG: Tabella users verificata/creata');
     } catch (error) {
       console.error('❌ PG: Errore nella creazione tabella users:', error);
@@ -70,10 +80,9 @@ export class PgUsersService {
 
   async createUser(username: string, password: string, role: string = 'user'): Promise<User | null> {
     try {
-      const hashedPassword = await bcrypt.hash(password, 10);
       const result = await query(
-        'INSERT INTO users (username, password, plain_password, role) VALUES ($1, $2, $3, $4) RETURNING id, username, password, plain_password, role, created_at, updated_at',
-        [username, hashedPassword, password, role]
+        'INSERT INTO users (username, password, plain_password, role) VALUES ($1, $2, $2, $3) RETURNING id, username, password, plain_password, role, created_at, updated_at',
+        [username, password, role]
       );
       console.log(`✅ PG: User ${username} creato`);
       return result.rows[0] || null;
@@ -94,9 +103,8 @@ export class PgUsersService {
         values.push(updates.username);
       }
       if (updates.password !== undefined) {
-        const hashedPassword = await bcrypt.hash(updates.password, 10);
         setClauses.push(`password = $${paramIndex++}`);
-        values.push(hashedPassword);
+        values.push(updates.password);
         setClauses.push(`plain_password = $${paramIndex++}`);
         values.push(updates.password);
       }
@@ -145,10 +153,9 @@ export class PgUsersService {
       
       const user = result.rows[0];
       if (!user) return null;
-      
-      const passwordMatch = await bcrypt.compare(password, user.password);
-      if (!passwordMatch) return null;
-      
+
+      if (user.password !== password) return null;
+
       return user;
     } catch (error) {
       console.error(`❌ PG: Errore nella validazione login:`, error);
