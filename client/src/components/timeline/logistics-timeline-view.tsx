@@ -156,6 +156,9 @@ interface LogisticsTimelineViewProps {
   onOpenMap?: () => void;
   statisticsOpen?: boolean;
   mapOpen?: boolean;
+  /** Lampeggio di "Invia a drivers" dopo la conferma della giornata. */
+  attentionSendToDrivers?: boolean;
+  onDismissSendToDriversAttention?: () => void;
 }
 
 /** Tasto shift orario prima fermata (come HK). Mettere `true` per riattivarlo. */
@@ -430,6 +433,8 @@ export default function LogisticsTimelineView({
   onOpenMap,
   statisticsOpen = false,
   mapOpen = false,
+  attentionSendToDrivers = false,
+  onDismissSendToDriversAttention,
 }: LogisticsTimelineViewProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -704,6 +709,8 @@ export default function LogisticsTimelineView({
   }
 
   const hasTasksInTimeline = driversAssignments.some((r) => (r.tasks?.length || 0) > 0);
+  const showSendToDriversAttention =
+    attentionSendToDrivers && !isReadOnly && hasTasksInTimeline && !isTransferringToAdam;
   const convocatiDrivers = drivers.filter((d) => !d.isRemoved);
 
   const getDriverRowDisplayLabel = (driver: LogisticsDriverRow) => {
@@ -2490,25 +2497,33 @@ export default function LogisticsTimelineView({
                 registerRef={registerTimelineScrollRef}
                 onScroll={handleTimelineScroll}
               />
-              <div className="relative flex h-[40px] shrink-0 items-stretch px-1">
+              <div className="relative mt-3 flex h-[40px] shrink-0 items-stretch px-1">
                 <div
                   className="relative flex-shrink-0 print:hidden"
                   style={{ width: `${driverColumnWidth}px` }}
                   aria-hidden
                 />
-                <div className="grid h-full flex-1 grid-cols-[1fr_auto] items-center pl-2 pr-0">
+                <div className="grid h-full flex-1 grid-cols-[1fr_auto] items-center pl-2 pr-2">
                   <Button
-                    onClick={() => setShowAdamTransferDialog(true)}
+                    onClick={() => {
+                      onDismissSendToDriversAttention?.();
+                      setShowAdamTransferDialog(true);
+                    }}
                     size="sm"
                     variant="outline"
-                    className="col-start-2 h-[38px] justify-self-end border-2 border-custom-blue px-3"
+                    className={cn(
+                      "col-start-2 h-[38px] justify-self-end border-2 px-3",
+                      showSendToDriversAttention ? "animate-blink-send-drivers" : "border-custom-blue",
+                    )}
                     disabled={isReadOnly || !hasTasksInTimeline || isTransferringToAdam}
                     title={
                       isReadOnly
                         ? "Non puoi inviare in modalità storico"
                         : !hasTasksInTimeline
                           ? "Nessuna task assegnata nella timeline"
-                          : "Invia le assegnazioni logistica ai driver"
+                          : attentionSendToDrivers
+                            ? "Giornata confermata: invia le assegnazioni ai driver"
+                            : "Invia le assegnazioni logistica ai driver"
                     }
                     data-testid="button-transfer-logistics-adam"
                   >
@@ -2528,7 +2543,7 @@ export default function LogisticsTimelineView({
                 >
                   <CheckCircle className="h-4 w-4 text-custom-blue" />
                   <span>
-                    {lastAdamTransfer ? `Salvato il ${(() => {
+                    {lastAdamTransfer ? `Inviato il ${(() => {
                       const d = new Date(lastAdamTransfer);
                       const day = String(d.getDate()).padStart(2, "0");
                       const month = String(d.getMonth() + 1).padStart(2, "0");
@@ -2536,7 +2551,7 @@ export default function LogisticsTimelineView({
                       const hours = String(d.getHours()).padStart(2, "0");
                       const minutes = String(d.getMinutes()).padStart(2, "0");
                       return `${day}/${month}/${year} alle ${hours}:${minutes}`;
-                    })()}` : "Nessun salvataggio su ADAM"}
+                    })()}` : "Non inviato ai drivers"}
                   </span>
                 </div>
               </div>

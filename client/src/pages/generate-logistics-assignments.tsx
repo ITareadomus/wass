@@ -496,12 +496,41 @@ function timelineRowToTaskType(t: any, fallbackPriority: TaskType["priority"]): 
   };
 }
 
+const LOGISTICS_SEND_DRIVERS_ATTENTION_PREFIX = "wass:logistics-send-drivers-attention:";
+
+function readLogisticsSendDriversAttention(workDate: string): boolean {
+  try {
+    return sessionStorage.getItem(`${LOGISTICS_SEND_DRIVERS_ATTENTION_PREFIX}${workDate}`) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeLogisticsSendDriversAttention(workDate: string, pending: boolean) {
+  try {
+    const key = `${LOGISTICS_SEND_DRIVERS_ATTENTION_PREFIX}${workDate}`;
+    if (pending) sessionStorage.setItem(key, "1");
+    else sessionStorage.removeItem(key);
+  } catch {
+    /* promemoria non persistito */
+  }
+}
+
 export default function GenerateLogisticsAssignments() {
   const { toast } = useToast();
   // Chi vede solo la logistica apre sempre oggi. Gli altri usano la stessa data di housekeeping.
   const [selectedDate, setSelectedDate] = useState<Date>(() =>
     isLogisticaRole(getStoredUserRole()) ? new Date() : readSharedWorkDate()
   );
+  const [sendToDriversAttention, setSendToDriversAttention] = useState(() =>
+    readLogisticsSendDriversAttention(format(selectedDate, "yyyy-MM-dd"))
+  );
+
+  useEffect(() => {
+    setSendToDriversAttention(
+      readLogisticsSendDriversAttention(format(selectedDate, "yyyy-MM-dd"))
+    );
+  }, [selectedDate]);
   const [searchTask, setSearchTask] = useState("");
   const [mapLayout, setMapLayoutState] = useState<LogisticsMapLayout>(readLogisticsMapLayout);
   const [dockedMapWidth, setDockedMapWidth] = useState(readDockedMapWidth);
@@ -616,7 +645,7 @@ export default function GenerateLogisticsAssignments() {
   const [isLoadingDragDrop, setIsLoadingDragDrop] = useState(false);
   const [isDraggingTimelineTask, setIsDraggingTimelineTask] = useState(false);
   const [draggingOverDriverId, setDraggingOverDriverId] = useState<number | null>(null);
-  /** Nasconde i containers e mostra il sommario anche se restano task non locked. */
+  /** Nasconde i containers anche se restano task non locked. Il resoconto resta visibile. */
   const [containersManuallyCollapsed, setContainersManuallyCollapsed] = useState(false);
   /** Riapre i containers a mano anche se vuoti o con soli task locked. */
   const [containersForcedOpen, setContainersForcedOpen] = useState(false);
@@ -1025,6 +1054,8 @@ export default function GenerateLogisticsAssignments() {
           title: "Ipotesi applicata",
           description: `${hypothesis.summary.title}: ${assignedCount} task assegnate, ${unassignedCount} non assegnate`,
         });
+        writeLogisticsSendDriversAttention(dateStr, true);
+        setSendToDriversAttention(true);
         clearHypothesisPreview();
         await reloadLogisticsPage();
       } catch (e: unknown) {
@@ -1355,7 +1386,6 @@ export default function GenerateLogisticsAssignments() {
 
   const showContainers =
     containersForcedOpen || (hasUnlockedContainerTasks && !containersManuallyCollapsed);
-  const showSequenceSummary = !showContainers;
 
   const sequenceSummaryGroups = useMemo(() => {
     const groups = buildSequenceSummaryGroupsFromDriverAssignments(
@@ -1784,10 +1814,10 @@ export default function GenerateLogisticsAssignments() {
                       setContainersForcedOpen(false);
                     }}
                     className="relative z-10 -mb-[2px] inline-flex max-w-full items-center gap-1.5 rounded-t-lg border-2 border-b-0 border-custom-blue bg-custom-blue-light px-2.5 py-1 text-[12px] font-medium leading-tight text-custom-blue after:pointer-events-none after:absolute after:-bottom-[2px] after:left-0 after:right-0 after:h-[2px] after:bg-custom-blue-light"
-                    aria-label="Nascondi containers per mostrare il sommario dei task assegnati"
+                    aria-label="Nascondi containers"
                   >
                     <ChevronUp className="h-4 w-4 shrink-0" />
-                    <span>Nascondi containers per mostrare il sommario dei task assegnati</span>
+                    <span>Nascondi containers</span>
                   </button>
                 </div>
                 <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-3">
@@ -1870,6 +1900,11 @@ export default function GenerateLogisticsAssignments() {
                   lastValidDragIndex={lastValidDragIndex}
                   onRefresh={reloadLogisticsPage}
                   adamSyncHistory={adamSyncHistory}
+                  attentionSendToDrivers={sendToDriversAttention}
+                  onDismissSendToDriversAttention={() => {
+                    writeLogisticsSendDriversAttention(format(selectedDate, "yyyy-MM-dd"), false);
+                    setSendToDriversAttention(false);
+                  }}
                   className={!showContainers ? "rounded-tr-none" : undefined}
                   onOpenStatistics={toggleStatistics}
                   onOpenMap={toggleMap}
@@ -1997,21 +2032,19 @@ export default function GenerateLogisticsAssignments() {
             )}
           </div>
 
-          {showSequenceSummary && (
-            <AssignedTasksSequenceSummary
-              groups={sequenceSummaryGroups}
-              searchTask={searchTask}
-              staffLabel="Driver"
-              isDragDisabled={isTimelineReadOnly || isHypothesisPreview || isLoadingDragDrop}
-              loadingDriverIds={
-                isLoadingDragDrop ? logisticsDrivers.map((driver) => logisticsLaneStaffId(driver)) : []
-              }
-              workDate={format(selectedDate, "yyyy-MM-dd")}
-              draggingOverDriverId={draggingOverDriverId}
-              activeDragDriverId={activeDragDriverId}
-              lastValidDragIndex={lastValidDragIndex}
-            />
-          )}
+          <AssignedTasksSequenceSummary
+            groups={sequenceSummaryGroups}
+            searchTask={searchTask}
+            staffLabel="Driver"
+            isDragDisabled={isTimelineReadOnly || isHypothesisPreview || isLoadingDragDrop}
+            loadingDriverIds={
+              isLoadingDragDrop ? logisticsDrivers.map((driver) => logisticsLaneStaffId(driver)) : []
+            }
+            workDate={format(selectedDate, "yyyy-MM-dd")}
+            draggingOverDriverId={draggingOverDriverId}
+            activeDragDriverId={activeDragDriverId}
+            lastValidDragIndex={lastValidDragIndex}
+          />
           <DndRemoveZone
             scope="logistics"
             visible={isDraggingTimelineTask && !isTimelineReadOnly && !isHypothesisPreview && !isLoadingDragDrop}

@@ -67,7 +67,16 @@ const ACTION_LABELS: Record<string, string> = {
   prune_empty_operational_day: "Task rimossi a fine giornata",
   auto_assign_early_out: "Assegnazione automatica Early out",
   auto_assign_high_priority: "Assegnazione automatica High priority",
+  auto_assign_low_priority: "Assegnazione automatica Low priority",
 };
+
+function hidesAssignmentList(type: string | null): boolean {
+  const key = String(type || "").trim();
+  if (key === "timeline_reset" || key === "reset") return true;
+  if (key.startsWith("auto_assign_")) return true;
+  if (key.startsWith("optimizer") || key.startsWith("wave-")) return true;
+  return false;
+}
 
 function actionLabel(type: string | null): string {
   const key = String(type || "").trim();
@@ -199,8 +208,10 @@ export function TimelineActionHistoryButton({
           ) : (
             <ol className="min-h-0 space-y-2 overflow-y-auto pr-1">
               {rows.map((row) => {
-                const detailLine = row.detail ? splitTaskLine(row.detail) : null;
-                const changes = row.changes ?? [];
+                const omitTasks = hidesAssignmentList(row.modification_type);
+                const detail = omitTasks ? null : row.detail;
+                const detailLine = detail ? splitTaskLine(detail) : null;
+                const changes = omitTasks ? [] : (row.changes ?? []);
                 const expanded = expandedRevisions.includes(row.revision);
                 const visibleChanges = expanded ? changes : changes.slice(0, 4);
                 const hiddenCount = changes.length - 4;
@@ -218,13 +229,13 @@ export function TimelineActionHistoryButton({
                       </span>
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">{actorLabel(row.created_by)}</p>
-                    {(row.detail || (row.changes && row.changes.length > 0)) && (
+                    {(detail || changes.length > 0) && (
                       <ul className="mt-2 space-y-1.5">
                         {detailLine && (
                           <HistoryTaskLine task={detailLine.task} rest={detailLine.rest} tier={row.detailTier} />
                         )}
-                        {!detailLine && row.detail && (
-                          <li className="text-xs leading-snug text-foreground">{row.detail}</li>
+                        {!detailLine && detail && (
+                          <li className="text-xs leading-snug text-foreground">{detail}</li>
                         )}
                         {visibleChanges.map((change, index) => (
                           <HistoryTaskLine
