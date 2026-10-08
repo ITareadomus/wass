@@ -1689,12 +1689,13 @@ export default function GenerateLogisticsAssignments() {
                       !selectedDate && "text-muted-foreground"
                     )}
                     data-testid="button-logistics-work-date"
+                    data-viewer-allow=""
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: it }) : <span>Seleziona data</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0" align="start" data-viewer-allow="">
                   <Calendar
                     mode="single"
                     selected={selectedDate}
@@ -1758,6 +1759,7 @@ export default function GenerateLogisticsAssignments() {
                   onChange={(e) => setSearchTask(e.target.value)}
                   className="border-2 border-custom-blue pl-10"
                   data-testid="input-search-task-logistics"
+                  data-viewer-allow=""
                 />
               </div>
               <div className="flex shrink-0 items-center overflow-hidden rounded-md border-2 border-custom-blue bg-custom-blue">
@@ -2010,6 +2012,7 @@ export default function GenerateLogisticsAssignments() {
                     headerExtra={
                       <button
                         type="button"
+                        data-viewer-allow=""
                         className={mapLayoutToggleClass}
                         title="Torna alla mappa fluttuante"
                         aria-label="Torna alla mappa fluttuante"

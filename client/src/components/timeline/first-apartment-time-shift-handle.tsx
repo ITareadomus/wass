@@ -7,6 +7,7 @@ import {
   minutesToClock,
   FIRST_APT_TIME_SHIFT_ATTRIBUTE,
 } from "@/lib/first-apartment-time-shift";
+import { getStoredUserRole, isViewerRole } from "@/lib/auth-role";
 
 type FirstApartmentTimeShiftProps = {
   enabled: boolean;
@@ -84,7 +85,7 @@ export function FirstApartmentTimeShift({
     }, 180);
   };
 
-  if (!enabled) {
+  if (!enabled || isViewerRole(getStoredUserRole())) {
     return <>{children}</>;
   }
 

@@ -2563,6 +2563,7 @@ export default function GenerateAssignments() {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
+                    data-viewer-allow=""
                     className={cn(
                       "justify-start border-2 border-custom-blue text-left text-[13px] font-normal [background-clip:unset] [-webkit-background-clip:unset]",
                       !selectedDate && "text-muted-foreground"
@@ -2572,7 +2573,7 @@ export default function GenerateAssignments() {
                     {selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: it }) : <span>Seleziona data</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0" align="start" data-viewer-allow="">
                   <Calendar
                     mode="single"
                     selected={selectedDate}
@@ -2641,6 +2642,7 @@ export default function GenerateAssignments() {
                   onChange={(e) => setSearchTask(e.target.value)}
                   className="border-2 border-custom-blue pl-10"
                   data-testid="input-search-task"
+                  data-viewer-allow=""
                 />
               </div>
               <div className="flex items-center flex-shrink-0 bg-custom-blue rounded-md overflow-hidden border-2 border-custom-blue">
@@ -3006,6 +3008,7 @@ export default function GenerateAssignments() {
                     headerExtra={
                       <button
                         type="button"
+                        data-viewer-allow=""
                         className={mapLayoutToggleClass}
                         title="Torna alla mappa fluttuante"
                         aria-label="Torna alla mappa fluttuante"

@@ -2405,6 +2405,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                       type="button"
                       variant="ghost"
                       size="icon"
+                      data-viewer-allow=""
                       className="h-8 w-8 shrink-0 text-yellow-500 hover:text-yellow-600 hover:bg-yellow-500/10"
                       aria-label="Info visualizzazione task brevi"
                     >
@@ -2432,6 +2433,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   </Label>
                   <Switch
                     id="execution-status-colors-switch"
+                    data-viewer-allow=""
                     checked={showExecutionStatusColors}
                     onCheckedChange={(checked) => setShowExecutionStatusColors(Boolean(checked))}
                     className="h-6 w-11 border-2 border-custom-blue data-[state=unchecked]:bg-sky-200 data-[state=checked]:bg-[hsl(199,89%,48%)] dark:data-[state=unchecked]:bg-sky-900/50 dark:data-[state=checked]:bg-[hsl(217,91%,53%)]"
@@ -2450,6 +2452,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 onClick={() => onOpenStatistics?.()}
                 variant="outline"
                 size="sm"
+                data-viewer-allow=""
                 aria-pressed={statisticsOpen}
                 title={statisticsOpen ? "Chiudi statistiche" : "Apri statistiche"}
                 className={cn(
@@ -2465,6 +2468,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 onClick={() => onOpenMap?.()}
                 variant="outline"
                 size="sm"
+                data-viewer-allow=""
                 aria-pressed={mapOpen}
                 title={mapOpen ? "Chiudi mappa" : "Apri mappa"}
                 className={cn(
@@ -2479,6 +2483,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 onClick={() => setLocation(isOfficeScope ? '/convocazioni?kind=office' : '/convocazioni')}
                 variant="outline"
                 size="sm"
+                data-viewer-allow=""
                 className="flex items-center gap-2 border-2 border-custom-blue"
                 disabled={isRosterEditDisabled}
                 title={isRosterEditDisabled ? rosterEditDisabledTitle : undefined}

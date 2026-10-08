@@ -22,6 +22,13 @@ interface Account {
   id: number;
   username: string;
   role: string;
+  source?: "wass" | "adam";
+  displayName?: string;
+}
+
+function accountLabel(account: Pick<Account, "username" | "source" | "displayName">) {
+  if (account.source === "adam" && account.displayName?.trim()) return account.displayName.trim();
+  return account.username;
 }
 
 interface ThemeToggleProps {
@@ -89,7 +96,7 @@ export function ThemeToggle({ showHomeButton = true, showAccountMenu = true, gap
   const getCurrentUser = () => {
     if (!user) return null;
     try {
-      return JSON.parse(user);
+      return JSON.parse(user) as { id?: number; username?: string; role?: string; source?: "wass" | "adam"; displayName?: string };
     } catch {
       return null;
     }
@@ -101,7 +108,7 @@ export function ThemeToggle({ showHomeButton = true, showAccountMenu = true, gap
     if (!user) return "";
     try {
       const userData = JSON.parse(user);
-      const username = userData.username || "";
+      const username = userData.displayName || userData.username || "";
       return username.charAt(0).toUpperCase();
     } catch {
       return "";
@@ -137,7 +144,7 @@ export function ThemeToggle({ showHomeButton = true, showAccountMenu = true, gap
   };
 
   return (
-    <div className={`flex items-center ${gapClassName}`}>
+    <div className={`flex items-center ${gapClassName}`} data-viewer-allow="">
       <Button
         variant="outline"
         size="icon"
@@ -155,6 +162,7 @@ export function ThemeToggle({ showHomeButton = true, showAccountMenu = true, gap
           onClick={() => setLocation(getHomePath())}
           variant="outline"
           size="icon"
+          data-viewer-allow=""
           className="rounded-full"
           title="Torna alla Home"
         >
@@ -172,21 +180,21 @@ export function ThemeToggle({ showHomeButton = true, showAccountMenu = true, gap
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-56" data-viewer-allow="">
             <DropdownMenuLabel>Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
             
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
                 <User className="mr-2 h-4 w-4" />
-                <span>{currentUser?.username || "Utente"}</span>
+                <span>{(currentUser?.displayName || currentUser?.username) || "Utente"}</span>
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
+              <DropdownMenuSubContent data-viewer-allow="">
                 <DropdownMenuLabel>Cambia Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {accounts.map((account) => (
                   <DropdownMenuItem
-                    key={account.id}
+                    key={`${account.source ?? "wass"}-${account.id}`}
                     onClick={() => switchAccount(account)}
                     className="cursor-pointer"
                   >
@@ -194,12 +202,17 @@ export function ThemeToggle({ showHomeButton = true, showAccountMenu = true, gap
                       <div className="flex items-center gap-2">
                         <Avatar className="h-6 w-6">
                           <AvatarFallback className={`${getAvatarColor(account.id)} text-white text-xs font-semibold`}>
-                            {account.username.charAt(0).toUpperCase()}
+                            {accountLabel(account).charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        <span>{account.username}</span>
+                        <span className="truncate">{accountLabel(account)}</span>
+                        {account.source === "adam" ? (
+                          <span className="inline-flex h-4 items-center rounded border border-violet-300 bg-violet-50 px-1 text-[9px] font-semibold tracking-wide text-violet-700 dark:border-violet-400/80 dark:bg-violet-950 dark:text-violet-300">
+                            AD
+                          </span>
+                        ) : null}
                       </div>
-                      {currentUser?.id === account.id && (
+                      {currentUser?.id === account.id && (currentUser?.source ?? "wass") === (account.source ?? "wass") && (
                         <Check className="h-4 w-4" />
                       )}
                     </div>

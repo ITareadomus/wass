@@ -103,6 +103,7 @@ export function StructureAccessKeyTypeField({ logisticCode }: { logisticCode: st
               <button
                 key={`${bundle.keysId ?? "bundle"}-${bundle.keysNumber ?? index}-${index}`}
                 type="button"
+                data-viewer-allow=""
                 className={cn(
                   "inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors",
                   bundleButtonClass(presentation.kind)

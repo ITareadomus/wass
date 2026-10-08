@@ -175,6 +175,7 @@ export function TimelineActionHistoryButton({
         type="button"
         variant="outline"
         size="sm"
+        data-viewer-allow=""
         className="border-2 border-custom-blue px-2"
         title="Cronologia"
         aria-label="Apri cronologia azioni"
@@ -249,6 +250,7 @@ export function TimelineActionHistoryButton({
                           <li>
                             <button
                               type="button"
+                              data-viewer-allow=""
                               className="pl-1 text-xs text-custom-blue underline-offset-2 hover:underline"
                               onClick={() =>
                                 setExpandedRevisions((current) =>

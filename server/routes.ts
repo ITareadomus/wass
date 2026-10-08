@@ -1175,6 +1175,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
     
     await pgUsersService.ensureTable();
+    const { ensureAdamWassRoleTable } = await import("./services/adam-wass-accounts");
+    await ensureAdamWassRoleTable();
     await pgDailyAssignmentsService.ensureCleanerAliasesAndRevisionsTables();
     await pgDailyAssignmentsService.ensureLockedColumns();
     await pgDailyAssignmentsService.ensureCustomerNoteColumns();
@@ -1230,9 +1232,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await pgUsersService.validateLogin(username, password);
 
       if (!user) {
-        return res.status(401).json({
-          success: false,
-          message: "Username o password non validi"
+        const { loginAdamWassAccount } = await import("./services/adam-wass-accounts");
+        const adamUser = await loginAdamWassAccount(username, password);
+        if (!adamUser) {
+          return res.status(401).json({
+            success: false,
+            message: "Username o password non validi"
+          });
+        }
+        return res.json({
+          success: true,
+          user: adamUser,
+          message: "Login effettuato con successo"
         });
       }
 
@@ -11094,8 +11105,15 @@ app.post("/api/transfer-to-adam", async (req, res) => {
   app.get("/api/accounts", async (req, res) => {
     try {
       const { pgUsersService } = await import("./services/pg-users-service");
-      const users = await pgUsersService.getAllUsers();
-      res.json({ users });
+      const { listAdamWassAccounts } = await import("./services/adam-wass-accounts");
+      const users = (await pgUsersService.getAllUsers()).map((user) => ({ ...user, source: "wass" as const }));
+      let adamAccounts: Awaited<ReturnType<typeof listAdamWassAccounts>> = [];
+      try {
+        adamAccounts = await listAdamWassAccounts();
+      } catch (adamError) {
+        console.error("Errore nel caricamento account ADAM con ruolo wass:", adamError);
+      }
+      res.json({ users: [...users, ...adamAccounts] });
     } catch (error) {
       console.error("Errore nel caricamento degli account:", error);
       res.status(500).json({ success: false, message: "Errore del server" });
@@ -11125,9 +11143,21 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
   app.post("/api/accounts/update", async (req, res) => {
     try {
-      const { id, username, password, role } = req.body;
+      const { id, username, password, role, source } = req.body;
       if (typeof id === 'undefined') {
         return res.status(400).json({ success: false, message: "ID account mancante." });
+      }
+
+      if (source === "adam") {
+        const { setAdamWassAccountRole } = await import("./services/adam-wass-accounts");
+        const result = await setAdamWassAccountRole(Number(id), String(role ?? ""));
+        if (result === "invalid") {
+          return res.status(400).json({ success: false, message: "Ruolo non valido." });
+        }
+        if (result === "missing") {
+          return res.status(404).json({ success: false, message: "Account ADAM non trovato o senza ruolo wass." });
+        }
+        return res.json({ success: true, message: "Ruolo WASS aggiornato. Nome e password restano quelli di ADAM." });
       }
 
       const { pgUsersService } = await import("./services/pg-users-service");
@@ -11160,9 +11190,16 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
   app.post("/api/accounts/delete", async (req, res) => {
     try {
-      const { id } = req.body;
+      const { id, source } = req.body;
       if (typeof id === 'undefined') {
         return res.status(400).json({ success: false, message: "ID account mancante." });
+      }
+
+      if (source === "adam") {
+        return res.status(403).json({
+          success: false,
+          message: "Gli account presi da ADAM non si eliminano da WASS."
+        });
       }
 
       // Impedisci eliminazione dell'account admin principale (id=1)

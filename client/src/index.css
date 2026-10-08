@@ -124,6 +124,45 @@
   outline-color: rgba(248, 113, 113, 0.6);
 }
 
+/* Ruolo viewer: i pulsanti di modifica restano visibili ma non si usano. */
+html[data-viewer="1"] button:not([data-viewer-allow]),
+html[data-viewer="1"] [role="button"]:not([data-viewer-allow]):not(:has([data-dnd-task-card-surface="true"])),
+html[data-viewer="1"] [role="switch"]:not([data-viewer-allow]),
+html[data-viewer="1"] [role="checkbox"]:not([data-viewer-allow]),
+html[data-viewer="1"] [role="menuitem"]:not([data-viewer-allow]),
+html[data-viewer="1"] [role="slider"]:not([data-viewer-allow]) {
+  cursor: not-allowed !important;
+  opacity: 0.4;
+}
+
+html[data-viewer="1"] [data-viewer-allow],
+html[data-viewer="1"] [data-viewer-allow] button,
+html[data-viewer="1"] [data-viewer-allow] [role="button"],
+html[data-viewer="1"] [data-viewer-allow] [role="switch"],
+html[data-viewer="1"] [data-viewer-allow] [role="menuitem"],
+html[data-viewer="1"] button[data-viewer-allow],
+html[data-viewer="1"] [role="button"][data-viewer-allow],
+html[data-viewer="1"] [data-dnd-task-card-surface="true"],
+html[data-viewer="1"] input[data-testid^="input-search"] {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+}
+
+html[data-viewer="1"] input[data-testid^="input-search"] {
+  cursor: text;
+}
+
+html[data-viewer="1"] input:not([data-viewer-allow]):not([readonly]):not([data-testid^="input-search"]),
+html[data-viewer="1"] textarea:not([data-viewer-allow]):not([readonly]),
+html[data-viewer="1"] select:not([data-viewer-allow]) {
+  pointer-events: none !important;
+}
+
+html[data-viewer="1"] [role="slider"][data-first-apt-time-shift] {
+  display: none !important;
+}
+
 @keyframes bounce {
   0% {
     transform: translateY(0);

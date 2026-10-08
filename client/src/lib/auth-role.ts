@@ -22,6 +22,10 @@ export function isLogisticaRole(role?: string | null): boolean {
   return String(role ?? "").toLowerCase() === "logistica";
 }
 
+export function isViewerRole(role?: string | null): boolean {
+  return String(role ?? "").toLowerCase() === "viewer";
+}
+
 /** True se l'utente logistica può restare su path+search correnti. */
 export function isLogisticaPathAllowed(pathname: string, search = ""): boolean {
   if (

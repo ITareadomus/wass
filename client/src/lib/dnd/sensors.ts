@@ -73,9 +73,22 @@ class AppPointerSensor extends PointerSensor {
         { onActivation }: PointerSensorOptions,
       ) => {
         if (!event.isPrimary || event.button !== 0) return false;
+        if (document.documentElement.dataset.viewer === "1") return false;
         if (isFirstAptTimeShiftTarget(event)) return false;
         onActivation?.({ event });
         return true;
+      },
+    },
+  ];
+}
+
+class AppKeyboardSensor extends KeyboardSensor {
+  static activators = [
+    {
+      eventName: "onKeyDown" as const,
+      handler: (...args: Parameters<(typeof KeyboardSensor.activators)[number]["handler"]>) => {
+        if (document.documentElement.dataset.viewer === "1") return false;
+        return KeyboardSensor.activators[0].handler(...args);
       },
     },
   ];
@@ -89,7 +102,7 @@ export function useAppDndSensors(options: AppDndSensorOptions = {}) {
     ...options.pointer,
   });
 
-  const keyboardSensor = useSensor(KeyboardSensor, {
+  const keyboardSensor = useSensor(AppKeyboardSensor, {
     coordinateGetter: sortableKeyboardCoordinates,
     ...options.keyboard,
   });

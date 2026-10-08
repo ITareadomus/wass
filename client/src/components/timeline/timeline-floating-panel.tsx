@@ -181,6 +181,7 @@ export default function TimelineFloatingPanel({
       {!isOpen && !hideClosedToggle && (
         <button
           type="button"
+          data-viewer-allow=""
           onClick={(event) => {
             if (suppressClosedToggleClickRef.current) {
               suppressClosedToggleClickRef.current = false;
@@ -233,10 +234,13 @@ export default function TimelineFloatingPanel({
               title={dragTitle}
             />
             {headerAction ? (
-              <div className="absolute right-11 top-2 z-40">{headerAction}</div>
+              <div className="absolute right-11 top-2 z-40" data-viewer-allow="">
+                {headerAction}
+              </div>
             ) : null}
             <button
               type="button"
+              data-viewer-allow=""
               onClick={() => {
                 onOpenChange(false);
                 onResetPanel();
