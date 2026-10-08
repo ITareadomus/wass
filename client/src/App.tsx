@@ -18,11 +18,13 @@ import { WassSiteHeader } from "@/components/wass-site-header";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { HelpCircle, Home } from "lucide-react";
+import { ViewerLock } from "@/components/viewer-lock";
 import {
   getStoredUserRole,
   homePathForRole,
   isLogisticaPathAllowed,
   isLogisticaRole,
+  isViewerRole,
   LOGISTICS_HOME_PATH,
 } from "@/lib/auth-role";
 
@@ -100,13 +102,14 @@ function GlobalHeader() {
       right={
         <>
           {showHomeButton ? (
-            <Link href={homeHref}>
+            <Link href={homeHref} data-viewer-allow="">
               <Button
                 variant="outline"
                 size="icon"
                 className="rounded-full"
                 title="Torna alla Home"
                 data-testid="link-home-global"
+                data-viewer-allow=""
               >
                 <Home className="h-5 w-5" />
               </Button>
@@ -119,6 +122,7 @@ function GlobalHeader() {
                 className="rounded-full"
                 title="Task Non Confermate"
                 data-testid="link-unconfirmed-tasks-global"
+                data-viewer-allow=""
               >
                 <HelpCircle className="h-5 w-5" />
               </Button>
@@ -128,6 +132,15 @@ function GlobalHeader() {
         </>
       }
     />
+  );
+}
+
+function ViewerBanner() {
+  if (!isViewerRole(getStoredUserRole())) return null;
+  return (
+    <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+      Sola lettura: puoi consultare i task della giornata e aprire i dettagli. Le modifiche sono disattivate.
+    </div>
   );
 }
 
@@ -174,6 +187,7 @@ function ProtectedRoute({ component: Component }: { component: () => JSX.Element
   return (
     <>
       <GlobalHeader />
+      <ViewerBanner />
       <Component />
     </>
   );
@@ -224,6 +238,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
+        <ViewerLock />
         <Router />
       </TooltipProvider>
     </QueryClientProvider>

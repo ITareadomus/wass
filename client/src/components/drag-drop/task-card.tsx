@@ -3449,7 +3449,11 @@ const displayClickableInputClass =
               className={isInTimeline ? "flex items-center" : ""}
             >
           {/* Task card con drag handle */}
-          <div {...(dragHandleProps ?? undefined)} className="focus-visible:outline-none">
+          <div
+            {...(dragHandleProps ?? undefined)}
+            data-viewer-allow=""
+            className="focus-visible:outline-none"
+          >
             {/* Task card effettiva */}
             <TooltipProvider delayDuration={300}>
               <Tooltip>
@@ -3488,6 +3492,7 @@ const displayClickableInputClass =
                               : 'auto',
                     }}
                     data-dnd-task-card-surface="true"
+                    data-viewer-allow=""
                     data-testid={`task-card-${getTaskKey(task)}`}
                     onClick={(e) => {
                       if (!isDragging) {
@@ -3862,6 +3867,7 @@ const displayClickableInputClass =
               <Button
                 variant="ghost"
                 size="icon"
+                data-viewer-allow=""
                 onClick={handlePrevTask}
                 disabled={!canGoPrev}
                 className={cn("h-8 w-8", !canGoPrev && "opacity-30 cursor-not-allowed")}
@@ -3897,6 +3903,7 @@ const displayClickableInputClass =
               <Button
                 variant="ghost"
                 size="icon"
+                data-viewer-allow=""
                 onClick={handleNextTask}
                 disabled={!canGoNext}
                 className={cn("h-8 w-8", !canGoNext && "opacity-30 cursor-not-allowed")}

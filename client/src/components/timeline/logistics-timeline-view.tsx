@@ -1733,6 +1733,7 @@ export default function LogisticsTimelineView({
                   type="button"
                   className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-yellow-400 bg-yellow-200 text-yellow-950 shadow-sm hover:bg-yellow-300 disabled:cursor-default disabled:opacity-40 dark:border-yellow-600 dark:bg-yellow-800/50 dark:text-yellow-50 dark:hover:bg-yellow-800/70"
                   aria-label="Sync precedente"
+                  data-viewer-allow=""
                   disabled={!canBrowseOlderAdamSync}
                   onClick={() => setAdamSyncIndex((index) => Math.max(0, index - 1))}
                 >
@@ -1741,6 +1742,7 @@ export default function LogisticsTimelineView({
                 <button
                   type="button"
                   className="inline-flex items-center gap-1.5 rounded-md border border-yellow-400 bg-yellow-200 px-3 py-1 text-center text-sm font-semibold text-yellow-950 shadow-sm hover:bg-yellow-300 dark:border-yellow-600 dark:bg-yellow-800/50 dark:text-yellow-50 dark:hover:bg-yellow-800/70"
+                  data-viewer-allow=""
                   onClick={() => setShowAdamSyncChanges(true)}
                 >
                   <span aria-hidden="true">⚠️</span>
@@ -1752,6 +1754,7 @@ export default function LogisticsTimelineView({
                   type="button"
                   className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-yellow-400 bg-yellow-200 text-yellow-950 shadow-sm hover:bg-yellow-300 disabled:cursor-default disabled:opacity-40 dark:border-yellow-600 dark:bg-yellow-800/50 dark:text-yellow-50 dark:hover:bg-yellow-800/70"
                   aria-label="Sync successiva"
+                  data-viewer-allow=""
                   disabled={!canBrowseNewerAdamSync}
                   onClick={() =>
                     setAdamSyncIndex((index) => Math.min(adamSyncHistory.length - 1, index + 1))
@@ -1769,6 +1772,7 @@ export default function LogisticsTimelineView({
                 type="button"
                 variant="outline"
                 size="sm"
+                data-viewer-allow=""
                 aria-pressed={statisticsOpen}
                 title={statisticsOpen ? "Chiudi statistiche" : "Apri statistiche"}
                 className={cn(
@@ -1784,6 +1788,7 @@ export default function LogisticsTimelineView({
                 type="button"
                 variant="outline"
                 size="sm"
+                data-viewer-allow=""
                 aria-pressed={mapOpen}
                 title={mapOpen ? "Chiudi mappa" : "Apri mappa"}
                 className={cn(
@@ -1798,6 +1803,7 @@ export default function LogisticsTimelineView({
               <Button
                 variant="outline"
                 size="sm"
+                data-viewer-allow=""
                 disabled={isReadOnly}
                 className="flex items-center gap-2 border-2 border-custom-blue"
                 onClick={() =>

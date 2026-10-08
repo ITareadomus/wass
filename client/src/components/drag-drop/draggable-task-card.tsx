@@ -8,6 +8,7 @@ import {
   appDndHandleAttributes,
 } from "@/lib/dnd";
 import { isHousekeepingTaskCleaned } from "@shared/housekeeping-task-execution-status";
+import { getStoredUserRole, isViewerRole } from "@/lib/auth-role";
 
 const getTaskSurfaceRect = (node: HTMLElement | null) => {
   const surface = node?.querySelector<HTMLElement>('[data-dnd-task-card-surface="true"]');
@@ -54,7 +55,7 @@ export function DraggableTaskCard({
   const draggable = useDraggable({
     id: dndId,
     data,
-    disabled: dragDisabled,
+    disabled: dragDisabled || isViewerRole(getStoredUserRole()),
   });
 
   return (

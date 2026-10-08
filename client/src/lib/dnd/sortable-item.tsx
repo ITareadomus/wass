@@ -1,5 +1,6 @@
 import { useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import { useSortable } from "@dnd-kit/sortable";
+import { getStoredUserRole, isViewerRole } from "@/lib/auth-role";
 import { CSS } from "@dnd-kit/utilities";
 import type { Data, UniqueIdentifier } from "@dnd-kit/core";
 import {
@@ -73,7 +74,7 @@ export function SortableItem({
   const sortable = useSortable({
     id,
     data: dataWithOverlayRect,
-    disabled,
+    disabled: disabled || isViewerRole(getStoredUserRole()),
     transition: {
       duration: 180,
       easing: "cubic-bezier(0.25, 1, 0.5, 1)",

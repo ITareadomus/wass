@@ -24,6 +24,7 @@ import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from 'wouter';
+import { getStoredUserRole, isViewerRole } from "@/lib/auth-role";
 import { isTaskLocked } from "@/lib/taskValidation";
 
 const OFFICE_SCOPE_ENABLED = false;
@@ -455,6 +456,7 @@ export default function Convocazioni() {
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
+  const viewer = isViewerRole(getStoredUserRole());
 
   // Aggiunto uno stato per i cleaners filtrati per evitare che vengano sovrascritti quando cambia la data
   const [filteredCleaners, setFilteredCleaners] = useState<Cleaner[]>([]);
@@ -866,6 +868,7 @@ export default function Convocazioni() {
     : undefined;
 
   const toggleCleanerSelection = (cleanerId: number, isAvailable: boolean) => {
+    if (viewer) return;
     // Se il cleaner è già selezionato, lo deseleziona
     if (selectedCleaners.has(cleanerId)) {
       setSelectedCleaners(prev => {
@@ -903,6 +906,10 @@ export default function Convocazioni() {
   };
 
   const handleConfirmUnavailable = () => {
+    if (viewer) {
+      setConfirmDialog({ open: false, cleanerId: null });
+      return;
+    }
     if (confirmDialog.cleanerId === null) {
       setConfirmDialog({ open: false, cleanerId: null });
       return;
@@ -1437,9 +1444,11 @@ export default function Convocazioni() {
                       key={cleaner.id}
                       onClick={() => toggleCleanerSelection(cleaner.id, isAvailable)}
                       className={`flex items-center justify-between p-3 rounded-lg transition-all ${borderColor} ${bgColor} ${
-                        !isAvailable
-                          ? "opacity-60 cursor-pointer hover:opacity-70"
-                          : "hover:opacity-80 cursor-pointer"
+                        viewer
+                          ? "cursor-default"
+                          : !isAvailable
+                            ? "opacity-60 cursor-pointer hover:opacity-70"
+                            : "hover:opacity-80 cursor-pointer"
                       }`}
                     >
                   <div className="flex items-start gap-4 flex-1">
@@ -1796,7 +1805,28 @@ export default function Convocazioni() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <div className="flex justify-center mt-3 pt-3 border-t shrink-0">
+          <div className="flex justify-center gap-3 mt-3 pt-3 border-t shrink-0">
+            {viewer ? (
+              <Button
+                type="button"
+                size="lg"
+                variant="outline"
+                data-viewer-allow=""
+                className="flex items-center gap-2 border-2 border-custom-blue"
+                onClick={() =>
+                  setLocation(
+                    isDrivers
+                      ? "/generate-logistics-assignments"
+                      : isOffice
+                        ? "/generate-assignments?scope=office"
+                        : "/generate-assignments",
+                  )
+                }
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Torna alla Home
+              </Button>
+            ) : null}
             <Button
               onClick={async () => {
                 const ok = await handleSaveSelection();

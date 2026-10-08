@@ -50,7 +50,7 @@ export default function Login() {
         }
         toast({
           title: "Login effettuato",
-          description: `Benvenuto/a ${data.user.username}!`,
+          description: `Benvenuto/a ${data.user.displayName || data.user.username}!`,
           variant: "success",
         });
         setLocation(isLogisticaRole(data.user?.role) ? homePathForRole(data.user?.role) : "/");
@@ -89,7 +89,7 @@ export default function Login() {
               <Input
                 id="username"
                 type="text"
-                placeholder="Inserisci username"
+                placeholder="Username o email"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required

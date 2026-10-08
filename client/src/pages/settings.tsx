@@ -1,12 +1,19 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Plus, Eye, EyeOff, Save, X, Home, Loader2 } from "lucide-react";
-import { PageViewportCentered } from "@/components/page-viewport-centered";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -24,14 +31,77 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Eye, EyeOff, Loader2, Lock, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { PageViewportCentered } from "@/components/page-viewport-centered";
+import { cn } from "@/lib/utils";
+
+type AccountRole = "admin" | "user" | "viewer" | "logistica";
 
 interface Account {
   id: number;
   username: string;
-  password: string;
+  password?: string;
   plain_password?: string;
-  role: "admin" | "user" | "viewer" | "logistica";
+  role: AccountRole;
+  source?: "wass" | "adam";
+  displayName?: string;
+}
+
+function isAdamAccount(account: Pick<Account, "source"> | null | undefined) {
+  return account?.source === "adam";
+}
+
+function accountKey(account: Pick<Account, "id" | "source">) {
+  return `${account.source ?? "wass"}-${account.id}`;
+}
+
+function accountLabel(account: Pick<Account, "username" | "source" | "displayName">) {
+  if (isAdamAccount(account) && account.displayName?.trim()) return account.displayName.trim();
+  return account.username;
+}
+
+const ROLES: { value: AccountRole; label: string; badgeClass: string }[] = [
+  {
+    value: "admin",
+    label: "Admin",
+    badgeClass: "border-transparent bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-200",
+  },
+  {
+    value: "user",
+    label: "User",
+    badgeClass: "border-transparent bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-200",
+  },
+  {
+    value: "viewer",
+    label: "Viewer",
+    badgeClass: "border-transparent bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-300",
+  },
+  {
+    value: "logistica",
+    label: "Logistica",
+    badgeClass: "border-transparent bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-200",
+  },
+];
+
+const AVATAR_COLORS = [
+  "bg-blue-500",
+  "bg-green-500",
+  "bg-purple-500",
+  "bg-orange-500",
+  "bg-pink-500",
+  "bg-teal-500",
+  "bg-red-500",
+  "bg-indigo-500",
+  "bg-yellow-500",
+  "bg-cyan-500",
+];
+
+function avatarColor(userId: number) {
+  return AVATAR_COLORS[(userId - 1) % AVATAR_COLORS.length];
+}
+
+function roleMeta(role: string) {
+  return ROLES.find((item) => item.value === role) ?? ROLES[1];
 }
 
 /** Password da mostrare e modificare: in chiaro, mai l'eventuale hash bcrypt residuo. */
@@ -41,35 +111,18 @@ function accountPassword(account: Pick<Account, "password" | "plain_password">):
   return account.password;
 }
 
-interface TaskTypeRules {
-  standard_cleaner: boolean;
-  premium_cleaner: boolean;
-  straordinaria_cleaner: boolean;
-  formatore_cleaner: boolean;
+function isPrimaryAdmin(account: Pick<Account, "id" | "role" | "source">) {
+  return !isAdamAccount(account) && account.id === 1 && account.role === "admin";
 }
 
-interface SystemSettings {
-  "early-out": {
-    eo_start_time: string;
-    eo_end_time: string;
-    eo_clients: number[];
-  };
-  "high-priority": {
-    hp_start_time: string;
-    hp_end_time: string;
-    hp_clients: number[];
-  };
-  dedupe_strategy: string;
-  apartment_types: {
-    standard_apt: string[];
-    premium_apt: string[];
-    formatore_apt: string[];
-  };
-  task_types: {
-    standard_apt: TaskTypeRules;
-    premium_apt: TaskTypeRules;
-    straordinario_apt: TaskTypeRules;
-  };
+async function readError(response: Response, fallback: string) {
+  try {
+    const data = await response.json();
+    if (typeof data?.message === "string" && data.message.trim()) return data.message;
+  } catch {
+    /* risposta non JSON */
+  }
+  return fallback;
 }
 
 export default function Settings() {
@@ -77,20 +130,18 @@ export default function Settings() {
   const { toast } = useToast();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showPassword, setShowPassword] = useState<{ [key: number]: boolean }>({});
+  const [query, setQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<AccountRole | "all">("all");
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<number, boolean>>({});
+  const [editorOpen, setEditorOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [draftUsername, setDraftUsername] = useState("");
+  const [draftPassword, setDraftPassword] = useState("");
+  const [draftRole, setDraftRole] = useState<AccountRole>("user");
+  const [showDraftPassword, setShowDraftPassword] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [accountToDelete, setAccountToDelete] = useState<number | null>(null);
-  const [isAddingNew, setIsAddingNew] = useState(false);
-  const [newAccount, setNewAccount] = useState<Omit<Account, "id">>({
-    username: "",
-    password: "",
-    role: "user",
-  });
-
-  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
 
   useEffect(() => {
     const user = localStorage.getItem("user");
@@ -111,134 +162,69 @@ export default function Settings() {
     }
 
     loadAccounts();
-    // loadSystemSettings(); // No longer needed
   }, [setLocation, toast]);
 
-  const loadAccounts = async () => {
-    setIsLoading(true);
+  const loadAccounts = async (silent = false) => {
+    if (!silent) setIsLoading(true);
     try {
       const response = await fetch("/api/accounts");
       if (response.ok) {
         const data = await response.json();
-        setAccounts(data.users);
+        setAccounts(Array.isArray(data.users) ? data.users : []);
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Errore",
         description: "Impossibile caricare gli account",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 
-  // const loadSystemSettings = async () => {
-  //   try {
-  //     const response = await fetch(`/data/input/settings.json?t=${Date.now()}`, {
-  //       cache: 'no-store',
-  //       headers: { 'Cache-Control': 'no-cache' }
-  //     });
-  //     if (response.ok) {
-  //       const data = await response.json();
-  //       console.log('✅ Settings loaded:', data);
-  //       console.log('✅ Task types loaded:', data?.task_types);
-  //       setSystemSettings(data);
-  //     }
-  //   } catch (error) {
-  //     console.error('❌ Error loading settings:', error);
-  //     toast({
-  //       title: "Errore",
-  //       description: "Impossibile caricare le impostazioni di sistema",
-  //       variant: "destructive",
-  //     });
-  //   }
-  // };
-
-  // const saveSystemSettings = async () => {
-  //   if (!systemSettings) return;
-
-  //   setIsSavingSettings(true);
-  //   try {
-  //     const response = await fetch("/api/save-settings", {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify(systemSettings),
-  //     });
-
-  //     if (response.ok) {
-  //       toast({
-  //         title: "Impostazioni salvate",
-  //         description: "Le modifiche sono state salvate con successo",
-  //       });
-  //       setHasUnsavedChanges(false);
-  //       // Ricarica le impostazioni per assicurarsi che siano aggiornate
-  //       await loadSystemSettings();
-  //     } else {
-  //       throw new Error();
-  //     }
-  //   } catch (error) {
-  //     toast({
-  //       title: "Errore",
-  //       description: "Impossibile salvare le impostazioni",
-  //       variant: "destructive",
-  //     });
-  //   } finally {
-  //     setIsSavingSettings(false);
-  //   }
-  // };
-
-  // const updateTaskTypeRule = (
-  //   taskType: keyof SystemSettings['task_types'],
-  //   cleanerType: keyof TaskTypeRules,
-  //   value: boolean
-  // ) => {
-  //   if (!systemSettings) return;
-
-  //   setSystemSettings({
-  //     ...systemSettings,
-  //     task_types: {
-  //       ...systemSettings.task_types,
-  //       [taskType]: {
-  //         ...systemSettings.task_types[taskType],
-  //         [cleanerType]: value
-  //       }
-  //     }
-  //   });
-  //   setHasUnsavedChanges(true);
-  // };
-
-
-
-  const handleSaveAccount = async (account: Account) => {
-    try {
-      const response = await fetch("/api/accounts/update", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(account),
-      });
-
-      if (response.ok) {
-        toast({
-          title: "Account aggiornato",
-          description: "Le modifiche sono state salvate con successo",
-        });
-        setEditingAccount(null);
-        loadAccounts();
-      } else {
-        throw new Error();
-      }
-    } catch (error) {
-      toast({
-        title: "Errore",
-        description: "Impossibile salvare le modifiche",
-        variant: "destructive",
-      });
+  const roleCounts = useMemo(() => {
+    const counts: Record<AccountRole, number> = { admin: 0, user: 0, viewer: 0, logistica: 0 };
+    for (const account of accounts) {
+      if (counts[account.role] !== undefined) counts[account.role] += 1;
     }
+    return counts;
+  }, [accounts]);
+
+  const visibleAccounts = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return accounts.filter((account) => {
+      if (roleFilter !== "all" && account.role !== roleFilter) return false;
+      if (!needle) return true;
+      return (
+        account.username.toLowerCase().includes(needle) ||
+        (account.displayName ?? "").toLowerCase().includes(needle)
+      );
+    });
+  }, [accounts, query, roleFilter]);
+
+  const openCreate = () => {
+    setEditingAccount(null);
+    setDraftUsername("");
+    setDraftPassword("");
+    setDraftRole("user");
+    setShowDraftPassword(false);
+    setEditorOpen(true);
   };
 
-  const handleAddAccount = async () => {
-    if (!newAccount.username || !newAccount.password) {
+  const openEdit = (account: Account) => {
+    if (isPrimaryAdmin(account)) return;
+    setEditingAccount(account);
+    setDraftUsername(accountLabel(account));
+    setDraftPassword(accountPassword(account));
+    setDraftRole(account.role);
+    setShowDraftPassword(false);
+    setEditorOpen(true);
+  };
+
+  const handleSave = async () => {
+    const isAdam = isAdamAccount(editingAccount);
+    if (!draftUsername.trim() || (!isAdam && !draftPassword)) {
       toast({
         title: "Campi mancanti",
         description: "Username e password sono obbligatori",
@@ -247,30 +233,41 @@ export default function Settings() {
       return;
     }
 
+    setIsSaving(true);
     try {
-      const response = await fetch("/api/accounts/add", {
+      const isEdit = editingAccount !== null;
+      const response = await fetch(isEdit ? "/api/accounts/update" : "/api/accounts/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newAccount),
+        body: JSON.stringify(
+          isEdit && isAdam
+            ? { source: "adam", id: editingAccount.id, role: draftRole }
+            : isEdit
+              ? { id: editingAccount.id, username: draftUsername.trim(), password: draftPassword, role: draftRole }
+              : { username: draftUsername.trim(), password: draftPassword, role: draftRole }
+        ),
       });
 
-      if (response.ok) {
-        toast({
-          title: "Account creato",
-          description: "Il nuovo account è stato aggiunto con successo",
-        });
-        setIsAddingNew(false);
-        setNewAccount({ username: "", password: "", role: "user" });
-        loadAccounts();
-      } else {
-        throw new Error();
+      if (!response.ok) {
+        throw new Error(await readError(response, isEdit ? "Impossibile salvare le modifiche" : "Impossibile creare l'account"));
       }
+
+      toast({
+        title: isEdit ? "Account aggiornato" : "Account creato",
+        description: isEdit
+          ? "Le modifiche sono state salvate con successo"
+          : "Il nuovo account è stato aggiunto con successo",
+      });
+      setEditorOpen(false);
+      await loadAccounts(true);
     } catch (error) {
       toast({
         title: "Errore",
-        description: "Impossibile creare l'account",
+        description: error instanceof Error ? error.message : "Operazione non riuscita",
         variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -281,30 +278,30 @@ export default function Settings() {
       const response = await fetch("/api/accounts/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: accountToDelete }),
+        body: JSON.stringify({ id: accountToDelete.id }),
       });
 
-      if (response.ok) {
-        toast({
-          title: "Account eliminato",
-          description: "L'account è stato rimosso con successo",
-        });
-        setDeleteDialogOpen(false);
-        setAccountToDelete(null);
-        loadAccounts();
-      } else {
-        throw new Error();
+      if (!response.ok) {
+        throw new Error(await readError(response, "Impossibile eliminare l'account"));
       }
+
+      toast({
+        title: "Account eliminato",
+        description: "L'account è stato rimosso con successo",
+      });
+      setDeleteDialogOpen(false);
+      setAccountToDelete(null);
+      await loadAccounts(true);
     } catch (error) {
       toast({
         title: "Errore",
-        description: "Impossibile eliminare l'account",
+        description: error instanceof Error ? error.message : "Impossibile eliminare l'account",
         variant: "destructive",
       });
     }
   };
 
-  if (isLoading) { // systemSettings check is removed as it's not loaded anymore
+  if (isLoading) {
     return (
       <PageViewportCentered layout="viewport" className="bg-background py-8">
         <div className="flex flex-col items-center gap-4 text-center">
@@ -316,261 +313,294 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Settings</h1>
+    <div className="min-h-[calc(100vh-3.75rem)] overflow-x-hidden bg-muted/30 text-foreground">
+      <div className="mx-auto w-full max-w-3xl px-4 py-8 md:py-10">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Account</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {accounts.length === 1 ? "1 accesso a WASS" : `${accounts.length} accessi a WASS`}
+            </p>
+          </div>
+          <Button onClick={openCreate} className="shrink-0">
+            <Plus className="h-4 w-4" />
+            Nuovo account
+          </Button>
         </div>
 
-        {/* Task Types Settings - Removed */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          <FilterChip active={roleFilter === "all"} onClick={() => setRoleFilter("all")} count={accounts.length}>
+            Tutti
+          </FilterChip>
+          {ROLES.map((role) => (
+            <FilterChip
+              key={role.value}
+              active={roleFilter === role.value}
+              onClick={() => setRoleFilter(role.value)}
+              count={roleCounts[role.value]}
+              toneClass={role.badgeClass}
+            >
+              {role.label}
+            </FilterChip>
+          ))}
+        </div>
 
-        {/* Account Management */}
-        <Card className="mb-6 bg-custom-blue-light border-2 border-custom-blue">
-          <CardHeader className="bg-custom-blue-light">
-            <CardTitle>Gestione Account</CardTitle>
-            <CardDescription>
-              Aggiungi, modifica o elimina gli account
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="bg-custom-blue-light">
-            <div className="space-y-4">
-              {!isAddingNew && (
-                <Button
-                  onClick={() => setIsAddingNew(true)}
-                  className="w-full bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Aggiungi Nuovo Account
-                </Button>
-              )}
+        <div className="relative mb-4">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Cerca per username"
+            className="bg-background pl-9"
+            aria-label="Cerca account"
+          />
+        </div>
 
-              {isAddingNew && (
-                <Card className="border-2 border-custom-blue bg-custom-blue-light">
-                  <CardContent className="pt-6 bg-custom-blue-light">
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="new-username">Username</Label>
-                        <Input
-                          id="new-username"
-                          value={newAccount.username}
-                          onChange={(e) =>
-                            setNewAccount({ ...newAccount, username: e.target.value })
-                          }
-                          placeholder="Inserisci username"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="new-password">Password</Label>
-                        <Input
-                          id="new-password"
-                          type="text"
-                          value={newAccount.password}
-                          onChange={(e) =>
-                            setNewAccount({ ...newAccount, password: e.target.value })
-                          }
-                          placeholder="Inserisci password"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="new-role">Ruolo</Label>
-                        <Select
-                          value={newAccount.role}
-                          onValueChange={(value: "admin" | "user" | "viewer" | "logistica") =>
-                            setNewAccount({ ...newAccount, role: value })
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="user">User</SelectItem>
-                            <SelectItem value="viewer">Viewer</SelectItem>
-                            <SelectItem value="logistica">Logistica</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={handleAddAccount}
-                          className="flex-1 border-2 border-custom-blue hover:opacity-80"
-                        >
-                          <Save className="w-4 h-4 mr-2" />
-                          Salva
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            setIsAddingNew(false);
-                            setNewAccount({ username: "", password: "", role: "user" });
-                          }}
-                          variant="outline"
-                          className="flex-1"
-                        >
-                          <X className="w-4 h-4 mr-2" />
-                          Annulla
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+        <div className="overflow-hidden rounded-xl border border-border/70 bg-background shadow-sm">
+          {visibleAccounts.length === 0 ? (
+            <p className="px-5 py-10 text-center text-sm text-muted-foreground">
+              Nessun account corrisponde alla ricerca.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border/70">
+              {visibleAccounts.map((account) => {
+                const role = roleMeta(account.role);
+                const locked = isPrimaryAdmin(account);
+                const passwordVisible = Boolean(visiblePasswords[accountKey(account)]);
+                const password = accountPassword(account);
+                const adam = isAdamAccount(account);
+                return (
+                  <li key={accountKey(account)} className="flex items-center gap-3 px-4 py-3.5 sm:gap-4 sm:px-5">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className={cn(avatarColor(account.id), "text-sm font-semibold text-white")}>
+                        {accountLabel(account).charAt(0).toUpperCase() || "?"}
+                      </AvatarFallback>
+                    </Avatar>
 
-              {accounts.map((account) => (
-                <Card key={account.id} className="bg-custom-blue-light border-2 border-custom-blue">
-                  <CardContent className="pt-6 bg-custom-blue-light">
-                    {editingAccount?.id === account.id ? (
-                      <div className="space-y-4">
-                        <div>
-                          <Label>Username</Label>
-                          <Input
-                            value={editingAccount.username}
-                            onChange={(e) =>
-                              setEditingAccount({
-                                ...editingAccount,
-                                username: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                        <div>
-                          <Label>Password</Label>
-                          <Input
-                            type="text"
-                            value={editingAccount.password}
-                            onChange={(e) =>
-                              setEditingAccount({
-                                ...editingAccount,
-                                password: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                        <div>
-                          <Label>Ruolo</Label>
-                          <Select
-                            value={editingAccount.role}
-                            onValueChange={(value: "admin" | "user" | "viewer" | "logistica") =>
-                              setEditingAccount({ ...editingAccount, role: value })
-                            }
-                            disabled={editingAccount.id === 1 && editingAccount.role === 'admin'}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate font-medium">{accountLabel(account)}</p>
+                        {adam ? (
+                          <span
+                            title="Account preso da ADAM"
+                            className="inline-flex h-5 items-center rounded-md border border-violet-300 bg-violet-50 px-1.5 text-[10px] font-semibold tracking-wide text-violet-700 dark:border-violet-400/80 dark:bg-violet-950 dark:text-violet-300"
                           >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="user">User</SelectItem>
-                              <SelectItem value="viewer">Viewer</SelectItem>
-                              <SelectItem value="logistica">Logistica</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => handleSaveAccount(editingAccount)}
-                            className="flex-1 border-2 border-custom-blue hover:opacity-80"
-                          >
-                            <Save className="w-4 h-4 mr-2" />
-                            Salva
-                          </Button>
-                          <Button
-                            onClick={() => setEditingAccount(null)}
-                            variant="outline"
-                            className="flex-1"
-                          >
-                            <X className="w-4 h-4 mr-2" />
-                            Annulla
-                          </Button>
-                        </div>
+                            AD
+                          </span>
+                        ) : null}
+                        <Badge className={role.badgeClass}>{role.label}</Badge>
+                        {locked ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                            <Lock className="h-3 w-3" />
+                            Principale
+                          </span>
+                        ) : null}
                       </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1 flex-1">
-                          <p className="font-semibold">{account.username}</p>
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm text-muted-foreground">
-                              {showPassword[account.id]
-                                ? (accountPassword(account) || "••••••••")
-                                : "••••••••"}
-                            </p>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() =>
-                                setShowPassword({
-                                  ...showPassword,
-                                  [account.id]: !showPassword[account.id],
-                                })
-                              }
-                              className="h-6 w-6"
-                            >
-                              {showPassword[account.id] ? (
-                                <EyeOff className="h-3 w-3" />
-                              ) : (
-                                <Eye className="h-3 w-3" />
-                              )}
-                            </Button>
-                          </div>
-                          <p className="text-sm">
-                            <span className="font-medium">Ruolo:</span>{" "}
-                            <span className="capitalize">{account.role}</span>
+                      {adam ? (
+                        <p className="mt-1 truncate text-xs text-muted-foreground">{account.username}</p>
+                      ) : (
+                        <div className="mt-1 flex items-center gap-1">
+                          <p className="truncate font-mono text-xs tracking-wide text-muted-foreground">
+                            {passwordVisible ? password || "—" : "••••••••"}
                           </p>
-                        </div>
-                        <div className="flex gap-2">
                           <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground"
+                            aria-label={passwordVisible ? "Nascondi password" : "Mostra password"}
                             onClick={() =>
-                              setEditingAccount({
-                                ...account,
-                                password: accountPassword(account),
-                              })
+                              setVisiblePasswords((current) => ({
+                                ...current,
+                                [accountKey(account)]: !current[accountKey(account)],
+                              }))
                             }
-                            variant="outline"
-                            size="sm"
-                            className="border-2 border-custom-blue"
-                            disabled={account.id === 1 && account.role === 'admin'}
                           >
-                            Modifica
-                          </Button>
-                          <Button
-                            onClick={() => {
-                              setAccountToDelete(account.id);
-                              setDeleteDialogOpen(true);
-                            }}
-                            variant="destructive"
-                            size="sm"
-                            className="border-2 border-custom-blue"
-                            disabled={account.id === 1}
-                          >
-                            <Trash2 className="w-4 h-4" />
+                            {passwordVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                           </Button>
                         </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                      )}
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Modifica ${accountLabel(account)}`}
+                        title={locked ? "L'account admin principale non si può modificare" : "Modifica"}
+                        disabled={locked}
+                        onClick={() => openEdit(account)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      {adam ? null : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        aria-label={`Elimina ${account.username}`}
+                        title={account.id === 1 ? "L'account admin principale non si può eliminare" : "Elimina"}
+                        disabled={account.id === 1}
+                        onClick={() => {
+                          setAccountToDelete(account);
+                          setDeleteDialogOpen(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </div>
+
+      <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingAccount ? "Modifica account" : "Nuovo account"}</DialogTitle>
+            <DialogDescription>
+              {isAdamAccount(editingAccount)
+                ? "Nome e password arrivano da ADAM. Qui puoi cambiare solo il ruolo WASS."
+                : editingAccount
+                  ? `Aggiorna username, password o ruolo di ${editingAccount.username}.`
+                  : "Username e password servono per entrare in WASS."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="account-username">{isAdamAccount(editingAccount) ? "Nome" : "Username"}</Label>
+              <Input
+                id="account-username"
+                value={draftUsername}
+                onChange={(event) => setDraftUsername(event.target.value)}
+                placeholder="Nome utente"
+                autoComplete="off"
+                readOnly={isAdamAccount(editingAccount)}
+                disabled={isAdamAccount(editingAccount)}
+              />
+              {isAdamAccount(editingAccount) ? (
+                <p className="text-xs text-muted-foreground">Accesso con {editingAccount?.username}</p>
+              ) : null}
+            </div>
+            {isAdamAccount(editingAccount) ? null : (
+            <div className="space-y-2">
+              <Label htmlFor="account-password">Password</Label>
+              <div className="relative">
+                <Input
+                  id="account-password"
+                  type={showDraftPassword ? "text" : "password"}
+                  value={draftPassword}
+                  onChange={(event) => setDraftPassword(event.target.value)}
+                  placeholder="Password"
+                  autoComplete="new-password"
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground"
+                  aria-label={showDraftPassword ? "Nascondi password" : "Mostra password"}
+                  onClick={() => setShowDraftPassword((current) => !current)}
+                >
+                  {showDraftPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="account-role">Ruolo</Label>
+              <Select
+                value={draftRole}
+                onValueChange={(value: AccountRole) => setDraftRole(value)}
+                disabled={editingAccount ? isPrimaryAdmin(editingAccount) : false}
+              >
+                <SelectTrigger id="account-role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLES.map((role) => (
+                    <SelectItem key={role.value} value={role.value}>
+                      <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", role.badgeClass)}>
+                        {role.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setEditorOpen(false)} disabled={isSaving}>
+              Annulla
+            </Button>
+            <Button type="button" onClick={handleSave} disabled={isSaving}>
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Salva
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Sei sicuro?</AlertDialogTitle>
+            <AlertDialogTitle>Eliminare {accountToDelete?.username}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Questa azione non può essere annullata. L'account verrà eliminato
-              permanentemente.
+              L'account non potrà più accedere a WASS. L'operazione non si può annullare.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annulla</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteAccount}>
-              Elimina
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleDeleteAccount}>Elimina</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function FilterChip({
+  active,
+  count,
+  onClick,
+  children,
+  toneClass,
+}: {
+  active: boolean;
+  count: number;
+  onClick: () => void;
+  children: string;
+  toneClass?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition-colors",
+        toneClass
+          ? cn(toneClass, active ? "ring-2 ring-offset-2 ring-current" : "hover:opacity-80")
+          : active
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-border bg-background text-foreground hover:bg-muted"
+      )}
+    >
+      {children}
+      <span
+        className={cn(
+          "text-xs tabular-nums",
+          toneClass ? "opacity-80" : active ? "text-primary-foreground/80" : "text-muted-foreground"
+        )}
+      >
+        {count}
+      </span>
+    </button>
   );
 }

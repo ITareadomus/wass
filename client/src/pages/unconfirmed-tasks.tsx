@@ -486,6 +486,7 @@ export default function UnconfirmedTasks() {
                   variant="outline"
                   onClick={() => navigate(assignmentsHomeHref)}
                   disabled={false}
+                  data-viewer-allow=""
                   data-testid="button-go-home"
                   className="border-2 border-custom-blue"
                 >
@@ -813,6 +814,7 @@ export default function UnconfirmedTasks() {
                   variant="outline"
                   onClick={() => navigate(assignmentsHomeHref)}
                   disabled={false}
+                  data-viewer-allow=""
                   data-testid="button-go-home"
                   className="border-2 border-custom-blue"
                 >
