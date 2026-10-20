@@ -4496,9 +4496,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         []
       );
 
-      const { pgUsersService } = await import("./services/pg-users-service");
-      const userRecord = await pgUsersService.getUserByUsername(username);
-      const adamUpdatedBy = userRecord?.adam_id ? `E${userRecord.adam_id}` : username;
+      const { resolveAdamUpdatedBy } = await import("./services/adam-wass-accounts");
+      const adamUpdatedBy = await resolveAdamUpdatedBy(username);
 
       const { syncLogisticsTimelineToAdam } = await import(
         "./services/adam-logistics-transfer-service"
@@ -8485,9 +8484,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (taskId && adamUpdates.length > 0) {
         let connection: any = null;
         try {
-          const { pgUsersService } = await import("./services/pg-users-service");
-          const userRecord = await pgUsersService.getUserByUsername(String(currentUsername || "system"));
-          const adamUpdatedBy = userRecord?.adam_id ? `E${userRecord.adam_id}` : String(currentUsername || "system");
+          const { resolveAdamUpdatedBy } = await import("./services/adam-wass-accounts");
+          const adamUpdatedBy = await resolveAdamUpdatedBy(currentUsername);
           const nowRome = format(new Date(), "yyyy-MM-dd HH:mm:ss");
           adamUpdates.push("updated_by = ?");
           adamValues.push(adamUpdatedBy);
@@ -8707,12 +8705,9 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     );
 
     // === Utente ADAM (updated_by) ===
-    const { pgUsersService } = await import("./services/pg-users-service");
-    const userRecord = await pgUsersService.getUserByUsername(username);
-    const adamUpdatedBy = userRecord?.adam_id ? `E${userRecord.adam_id}` : username;
-    console.log(
-      `📝 updated_by per ADAM: ${adamUpdatedBy} (adam_id: ${userRecord?.adam_id || "N/A"})`
-    );
+    const { resolveAdamUpdatedBy } = await import("./services/adam-wass-accounts");
+    const adamUpdatedBy = await resolveAdamUpdatedBy(username);
+    console.log(`📝 updated_by per ADAM: ${adamUpdatedBy} (username: ${username})`);
 
     // === Collaborazioni (Fonte di Verità: Postgres) ===
     const { taskCollaborationService } = await import(

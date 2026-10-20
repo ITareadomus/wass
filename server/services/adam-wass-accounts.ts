@@ -131,6 +131,48 @@ export async function setAdamWassAccountRole(
   return "ok";
 }
 
+/** Id dipendente ADAM (ruolo wass) a partire dall'email di login. */
+export async function findAdamWassEmployeeIdByEmail(email: string): Promise<number | null> {
+  const normalized = email.trim();
+  if (!normalized) return null;
+  const row = await withMysql(async (connection) => {
+    const [rows] = await connection.execute(
+      `SELECT e.id ${EMPLOYEE_JOIN} AND LOWER(e.email) = LOWER(?) LIMIT 1`,
+      [BACKPACK_USER, ADAM_ROLE_NAME, normalized]
+    );
+    const list = Array.isArray(rows) ? rows : [];
+    return (list[0] as { id?: unknown } | undefined) ?? null;
+  });
+  const id = Number(row?.id);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+/**
+ * Valore per `updated_by` / `deleted_by` su ADAM.
+ * Account WASS con adam_id → `E{id}`.
+ * Account ADAM (username = email, assenti da `users`) → stesso codice, letto dal dipendente.
+ * Altrimenti lo username corto degli account locali.
+ */
+export async function resolveAdamUpdatedBy(username: string | null | undefined): Promise<string> {
+  const name = String(username ?? "").trim() || "system";
+  try {
+    const { pgUsersService } = await import("./pg-users-service");
+    const userRecord = await pgUsersService.getUserByUsername(name);
+    if (userRecord?.adam_id) return `E${userRecord.adam_id}`;
+  } catch (error) {
+    console.warn("resolveAdamUpdatedBy: lookup utenti WASS fallito", error);
+  }
+  if (name.includes("@")) {
+    try {
+      const employeeId = await findAdamWassEmployeeIdByEmail(name);
+      if (employeeId) return `E${employeeId}`;
+    } catch (error) {
+      console.warn("resolveAdamUpdatedBy: lookup dipendente ADAM fallito", error);
+    }
+  }
+  return name;
+}
+
 export async function loginAdamWassAccount(
   email: string,
   password: string

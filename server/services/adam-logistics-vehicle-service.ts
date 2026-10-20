@@ -290,12 +290,11 @@ export async function runLogisticsDriverVehiclesAdamSync(
   username: string
 ): Promise<LogisticsDriverVehiclesAdamSyncResult> {
   const { pgDailyAssignmentsService } = await import("./pg-daily-assignments-service");
-  const { pgUsersService } = await import("./pg-users-service");
+  const { resolveAdamUpdatedBy } = await import("./adam-wass-accounts");
 
   const vehicleAssignments =
     await pgDailyAssignmentsService.loadSelectedLogisticsDriverVehicleAssignments(workDate);
-  const userRecord = await pgUsersService.getUserByUsername(username);
-  const adamUpdatedBy = userRecord?.adam_id ? `E${userRecord.adam_id}` : username;
+  const adamUpdatedBy = await resolveAdamUpdatedBy(username);
 
   let connection: Connection | null = null;
   try {
