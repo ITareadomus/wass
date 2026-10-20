@@ -13,6 +13,7 @@ import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, getLatestRunF
 import { loadPriorityStartWindows, mapPriorityType, priorityToDbFormat } from './priorityWindows';
 import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, calculateMinutesBasedTargets, TaskForPhase2, DEFAULT_FAIRNESS_PARAMS, FormatoreRules, TaskTypesByCleanerConfig } from './phase2';
 import { TimelineContext } from './timelineContext';
+import { loadTriadeAssignmentWeights, triadeWeightOrBase } from '../triade-assignment';
 
 async function loadApartmentTypes(): Promise<ApartmentTypes> {
   try {
@@ -746,6 +747,21 @@ export async function runPhase4(
           (schedule as any).anchorTask = anchor;
         }
       }
+    }
+
+    const triadeWeights = await loadTriadeAssignmentWeights(
+      resolvedWorkDate,
+      Array.from(tasksMap.values()).map((task) => ({
+        taskId: task.taskId,
+        operationId: task.operationId,
+      })),
+      schedules.map((schedule) => schedule.cleanerId)
+    );
+    for (const task of tasksMap.values()) {
+      task.triadeWeight = triadeWeights.taskWeight.get(task.taskId) ?? triadeWeightOrBase(null);
+    }
+    for (const schedule of schedules) {
+      schedule.triadeWeight = triadeWeights.cleanerWeight.get(schedule.cleanerId) ?? triadeWeightOrBase(null);
     }
 
     result.schedulesLoaded = schedules.length;

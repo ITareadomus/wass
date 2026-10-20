@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RefreshCw, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { CleanerTriadMark } from "@/components/triad-mark";
+import { CleanerTriadMark, type CleanerTriadeLevel } from "@/components/triad-mark";
 
 interface Cleaner {
   id: number;
@@ -24,6 +24,7 @@ interface Cleaner {
   weekly_hours?: number;
   role?: string;
   contract_type?: string;
+  triade?: CleanerTriadeLevel | null;
 }
 
 interface CleanerSelectorDialogProps {
@@ -143,6 +144,7 @@ export function CleanerSelectorDialog({
         weekly_hours: c.weekly_hours,
         role: c.role,
         contract_type: c.contract_type,
+        triade: c.triade ?? null,
       }));
 
       if (excludeCleanerId) {
@@ -317,7 +319,7 @@ export function CleanerSelectorDialog({
                                 Ufficio
                               </span>
                             ) : (
-                              <CleanerTriadMark role={cleaner.role || "Standard"} />
+                              <CleanerTriadMark triade={cleaner.triade} />
                             )}
                           </div>
                         </label>
@@ -383,7 +385,7 @@ export function CleanerSelectorDialog({
                                 Ufficio
                               </span>
                             ) : (
-                              <CleanerTriadMark role={cleaner.role || "Standard"} />
+                              <CleanerTriadMark triade={cleaner.triade} />
                             )}
                           </div>
                         </label>

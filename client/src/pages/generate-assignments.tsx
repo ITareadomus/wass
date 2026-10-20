@@ -4,6 +4,8 @@ import {
   isWorkDateHistoricallyLocked,
   isWorkDateInPast,
 } from "@shared/work-date-access";
+import { HkHypothesisSwitcher } from "@/components/dialogs/hk-hypothesis-switcher";
+import type { HkHypothesisPickerItem } from "@shared/hk-assignment-hypotheses";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
 import MapSection from "@/components/map/map-section";
@@ -512,6 +514,9 @@ export default function GenerateAssignments() {
 
   // Stato per tracciare tutte le task con le loro assegnazioni
   const [allTasksWithAssignments, setAllTasksWithAssignments] = useState<Task[]>([]);
+  const [hkHypotheses, setHkHypotheses] = useState<HkHypothesisPickerItem[]>([]);
+  const [previewHypothesisId, setPreviewHypothesisId] = useState<string | null>(null);
+  const [applyingHypothesisId, setApplyingHypothesisId] = useState<string | null>(null);
 
   // Stato per la ricerca di task
   const [searchTask, setSearchTask] = useState("");
@@ -1417,6 +1422,8 @@ export default function GenerateAssignments() {
   // silent=true per evitare loader durante DnD background refresh
   const loadTasks = async (skipExtraction: boolean = false, silent: boolean = false) => {
     try {
+      const { invalidateTaskTriade } = await import("@/lib/task-triade");
+      invalidateTaskTriade();
       if (!silent) {
         setIsLoadingTasks(true);
         setExtractionStep("Caricamento task nei contenitori...");
@@ -2078,7 +2085,7 @@ export default function GenerateAssignments() {
           }
           throw new Error(errData.locked_reason || 'Task bloccata: impossibile assegnare');
         }
-        throw new Error(`Errore nel salvataggio dell'assegnazione: ${errData.error || response.statusText}`);
+        throw new Error(errData.message || `Errore nel salvataggio dell'assegnazione: ${errData.error || response.statusText}`);
       }
       console.log(`Assegnazione salvata: taskId=${taskId}, logisticCode=${logisticCode}`);
     } catch (error: any) {
@@ -2481,13 +2488,90 @@ export default function GenerateAssignments() {
   // Determina se la modalità storica è attiva (data passata)
   const isHistoricalMode = isWorkDateHistoricallyLocked(selectedDate);
 
+  const selectedHkHypothesis = useMemo(
+    () =>
+      hkHypotheses.find((hypothesis) => hypothesis.summary.id === previewHypothesisId) ??
+      hkHypotheses[0] ??
+      null,
+    [hkHypotheses, previewHypothesisId]
+  );
+  const isHkHypothesisPreview = !isOfficeScope && selectedHkHypothesis != null;
+  const displayedTimelineTasks = useMemo(() => {
+    if (!selectedHkHypothesis || isOfficeScope) return allTasksWithAssignments;
+    const byId = new Map(selectedHkHypothesis.assignments.map((row) => [String(row.taskId), row]));
+    return allTasksWithAssignments.map((task) => {
+      const id = String((task as any).id ?? (task as any).task_id ?? "");
+      const row = byId.get(id);
+      if (!row) return task;
+      return {
+        ...task,
+        assignedCleaner: row.cleanerId,
+        cleanerId: row.cleanerId,
+        sequence: row.sequence,
+        start_time: row.startTime,
+        end_time: row.endTime,
+        startTime: row.startTime,
+        endTime: row.endTime,
+        travelTime: row.travelMin,
+        travel_time: row.travelMin,
+        priority: row.priority || (task as any).priority,
+      } as Task;
+    });
+  }, [allTasksWithAssignments, selectedHkHypothesis, isOfficeScope]);
+  const previewTaskId = (task: Task) => String((task as any).id ?? (task as any).task_id ?? "");
+  const previewAssignedIds = useMemo(() => {
+    if (!isHkHypothesisPreview || !selectedHkHypothesis) return new Set<string>();
+    return new Set(selectedHkHypothesis.assignments.map((row) => String(row.taskId)));
+  }, [isHkHypothesisPreview, selectedHkHypothesis]);
+
+  useEffect(() => {
+    setHkHypotheses([]);
+    setPreviewHypothesisId(null);
+    setApplyingHypothesisId(null);
+  }, [selectedDate]);
+
+  const applyHkHypothesis = async (hypothesis: HkHypothesisPickerItem) => {
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+    const day = String(selectedDate.getDate()).padStart(2, "0");
+    const dateStr = `${year}-${month}-${day}`;
+    setApplyingHypothesisId(hypothesis.summary.id);
+    try {
+      const response = await fetch("/api/optimizer/apply-hypothesis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: dateStr, runId: hypothesis.runId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || data?.error || "Errore durante l'applicazione");
+      }
+      toast({
+        variant: "success",
+        title: "Assegnazione completata",
+        description: `${hypothesis.summary.title}: ${hypothesis.summary.assignedTaskCount} task assegnate, ${hypothesis.summary.droppedTaskCount} non assegnate`,
+      });
+      setHkHypotheses([]);
+      setPreviewHypothesisId(null);
+      await reloadAllTasks();
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Errore",
+        description: error instanceof Error ? error.message : "Errore durante l'applicazione",
+      });
+    } finally {
+      setApplyingHypothesisId(null);
+    }
+  };
+
   const assignmentStatistics = useMemo(
     () =>
       computeAssignmentTaskStatisticsFromTasks(
-        allTasksWithAssignments,
+        displayedTimelineTasks,
         isOfficeScope ? "office" : "housekeeping"
       ),
-    [allTasksWithAssignments, isOfficeScope]
+    [displayedTimelineTasks, isOfficeScope]
   );
   const timelinePriorityState = useMemo(() => {
     let hasEoOnTimeline = false;
@@ -2676,6 +2760,27 @@ export default function GenerateAssignments() {
                     const day = String(selectedDate.getDate()).padStart(2, '0');
                     const dateStr = `${year}-${month}-${day}`;
                     
+                    if (!isOfficeScope) {
+                      const response = await fetch('/api/optimizer/hypotheses', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ date: dateStr, scope: scopeValue })
+                      });
+                      const result = await response.json().catch(() => ({}));
+                      if (!response.ok || !result?.success) {
+                        throw new Error(result?.message || result?.error || 'Errore durante l\'assegnazione');
+                      }
+                      const hypotheses = Array.isArray(result.hypotheses) ? result.hypotheses : [];
+                      if (hypotheses.length === 0) {
+                        throw new Error('Nessuna ipotesi disponibile');
+                      }
+                      setHkHypotheses(hypotheses);
+                      setPreviewHypothesisId(hypotheses[0]?.summary?.id ?? null);
+                      toast({
+                        title: "Ipotesi pronte",
+                        description: "Confrontale in timeline e applica quella che preferisci.",
+                      });
+                    } else {
                     const response = await fetch('/api/optimizer/run-all', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -2697,17 +2802,18 @@ export default function GenerateAssignments() {
                       description: `${summary.tasksAssigned || 0} task assegnate, ${summary.tasksUnassigned || 0} non assegnate`,
                     });
                     await reloadAllTasks();
+                    }
                   } catch (error) {
                     toast({
                       variant: "destructive",
                       title: "Errore",
-                      description: "Errore durante l'assegnazione automatica",
+                      description: error instanceof Error ? error.message : "Errore durante l'assegnazione automatica",
                     });
                   } finally {
                     setIsAssigning(false);
                   }
                 }}
-                disabled={isAssigning || isWassManualLocked || isRefreshingContainers}
+                disabled={isAssigning || isWassManualLocked || isRefreshingContainers || isHkHypothesisPreview}
                 className="flex items-center gap-2 rounded-none text-black dark:text-white hover:bg-custom-blue/80 px-3"
               >
                 {isAssigning ? (
@@ -2799,13 +2905,13 @@ export default function GenerateAssignments() {
                   <PriorityColumn
                     title="EARLY OUT"
                     priority="early-out"
-                    tasks={earlyOutTasks}
+                    tasks={earlyOutTasks.filter((task) => !previewAssignedIds.has(previewTaskId(task)))}
                     workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="early-out"
                     icon="clock"
                     assignAction={assignEarlyOutToTimeline}
-                    assignButtonDisabled={hasRunAssignEo || isRefreshingContainers || isWassManualLocked}
-                    isDragDisabled={isWassManualLocked || isLoadingDragDrop || isRefreshingContainers}
+                    assignButtonDisabled={hasRunAssignEo || isRefreshingContainers || isWassManualLocked || isHkHypothesisPreview}
+                    isDragDisabled={isWassManualLocked || isLoadingDragDrop || isRefreshingContainers || isHkHypothesisPreview}
                     containerMultiSelectState={getContainerMultiSelectState('early_out')}
                     highlightedTaskIds={highlightedEarlyOut}
                     isContentLoading={isRefreshingContainers}
@@ -2813,13 +2919,13 @@ export default function GenerateAssignments() {
                   <PriorityColumn
                     title="HIGH PRIORITY"
                     priority="high"
-                    tasks={highPriorityTasks}
+                    tasks={highPriorityTasks.filter((task) => !previewAssignedIds.has(previewTaskId(task)))}
                     workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="high"
                     icon="alert-circle"
                     assignAction={assignHighPriorityToTimeline}
-                    assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || hasRunAssignHp || isRefreshingContainers || isWassManualLocked}
-                    isDragDisabled={isWassManualLocked || isLoadingDragDrop || isRefreshingContainers}
+                    assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || hasRunAssignHp || isRefreshingContainers || isWassManualLocked || isHkHypothesisPreview}
+                    isDragDisabled={isWassManualLocked || isLoadingDragDrop || isRefreshingContainers || isHkHypothesisPreview}
                     containerMultiSelectState={getContainerMultiSelectState('high_priority')}
                     highlightedTaskIds={highlightedHighPriority}
                     isContentLoading={isRefreshingContainers}
@@ -2828,13 +2934,13 @@ export default function GenerateAssignments() {
                   <PriorityColumn
                     title="LOW PRIORITY"
                     priority="low"
-                    tasks={lowPriorityTasks}
+                    tasks={lowPriorityTasks.filter((task) => !previewAssignedIds.has(previewTaskId(task)))}
                     workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="low"
                     icon="arrow-down"
                     assignAction={assignLowPriorityToTimeline}
-                    assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || !timelinePriorityState.hasHpOnTimeline || hasRunAssignLp || isRefreshingContainers || isWassManualLocked}
-                    isDragDisabled={isWassManualLocked || isLoadingDragDrop || isRefreshingContainers}
+                    assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || !timelinePriorityState.hasHpOnTimeline || hasRunAssignLp || isRefreshingContainers || isWassManualLocked || isHkHypothesisPreview}
+                    isDragDisabled={isWassManualLocked || isLoadingDragDrop || isRefreshingContainers || isHkHypothesisPreview}
                     containerMultiSelectState={getContainerMultiSelectState('low_priority')}
                     highlightedTaskIds={highlightedLowPriority}
                     isContentLoading={isRefreshingContainers}
@@ -2866,11 +2972,24 @@ export default function GenerateAssignments() {
                   </button>
                 </div>
               )}
+              {isHkHypothesisPreview && selectedHkHypothesis && (
+                <HkHypothesisSwitcher
+                  hypotheses={hkHypotheses}
+                  selectedId={selectedHkHypothesis.summary.id}
+                  applyingId={applyingHypothesisId}
+                  onSelect={setPreviewHypothesisId}
+                  onApply={(hypothesis) => void applyHkHypothesis(hypothesis)}
+                  onCancel={() => {
+                    setHkHypotheses([]);
+                    setPreviewHypothesisId(null);
+                  }}
+                />
+              )}
               {/* Timeline View */}
               <div data-print-timeline className="relative">
                 <TimelineView
                   personnel={[]}
-                  tasks={allTasksWithAssignments}
+                  tasks={displayedTimelineTasks}
                   selectedDate={selectedDate}
                   hasUnsavedChanges={hasUnsavedChanges}
                   onTaskMoved={handleTaskMoved}
@@ -2879,7 +2998,7 @@ export default function GenerateAssignments() {
                     setHasRunAssignHp(false);
                     setHasRunAssignLp(false);
                   }}
-                  isReadOnly={isWassManualLocked}
+                  isReadOnly={isWassManualLocked || isHkHypothesisPreview}
                   isLoadingDragDrop={isLoadingDragDrop || isRefreshingContainers}
                   loadingMessage={
                     isRefreshingContainers
@@ -2955,7 +3074,7 @@ export default function GenerateAssignments() {
                   }
                 >
                   <MapSection
-                    tasks={allTasksWithAssignments}
+                    tasks={displayedTimelineTasks}
                     workDate={format(selectedDate, "yyyy-MM-dd")}
                     compact
                     className="h-full"
@@ -2984,7 +3103,7 @@ export default function GenerateAssignments() {
                   <span className="h-10 w-1 rounded-full bg-custom-blue/70" />
                 </div>
                 <MapSection
-                  tasks={allTasksWithAssignments}
+                  tasks={displayedTimelineTasks}
                   workDate={format(selectedDate, "yyyy-MM-dd")}
                   compact
                   className="h-full min-h-0 w-full border-custom-blue"
@@ -3024,7 +3143,7 @@ export default function GenerateAssignments() {
             activeDragTask={assignmentDnd.activeDragTask}
             activeRect={assignmentDnd.activeRect}
             insertTarget={assignmentDnd.insertTarget}
-            tasks={allTasksWithAssignments}
+            tasks={displayedTimelineTasks}
             scope="housekeeping"
           />
         </DndContext>

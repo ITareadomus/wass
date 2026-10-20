@@ -12,6 +12,7 @@
  */
 
 import { spawn } from 'child_process';
+import { parseSolverJson } from './solver-json';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import {
@@ -97,7 +98,8 @@ function buildPayload(
     isOfficeTask: t.isOfficeTask === true,
     typeApt: t.typeApt,
     priority: t.priority,
-    cleaningTime: t.cleaningTime
+    cleaningTime: t.cleaningTime,
+    triadeWeight: t.triadeWeight ?? 1
   }));
 
   const cleanersPayload = cleaners.map(c => ({
@@ -106,7 +108,8 @@ function buildPayload(
     role: c.role,
     contractType: c.contractType,
     preferredCustomers: c.preferredCustomers,
-    counterHours: c.counterHours
+    counterHours: c.counterHours,
+    triadeWeight: c.triadeWeight ?? 1
   }));
 
   const maxTasksPerCleaner = params.dynamicMaxTasks != null ? params.dynamicMaxTasks + 1 : 4;
@@ -162,7 +165,9 @@ function buildPayload(
     straordinariaLongThresholdMin: STRAORDINARIA_LONG_THRESHOLD_MIN,
     straordinariaExtraTaskMaxMin: STRAORDINARIA_EXTRA_TASK_MAX_MIN,
     travelToFirstTaskMin,
-    travelWeight: params.travelWeight ?? 2
+    travelWeight: params.travelWeight ?? 2,
+    triadLevelBonus: params.triadLevelBonus ?? 8000,
+    triadOverqualPenalty: params.triadOverqualPenalty ?? 3000
   };
 
   return JSON.stringify(payload);
@@ -203,7 +208,7 @@ function runPythonScript(
         if (stdout) console.error('[Phase2 OR-Tools] stdout (last 1500 chars):', stdout.slice(-1500));
         // Python may still print JSON to stdout before exit(1) (e.g. status "error" or "infeasible")
         try {
-          const data = JSON.parse(stdout) as { status?: string; message?: string };
+          const data = parseSolverJson<{ status?: string; message?: string }>(stdout);
           if (data.status === 'infeasible') {
             reject(new Error(`Phase 2 OR-Tools infeasible${data.message ? `: ${data.message}` : ''}`));
             return;
@@ -243,7 +248,7 @@ function parseOutput(
   };
 
   try {
-    data = JSON.parse(stdout);
+    data = parseSolverJson(stdout);
   } catch {
     throw new Error('Phase 2 OR-Tools invalid JSON output');
   }

@@ -19,6 +19,16 @@ except ImportError:
 SCALE = 10
 
 
+def triad_weight(value):
+    try:
+        weight = int(value)
+    except (TypeError, ValueError):
+        return 1
+    if weight < 1:
+        return 1
+    return min(weight, 3)
+
+
 def main():
     try:
         import io
@@ -102,15 +112,24 @@ def main():
         model.add(load_expr <= max_load)
         model.add(count_expr <= max_tasks)
 
-    # Objective: maximize tasks assigned (priority 1), minimize total travel (priority 2)
+    # Objective: maximize tasks assigned, then prefer a higher triad task on a
+    # cleaner of the same level. The level term stays below one extra task.
     task_weight = 1000000
+    triad_level_bonus = int(data.get("triadLevelBonus", 10000))
+    triad_overqual_penalty = int(data.get("triadOverqualPenalty", 4000))
     travel_weight = 1
-    obj_tasks = []
-    obj_travel = []
+    task_triade = [triad_weight(tasks_by_id.get(tid, {}).get("triadeWeight")) for tid in task_ids]
+    cleaner_triade = [
+        triad_weight(cleaners_list[c].get("triadeWeight") if c < len(cleaners_list) else 1)
+        for c in range(n_cleaners)
+    ]
+    obj_terms = []
     for (t_idx, c_idx, delta_scaled, _) in allowed_pairs:
-        obj_tasks.append(x[(t_idx, c_idx)])
-        obj_travel.append(x[(t_idx, c_idx)] * delta_scaled)
-    model.maximize(task_weight * sum(obj_tasks) - travel_weight * sum(obj_travel))
+        tw = task_triade[t_idx]
+        gap = max(0, cleaner_triade[c_idx] - tw)
+        level_term = triad_level_bonus * tw - triad_overqual_penalty * gap
+        obj_terms.append((task_weight + level_term) * x[(t_idx, c_idx)] - travel_weight * delta_scaled * x[(t_idx, c_idx)])
+    model.maximize(sum(obj_terms))
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 60.0

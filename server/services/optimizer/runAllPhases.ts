@@ -21,6 +21,7 @@ import path from 'path';
 import { TimelineContext } from './timelineContext';
 import { CONTINUAZIONE_PS_OPERATION_ID, isTaskEquivalentToStraordinaria } from '../../utils/straordinaria-utils';
 import { buildSchedulingWindows, parsePrioritySettings } from '../../../shared/taskPriorityClassification';
+import { hkHypothesisProfileById, type HkHypothesisId } from '../../../shared/hk-assignment-hypotheses';
 
 export type WavePriority = 'early_out' | 'high_priority' | 'low_priority';
 
@@ -270,6 +271,8 @@ export interface RunAllPhasesOptions {
   applyToProduction?: boolean;
   forceFullPipeline?: boolean;
   anchorTaskIds?: number[];
+  hypothesisId?: HkHypothesisId;
+  recordPlan?: boolean;
 }
 
 interface TimelineAnchorBuildResult {
@@ -444,8 +447,11 @@ export async function runAllPhases(
     skipPhase4 = false,
     applyToProduction = false,
     forceFullPipeline = false,
-    anchorTaskIds = []
+    anchorTaskIds = [],
+    hypothesisId,
+    recordPlan = true,
   } = options;
+  const hypothesisProfile = hypothesisId ? hkHypothesisProfileById(hypothesisId) : null;
 
   const result: AllPhasesRunResult = {
     runId,
@@ -581,7 +587,16 @@ export async function runAllPhases(
     // Passa baseMax - il bonus travel (+1) viene applicato per-cleaner basato su avgTravel ≤ 10min
     // Passa timelineContext per fairness scoring (pre-existing load)
     result.phase2 = await runPhase2(workDate, runId, { 
-      params: { dynamicMaxTasks: dynamicLimits.baseMax },
+      params: {
+        dynamicMaxTasks: dynamicLimits.baseMax,
+        ...(hypothesisProfile
+          ? {
+              travelWeight: hypothesisProfile.travelWeight,
+              triadLevelBonus: hypothesisProfile.triadLevelBonus,
+              triadOverqualPenalty: hypothesisProfile.triadOverqualPenalty,
+            }
+          : {}),
+      },
       timelineContext: phase2TimelineContext
     });
     if (result.phase2.status === 'failed') {
@@ -612,7 +627,14 @@ export async function runAllPhases(
       result.phase4 = await runPhase4(workDate, runId, { 
         params: {
           dynamicMaxTasks: dynamicLimits.baseMax,
-          ...(hasExistingTimeline ? { appendOnly: true, travelPolicy: DEFAULT_TRAVEL_POLICY } : {})
+          ...(hasExistingTimeline ? { appendOnly: true, travelPolicy: DEFAULT_TRAVEL_POLICY } : {}),
+          ...(hypothesisProfile
+            ? {
+                triadSwap: hypothesisProfile.triadSwap,
+                triadLevelBonus: hypothesisProfile.phase4LevelBonus,
+                triadOverqualPenalty: hypothesisProfile.phase4OverqualPenalty,
+              }
+            : {}),
         },
         timelineContext: result.phase0?.timelineContext
       });
@@ -626,7 +648,15 @@ export async function runAllPhases(
     // Phase 5: Inter-Cleaner Travel Optimization (relocations + swaps)
     console.log(`[runAllPhases] === PHASE 5: Inter-Cleaner Travel Optimization ===`);
     result.phase5 = await runPhase5(workDate, runId, {
-      params: { dynamicMaxTasks: dynamicLimits.baseMax },
+      params: {
+        dynamicMaxTasks: dynamicLimits.baseMax,
+        ...(hypothesisProfile
+          ? {
+              maxIterations: hypothesisProfile.phase5MaxIterations,
+              maxFairnessIterations: hypothesisProfile.phase5MaxFairnessIterations,
+            }
+          : {}),
+      },
       timelineContext: result.phase0?.timelineContext
     });
     if (result.phase5.status === 'failed') {
@@ -673,7 +703,7 @@ export async function runAllPhases(
 
     // Persist plan only for full runs without pre-existing timeline.
     // This is the "single solve" baseline used by wave applies.
-    if (!hasExistingTimeline) {
+    if (recordPlan && !hasExistingTimeline) {
       await setPlanRunIdForDate(workDate, runId);
       console.log(`[runAllPhases] Plan run updated for ${workDate}: ${runId}`);
     }

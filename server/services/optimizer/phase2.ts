@@ -1,5 +1,6 @@
 import { estimateTravelMinutes, TaskInput } from './phase1';
 import { isTaskEquivalentToStraordinaria } from '../../utils/straordinaria-utils';
+import { cleanerCanTakeTriadeTask } from '../triade-assignment';
 
 export interface CleanerInput {
   cleanerId: number;
@@ -10,6 +11,7 @@ export interface CleanerInput {
   counterHours: number;
   lat?: number;
   lng?: number;
+  triadeWeight?: number;
 }
 
 export interface TaskForPhase2 {
@@ -25,6 +27,7 @@ export interface TaskForPhase2 {
   cleaningTime: number;
   operationId?: number | null;
   isOfficeTask?: boolean;
+  triadeWeight?: number;
 }
 
 export interface GroupCandidate {
@@ -106,6 +109,8 @@ export interface FormatoreRules {
 
 export interface Phase2Params {
   travelWeight: number;
+  triadLevelBonus?: number;
+  triadOverqualPenalty?: number;
   loadWeight: number;
   preferenceBonus: number;
   apartmentTypes: ApartmentTypes;
@@ -309,6 +314,10 @@ export function isCleanerCompatible(
   // Cleaner ufficio non prende task non-ufficio.
   if (normalizedRole === 'ufficio_cleaner') {
     return { compatible: false, reason: 'UFFICIO_CLEANER_NON_OFFICE_TASK' };
+  }
+
+  if (!cleanerCanTakeTriadeTask(cleaner.triadeWeight, task.triadeWeight)) {
+    return { compatible: false, reason: 'TRIADE_LEVEL' };
   }
 
   if (task.premium && normalizedRole !== 'premium_cleaner') {

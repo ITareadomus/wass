@@ -96,6 +96,9 @@ import { CleanerSelectorDialog } from "@/components/dialogs/cleaner-selector-dia
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { isContinuazioneStraordinariaTask, isTaskLocked } from "@/lib/taskValidation";
+import { useTaskTriade } from "@/lib/task-triade";
+import { parseCleanerTriade, TaskTriadMark } from "@/components/triad-mark";
+import { DayTriadLevel } from "@/components/day-triad-level";
 import {
   getHousekeepingTypeTier,
   type HousekeepingTypeTier,
@@ -1031,6 +1034,8 @@ const displayClickableInputClass =
   }, [allTasks, task]);
 
   // Trova l'indice effettivo della task nel cleaner
+  const showTaskTriade = operationsScope !== "logistics";
+  const cardTriade = useTaskTriade(task, showTaskTriade);
   const { currentIndex, effectiveCurrentId, currentTaskInNavigable, displayTask, canGoPrev, canGoNext } = React.useMemo(() => {
     const normalizedCurrentId = currentTaskId ? String(currentTaskId) : null;
     const normalizedTaskId = getTaskNavigationKey(task, index);
@@ -1067,6 +1072,7 @@ const displayClickableInputClass =
       canGoNext: next
     };
   }, [navigableTasks, currentTaskId, task, index]);
+  const dialogTriade = useTaskTriade(displayTask, showTaskTriade);
 
   const dialogTaskKey = getTaskKey(displayTask) || getTaskKey(task);
   const dialogTaskIdRaw =
@@ -3029,13 +3035,14 @@ const displayClickableInputClass =
               </div>
               <div>
                 <p className="text-sm font-semibold text-muted-foreground">Cliente</p>
-                <Input
-                  value={String(displayTask.customer_name ?? "non migrato")}
-                  readOnly
-                  className={displayInputClass}
-                  tabIndex={-1}
-                  onFocus={(e) => e.currentTarget.blur()}
-                />
+                <div className="flex h-9 items-center gap-1.5">
+                  <span className="min-w-0 truncate text-sm text-foreground">
+                    {String(displayTask.customer_name ?? "non migrato")}
+                  </span>
+                  {showTaskTriade && parseCleanerTriade(dialogTriade?.customerTriade) ? (
+                    <TaskTriadMark triade={dialogTriade?.customerTriade} size="md" />
+                  ) : null}
+                </div>
               </div>
             </div>
 
@@ -3227,6 +3234,28 @@ const displayClickableInputClass =
                 />
               </div>
             </div>
+
+            {showTaskTriade && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                  Livello Triade
+                  {!isHousekeepingFieldsReadOnly && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                </p>
+                <div className="flex min-h-10 items-center">
+                  <DayTriadLevel
+                    workDate={effectiveWorkDate}
+                    taskId={dialogTaskId}
+                    original={dialogTriade === undefined ? undefined : dialogTriade.triade ?? null}
+                    enabled={showTaskTriade}
+                    editable={!isHousekeepingFieldsReadOnly}
+                    size="lg"
+                    unknown="text"
+                  />
+                </div>
+              </div>
+            </div>
+            )}
 
             {/* Quinta riga: Pax-In - Pax-Out */}
             <div className="grid grid-cols-2 gap-4">
@@ -3511,6 +3540,17 @@ const displayClickableInputClass =
                       )}
                     {showCompactAdamTimelineUi ? (
                       <div className="relative z-[2] isolate flex h-full w-full items-center justify-center mix-blend-normal">
+                        {showTaskTriade && (
+                          <DayTriadLevel
+                            workDate={effectiveWorkDate}
+                            taskId={Number((task as any).task_id ?? (task as any).id)}
+                            original={cardTriade === undefined ? undefined : cardTriade.triade ?? null}
+                            enabled={showTaskTriade}
+                            size="sm"
+                            appearance="real"
+                            className="absolute left-1 top-1/2 z-[3] -translate-y-1/2"
+                          />
+                        )}
                         <LogisticsAdamCodeLabel
                           code={logisticsAdamCode}
                           lightOnColor={Boolean(
@@ -3610,6 +3650,16 @@ const displayClickableInputClass =
                         >
                           {task.name}
                         </span>
+                        {showTaskTriade && (
+                          <DayTriadLevel
+                            workDate={effectiveWorkDate}
+                            taskId={Number((task as any).task_id ?? (task as any).id)}
+                            original={cardTriade === undefined ? undefined : cardTriade.triade ?? null}
+                            enabled={showTaskTriade}
+                            size="sm"
+                            appearance="real"
+                          />
+                        )}
                         {(task as any).customer_reference && !isShortHousekeepingTimelineTask && (
                           <span className="text-red-600 dark:text-red-400 font-bold text-[11px] whitespace-nowrap">
                             ({(task as any).customer_reference})

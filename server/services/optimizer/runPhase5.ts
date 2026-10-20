@@ -10,6 +10,7 @@ import { CleanerSchedule } from './phase4';
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, getLatestRunForDate, loadLockedCleanerIds } from './db';
 import { loadPriorityStartWindows, mapPriorityType, priorityToDbFormat } from './priorityWindows';
 import { TimelineContext } from './timelineContext';
+import { loadTriadeAssignmentWeights, triadeWeightOrBase } from '../triade-assignment';
 
 export interface Phase5RunResult {
   runId: string;
@@ -286,6 +287,21 @@ export async function runPhase5(
     ]);
 
     result.schedulesLoaded = schedules.length;
+
+    const triadeWeights = await loadTriadeAssignmentWeights(
+      resolvedWorkDate,
+      Array.from(tasksMap.values()).map((task) => ({
+        taskId: task.taskId,
+        operationId: task.operationId,
+      })),
+      schedules.map((schedule) => schedule.cleanerId)
+    );
+    for (const task of tasksMap.values()) {
+      task.triadeWeight = triadeWeights.taskWeight.get(task.taskId) ?? triadeWeightOrBase(null);
+    }
+    for (const schedule of schedules) {
+      schedule.triadeWeight = triadeWeights.cleanerWeight.get(schedule.cleanerId) ?? triadeWeightOrBase(null);
+    }
 
     const totalTasks = schedules.reduce((sum, s) => sum + s.tasks.length, 0);
     if (totalTasks <= 1) {

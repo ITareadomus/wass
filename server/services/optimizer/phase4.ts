@@ -11,6 +11,7 @@ import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, FairnessParams, DEFAULT_FAIRNE
 import { TravelPolicy, getWaveLevelConstraints } from './travelPolicy';
 import { runPhase4RepairBatch } from './phase4OrTools';
 import { isTaskEquivalentToStraordinaria } from '../../utils/straordinaria-utils';
+import { cleanerCanTakeTriadeTask, triadeWeightOrBase } from '../triade-assignment';
 
 export interface Phase4Params {
   maxInsertionAttempts: number;
@@ -35,6 +36,9 @@ export interface Phase4Params {
   formatoreRules?: FormatoreRules | null;
   // Dynamic max tasks per cleaner (calcolato da totalTasks/numCleaners)
   dynamicMaxTasks?: number;
+  triadSwap?: boolean;
+  triadLevelBonus?: number;
+  triadOverqualPenalty?: number;
   // Minutes-based fairness parameters
   fairness: FairnessParams;
   // Wave-only: per-leg travel policy (mirrors Phase 1 thresholds).
@@ -89,6 +93,7 @@ export interface CleanerSchedule {
   // Dati per vincoli hard (opzionali per retrocompatibilità)
   role?: string;
   contractType?: string;
+  triadeWeight?: number;
   // Fairness tracking: ore totali lavorate (in minuti)
   totalWorkMinutes?: number;
 }
@@ -267,6 +272,10 @@ function checkHardConstraints(
   // Cleaner ufficio non prende task non-ufficio.
   if (normalizedRole === 'ufficio_cleaner') {
     return { compatible: false, reason: 'UFFICIO_CLEANER_NON_OFFICE_TASK' };
+  }
+
+  if (!cleanerCanTakeTriadeTask(schedule.triadeWeight, task.triadeWeight)) {
+    return { compatible: false, reason: 'TRIADE_LEVEL' };
   }
   
   // 0. Verifica premium: task premium richiede cleaner Premium
@@ -828,6 +837,8 @@ function trySwapForTask(
       // Calcola il "valore" del task rimosso (approssimativo)
       // Un task normale vale circa la baseUnassignedPenalty
       const removedTaskScore = params.baseUnassignedPenalty;
+      const incomingWeight = triadeWeightOrBase(task.triadeWeight);
+      const removedWeight = triadeWeightOrBase(removedTask?.triadeWeight);
       
       // Crea schedule senza questo task
       const tasksWithoutRemoved = schedule.tasks.filter((_, idx) => idx !== i);
@@ -912,7 +923,12 @@ function trySwapForTask(
       // Calcola guadagno netto (include relaxPenalty nel costo)
       // Guadagno: evito penalità del nuovo task
       // Perdita: devo poi riassegnare il task rimosso + relaxPenalty
-      const netGain = unassignedPenaltyValue - removedTaskScore - relaxPenaltyValue;
+      // Un task di triade più alta prende il posto di uno più basso sullo stesso cleaner.
+      const triadUpgradeGain =
+        params.triadSwap !== false && incomingWeight > removedWeight
+          ? (incomingWeight - removedWeight) * (params.baseUnassignedPenalty + relaxPenaltyValue + 1)
+          : 0;
+      const netGain = unassignedPenaltyValue - removedTaskScore - relaxPenaltyValue + triadUpgradeGain;
       
       // Accetta solo se il guadagno è positivo (vale la pena fare lo swap)
       if (netGain > 0) {
@@ -947,6 +963,7 @@ function trySwapForTask(
               // Preserva i dati per vincoli hard
               role: schedule.role,
               contractType: schedule.contractType,
+              triadeWeight: schedule.triadeWeight,
               // Fairness tracking
               totalWorkMinutes: newTotalWorkMinutes
             },
@@ -1147,6 +1164,10 @@ export async function runPhase4Algorithm(
     const straordA = taskA && isTaskEquivalentToStraordinaria(taskA) ? 0 : 1;
     const straordB = taskB && isTaskEquivalentToStraordinaria(taskB) ? 0 : 1;
     if (straordA !== straordB) return straordA - straordB;
+
+    const weightA = triadeWeightOrBase(taskA?.triadeWeight);
+    const weightB = triadeWeightOrBase(taskB?.triadeWeight);
+    if (weightA !== weightB) return weightB - weightA;
     
     // Then by scarcity (più rari prima - meno compatibili = priorità più alta)
     const scarcityA = taskScarcity.get(a.taskId) ?? schedules.length;
@@ -1217,7 +1238,8 @@ export async function runPhase4Algorithm(
           seenTaskIds.add(task.taskId);
           repairTasks.push({
             taskId: task.taskId,
-            cleaningTimeMinutes: task.cleaningTimeMinutes ?? 60
+            cleaningTimeMinutes: task.cleaningTimeMinutes ?? 60,
+            triadeWeight: triadeWeightOrBase(task.triadeWeight)
           });
         }
         for (const schedule of assignableSchedules) {
@@ -1265,7 +1287,8 @@ export async function runPhase4Algorithm(
           currentLoadMin,
           currentTaskCount,
           maxLoad: targets.maxTarget,
-          maxTasks
+          maxTasks,
+          triadeWeight: triadeWeightOrBase(schedule.triadeWeight)
         });
       }
       try {
@@ -1274,7 +1297,11 @@ export async function runPhase4Algorithm(
           repairTasks,
           repairCleaners,
           params.fairness.wT,
-          { timeoutMs: 60000 }
+          {
+            timeoutMs: 60000,
+            triadLevelBonus: params.triadLevelBonus,
+            triadOverqualPenalty: params.triadOverqualPenalty,
+          }
         );
         const sortedAssignments = [...batchResult.assignments].sort(
           (a, b) => a.cleanerId - b.cleanerId || a.taskId - b.taskId

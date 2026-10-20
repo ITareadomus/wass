@@ -361,6 +361,31 @@ export class PgDailyAssignmentsService {
     }
   }
 
+  /**
+   * Eccezione di livello triade valida solo per una giornata.
+   * Il livello originale resta su ADAM. Il reset della timeline svuota queste righe.
+   */
+  async ensureTriadeOverrideTable(): Promise<void> {
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS daily_task_triade_override (
+          work_date DATE NOT NULL,
+          task_id INTEGER NOT NULL,
+          weight SMALLINT NOT NULL CHECK (weight BETWEEN 1 AND 3),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (work_date, task_id)
+        )
+      `);
+      await query(`
+        CREATE INDEX IF NOT EXISTS idx_daily_task_triade_override_date
+        ON daily_task_triade_override(work_date)
+      `);
+      console.log('✅ PG: Tabella daily_task_triade_override verificata');
+    } catch (error) {
+      console.warn('⚠️ PG: Errore (ignorabile) nella creazione daily_task_triade_override:', error);
+    }
+  }
+
   async ensureOperationalDayTable(): Promise<void> {
     try {
       await query(`

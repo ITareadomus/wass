@@ -43,6 +43,7 @@ export interface TaskForScheduling {
   typeApt?: string;
   operationId?: number | null;
   isOfficeTask?: boolean;
+  triadeWeight?: number;
 }
 
 export interface CleanerForScheduling {

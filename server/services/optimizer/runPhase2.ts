@@ -16,6 +16,7 @@ import {
 import { runPhase2WithOrTools } from './phase2OrTools';
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, loadLockedCleanerIds } from './db';
 import { TimelineContext } from './timelineContext';
+import { loadTriadeAssignmentWeights, triadeWeightOrBase } from '../triade-assignment';
 
 async function loadApartmentTypes(): Promise<ApartmentTypes> {
   try {
@@ -450,6 +451,22 @@ export async function runPhase2(
     console.log(`[Phase2] Cleaners after lock filter: ${cleaners.length}/${selectedCleanerIds.length}`);
     
     result.cleanersLoaded = cleaners.length;
+
+    const triadeWeights = await loadTriadeAssignmentWeights(
+      workDate,
+      Array.from(tasksMap.values()).map((task) => ({
+        taskId: task.taskId,
+        clientId: task.clientId,
+        operationId: task.operationId,
+      })),
+      cleaners.map((cleaner) => cleaner.cleanerId)
+    );
+    for (const task of tasksMap.values()) {
+      task.triadeWeight = triadeWeights.taskWeight.get(task.taskId) ?? triadeWeightOrBase(null);
+    }
+    for (const cleaner of cleaners) {
+      cleaner.triadeWeight = triadeWeights.cleanerWeight.get(cleaner.cleanerId) ?? triadeWeightOrBase(null);
+    }
 
     const allTaskIds = new Set(allGroups.flatMap((g) => g.taskIds));
     const { selected: selectedGroups, uncoveredTaskIds } = selectPartitionCoveringAllTasks(allGroups, allTaskIds);

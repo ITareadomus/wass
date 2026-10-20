@@ -87,6 +87,16 @@ def is_continuazione_ps_task(task):
     return str(op_name).strip().lower() == CONTINUAZIONE_PS_OPERATION_NAME
 
 
+def task_triade_weight(value):
+    try:
+        weight = int(value)
+    except (TypeError, ValueError):
+        return 1
+    if weight < 1:
+        return 1
+    return min(weight, 3)
+
+
 def task_cleaner_compatible(cleaner, task, apartment_types, office_operation_ids, task_types_by_cleaner):
     role_key = normalize_role(cleaner.get("role"))
     _ = task_types_by_cleaner
@@ -95,6 +105,10 @@ def task_cleaner_compatible(cleaner, task, apartment_types, office_operation_ids
         return role_key == "ufficio_cleaner"
 
     if role_key == "ufficio_cleaner":
+        return False
+    cleaner_weight = task_triade_weight(cleaner.get("triadeWeight"))
+    task_weight = task_triade_weight(task.get("triadeWeight"))
+    if cleaner_weight < task_weight:
         return False
     if task.get("premium") and role_key != "premium_cleaner":
         return False
@@ -180,6 +194,8 @@ def main():
     target_load_scaled = int((targets.get("targetLoadMin") or 0) * SCALE)
     travel_to_first = data.get("travelToFirstTaskMin") or []  # [g][c] in minutes
     travel_weight = float(data.get("travelWeight", 2))
+    triad_level_bonus = int(data.get("triadLevelBonus", 8000))
+    triad_overqual_penalty = int(data.get("triadOverqualPenalty", 3000))
     k_under = float(fairness.get("k_under", 6))
     k_balance = float(fairness.get("k_balance", 2))
     k_over = float(fairness.get("k_over", 0.05))
@@ -216,6 +232,7 @@ def main():
     group_long_ot = []
     group_ot_duration = []
     group_anchored = []
+    group_triade = []
 
     for g in groups:
         task_ids = g.get("taskIds") or []
@@ -232,6 +249,7 @@ def main():
         group_long_ot.append(long_ot)
         group_ot_duration.append(ot_dur)
         group_anchored.append(g.get("anchoredCleanerId"))
+        group_triade.append(max((task_triade_weight(t.get("triadeWeight")) for t in tasks), default=1))
 
     # Per-cleaner initial state
     def fixed_task_count(c_idx):
@@ -417,8 +435,11 @@ def main():
         else:
             has_any_c.append((c, None))
 
-    # Objective: legacy weights (task_weight dominant, then travel, under, balance, over, zeroBonus)
+    # Objective: assign as many tasks as possible, then prefer a higher triad
+    # task on a cleaner of the same level. The level bonus stays below one
+    # extra task, so a feasible assignment is never dropped only to match levels.
     task_weight = 100000
+    cleaner_triade = [task_triade_weight(cleaners[c].get("triadeWeight")) for c in range(n_c)]
     obj_terms = []
 
     for g in range(n_g):
@@ -426,6 +447,9 @@ def main():
             if x[g][c] is None:
                 continue
             obj_terms.append(task_weight * x[g][c] * group_ntasks[g])
+            group_weight = group_triade[g]
+            level_gap = max(0, cleaner_triade[c] - group_weight)
+            obj_terms.append((triad_level_bonus * group_weight - triad_overqual_penalty * level_gap) * x[g][c])
             travel_first_min = float(travel_to_first[g][c] if g < len(travel_to_first) and c < len(travel_to_first[g]) else 0) or 0
             travel_min = travel_first_min + (group_travel[g] / SCALE)
             obj_terms.append((-travel_weight * travel_min) * x[g][c])

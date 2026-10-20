@@ -25,7 +25,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from 'wouter';
 import { isTaskLocked } from "@/lib/taskValidation";
-import { CleanerTriadMark } from "@/components/triad-mark";
+import { CleanerTriadMark, type CleanerTriadeLevel } from "@/components/triad-mark";
 
 const OFFICE_SCOPE_ENABLED = false;
 
@@ -57,6 +57,7 @@ interface Cleaner {
   assigned_vehicle_name?: string | null;
   assigned_vehicle_pms_code?: string | null;
   assigned_vehicle_task_id?: number | null;
+  triade?: CleanerTriadeLevel | null;
 }
 
 interface TaskStats {
@@ -1497,7 +1498,7 @@ export default function Convocazioni() {
                               Ufficio
                             </span>
                           ) : (
-                            <CleanerTriadMark role={cleaner.role || "Standard"} />
+                            <CleanerTriadMark triade={cleaner.triade} />
                           )}
                         </div>
                       </div>

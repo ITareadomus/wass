@@ -1,4 +1,5 @@
 import { TaskForScheduling, simulateSequence, Phase3TimelineConstraints } from './phase3';
+import { cleanerCanTakeTriadeTask } from '../triade-assignment';
 import { PriorityWindows } from './priorityWindows';
 import { CleanerSchedule } from './phase4';
 import { FairnessParams, DEFAULT_FAIRNESS_PARAMS } from './phase2';
@@ -81,6 +82,8 @@ function isTaskMovableToCleaner(
   tasksMap: Map<number, TaskForScheduling>
 ): boolean {
   if (task.straordinaria) return false;
+
+  if (!cleanerCanTakeTriadeTask(target.triadeWeight, task.triadeWeight)) return false;
 
   if (task.premium) {
     const role = (target.role || 'Standard').toLowerCase();

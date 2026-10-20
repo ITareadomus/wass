@@ -48,7 +48,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { openTimelineMapPanel } from "@/lib/timeline-map-panel";
 import { getPersonnelHexColor } from "@/lib/cleaner-colors";
-import { CleanerTriadMark } from "@/components/triad-mark";
+import { CleanerTriadMark, parseCleanerTriade, type CleanerTriadeLevel } from "@/components/triad-mark";
 import { useSyncedTimelineScroll } from "@/hooks/use-synced-timeline-scroll";
 import {
   AlertDialog,
@@ -107,6 +107,7 @@ interface Cleaner {
   start_time: string | null;
   end_time?: string | null;
   show_plus_one?: boolean;
+  triade?: CleanerTriadeLevel | null;
 }
 
 const DEFAULT_TIMELINE_START_MINUTES = 10 * 60;
@@ -235,6 +236,7 @@ type CleanerDirectoryEntry = {
   lastname?: string;
   alias?: string;
   role?: string;
+  triade?: ReturnType<typeof parseCleanerTriade>;
 };
 
 const PREASSIGNED_REASON_NORMAL = "preassigned_enable_wass";
@@ -560,6 +562,7 @@ export default function TimelineView({
     const fullName = `${resolvedName} ${lastname}`.trim();
     const role = normalizeCleanerRole(cleanerLike?.role || directoryEntry?.role);
     const primaryLabel = alias || fullName || `ID ${cleanerId}`;
+    const triade = parseCleanerTriade(cleanerLike?.triade) || directoryEntry?.triade || null;
 
     return {
       alias,
@@ -568,6 +571,7 @@ export default function TimelineView({
       fullName,
       role,
       primaryLabel,
+      triade,
     };
   };
 
@@ -1262,6 +1266,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             lastname: current.lastname || String(cleaner?.lastname ?? "").trim() || undefined,
             alias: current.alias || String(cleaner?.alias ?? "").trim() || undefined,
             role: current.role || String(cleaner?.role ?? "").trim() || undefined,
+            triade: current.triade || parseCleanerTriade(cleaner?.triade),
           };
         }
       }
@@ -2845,7 +2850,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           </div>
                         )}
                         {!isRemoved && cleanerRole !== "Ufficio" && (
-                          <CleanerTriadMark role={cleanerRole || "Standard"} size="sm" />
+                          <CleanerTriadMark triade={cleanerDisplay.triade} size="sm" />
                         )}
                       </div>
                     </div>
@@ -3830,7 +3835,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                             Ufficio
                           </span>
                         ) : (
-                          <CleanerTriadMark role={cleaner.role || "Standard"} />
+                          <CleanerTriadMark triade={cleaner.triade} />
                         )}
                       </div>
                     </div>
@@ -3950,7 +3955,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           Ufficio
                         </span>
                       ) : (
-                        <CleanerTriadMark role={cleaner.role || "Standard"} />
+                        <CleanerTriadMark triade={cleaner.triade} />
                       )}
                     </div>
                   </div>
@@ -4110,7 +4115,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     </span>
                   ) : (
                     <CleanerTriadMark
-                      role={getCleanerDisplayData(selectedCleaner).role || "Standard"}
+                      triade={getCleanerDisplayData(selectedCleaner).triade}
                       size="md"
                     />
                   )
