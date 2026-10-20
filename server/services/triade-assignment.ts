@@ -1,6 +1,7 @@
 import { loadCleanerTriadeByIds } from "./adam-triade";
 import { resolveTaskTriade } from "./adam-task-triade";
 import { listDayTriadeOverrides } from "./pg-task-triade-override";
+import { listDayCleanerTriadeOverrides } from "./pg-cleaner-triade-override";
 
 /** Senza livello il task vale 1. Un cleaner senza livello vale 1 e prende solo quelli. */
 export const TRIADE_BASE_WEIGHT = 1;
@@ -23,7 +24,7 @@ export async function loadTriadeAssignmentWeights(
 ): Promise<{ taskWeight: Map<number, number>; cleanerWeight: Map<number, number> }> {
   const taskIds = [...new Set(tasks.map((task) => Number(task.taskId)).filter((id) => Number.isFinite(id) && id > 0))];
   const ids = [...new Set(cleanerIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0))];
-  const [resolved, overrides, cleaners] = await Promise.all([
+  const [resolved, overrides, cleanerOverrides, cleaners] = await Promise.all([
     resolveTaskTriade(
       tasks
         .filter((task) => Number.isFinite(Number(task.taskId)) && Number(task.taskId) > 0)
@@ -34,6 +35,7 @@ export async function loadTriadeAssignmentWeights(
         }))
     ),
     listDayTriadeOverrides(workDate).catch(() => []),
+    listDayCleanerTriadeOverrides(workDate).catch(() => []),
     loadCleanerTriadeByIds(ids),
   ]);
 
@@ -48,9 +50,11 @@ export async function loadTriadeAssignmentWeights(
     if (taskWeight.has(taskId)) taskWeight.set(taskId, triadeWeightOrBase(weight));
   }
 
+  const overrideByCleaner = new Map(cleanerOverrides.map((row) => [row.cleaner_id, row.weight]));
   const cleanerWeight = new Map<number, number>();
   for (const id of ids) {
-    cleanerWeight.set(id, triadeWeightOrBase(cleaners.get(id)?.weight ?? TRIADE_BASE_WEIGHT));
+    const override = overrideByCleaner.get(id);
+    cleanerWeight.set(id, triadeWeightOrBase(override ?? cleaners.get(id)?.weight ?? TRIADE_BASE_WEIGHT));
   }
   return { taskWeight, cleanerWeight };
 }

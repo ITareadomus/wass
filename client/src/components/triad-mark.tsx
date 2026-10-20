@@ -11,6 +11,12 @@ export type CleanerTriadeLevel = {
 };
 
 const HEX = /^#[0-9A-Fa-f]{6}$/;
+const MAX_TRIAD_DIAMONDS = 6;
+
+function shownDiamondCount(weight: number): number {
+  if (!Number.isFinite(weight) || weight < 1) return 0;
+  return Math.min(MAX_TRIAD_DIAMONDS, Math.floor(weight));
+}
 
 function readHex(value: unknown): string | null {
   const text = String(value ?? "").trim();
@@ -42,11 +48,11 @@ export function parseCleanerTriade(value: unknown): {
   const weight = Number(row.weight);
   const color = readHex(row.color);
   const name = String(row.name ?? "").trim();
-  if (!Number.isFinite(weight) || weight < 1 || !color || !name) return null;
+  if (!Number.isInteger(weight) || weight < 1 || !color || !name) return null;
   const colorBg = readHex(row.color_bg) ?? readHex(row.colorBg) ?? mixHex("#FFFFFF", color, 0.82);
   return {
     name,
-    weight: Math.min(6, Math.floor(weight)),
+    weight,
     color,
     colorBg,
   };
@@ -254,7 +260,7 @@ export function CleanerTriadMark({
       title={level.name}
       aria-label={level.name}
     >
-      {Array.from({ length: level.weight }, (_, index) => (
+      {Array.from({ length: shownDiamondCount(level.weight) }, (_, index) => (
         <Diamond
           key={index}
           gradientId={`triad-${reactId}-${index}`}
@@ -270,10 +276,12 @@ type DayMark = "solid" | "added" | "removed";
 
 function dayMarks(originalWeight: number, overrideWeight: number | null): DayMark[] {
   const current = overrideWeight ?? originalWeight;
+  const drawnOriginal = shownDiamondCount(originalWeight);
+  const drawnCurrent = shownDiamondCount(current);
   if (current === originalWeight) {
-    return Array.from({ length: originalWeight }, () => "solid");
+    return Array.from({ length: drawnOriginal }, () => "solid");
   }
-  const count = Math.max(originalWeight, current);
+  const count = Math.max(drawnOriginal, drawnCurrent);
   return Array.from({ length: count }, (_, index) => {
     const step = index + 1;
     if (step <= Math.min(originalWeight, current)) return "solid";

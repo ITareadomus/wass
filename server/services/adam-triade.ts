@@ -94,6 +94,13 @@ export async function loadCleanerTriadeByIds(
   return out;
 }
 
+/** Il peso è selezionabile nell'override solo se appartiene a un livello attivo del catalogo ADAM. */
+export async function isActiveTriadeWeight(weight: number): Promise<boolean> {
+  if (!Number.isInteger(weight) || weight < 1) return false;
+  const levels = await loadActiveTriadeLevels();
+  return levels.some((level) => level.weight === weight);
+}
+
 /** Catalogo attivo, dal peso più basso. Serve al selettore di giornata. */
 export async function loadActiveTriadeLevels(): Promise<CleanerTriadeLevel[]> {
   if (!databaseConfig.isMysqlConfigured()) return [];

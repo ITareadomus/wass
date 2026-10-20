@@ -362,6 +362,34 @@ export class PgDailyAssignmentsService {
   }
 
   /**
+   * Le tabelle già create avevano il tetto fisso 1–3.
+   * Il peso ammesso segue il catalogo ADAM: qui resta solo il minimo.
+   */
+  private async relaxTriadeWeightCheck(
+    table: "daily_task_triade_override" | "daily_cleaner_triade_override"
+  ): Promise<void> {
+    await query(
+      `DO $$
+      DECLARE r record;
+      BEGIN
+        FOR r IN
+          SELECT con.conname
+          FROM pg_constraint con
+          JOIN pg_class rel ON rel.oid = con.conrelid
+          WHERE rel.relname = '${table}'
+            AND con.contype = 'c'
+            AND pg_get_constraintdef(con.oid) ILIKE '%weight%'
+        LOOP
+          EXECUTE format('ALTER TABLE ${table} DROP CONSTRAINT %I', r.conname);
+        END LOOP;
+      END $$`
+    );
+    await query(
+      `ALTER TABLE ${table} ADD CONSTRAINT ${table}_weight_check CHECK (weight >= 1)`
+    );
+  }
+
+  /**
    * Eccezione di livello triade valida solo per una giornata.
    * Il livello originale resta su ADAM. Il reset della timeline svuota queste righe.
    */
@@ -371,7 +399,7 @@ export class PgDailyAssignmentsService {
         CREATE TABLE IF NOT EXISTS daily_task_triade_override (
           work_date DATE NOT NULL,
           task_id INTEGER NOT NULL,
-          weight SMALLINT NOT NULL CHECK (weight BETWEEN 1 AND 3),
+          weight SMALLINT NOT NULL CHECK (weight >= 1),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           PRIMARY KEY (work_date, task_id)
         )
@@ -380,7 +408,22 @@ export class PgDailyAssignmentsService {
         CREATE INDEX IF NOT EXISTS idx_daily_task_triade_override_date
         ON daily_task_triade_override(work_date)
       `);
-      console.log('✅ PG: Tabella daily_task_triade_override verificata');
+      await query(`
+        CREATE TABLE IF NOT EXISTS daily_cleaner_triade_override (
+          work_date DATE NOT NULL,
+          cleaner_id INTEGER NOT NULL,
+          weight SMALLINT NOT NULL CHECK (weight >= 1),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (work_date, cleaner_id)
+        )
+      `);
+      await query(`
+        CREATE INDEX IF NOT EXISTS idx_daily_cleaner_triade_override_date
+        ON daily_cleaner_triade_override(work_date)
+      `);
+      await this.relaxTriadeWeightCheck("daily_task_triade_override");
+      await this.relaxTriadeWeightCheck("daily_cleaner_triade_override");
+      console.log('✅ PG: Tabelle daily_task_triade_override e daily_cleaner_triade_override verificate');
     } catch (error) {
       console.warn('⚠️ PG: Errore (ignorabile) nella creazione daily_task_triade_override:', error);
     }

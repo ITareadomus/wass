@@ -1338,6 +1338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`✅ Collaborazioni cancellate da task_collaborators per ${workDate}`);
 
       await query(`DELETE FROM daily_task_triade_override WHERE work_date = $1`, [workDate]);
+      await query(`DELETE FROM daily_cleaner_triade_override WHERE work_date = $1`, [workDate]);
       console.log(`✅ Eccezioni triade cancellate per ${workDate}`);
 
       // 3. Refresh containers direttamente da ADAM (fonte sorgente)
@@ -2087,7 +2088,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!Number.isFinite(taskId) || taskId <= 0) {
         return res.status(400).json({ success: false, error: "Task non valida" });
       }
-      if (weight != null && (!Number.isInteger(weight) || weight < 1 || weight > 3)) {
+      const { isActiveTriadeWeight } = await import("./services/adam-triade");
+      if (weight != null && !(await isActiveTriadeWeight(weight))) {
         return res.status(400).json({ success: false, error: "Livello non valido" });
       }
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
@@ -2096,6 +2098,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, task_id: taskId, weight });
     } catch (error: any) {
       console.error("PUT /api/triade/day-overrides:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/triade/cleaner-day-overrides", async (req, res) => {
+    try {
+      const workDate = String(req.query.date || "");
+      if (!isValidWorkDate(workDate)) {
+        return res.status(400).json({ success: false, error: "Data non valida" });
+      }
+      const { loadActiveTriadeLevels } = await import("./services/adam-triade");
+      const { listDayCleanerTriadeOverrides } = await import("./services/pg-cleaner-triade-override");
+      const [levels, overrides] = await Promise.all([
+        loadActiveTriadeLevels(),
+        listDayCleanerTriadeOverrides(workDate),
+      ]);
+      res.json({ success: true, levels, overrides });
+    } catch (error: any) {
+      console.error("GET /api/triade/cleaner-day-overrides:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.put("/api/triade/cleaner-day-overrides", async (req, res) => {
+    try {
+      const workDate = String(req.body?.date || "");
+      const cleanerId = Number(req.body?.cleaner_id);
+      const rawWeight = req.body?.weight;
+      const weight = rawWeight == null || rawWeight === "" ? null : Number(rawWeight);
+      if (!isValidWorkDate(workDate)) {
+        return res.status(400).json({ success: false, error: "Data non valida" });
+      }
+      if (!Number.isFinite(cleanerId) || cleanerId <= 0) {
+        return res.status(400).json({ success: false, error: "Cleaner non valido" });
+      }
+      const { isActiveTriadeWeight } = await import("./services/adam-triade");
+      if (weight != null && !(await isActiveTriadeWeight(weight))) {
+        return res.status(400).json({ success: false, error: "Livello non valido" });
+      }
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+      const { saveDayCleanerTriadeOverride } = await import("./services/pg-cleaner-triade-override");
+      await saveDayCleanerTriadeOverride(workDate, cleanerId, weight);
+      res.json({ success: true, cleaner_id: cleanerId, weight });
+    } catch (error: any) {
+      console.error("PUT /api/triade/cleaner-day-overrides:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });

@@ -37,7 +37,7 @@ async function load(workDate: string) {
         const taskId = Number(row?.task_id);
         const weight = Number(row?.weight);
         if (!Number.isFinite(taskId) || taskId <= 0) continue;
-        if (!Number.isInteger(weight) || weight < 1 || weight > 3) continue;
+        if (!Number.isInteger(weight) || weight < 1) continue;
         overrides[taskId] = weight;
       }
       write(workDate, { levels, overrides, ready: true });

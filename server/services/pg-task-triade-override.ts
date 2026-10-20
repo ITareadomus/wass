@@ -8,7 +8,7 @@ export type DayTriadeOverride = {
 
 function asWeight(value: unknown): number | null {
   const weight = Number(value);
-  if (!Number.isInteger(weight) || weight < 1 || weight > 3) return null;
+  if (!Number.isInteger(weight) || weight < 1) return null;
   return weight;
 }
 

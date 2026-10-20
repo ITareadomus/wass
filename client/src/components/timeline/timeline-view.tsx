@@ -49,6 +49,7 @@ import { cn } from "@/lib/utils";
 import { openTimelineMapPanel } from "@/lib/timeline-map-panel";
 import { getPersonnelHexColor } from "@/lib/cleaner-colors";
 import { CleanerTriadMark, parseCleanerTriade, type CleanerTriadeLevel } from "@/components/triad-mark";
+import { DayCleanerTriadLevel } from "@/components/day-cleaner-triad-level";
 import { useSyncedTimelineScroll } from "@/hooks/use-synced-timeline-scroll";
 import {
   AlertDialog,
@@ -2850,7 +2851,17 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           </div>
                         )}
                         {!isRemoved && cleanerRole !== "Ufficio" && (
-                          <CleanerTriadMark triade={cleanerDisplay.triade} size="sm" />
+                          isOfficeScope ? (
+                            <CleanerTriadMark triade={cleanerDisplay.triade} size="sm" />
+                          ) : (
+                            <DayCleanerTriadLevel
+                              workDate={workDate}
+                              cleanerId={cleaner.id}
+                              original={cleanerDisplay.triade}
+                              enabled
+                              size="sm"
+                            />
+                          )
                         )}
                       </div>
                     </div>
@@ -3834,8 +3845,16 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
                             Ufficio
                           </span>
-                        ) : (
+                        ) : isOfficeScope ? (
                           <CleanerTriadMark triade={cleaner.triade} />
+                        ) : (
+                          <DayCleanerTriadLevel
+                            workDate={workDate}
+                            cleanerId={cleaner.id}
+                            original={cleaner.triade}
+                            enabled
+                            size="md"
+                          />
                         )}
                       </div>
                     </div>
@@ -3954,8 +3973,16 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
                           Ufficio
                         </span>
-                      ) : (
+                      ) : isOfficeScope ? (
                         <CleanerTriadMark triade={cleaner.triade} />
+                      ) : (
+                        <DayCleanerTriadLevel
+                          workDate={workDate}
+                          cleanerId={cleaner.id}
+                          original={cleaner.triade}
+                          enabled
+                          size="md"
+                        />
                       )}
                     </div>
                   </div>
@@ -4103,22 +4130,25 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             "dark:bg-background",
           )}
           onOpenAutoFocus={(e) => e.preventDefault()}
+          onPointerDownOutside={(event) => {
+            const originalEvent = (event as any)?.detail?.originalEvent;
+            const target = (originalEvent?.target ?? event.target) as HTMLElement | null;
+            if (target?.closest?.("[data-radix-popper-content-wrapper]")) event.preventDefault();
+          }}
+          onInteractOutside={(event) => {
+            const originalEvent = (event as any)?.detail?.originalEvent;
+            const target = (originalEvent?.target ?? event.target) as HTMLElement | null;
+            if (target?.closest?.("[data-radix-popper-content-wrapper]")) event.preventDefault();
+          }}
         >
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 Dettagli Cleaner #{selectedCleaner?.id}
-                {selectedCleaner && (
-                  getCleanerDisplayData(selectedCleaner).role === "Ufficio" ? (
-                    <span className="px-2 py-0.5 rounded border font-medium text-sm bg-sky-600/30 text-gray-900 dark:bg-sky-500/40 dark:text-sky-200 border-sky-700 dark:border-sky-400">
-                      Ufficio
-                    </span>
-                  ) : (
-                    <CleanerTriadMark
-                      triade={getCleanerDisplayData(selectedCleaner).triade}
-                      size="md"
-                    />
-                  )
+                {selectedCleaner && getCleanerDisplayData(selectedCleaner).role === "Ufficio" && (
+                  <span className="px-2 py-0.5 rounded border font-medium text-sm bg-sky-600/30 text-gray-900 dark:bg-sky-500/40 dark:text-sky-200 border-sky-700 dark:border-sky-400">
+                    Ufficio
+                  </span>
                 )}
               </div>
 
@@ -4231,6 +4261,27 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     className={displayInputClass}
                   />
                 </div>
+
+                {!isOfficeScope && getCleanerDisplayData(selectedCleaner).role !== "Ufficio" && (
+                  <div className="col-span-4">
+                    <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1 flex items-center gap-1">
+                      Livello Triade
+                      {!isReadOnly && <Pencil className="w-3 h-3 text-gray-700 dark:text-muted-foreground/60" />}
+                    </p>
+                    <div className="flex min-h-10 items-center">
+                      <DayCleanerTriadLevel
+                        workDate={workDate}
+                        cleanerId={selectedCleaner.id}
+                        original={getCleanerDisplayData(selectedCleaner).triade}
+                        enabled
+                        editable={!isReadOnly}
+                        size="lg"
+                        unknown="text"
+                        appearance="day"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Giorni lavorati (2/4) */}
                 <div className="col-span-2">

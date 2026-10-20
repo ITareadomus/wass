@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RefreshCw, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CleanerTriadMark, type CleanerTriadeLevel } from "@/components/triad-mark";
+import { DayCleanerTriadLevel } from "@/components/day-cleaner-triad-level";
 
 interface Cleaner {
   id: number;
@@ -318,6 +319,14 @@ export function CleanerSelectorDialog({
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
                                 Ufficio
                               </span>
+                            ) : scopeValue === "housekeeping" ? (
+                              <DayCleanerTriadLevel
+                                workDate={workDate}
+                                cleanerId={cleaner.id}
+                                original={cleaner.triade}
+                                enabled
+                                  size="md"
+                              />
                             ) : (
                               <CleanerTriadMark triade={cleaner.triade} />
                             )}
@@ -384,6 +393,14 @@ export function CleanerSelectorDialog({
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
                                 Ufficio
                               </span>
+                            ) : scopeValue === "housekeeping" ? (
+                              <DayCleanerTriadLevel
+                                workDate={workDate}
+                                cleanerId={cleaner.id}
+                                original={cleaner.triade}
+                                enabled
+                                  size="md"
+                              />
                             ) : (
                               <CleanerTriadMark triade={cleaner.triade} />
                             )}

@@ -55,10 +55,9 @@ export function DayTriadLevel({
   const preview = hoverWeight ?? committed;
   const catalog = day.levels
     .map((level) => parseCleanerTriade(level))
-    .filter((level): level is NonNullable<typeof level> => level != null && level.weight <= 3)
+    .filter((level): level is NonNullable<typeof level> => level != null)
     .sort((left, right) => left.weight - right.weight);
   const previewLevel = catalog.find((level) => level.weight === preview) ?? null;
-  const slots = catalog.length > 0 ? catalog : [1, 2, 3].map((weight) => ({ weight, level: null }));
 
   const commit = async (weight: number | null) => {
     if (saving) return;
@@ -114,19 +113,18 @@ export function DayTriadLevel({
           className="flex items-center gap-1"
           onMouseLeave={() => setHoverWeight(null)}
         >
-          {slots.map((slot) => {
-            const weight = slot.weight;
-            const level = "name" in slot ? slot : null;
+          {catalog.map((level) => {
+            const weight = level.weight;
             return (
               <button
-                key={weight}
+                key={`${level.name}-${weight}`}
                 type="button"
-                disabled={saving || !level}
+                disabled={saving}
                 className="rounded-sm p-0.5 hover:bg-muted/50 disabled:cursor-default"
-                aria-label={level ? level.name : `Livello ${weight}`}
-                onMouseEnter={() => level && setHoverWeight(weight)}
-                onFocus={() => level && setHoverWeight(weight)}
-                onClick={() => level && choose(weight)}
+                aria-label={level.name}
+                onMouseEnter={() => setHoverWeight(weight)}
+                onFocus={() => setHoverWeight(weight)}
+                onClick={() => choose(weight)}
               >
                 <TriadDiamondRow
                   level={preview > 0 && weight <= preview ? previewLevel : null}

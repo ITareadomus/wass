@@ -25,7 +25,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from 'wouter';
 import { isTaskLocked } from "@/lib/taskValidation";
-import { CleanerTriadMark, type CleanerTriadeLevel } from "@/components/triad-mark";
+import { type CleanerTriadeLevel } from "@/components/triad-mark";
+import { DayCleanerTriadLevel } from "@/components/day-cleaner-triad-level";
 
 const OFFICE_SCOPE_ENABLED = false;
 
@@ -1498,7 +1499,13 @@ export default function Convocazioni() {
                               Ufficio
                             </span>
                           ) : (
-                            <CleanerTriadMark triade={cleaner.triade} />
+                            <DayCleanerTriadLevel
+                              workDate={format(selectedDate, "yyyy-MM-dd")}
+                              cleanerId={cleaner.id}
+                              original={cleaner.triade}
+                                enabled
+                                size="md"
+                            />
                           )}
                         </div>
                       </div>
