@@ -1,6 +1,6 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
 import { formatClockFromMinutes } from "@shared/clock-display";
-import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, UserMinus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap, Lock, Unlock, AlertCircle, BarChart3, Map as MapIcon } from "lucide-react";
+import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, UserMinus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap, Lock, Unlock, AlertCircle, BarChart3, Map as MapIcon, CheckSquare } from "lucide-react";
 import { TimelineActionHistoryButton } from "@/components/timeline/timeline-action-history-button";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
@@ -87,6 +87,14 @@ interface TimelineViewProps {
   onOpenMap?: () => void;
   statisticsOpen?: boolean;
   mapOpen?: boolean;
+  timelineMultiSelect?: {
+    isActive: boolean;
+    selectedTasks: Array<{ taskId: string; order: number; cleanerId: number }>;
+    toggleMode: () => void;
+    toggleTask: (taskId: string, cleanerId: number) => void;
+    isTaskSelected: (taskId: string) => boolean;
+    getTaskOrder: (taskId: string) => number | undefined;
+  };
 }
 
 interface Cleaner {
@@ -263,6 +271,7 @@ export default function TimelineView({
   onOpenMap,
   statisticsOpen = false,
   mapOpen = false,
+  timelineMultiSelect,
 }: TimelineViewProps) {
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
@@ -2446,6 +2455,25 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   />
                 </div>
               )}
+              <Button
+                type="button"
+                variant={timelineMultiSelect?.isActive ? "default" : "outline"}
+                size="sm"
+                onClick={() => timelineMultiSelect?.toggleMode()}
+                disabled={isReadOnly || !hasTasksInTimeline || !timelineMultiSelect}
+                className="border-2 border-custom-blue px-2"
+                aria-pressed={timelineMultiSelect?.isActive}
+                title={
+                  timelineMultiSelect?.isActive
+                    ? timelineMultiSelect.selectedTasks.length > 0
+                      ? `Disattiva la selezione multipla (${timelineMultiSelect.selectedTasks.length} task)`
+                      : "Disattiva la selezione multipla in timeline"
+                    : "Seleziona più task in timeline e trascinale insieme"
+                }
+                data-testid="button-toggle-timeline-multiselect"
+              >
+                <CheckSquare className="h-4 w-4" />
+              </Button>
               <TimelineActionHistoryButton workDate={workDate} variant="housekeeping" scope={scopeValue} />
               <Button
                 type="button"
@@ -3096,6 +3124,16 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     const uniqueKey = `${taskId}-cleaner-${cleaner.id}`;
                                     const taskKey = getTaskDndKey(task);
                                     const dndId = taskDndId("housekeeping", taskKey, cleaner.id, "timeline");
+                                    const timelineSelectionActive = timelineMultiSelect?.isActive ?? false;
+                                    const selectedTimelineSources = timelineSelectionActive
+                                      && timelineMultiSelect?.isTaskSelected(taskKey)
+                                      ? [...(timelineMultiSelect?.selectedTasks ?? [])]
+                                          .sort((a, b) => a.order - b.order)
+                                          .map((selected) => ({
+                                            taskId: selected.taskId,
+                                            staffId: selected.cleanerId,
+                                          }))
+                                      : undefined;
                                     const dndData: AppDndItem = {
                                       kind: "task",
                                       scope: "housekeeping",
@@ -3106,7 +3144,21 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                         type: "timeline",
                                         staffId: cleaner.id,
                                       },
+                                      selectedTaskIds: selectedTimelineSources?.map((selected) => selected.taskId),
+                                      selectedTaskSources: selectedTimelineSources,
                                     };
+                                    const timelineCardMultiSelect = timelineSelectionActive && timelineMultiSelect
+                                      ? {
+                                          isMultiSelectMode: true,
+                                          selectedTasks: timelineMultiSelect.selectedTasks,
+                                          toggleMode: timelineMultiSelect.toggleMode,
+                                          toggleTask: (taskId: string) =>
+                                            timelineMultiSelect.toggleTask(taskId, cleaner.id),
+                                          clearSelection: () => {},
+                                          isTaskSelected: timelineMultiSelect.isTaskSelected,
+                                          getTaskOrder: timelineMultiSelect.getTaskOrder,
+                                        }
+                                      : null;
 
                                     // Verifica compatibilità task-cleaner
                                     const isIncompatible = validationRules && cleanerRole && !isOfficeCleanerRole(cleanerRole)
@@ -3234,6 +3286,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           compactAdamTimelineUi={hideRouteSpacers}
                                           isHighlighted={highlightedTaskIds.has(String(task.id))}
                                           cleanerId={cleaner.id}
+                                          multiSelectContext={timelineCardMultiSelect}
                                           showExecutionStatusColors={showExecutionStatusColors}
                                         />
                                         </FirstApartmentTimeShift>

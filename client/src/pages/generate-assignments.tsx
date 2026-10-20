@@ -228,6 +228,34 @@ function getLogisticCode(t: RawTask | Task | null | undefined): string | null {
   );
 }
 
+function planTimelineGroupMoves(
+  currentIds: string[],
+  groupIdsInOrder: string[],
+  insertAt: number,
+): Array<{ taskId: string; toIndex: number }> {
+  const groupSet = new Set(groupIdsInOrder);
+  const present = groupIdsInOrder.filter((id) => currentIds.includes(id));
+  const before = currentIds.slice(0, insertAt).filter((id) => groupSet.has(id)).length;
+  const rest = currentIds.filter((id) => !groupSet.has(id));
+  const at = Math.max(0, Math.min(rest.length, insertAt - before));
+  const targetIndex = new Map(present.map((id, index) => [id, at + index]));
+  const cursor = [...currentIds];
+  const steps: Array<{ taskId: string; toIndex: number }> = [];
+
+  for (const taskId of present) {
+    const target = targetIndex.get(taskId);
+    if (target == null || cursor[target] === taskId) continue;
+    const from = cursor.indexOf(taskId);
+    if (from < 0) continue;
+    const [item] = cursor.splice(from, 1);
+    const toIndex = Math.max(0, Math.min(target, cursor.length));
+    cursor.splice(toIndex, 0, item);
+    steps.push({ taskId, toIndex });
+  }
+
+  return steps;
+}
+
 function getTaskId(t: RawTask | Task | null | undefined): string {
   if (!t) return "";
   return String(
@@ -250,17 +278,6 @@ function dedupeById(list: Task[]): Task[] {
     }
   }
   return out;
-}
-
-type WavePriorityState = 'early_out' | 'high_priority' | 'low_priority' | null;
-
-function normalizeWavePriority(value: unknown): WavePriorityState {
-  if (typeof value !== 'string') return null;
-  const normalized = value.toLowerCase();
-  if (normalized === 'early_out' || normalized === 'early-out') return 'early_out';
-  if (normalized === 'high_priority' || normalized === 'high') return 'high_priority';
-  if (normalized === 'low_priority' || normalized === 'low') return 'low_priority';
-  return null;
 }
 
 // Indice per id (1:1)
@@ -375,15 +392,6 @@ export default function GenerateAssignments() {
   const isDraggingRef = useRef<boolean>(false);
   const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // PATCH B: Debounce per refreshAssignments (evita reload multipli)
-  const refreshDebounceRef = useRef<NodeJS.Timeout | null>(null);
-  const scheduleManualRefresh = useCallback((delayMs: number = 600) => {
-    if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current);
-    refreshDebounceRef.current = setTimeout(() => {
-      refreshAssignments("manual").catch(console.error);
-    }, delayMs);
-  }, []);
-
   // Preview della posizione di sequenza mentre trascini
   const [dragSequencePreview, setDragSequencePreview] = useState<{ sequenceIndex: number } | null>(null);
   
@@ -400,7 +408,7 @@ export default function GenerateAssignments() {
   const [containersForcedOpen, setContainersForcedOpen] = useState(false);
   const prevHasUnlockedContainerTasksRef = useRef(false);
 
-  // Stati per selezione multipla INDIPENDENTE per container (ma selezione CROSS-CONTAINER)
+  // Selezione multipla condivisa: accenderla su un container la attiva su tutti.
   const [multiSelectModes, setMultiSelectModes] = useState<{
     early_out: boolean;
     high_priority: boolean;
@@ -411,6 +419,11 @@ export default function GenerateAssignments() {
     low_priority: false
   });
   const [selectedTasks, setSelectedTasks] = useState<Array<{taskId: string; order: number; container: string}>>([]);
+  const [isLockingSelected, setIsLockingSelected] = useState(false);
+  const [timelineMultiSelectActive, setTimelineMultiSelectActive] = useState(false);
+  const [timelineSelectedTasks, setTimelineSelectedTasks] = useState<
+    Array<{ taskId: string; order: number; cleanerId: number }>
+  >([]);
 
   // Determina se ALMENO un container ha multi-select attivo
   const isAnyMultiSelectActive = multiSelectModes.early_out || multiSelectModes.high_priority || multiSelectModes.low_priority;
@@ -419,6 +432,10 @@ export default function GenerateAssignments() {
   const toggleMode = useCallback(() => {
     // Toggle globale (attiva/disattiva tutti i container)
     const newState = !isAnyMultiSelectActive;
+    if (newState) {
+      setTimelineMultiSelectActive(false);
+      setTimelineSelectedTasks([]);
+    }
     setMultiSelectModes({
       early_out: newState,
       high_priority: newState,
@@ -442,9 +459,49 @@ export default function GenerateAssignments() {
   }, []);
 
   const clearSelection = useCallback(() => {
-    console.log('[DEBUG] Clearing all selections');
     setSelectedTasks([]);
+    setTimelineSelectedTasks([]);
   }, []);
+
+  const toggleTimelineMultiSelect = useCallback(() => {
+    setTimelineMultiSelectActive((prev) => {
+      const next = !prev;
+      if (next) {
+        setMultiSelectModes({
+          early_out: false,
+          high_priority: false,
+          low_priority: false,
+        });
+        setSelectedTasks([]);
+      } else {
+        setTimelineSelectedTasks([]);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleTimelineTask = useCallback((taskId: string, cleanerId: number) => {
+    if (!Number.isFinite(cleanerId)) return;
+    setTimelineSelectedTasks((prev) => {
+      const existing = prev.find((task) => task.taskId === taskId);
+      if (existing) return prev.filter((task) => task.taskId !== taskId);
+      const maxOrder = prev.length > 0 ? Math.max(...prev.map((task) => task.order)) : 0;
+      return [...prev, { taskId, order: maxOrder + 1, cleanerId }];
+    });
+  }, []);
+
+  const isTimelineTaskSelected = useCallback((taskId: string) => {
+    return timelineSelectedTasks.some((task) => task.taskId === taskId);
+  }, [timelineSelectedTasks]);
+
+  const getTimelineTaskOrder = useCallback((taskId: string) => {
+    return timelineSelectedTasks.find((task) => task.taskId === taskId)?.order;
+  }, [timelineSelectedTasks]);
+
+  useEffect(() => {
+    setTimelineMultiSelectActive(false);
+    setTimelineSelectedTasks([]);
+  }, [selectedDate]);
 
   const isTaskSelected = useCallback((taskId: string) => {
     return selectedTasks.some(t => t.taskId === taskId);
@@ -455,31 +512,18 @@ export default function GenerateAssignments() {
     return task?.order;
   }, [selectedTasks]);
 
-  // Helper per ottenere lo stato multi-select di un container specifico
+  // Lo stato è lo stesso per ogni colonna: la selezione prende task da tutti i container.
   const getContainerMultiSelectState = useCallback((container: 'early_out' | 'high_priority' | 'low_priority') => {
     return {
-      isActive: multiSelectModes[container],
-      toggleMode: () => {
-        // Use functional updates to avoid stale closures
-        setMultiSelectModes(prev => {
-          const wasActive = prev[container];
-          // If deactivating, clear selections from this container
-          if (wasActive) {
-            setSelectedTasks(prevTasks => prevTasks.filter(t => t.container !== container));
-          }
-          return {
-            ...prev,
-            [container]: !wasActive
-          };
-        });
-      },
+      isActive: isAnyMultiSelectActive,
+      toggleMode,
       selectedTasks,
       toggleTask: (taskId: string) => toggleTask(taskId, container),
       clearSelection,
       isTaskSelected,
       getTaskOrder,
     };
-  }, [multiSelectModes, selectedTasks, toggleTask, clearSelection, isTaskSelected, getTaskOrder]);
+  }, [isAnyMultiSelectActive, toggleMode, selectedTasks, toggleTask, clearSelection, isTaskSelected, getTaskOrder]);
 
   // Memoizza il context value cross-container
   const multiSelectContextValue: MultiSelectContextType = useMemo(() => ({
@@ -698,18 +742,6 @@ export default function GenerateAssignments() {
   const [showUnlockConfirmDialog, setShowUnlockConfirmDialog] = useState(false);
   const [pendingLockedTasks, setPendingLockedTasks] = useState<LockedConflictTask[]>([]);
   const [pendingRefreshMode, setPendingRefreshMode] = useState<AdamRefreshMode>("assignments");
-  // Disabilitazione pulsanti Assegna solo dopo aver premuto il pulsante (non per D&D)
-  const [hasRunAssignEo, setHasRunAssignEo] = useState(false);
-  const [hasRunAssignHp, setHasRunAssignHp] = useState(false);
-  const [hasRunAssignLp, setHasRunAssignLp] = useState(false);
-
-  // Reset flag "ha premuto Assegna" al cambio data
-  useEffect(() => {
-    setHasRunAssignEo(false);
-    setHasRunAssignHp(false);
-    setHasRunAssignLp(false);
-  }, [selectedDate]);
-
   // Polling ADAM: fingerprint (apt + assegnazioni). Auto-sync solo con giornata operativa ON.
   const adamBaselineRef = useRef<AdamFingerprint | null>(null);
   const [hasAdamUpdates, setHasAdamUpdates] = useState(false);
@@ -1795,6 +1827,90 @@ export default function GenerateAssignments() {
     await refreshAssignments("manual");
   };
 
+  const selectedContainerTasks = useMemo(() => {
+    const byId = new Map<string, Task>();
+    for (const task of [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks]) {
+      byId.set(String(task.id), task);
+    }
+    return selectedTasks
+      .map((selected) => byId.get(selected.taskId))
+      .filter((task): task is Task => Boolean(task));
+  }, [selectedTasks, earlyOutTasks, highPriorityTasks, lowPriorityTasks]);
+
+  const lockableSelectedTasks = useMemo(
+    () =>
+      selectedContainerTasks.filter((task) => {
+        if (resolvePreAssignedModeFromTask(task) === "readonly") return false;
+        if (Boolean((task as any).is_finished ?? (task as any).isFinished)) return false;
+        return true;
+      }),
+    [selectedContainerTasks]
+  );
+
+  const lockSelectedAction: "lock" | "unlock" =
+    lockableSelectedTasks.length > 0 && lockableSelectedTasks.every((task) => isTaskLocked(task))
+      ? "unlock"
+      : "lock";
+
+  const lockSelectedContainerTasks = async () => {
+    if (isWassManualLocked || isLockingSelected) return;
+
+    const targets =
+      lockSelectedAction === "unlock"
+        ? lockableSelectedTasks
+        : lockableSelectedTasks.filter((task) => !isTaskLocked(task));
+
+    if (targets.length === 0) {
+      toast({
+        title: "Nessuna task da bloccare",
+        description: "Le task selezionate non si possono bloccare.",
+        variant: "warning",
+      });
+      return;
+    }
+
+    try {
+      setIsLockingSelected(true);
+      const response = await fetch("/api/bulk-lock-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          task_ids: targets.map((task) => Number((task as any).task_id || task.id)),
+          locked: lockSelectedAction === "lock",
+          locked_reason: "",
+          date: format(selectedDate, "yyyy-MM-dd"),
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({} as { error?: string; message?: string }));
+        throw new Error(errData.error || errData.message || "Impossibile aggiornare il blocco");
+      }
+
+      const skipped = selectedContainerTasks.length - targets.length;
+      toast({
+        variant: "success",
+        title: lockSelectedAction === "unlock" ? "Task sbloccate" : "Task bloccate",
+        description:
+          lockSelectedAction === "unlock"
+            ? `${targets.length} task di nuovo disponibili`
+            : `${targets.length} task non possono essere assegnate o trascinate${
+                skipped > 0 ? `. ${skipped} escluse perché già bloccate o non modificabili` : ""
+              }`,
+      });
+      clearSelection();
+      await reloadAllTasks();
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error?.message || "Impossibile modificare il blocco",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLockingSelected(false);
+    }
+  };
+
   const applyLatestHousekeepingExecutionStatus = async (workDate: string) => {
     try {
       const r = await fetch(
@@ -1927,82 +2043,8 @@ export default function GenerateAssignments() {
   };
   runAdamContainersRefreshRef.current = runAdamContainersRefresh;
 
-  const runWaveAssignment = async (priority: 'early_out' | 'high_priority' | 'low_priority', label: string) => {
-    if (isWassManualLocked) {
-      toast({
-        title: "Operazione non permessa",
-        description: isOperationalDayStarted
-          ? "Giornata operativa iniziata: da WASS puoi solo visualizzare."
-          : "La timeline è in sola visualizzazione per questa data.",
-        variant: "warning",
-      });
-      return;
-    }
-    try {
-      const year = selectedDate.getFullYear();
-      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-      const day = String(selectedDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-
-      const response = await fetch("/api/optimizer/run-wave", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: dateStr, priority, scope: scopeValue }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        if (priority === 'early_out') setHasRunAssignEo(true);
-        if (priority === 'high_priority') setHasRunAssignHp(true);
-        if (priority === 'low_priority') setHasRunAssignLp(true);
-
-        toast({
-          title: `${label} Assegnati!`,
-          description: result.message || `${result.applied?.insertedCount || 0} task assegnati`,
-          duration: 3000,
-        });
-
-        if (result.warnings?.length) {
-          toast({
-            title: `Attenzione: ${result.warnings.length} violazione/i checkin`,
-            description: result.warnings.join(' | '),
-            variant: "destructive",
-            duration: 10000,
-          });
-        }
-
-        scheduleManualRefresh(0);
-      } else {
-        toast({
-          title: "Errore",
-          description: result.error || result.message || `Errore durante l'assegnazione ${label}`,
-          variant: "destructive",
-          duration: 3000,
-        });
-      }
-    } catch (error: any) {
-      console.error(`Errore nell'assegnazione ${label}:`, error);
-      toast({
-        title: "Errore",
-        description: error.message || `Errore durante l'assegnazione ${label}`,
-        variant: "destructive",
-        duration: 3000,
-      });
-    }
-  };
-
-  const assignEarlyOutToTimeline = async () => runWaveAssignment('early_out', 'Early Out');
-
-  const assignHighPriorityToTimeline = async () => runWaveAssignment('high_priority', 'High Priority');
-
-  const assignLowPriorityToTimeline = async () => runWaveAssignment('low_priority', 'Low Priority');
-
   // Esponi le funzioni per poterle chiamare da altri componenti
   (window as any).reloadAllTasks = reloadAllTasks;
-  (window as any).assignEarlyOutToTimeline = assignEarlyOutToTimeline;
-  (window as any).assignHighPriorityToTimeline = assignHighPriorityToTimeline;
-  (window as any).assignLowPriorityToTimeline = assignLowPriorityToTimeline;
   (window as any).setHasUnsavedChanges = setHasUnsavedChanges;
 
 
@@ -2200,6 +2242,98 @@ export default function GenerateAssignments() {
     setActiveDragCleanerId(null);
   }, []);
 
+  const placeSelectedTimelineTasks = async (
+    sources: Array<{ taskId: string; staffId: number }>,
+    destStaffId: number,
+    insertAt: number,
+  ) => {
+    const ordered = [...sources];
+    const groupIds = ordered.map((source) => String(source.taskId));
+    const idsOnCleaner = (staffId: number) =>
+      allTasksWithAssignments
+        .filter((task) => Number((task as any).assignedCleaner) === staffId)
+        .sort(
+          (a, b) =>
+            Number((a as any).sequence ?? 0) - Number((b as any).sequence ?? 0),
+        )
+        .map((task) => String(task.id));
+    const findTask = (taskId: string, staffId?: number) =>
+      allTasksWithAssignments.find((task) => {
+        if (String(task.id) !== String(taskId)) return false;
+        if (staffId == null) return true;
+        return Number((task as any).assignedCleaner) === staffId;
+      }) ??
+      allTasksWithAssignments.find((task) => String(task.id) === String(taskId));
+
+    for (const source of ordered) {
+      if (source.staffId === destStaffId) continue;
+      const task = findTask(source.taskId, source.staffId);
+      if (resolvePreAssignedModeFromTask(task) === "readonly") {
+        throw new Error("Task pre-assegnata readonly: non puoi cambiare cleaner");
+      }
+      if (isTaskLocked(task)) {
+        throw new Error(
+          (task as any)?.locked_reason || "Task bloccata: impossibile spostare",
+        );
+      }
+    }
+
+    let destIds = idsOnCleaner(destStaffId);
+    const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+    for (const source of ordered) {
+      if (source.staffId === destStaffId) continue;
+      const task = findTask(source.taskId, source.staffId);
+      const response = await fetch("/api/move-task-between-cleaners", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: source.taskId,
+          logisticCode: task?.name,
+          sourceCleanerId: source.staffId,
+          destCleanerId: destStaffId,
+          destIndex: destIds.length,
+          date: format(selectedDate, "yyyy-MM-dd"),
+          scope: scopeValue,
+          mode: "move_assignment",
+          modified_by: currentUser.username || "unknown",
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({} as { error?: string; message?: string; locked_reason?: string }));
+        if (response.status === 423) {
+          if (errorData.error === "PREASSIGNED_READONLY") {
+            throw new Error("Task pre-assegnata readonly: non puoi cambiare cleaner");
+          }
+          if (errorData.error === "TASK_CLEANED") {
+            throw new Error(errorData.message || "Task già pulita: impossibile spostare");
+          }
+          if (errorData.error === "CLEANER_LOCKED") {
+            throw new Error("Cleaner bloccato: impossibile assegnare");
+          }
+          throw new Error(errorData.locked_reason || "Task bloccata: impossibile assegnare");
+        }
+        throw new Error(
+          errorData.message ||
+            errorData.locked_reason ||
+            "Errore nello spostamento del gruppo",
+        );
+      }
+      destIds = [...destIds, String(source.taskId)];
+    }
+
+    const steps = planTimelineGroupMoves(destIds, groupIds, insertAt);
+    for (const step of steps) {
+      const task = findTask(step.taskId, destStaffId);
+      await reorderTimelineAssignment(
+        step.taskId,
+        task?.name,
+        destStaffId,
+        0,
+        step.toIndex,
+      );
+    }
+  };
+
   const handleDndOperation = useCallback(
     async (operation: DndDropOperation) => {
       if (operation.type === "noop") return;
@@ -2270,6 +2404,17 @@ export default function GenerateAssignments() {
           }
 
           case "reorder": {
+            if (operation.taskSources && operation.taskSources.length > 1) {
+              await placeSelectedTimelineTasks(
+                operation.taskSources,
+                operation.in.staffId,
+                operation.toIndex,
+              );
+              setHasUnsavedChanges(true);
+              handleTaskMoved?.();
+              await refreshAssignments("manual");
+              break;
+            }
             const cleanerId = operation.in.staffId;
             let destIndex = operation.toIndex;
             for (const taskId of operation.taskIds) {
@@ -2292,6 +2437,17 @@ export default function GenerateAssignments() {
           }
 
           case "reassign": {
+            if (operation.taskSources && operation.taskSources.length > 1) {
+              await placeSelectedTimelineTasks(
+                operation.taskSources,
+                operation.to.staffId,
+                operation.index,
+              );
+              setHasUnsavedChanges(true);
+              handleTaskMoved?.();
+              await refreshAssignments("manual");
+              break;
+            }
             let destIndex = operation.index;
             for (const taskId of operation.taskIds) {
               const task = allTasksWithAssignments.find(
@@ -2408,6 +2564,7 @@ export default function GenerateAssignments() {
       removeTimelineAssignment,
       saveTaskAssignment,
       clearSelection,
+      placeSelectedTimelineTasks,
       toast,
     ],
   );
@@ -2498,25 +2655,6 @@ export default function GenerateAssignments() {
       ),
     [allTasksWithAssignments, isOfficeScope]
   );
-  const timelinePriorityState = useMemo(() => {
-    let hasEoOnTimeline = false;
-    let hasHpOnTimeline = false;
-    let hasLpOnTimeline = false;
-
-    for (const task of allTasksWithAssignments) {
-      if (!(task as any).assignedCleaner) continue;
-      const normalizedPriority =
-        normalizeWavePriority((task as any).priority) ??
-        normalizeWavePriority((task as any).priority_type) ??
-        normalizeWavePriority((task as any).priorityType);
-      if (normalizedPriority === 'early_out') hasEoOnTimeline = true;
-      if (normalizedPriority === 'high_priority') hasHpOnTimeline = true;
-      if (normalizedPriority === 'low_priority') hasLpOnTimeline = true;
-    }
-
-    return { hasEoOnTimeline, hasHpOnTimeline, hasLpOnTimeline };
-  }, [allTasksWithAssignments]);
-
   const hasUnlockedContainerTasks = useMemo(
     () =>
       earlyOutTasks.some((task) => !isTaskLocked(task)) ||
@@ -2814,10 +2952,11 @@ export default function GenerateAssignments() {
                     workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="early-out"
                     icon="clock"
-                    assignAction={assignEarlyOutToTimeline}
-                    assignButtonDisabled={hasRunAssignEo || isRefreshingContainers || isWassManualLocked}
                     isDragDisabled={isWassManualLocked || isLoadingDragDrop || isRefreshingContainers}
                     containerMultiSelectState={getContainerMultiSelectState('early_out')}
+                    onLockSelected={() => void lockSelectedContainerTasks()}
+                    lockSelectedAction={lockSelectedAction}
+                    isLockingSelected={isLockingSelected}
                     highlightedTaskIds={highlightedEarlyOut}
                     isContentLoading={isRefreshingContainers}
                   />
@@ -2828,10 +2967,11 @@ export default function GenerateAssignments() {
                     workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="high"
                     icon="alert-circle"
-                    assignAction={assignHighPriorityToTimeline}
-                    assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || hasRunAssignHp || isRefreshingContainers || isWassManualLocked}
                     isDragDisabled={isWassManualLocked || isLoadingDragDrop || isRefreshingContainers}
                     containerMultiSelectState={getContainerMultiSelectState('high_priority')}
+                    onLockSelected={() => void lockSelectedContainerTasks()}
+                    lockSelectedAction={lockSelectedAction}
+                    isLockingSelected={isLockingSelected}
                     highlightedTaskIds={highlightedHighPriority}
                     isContentLoading={isRefreshingContainers}
                     loadingMessage={isRefreshingContainers ? "Sincronizzazione dati da ADAM" : undefined}
@@ -2843,10 +2983,11 @@ export default function GenerateAssignments() {
                     workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="low"
                     icon="arrow-down"
-                    assignAction={assignLowPriorityToTimeline}
-                    assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || !timelinePriorityState.hasHpOnTimeline || hasRunAssignLp || isRefreshingContainers || isWassManualLocked}
                     isDragDisabled={isWassManualLocked || isLoadingDragDrop || isRefreshingContainers}
                     containerMultiSelectState={getContainerMultiSelectState('low_priority')}
+                    onLockSelected={() => void lockSelectedContainerTasks()}
+                    lockSelectedAction={lockSelectedAction}
+                    isLockingSelected={isLockingSelected}
                     highlightedTaskIds={highlightedLowPriority}
                     isContentLoading={isRefreshingContainers}
                     className="rounded-tr-none"
@@ -2885,11 +3026,6 @@ export default function GenerateAssignments() {
                   selectedDate={selectedDate}
                   hasUnsavedChanges={hasUnsavedChanges}
                   onTaskMoved={handleTaskMoved}
-                  onWaveAssignStateReset={() => {
-                    setHasRunAssignEo(false);
-                    setHasRunAssignHp(false);
-                    setHasRunAssignLp(false);
-                  }}
                   isReadOnly={isWassManualLocked}
                   isLoadingDragDrop={isLoadingDragDrop || isRefreshingContainers}
                   loadingMessage={
@@ -2901,6 +3037,14 @@ export default function GenerateAssignments() {
                   draggingOverCleanerId={draggingOverCleanerId}
                   activeDragCleanerId={activeDragCleanerId}
                   searchTask={searchTask}
+                  timelineMultiSelect={{
+                    isActive: timelineMultiSelectActive,
+                    selectedTasks: timelineSelectedTasks,
+                    toggleMode: toggleTimelineMultiSelect,
+                    toggleTask: toggleTimelineTask,
+                    isTaskSelected: isTimelineTaskSelected,
+                    getTaskOrder: getTimelineTaskOrder,
+                  }}
                   preassignedAnimatedTaskIds={preassignedAnimatedTaskIds}
                   isOperationalDayStarted={isOperationalDayStarted}
                   onOperationalDayToggle={(started) => void handleOperationalDayToggle(started)}

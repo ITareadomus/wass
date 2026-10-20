@@ -62,7 +62,9 @@ import { isTaskLocked } from "@/lib/taskValidation";
 import { isEquivalentStraordinariaTask } from "@/lib/housekeeping-intervention-type";
 import { buildSequenceSummaryGroupsFromDriverAssignments } from "@/lib/sequence-summary";
 import {
+  isLogisticsRemovedLeftoverTask,
   logisticsLaneStaffId,
+  resolveLogisticsLaneStaffId,
   splitLogisticsAssignmentLanes,
 } from "@shared/logistics-removed-leftover";
 import {
@@ -218,6 +220,34 @@ const EMPTY_LOGISTICS_TASK_LISTS: LogisticsTaskLists = {
   high_priority: [],
   low_priority: [],
 };
+
+function planTimelineGroupMoves(
+  currentIds: string[],
+  groupIdsInOrder: string[],
+  insertAt: number,
+): Array<{ taskId: string; toIndex: number }> {
+  const groupSet = new Set(groupIdsInOrder);
+  const present = groupIdsInOrder.filter((id) => currentIds.includes(id));
+  const before = currentIds.slice(0, insertAt).filter((id) => groupSet.has(id)).length;
+  const rest = currentIds.filter((id) => !groupSet.has(id));
+  const at = Math.max(0, Math.min(rest.length, insertAt - before));
+  const targetIndex = new Map(present.map((id, index) => [id, at + index]));
+  const cursor = [...currentIds];
+  const steps: Array<{ taskId: string; toIndex: number }> = [];
+
+  for (const taskId of present) {
+    const target = targetIndex.get(taskId);
+    if (target == null || cursor[target] === taskId) continue;
+    const from = cursor.indexOf(taskId);
+    if (from < 0) continue;
+    const [item] = cursor.splice(from, 1);
+    const toIndex = Math.max(0, Math.min(target, cursor.length));
+    cursor.splice(toIndex, 0, item);
+    steps.push({ taskId, toIndex });
+  }
+
+  return steps;
+}
 
 function parseLogisticsTaskLists(data: any): LogisticsTaskLists {
   return {
@@ -675,6 +705,106 @@ export default function GenerateLogisticsAssignments() {
   const logisticsProgramBlockedRef = useRef(false);
 
   const isTimelineReadOnly = isWorkDateHistoricallyLocked(selectedDate);
+
+  const [multiSelectModes, setMultiSelectModes] = useState({
+    early_out: false,
+    high_priority: false,
+    low_priority: false,
+  });
+  const [selectedTasks, setSelectedTasks] = useState<
+    Array<{ taskId: string; order: number; container: string }>
+  >([]);
+  const [isLockingSelected, setIsLockingSelected] = useState(false);
+  const [timelineMultiSelectActive, setTimelineMultiSelectActive] = useState(false);
+  const [timelineSelectedTasks, setTimelineSelectedTasks] = useState<
+    Array<{ taskId: string; order: number; cleanerId: number }>
+  >([]);
+  const isAnyMultiSelectActive =
+    multiSelectModes.early_out || multiSelectModes.high_priority || multiSelectModes.low_priority;
+
+  const toggleMode = useCallback(() => {
+    const next = !isAnyMultiSelectActive;
+    if (next) {
+      setTimelineMultiSelectActive(false);
+      setTimelineSelectedTasks([]);
+    }
+    setMultiSelectModes({
+      early_out: next,
+      high_priority: next,
+      low_priority: next,
+    });
+    if (!next) setSelectedTasks([]);
+  }, [isAnyMultiSelectActive]);
+
+  const toggleTask = useCallback((taskId: string, container?: string) => {
+    setSelectedTasks((prev) => {
+      const existing = prev.find((task) => task.taskId === taskId);
+      if (existing) return prev.filter((task) => task.taskId !== taskId);
+      const maxOrder = prev.length > 0 ? Math.max(...prev.map((task) => task.order)) : 0;
+      return [...prev, { taskId, order: maxOrder + 1, container: container ?? "high_priority" }];
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedTasks([]);
+    setTimelineSelectedTasks([]);
+  }, []);
+
+  const isTaskSelected = useCallback(
+    (taskId: string) => selectedTasks.some((task) => task.taskId === taskId),
+    [selectedTasks],
+  );
+
+  const getTaskOrder = useCallback(
+    (taskId: string) => selectedTasks.find((task) => task.taskId === taskId)?.order,
+    [selectedTasks],
+  );
+
+  const getContainerMultiSelectState = useCallback(
+    (container: "early_out" | "high_priority" | "low_priority") => ({
+      isActive: isAnyMultiSelectActive,
+      toggleMode,
+      selectedTasks,
+      toggleTask: (taskId: string) => toggleTask(taskId, container),
+      clearSelection,
+      isTaskSelected,
+      getTaskOrder,
+    }),
+    [isAnyMultiSelectActive, toggleMode, selectedTasks, toggleTask, clearSelection, isTaskSelected, getTaskOrder],
+  );
+
+  const toggleTimelineMultiSelect = useCallback(() => {
+    setTimelineMultiSelectActive((prev) => {
+      const next = !prev;
+      if (next) {
+        setMultiSelectModes({ early_out: false, high_priority: false, low_priority: false });
+        setSelectedTasks([]);
+      } else {
+        setTimelineSelectedTasks([]);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleTimelineTask = useCallback((taskId: string, cleanerId: number) => {
+    if (!Number.isFinite(cleanerId)) return;
+    setTimelineSelectedTasks((prev) => {
+      const existing = prev.find((task) => task.taskId === taskId);
+      if (existing) return prev.filter((task) => task.taskId !== taskId);
+      const maxOrder = prev.length > 0 ? Math.max(...prev.map((task) => task.order)) : 0;
+      return [...prev, { taskId, order: maxOrder + 1, cleanerId }];
+    });
+  }, []);
+
+  const isTimelineTaskSelected = useCallback(
+    (taskId: string) => timelineSelectedTasks.some((task) => task.taskId === taskId),
+    [timelineSelectedTasks],
+  );
+
+  const getTimelineTaskOrder = useCallback(
+    (taskId: string) => timelineSelectedTasks.find((task) => task.taskId === taskId)?.order,
+    [timelineSelectedTasks],
+  );
 
   useEffect(() => {
     const dateStr = format(selectedDate, "yyyy-MM-dd");
@@ -1372,6 +1502,10 @@ export default function GenerateLogisticsAssignments() {
     setContainersForcedOpen(false);
     setLogisticsHypotheses([]);
     setPreviewHypothesisId(null);
+    setMultiSelectModes({ early_out: false, high_priority: false, low_priority: false });
+    setSelectedTasks([]);
+    setTimelineMultiSelectActive(false);
+    setTimelineSelectedTasks([]);
   }, [selectedDate]);
 
   useEffect(() => {
@@ -1418,6 +1552,84 @@ export default function GenerateLogisticsAssignments() {
     }
     return [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks, ...timelineTasks];
   }, [earlyOutTasks, highPriorityTasks, lowPriorityTasks, displayedDriversAssignments]);
+
+  const selectedContainerTasks = useMemo(() => {
+    const byId = new Map<string, TaskType>();
+    for (const task of [...earlyOutTasks, ...highPriorityTasks, ...lowPriorityTasks]) {
+      byId.set(String(task.id), task);
+    }
+    return selectedTasks
+      .map((selected) => byId.get(selected.taskId))
+      .filter((task): task is TaskType => Boolean(task));
+  }, [selectedTasks, earlyOutTasks, highPriorityTasks, lowPriorityTasks]);
+
+  const lockableSelectedTasks = useMemo(
+    () =>
+      selectedContainerTasks.filter((task) => {
+        if (Boolean((task as any).is_finished ?? (task as any).isFinished)) return false;
+        return true;
+      }),
+    [selectedContainerTasks],
+  );
+
+  const lockSelectedAction: "lock" | "unlock" =
+    lockableSelectedTasks.length > 0 && lockableSelectedTasks.every((task) => isTaskLocked(task))
+      ? "unlock"
+      : "lock";
+
+  const lockSelectedContainerTasks = async () => {
+    if (isTimelineReadOnly || isHypothesisPreview || isLockingSelected) return;
+    const targets =
+      lockSelectedAction === "unlock"
+        ? lockableSelectedTasks
+        : lockableSelectedTasks.filter((task) => !isTaskLocked(task));
+    if (targets.length === 0) {
+      toast({
+        title: "Nessuna task da bloccare",
+        description: "Le task selezionate non si possono bloccare.",
+        variant: "warning",
+      });
+      return;
+    }
+    try {
+      setIsLockingSelected(true);
+      const response = await fetch("/api/bulk-lock-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          task_ids: targets.map((task) => Number((task as any).task_id || task.id)),
+          locked: lockSelectedAction === "lock",
+          locked_reason: "",
+          date: format(selectedDate, "yyyy-MM-dd"),
+        }),
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({} as { error?: string; message?: string }));
+        throw new Error(errData.error || errData.message || "Impossibile aggiornare il blocco");
+      }
+      const skipped = selectedContainerTasks.length - targets.length;
+      toast({
+        variant: "success",
+        title: lockSelectedAction === "unlock" ? "Task sbloccate" : "Task bloccate",
+        description:
+          lockSelectedAction === "unlock"
+            ? `${targets.length} task di nuovo disponibili`
+            : `${targets.length} task non possono essere assegnate o trascinate${
+                skipped > 0 ? `. ${skipped} escluse perché già bloccate o non modificabili` : ""
+              }`,
+      });
+      clearSelection();
+      await reloadLogisticsPage();
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error?.message || "Impossibile modificare il blocco",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLockingSelected(false);
+    }
+  };
 
   const saveLogisticsAssignment = async (
     taskId: string,
@@ -1491,6 +1703,68 @@ export default function GenerateLogisticsAssignments() {
     lastValidDragIndexRef.current = null;
   }, []);
 
+  const placeSelectedLogisticsTasks = async (
+    sources: Array<{ taskId: string; staffId: number }>,
+    destStaffId: number,
+    insertAt: number,
+  ) => {
+    const ordered = [...sources];
+    const groupIds = ordered.map((source) => String(source.taskId));
+    const idsOnLane = (staffId: number) => {
+      const lane = resolveLogisticsLaneStaffId(staffId);
+      const row = displayedDriversAssignments.find(
+        (entry) => Number(entry?.driver?.id) === lane.driverId,
+      );
+      return (row?.tasks || [])
+        .filter((task) => isLogisticsRemovedLeftoverTask(task) === lane.leftoverLane)
+        .map((task) => String(task?.task_id ?? task?.id ?? ""))
+        .filter(Boolean);
+    };
+    const findTask = (taskId: string) =>
+      allTasksWithAssignments.find((task) => String(task.id) === String(taskId));
+
+    for (const source of ordered) {
+      const task = findTask(source.taskId);
+      if (Boolean((task as any)?.is_finished ?? (task as any)?.isFinished)) {
+        throw new Error("Task già completata");
+      }
+      if (source.staffId !== destStaffId && isTaskLocked(task)) {
+        throw new Error((task as any)?.locked_reason || "Task bloccata: impossibile spostare");
+      }
+    }
+
+    let destIds = idsOnLane(destStaffId);
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    for (const source of ordered) {
+      if (source.staffId === destStaffId) continue;
+      const task = findTask(source.taskId);
+      const response = await fetch("/api/move-task-between-drivers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: source.taskId,
+          logisticCode: task?.name,
+          sourceDriverId: source.staffId,
+          destDriverId: destStaffId,
+          destIndex: destIds.length,
+          date: format(selectedDate, "yyyy-MM-dd"),
+          modified_by: user.username || "unknown",
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({} as { message?: string; locked_reason?: string }));
+        throw new Error(errorData.locked_reason || errorData.message || "Spostamento fallito");
+      }
+      destIds = [...destIds, String(source.taskId)];
+    }
+
+    const steps = planTimelineGroupMoves(destIds, groupIds, insertAt);
+    for (const step of steps) {
+      const task = findTask(step.taskId);
+      await reorderLogisticsTimeline(step.taskId, task?.name, destStaffId, 0, step.toIndex);
+    }
+  };
+
   const handleDndOperation = useCallback(
     async (operation: DndDropOperation) => {
       if (operation.type === "noop") return;
@@ -1551,6 +1825,15 @@ export default function GenerateLogisticsAssignments() {
           }
 
           case "reorder": {
+            if (operation.taskSources && operation.taskSources.length > 1) {
+              await placeSelectedLogisticsTasks(
+                operation.taskSources,
+                operation.in.staffId,
+                operation.toIndex,
+              );
+              await reloadLogisticsPage();
+              break;
+            }
             const driverId = operation.in.staffId;
             let destIndex = operation.toIndex;
             for (const taskId of operation.taskIds) {
@@ -1574,6 +1857,16 @@ export default function GenerateLogisticsAssignments() {
           }
 
           case "reassign": {
+            if (operation.taskSources && operation.taskSources.length > 1) {
+              await placeSelectedLogisticsTasks(
+                operation.taskSources,
+                operation.to.staffId,
+                operation.index,
+              );
+              await reloadLogisticsPage();
+              toast({ title: "Task spostate", variant: "success" });
+              break;
+            }
             let destIndex = operation.index;
             const user = JSON.parse(localStorage.getItem("user") || "{}");
             for (const taskId of operation.taskIds) {
@@ -1630,6 +1923,7 @@ export default function GenerateLogisticsAssignments() {
         if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
         setIsLoadingDragDrop(false);
         resetDndUiState();
+        clearSelection();
       }
     },
     [
@@ -1641,6 +1935,8 @@ export default function GenerateLogisticsAssignments() {
       resetDndUiState,
       selectedDate,
       toast,
+      placeSelectedLogisticsTasks,
+      clearSelection,
     ],
   );
 
@@ -1831,7 +2127,11 @@ export default function GenerateLogisticsAssignments() {
                     droppableId="early-out"
                     icon="clock"
                     isDragDisabled={isTimelineReadOnly || isHypothesisPreview || isLoadingDragDrop}
-                    disableToolbar
+                    disableToolbar={isHypothesisPreview}
+                    containerMultiSelectState={getContainerMultiSelectState("early_out")}
+                    onLockSelected={() => void lockSelectedContainerTasks()}
+                    lockSelectedAction={lockSelectedAction}
+                    isLockingSelected={isLockingSelected}
                     flushDropZone
                     operationsScope="logistics"
                     highlightedTaskIds={highlightedEarlyOut}
@@ -1845,7 +2145,11 @@ export default function GenerateLogisticsAssignments() {
                     droppableId="high"
                     icon="alert-circle"
                     isDragDisabled={isTimelineReadOnly || isHypothesisPreview || isLoadingDragDrop}
-                    disableToolbar
+                    disableToolbar={isHypothesisPreview}
+                    containerMultiSelectState={getContainerMultiSelectState("high_priority")}
+                    onLockSelected={() => void lockSelectedContainerTasks()}
+                    lockSelectedAction={lockSelectedAction}
+                    isLockingSelected={isLockingSelected}
                     flushDropZone
                     operationsScope="logistics"
                     highlightedTaskIds={highlightedHighPriority}
@@ -1859,7 +2163,11 @@ export default function GenerateLogisticsAssignments() {
                     droppableId="low"
                     icon="arrow-down"
                     isDragDisabled={isTimelineReadOnly || isHypothesisPreview || isLoadingDragDrop}
-                    disableToolbar
+                    disableToolbar={isHypothesisPreview}
+                    containerMultiSelectState={getContainerMultiSelectState("low_priority")}
+                    onLockSelected={() => void lockSelectedContainerTasks()}
+                    lockSelectedAction={lockSelectedAction}
+                    isLockingSelected={isLockingSelected}
                     flushDropZone
                     operationsScope="logistics"
                     highlightedTaskIds={highlightedLowPriority}
@@ -1912,6 +2220,14 @@ export default function GenerateLogisticsAssignments() {
                   onOpenMap={toggleMap}
                   statisticsOpen={timelineStatsPanel.isOpen}
                   mapOpen={timelineMapPanel.isOpen}
+                  timelineMultiSelect={{
+                    isActive: timelineMultiSelectActive,
+                    selectedTasks: timelineSelectedTasks,
+                    toggleMode: toggleTimelineMultiSelect,
+                    toggleTask: toggleTimelineTask,
+                    isTaskSelected: isTimelineTaskSelected,
+                    getTaskOrder: getTimelineTaskOrder,
+                  }}
                 />
                 {!dockedMapVisible && (
                 <TimelineFloatingPanel

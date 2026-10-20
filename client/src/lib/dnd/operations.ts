@@ -25,8 +25,13 @@ export const buildDndDropOperation = (
   if (!target) return { type: "noop" };
 
   const taskIds = getDraggedTaskIds(item);
+  const taskSources =
+    item.selectedTaskSources && item.selectedTaskSources.length > 0
+      ? item.selectedTaskSources
+      : undefined;
   const { container, index } = target;
   const sourceIndex = item.initialIndex ?? item.index;
+  const isGroupMove = taskIds.length > 1;
 
   if (item.from.type === "priority" && container.type === "timeline") {
     return {
@@ -45,13 +50,14 @@ export const buildDndDropOperation = (
   if (item.from.type === "timeline" || item.from.type === "summary") {
     if (container.type === "timeline" || container.type === "summary") {
       if (item.from.staffId === container.staffId) {
-        if (sourceIndex === index) {
+        if (!isGroupMove && sourceIndex === index) {
           return { type: "noop" };
         }
 
         return {
           type: "reorder",
           taskIds,
+          taskSources,
           in: item.from,
           fromIndex: sourceIndex,
           toIndex: index,
@@ -61,6 +67,7 @@ export const buildDndDropOperation = (
       return {
         type: "reassign",
         taskIds,
+        taskSources,
         from: item.from,
         to: container,
         index,
@@ -75,6 +82,7 @@ export const buildDndDropOperation = (
     return {
       type: "remove",
       taskIds,
+      taskSources,
       from: item.from,
       to: container,
     };
@@ -87,6 +95,7 @@ export const buildDndDropOperation = (
     return {
       type: "remove",
       taskIds,
+      taskSources,
       from: item.from,
       to: container,
     };

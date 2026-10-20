@@ -21,6 +21,11 @@ export type AppDndSource =
   | { type: "timeline"; staffId: DndStaffId }
   | { type: "summary"; staffId: DndStaffId };
 
+export type DndSelectedTaskSource = {
+  taskId: DndTaskId;
+  staffId: DndStaffId;
+};
+
 export type AppDndItem = {
   kind: "task";
   scope: DndScope;
@@ -29,6 +34,8 @@ export type AppDndItem = {
   initialIndex?: number;
   from: AppDndSource;
   selectedTaskIds?: DndTaskId[];
+  /** Task timeline selezionate insieme, nell'ordine di selezione, con il cleaner di origine. */
+  selectedTaskSources?: DndSelectedTaskSource[];
   getDragOverlayRect?: () => { width: number; height: number } | null;
   getTask?: () => unknown;
 };
@@ -84,6 +91,7 @@ export type DndDropOperation =
   | {
       type: "reorder";
       taskIds: DndTaskId[];
+      taskSources?: DndSelectedTaskSource[];
       in: Extract<AppDndSource, { type: "timeline" | "summary" }>;
       fromIndex: number;
       toIndex: number;
@@ -91,6 +99,7 @@ export type DndDropOperation =
   | {
       type: "reassign";
       taskIds: DndTaskId[];
+      taskSources?: DndSelectedTaskSource[];
       from: Extract<AppDndSource, { type: "timeline" | "summary" }>;
       to: Extract<AppDndContainer, { type: "timeline" | "summary" }>;
       index: number;
@@ -98,6 +107,7 @@ export type DndDropOperation =
   | {
       type: "remove";
       taskIds: DndTaskId[];
+      taskSources?: DndSelectedTaskSource[];
       from: Extract<AppDndSource, { type: "timeline" | "summary" }>;
       to: Extract<AppDndContainer, { type: "priority" | "remove-zone" }>;
     };

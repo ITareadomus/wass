@@ -691,9 +691,12 @@ const displayClickableInputClass =
   const handleCardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // In multi-select mode nei container: toggle selezione invece di aprire modale
-    if (isMultiSelectMode && !isInTimeline && multiSelectContext) {
-      multiSelectContext.toggleTask(String(task.id), currentContainer);
+    // Selezione multipla: nei container oppure in timeline, mai insieme.
+    if (isMultiSelectMode && multiSelectContext) {
+      multiSelectContext.toggleTask(
+        String(task.id),
+        isInTimeline ? String(cleanerId ?? "") : currentContainer,
+      );
       return;
     }
 
@@ -3463,7 +3466,7 @@ const displayClickableInputClass =
                       cardSurfaceClass,
                       "rounded-md border transition-colors duration-200",
                       showCompactAdamTimelineUi ? "px-1 py-0" : "flex items-center px-2 py-1",
-                      isSelected && isMultiSelectMode && !isInTimeline && "z-[1] ring-2 ring-sky-500 ring-inset",
+                      isSelected && isMultiSelectMode && "z-[1] ring-2 ring-sky-500 ring-inset",
                       isOverdue && timelineViolationVisible && "task-violation-outline",
                       isInTimeline &&
                         executionColorsEnabled &&
@@ -3519,6 +3522,35 @@ const displayClickableInputClass =
                       className={`absolute left-[2px] top-[2px] bottom-[2px] z-[1] w-1.5 rounded-sm ${categoryStripeClass}`}
                       aria-hidden="true"
                     />
+                    {isMultiSelectMode && (
+                      <div className="absolute -top-1.5 -left-1 z-[35]">
+                        <div
+                          className={[
+                            "w-4 h-4 rounded-full flex items-center justify-center",
+                            "text-[10px] font-bold leading-none border-2 transition-all duration-150",
+                            isSelected
+                              ? "opacity-100"
+                              : "opacity-0 group-hover:opacity-100",
+                            isSelected
+                            ? "bg-sky-600 text-white border-sky-700 shadow-md"
+                            : "bg-transparent text-sky-600 border-sky-600"
+                          ].join(" ")}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            multiSelectContext?.toggleTask(
+                              String(task.id),
+                              isInTimeline ? String(cleanerId ?? "") : currentContainer,
+                            );
+                          }}
+                          role="checkbox"
+                          aria-checked={isSelected}
+                        >
+                          {isSelected ? selectionOrder : ""}
+                        </div>
+                      </div>
+                    )}
+
                     {operationsScope === "logistics" && cardLogisticsSequenceLabel && (
                       <LogisticsSequenceBadge
                         sequence={cardLogisticsSequenceLabel}
@@ -3544,32 +3576,6 @@ const displayClickableInputClass =
                       </div>
                     ) : (
                       <>
-                    {/* Selection indicator (top-left) */}
-                    {isMultiSelectMode && !isInTimeline && (
-                      <div className="absolute -top-1.5 -left-1 z-[35]">
-                        <div
-                          className={[
-                            "w-4 h-4 rounded-full flex items-center justify-center",
-                            "text-[10px] font-bold leading-none border-2 transition-all duration-150",
-                            isSelected
-                              ? "opacity-100"
-                              : "opacity-0 group-hover:opacity-100",
-                            isSelected
-                            ? "bg-sky-600 text-white border-sky-700 shadow-md"
-                            : "bg-transparent text-sky-600 border-sky-600"                          
-                          ].join(" ")}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            multiSelectContext?.toggleTask(String(task.id), currentContainer);
-                          }}
-                          role="checkbox"
-                          aria-checked={isSelected}
-                        >
-                          {isSelected ? selectionOrder : ""}
-                        </div>
-                      </div>
-                    )}
-
                     {missingLogisticsKindMessage && effectiveLogisticsTaskKind == null && !isSelected ? (
                       <div className="absolute -top-1 -right-1 z-10">
                         <div

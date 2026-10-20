@@ -15,6 +15,7 @@ import {
   ChevronRight,
   BarChart3,
   Map as MapIcon,
+  CheckSquare,
 } from "lucide-react";
 import { TimelineActionHistoryButton } from "@/components/timeline/timeline-action-history-button";
 import {
@@ -159,6 +160,14 @@ interface LogisticsTimelineViewProps {
   /** Lampeggio di "Invia a drivers" dopo la conferma della giornata. */
   attentionSendToDrivers?: boolean;
   onDismissSendToDriversAttention?: () => void;
+  timelineMultiSelect?: {
+    isActive: boolean;
+    selectedTasks: Array<{ taskId: string; order: number; cleanerId: number }>;
+    toggleMode: () => void;
+    toggleTask: (taskId: string, cleanerId: number) => void;
+    isTaskSelected: (taskId: string) => boolean;
+    getTaskOrder: (taskId: string) => number | undefined;
+  };
 }
 
 /** Tasto shift orario prima fermata (come HK). Mettere `true` per riattivarlo. */
@@ -435,6 +444,7 @@ export default function LogisticsTimelineView({
   mapOpen = false,
   attentionSendToDrivers = false,
   onDismissSendToDriversAttention,
+  timelineMultiSelect,
 }: LogisticsTimelineViewProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -1774,6 +1784,29 @@ export default function LogisticsTimelineView({
               <span />
             )}
             <div className="flex justify-self-end gap-3 print:hidden">
+              <Button
+                type="button"
+                variant={timelineMultiSelect?.isActive ? "default" : "outline"}
+                size="sm"
+                onClick={() => timelineMultiSelect?.toggleMode()}
+                disabled={
+                  isReadOnly ||
+                  !timelineMultiSelect ||
+                  !driversAssignments.some((row) => (row.tasks || []).length > 0)
+                }
+                className="border-2 border-custom-blue px-2"
+                aria-pressed={timelineMultiSelect?.isActive}
+                title={
+                  timelineMultiSelect?.isActive
+                    ? timelineMultiSelect.selectedTasks.length > 0
+                      ? `Disattiva la selezione multipla (${timelineMultiSelect.selectedTasks.length} task)`
+                      : "Disattiva la selezione multipla in timeline"
+                    : "Seleziona più task in timeline e trascinale insieme"
+                }
+                data-testid="button-toggle-timeline-multiselect"
+              >
+                <CheckSquare className="h-4 w-4" />
+              </Button>
               <TimelineActionHistoryButton workDate={workDate} variant="logistics" />
               <Button
                 type="button"
@@ -2340,6 +2373,16 @@ export default function LogisticsTimelineView({
                                   {renderCrossDriverInsertSlot(index)}
                                   {(() => {
                                     const taskKey = getTaskDndKey(task);
+                                    const timelineSelectionActive = timelineMultiSelect?.isActive ?? false;
+                                    const selectedTimelineSources = timelineSelectionActive
+                                      && timelineMultiSelect?.isTaskSelected(taskKey)
+                                      ? [...(timelineMultiSelect?.selectedTasks ?? [])]
+                                          .sort((a, b) => a.order - b.order)
+                                          .map((selected) => ({
+                                            taskId: selected.taskId,
+                                            staffId: selected.cleanerId,
+                                          }))
+                                      : undefined;
                                     const dndData: AppDndItem = {
                                       kind: "task",
                                       scope: "logistics",
@@ -2350,7 +2393,21 @@ export default function LogisticsTimelineView({
                                         type: "timeline",
                                         staffId,
                                       },
+                                      selectedTaskIds: selectedTimelineSources?.map((selected) => selected.taskId),
+                                      selectedTaskSources: selectedTimelineSources,
                                     };
+                                    const timelineCardMultiSelect = timelineSelectionActive && timelineMultiSelect
+                                      ? {
+                                          isMultiSelectMode: true,
+                                          selectedTasks: timelineMultiSelect.selectedTasks,
+                                          toggleMode: timelineMultiSelect.toggleMode,
+                                          toggleTask: (taskId: string) =>
+                                            timelineMultiSelect.toggleTask(taskId, staffId),
+                                          clearSelection: () => {},
+                                          isTaskSelected: timelineMultiSelect.isTaskSelected,
+                                          getTaskOrder: timelineMultiSelect.getTaskOrder,
+                                        }
+                                      : null;
                                     const firstTaskId = raw?.task_id || task.id;
 
                                     return (
@@ -2426,6 +2483,7 @@ export default function LogisticsTimelineView({
                                         : MIN_TIMELINE_TASK_WIDTH_PX
                                     }
                                     operationsScope="logistics"
+                                    multiSelectContext={timelineCardMultiSelect}
                                     isHighlighted={hi.has(String(task.id))}
                                     timelineRowStaffDisplayLabel={driverRowDisplayLabel}
                                     onLogisticsTimelineMutated={onRefresh}

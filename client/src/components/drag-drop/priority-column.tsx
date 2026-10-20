@@ -2,7 +2,7 @@ import { TaskType as Task } from "@shared/schema";
 import { isWorkDateHistoricallyLocked } from "@shared/work-date-access";
 import DraggableTaskCard from "./draggable-task-card";
 import { ContainerTaskClip } from "./container-task-clip";
-import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare, Loader2 } from "lucide-react";
+import { Clock, AlertCircle, ArrowDown, CheckSquare, Loader2, Lock, LockOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,10 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
 import { useState, useMemo } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { fetchWithOperation } from "@/lib/operationManager";
 import { cn } from "@/lib/utils";
 import {
   getTaskDndKey,
@@ -43,12 +41,14 @@ interface PriorityColumnProps {
   workDate: string;
   droppableId: string;
   icon: "clock" | "alert-circle" | "arrow-down";
-  assignAction?: () => Promise<void>;
-  assignButtonDisabled?: boolean;
   isDragDisabled?: boolean;
   containerMultiSelectState?: ContainerMultiSelectState;
+  /** Blocca o sblocca tutte le task selezionate, anche quelle degli altri container. */
+  onLockSelected?: () => void;
+  lockSelectedAction?: "lock" | "unlock";
+  isLockingSelected?: boolean;
   highlightedTaskIds?: Set<string>;
-  /** Disabilita toolbar Multiselect + Assegna (es. pagina logistics senza timeline) */
+  /** Disabilita il pulsante di selezione multipla (es. pagina logistics). */
   disableToolbar?: boolean;
   /** Zona drop senza padding interno (evita l'effetto "riquadro" dentro la colonna). */
   flushDropZone?: boolean;
@@ -69,10 +69,11 @@ export default function PriorityColumn({
   workDate,
   droppableId,
   icon,
-  assignAction,
-  assignButtonDisabled = false,
   isDragDisabled = false,
   containerMultiSelectState,
+  onLockSelected,
+  lockSelectedAction = "lock",
+  isLockingSelected = false,
   highlightedTaskIds = new Set(),
   disableToolbar = false,
   flushDropZone = false,
@@ -82,11 +83,9 @@ export default function PriorityColumn({
   isContentLoading = false,
   loadingMessage,
 }: PriorityColumnProps) {
-  const [isAssigning, setIsAssigning] = useState(false);
   const [duplicateDialog, setDuplicateDialog] = useState<{
     logisticCode: string;
   } | null>(null);
-  const { toast } = useToast();
   const [workYear, workMonth, workDay] = workDate.split("-").map(Number);
   const isHistoricalDateLocked = isWorkDateHistoricallyLocked(
     new Date(workYear, workMonth - 1, workDay)
@@ -285,22 +284,6 @@ export default function PriorityColumn({
     };
   };
 
-  // Funzione modificata per usare hasAssigned e stato di loading
-  const handleAssign = async () => {
-    if (!assignAction) return;
-    
-    try {
-      setIsAssigning(true);
-      await assignAction();
-    } catch (error) {
-      console.error("Errore durante l'assegnazione:", error);
-      // I toast di errore vengono gestiti all'interno di assignAction
-    } finally {
-      setIsAssigning(false);
-    }
-  };
-
-
   const getColumnClass = (priority: string, tasks: Task[]) => {
     switch (priority) {
       case "early-out":
@@ -335,61 +318,6 @@ export default function PriorityColumn({
         return <AlertCircle className="w-5 h-5 mr-2" />;
       case "arrow-down":
         return <ArrowDown className="w-5 h-5 mr-2" />;
-    }
-  };
-
-  const handleAssignContainer = async () => {
-    try {
-      setIsAssigning(true);
-      const dateStr = workDate;
-
-      const endpoint = '/api/optimizer/run-all';
-      const successMessage = `✅ ${title} assegnati!`;
-      
-      console.log(`🚀 Esecuzione optimizer per ${priority}, data: ${dateStr}`);
-      const response = await fetchWithOperation(`assign-${priority}`, endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          date: dateStr, 
-          skipPhase4: false, 
-          applyToProduction: true 
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Errore durante l'assegnazione ${priority}`);
-      }
-
-      const result = await response.json();
-      console.log(`Assegnazione ${priority} completata:`, result);
-      
-      const summary = result.summary || {};
-      toast({
-        variant: "success",
-        title: "Successo",
-        description: `${successMessage} (${summary.tasksAssigned || 0} task assegnate, ${summary.tasksUnassigned || 0} non assegnate)`,
-      });
-
-      // Ricarica i task per riflettere le nuove assegnazioni
-      if ((window as any).reloadAllTasks) {
-        console.log('🔄 Ricaricamento task dopo assegnazione...');
-        await (window as any).reloadAllTasks();
-        console.log('✅ Task ricaricati con successo');
-      }
-    } catch (error: any) {
-      if (error.message.includes("Operazione annullata")) {
-        console.log(`ℹ️ Assegnazione ${priority} annullata - richiesta più recente in corso`);
-        return;
-      }
-      console.error(`Errore nell'assegnazione ${priority}:`, error);
-      toast({
-        title: "Errore",
-        description: `${title} non assegnati, errore!`,
-        variant: "destructive",
-      });
-    } finally {
-      setIsAssigning(false);
     }
   };
 
@@ -448,11 +376,6 @@ export default function PriorityColumn({
                 ({selectedTasks.filter(st => tasks.some(t => String(t.id) === st.taskId)).length} selezionate)
               </span>
             )}
-            {!isMultiSelectMode && selectedTasks.filter(st => tasks.some(t => String(t.id) === st.taskId)).length > 0 && (
-              <span className="ml-2 text-amber-600 font-semibold">
-                ({selectedTasks.filter(st => tasks.some(t => String(t.id) === st.taskId)).length} da altri container)
-              </span>
-            )}
             {selectedTasks.length > 0 && (
               <span className="ml-2 text-green-600 font-semibold">
                 [TOT: {selectedTasks.length}]
@@ -465,33 +388,38 @@ export default function PriorityColumn({
             variant={isMultiSelectMode ? "default" : "outline"}
             size="sm"
             onClick={toggleMode}
-            disabled={tasks.length === 0 || isHistoricalDateLocked || disableToolbar}
+            disabled={(tasks.length === 0 && !isMultiSelectMode) || isHistoricalDateLocked || disableToolbar}
             className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
-            title={isMultiSelectMode ? "Disattiva selezione multipla" : "Attiva selezione multipla"}
+            title={isMultiSelectMode ? "Disattiva selezione su tutti i container" : "Attiva selezione su tutti i container"}
             data-testid="button-toggle-multiselect"
           >
             <CheckSquare className={`w-3 h-3 ${isMultiSelectMode ? "mr-1" : ""}`} />
             {isMultiSelectMode && <span className="ml-1">On</span>}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleAssign}
-            disabled={
-              !assignAction ||
-              assignButtonDisabled ||
-              tasks.length === 0 ||
-              isHistoricalDateLocked ||
-              isAssigning ||
-              disableToolbar
-            }
-            className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
-            title="Assegna"
-            data-testid="button-assign-priority"
-          >
-            <Calendar className="w-3 h-3 mr-1" />
-            <span>{isAssigning ? "Assegnando..." : "Assegna"}</span>
-          </Button>
+          {isMultiSelectMode && selectedTasks.length > 0 && onLockSelected && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onLockSelected}
+              disabled={isHistoricalDateLocked || isDragDisabled || isLockingSelected || disableToolbar}
+              className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
+              title={
+                lockSelectedAction === "unlock"
+                  ? "Sblocca le task selezionate in tutti i container"
+                  : "Blocca le task selezionate in tutti i container"
+              }
+              data-testid="button-lock-selected-tasks"
+            >
+              {isLockingSelected ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : lockSelectedAction === "unlock" ? (
+                <LockOpen className="w-3 h-3" />
+              ) : (
+                <Lock className="w-3 h-3" />
+              )}
+              <span className="ml-1">{lockSelectedAction === "unlock" ? "Sblocca" : "Blocca"}</span>
+            </Button>
+          )}
         </div>
       </div>
       <div
