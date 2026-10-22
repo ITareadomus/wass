@@ -10,6 +10,7 @@ import {
 import { updateRunStatus, insertDecisionsBatch, OptimizerDecision, getLatestRunForDate } from './db';
 import { loadPriorityStartWindows, mapPriorityType, priorityToDbFormat, PriorityWindows } from './priorityWindows';
 import { TimelineContext } from './timelineContext';
+import { HK_CONSTRAINT_PRESETS, type HkConstraintSettings } from '../../../shared/hk-constraint-settings';
 
 export interface Phase3RunResult {
   runId: string;
@@ -213,6 +214,7 @@ async function insertUnassigned(
 
 export interface RunPhase3Options {
   timelineContext?: TimelineContext;
+  hkConstraints?: HkConstraintSettings;
 }
 
 export async function runPhase3(
@@ -349,7 +351,14 @@ export async function runPhase3(
       console.log(`[Phase3] Using timeline constraints for ${constraintsByCleaner.size} cleaners`);
     }
 
-    const phase3Result = runPhase3Algorithm(workDate, cleanerGroups, tasksMap, priorityWindows, constraintsByCleaner);
+    const phase3Result = runPhase3Algorithm(
+      workDate,
+      cleanerGroups,
+      tasksMap,
+      priorityWindows,
+      constraintsByCleaner,
+      options.hkConstraints ?? HK_CONSTRAINT_PRESETS.balanced
+    );
 
     result.tasksScheduled = phase3Result.stats.tasksScheduled;
     result.tasksUnassigned = phase3Result.stats.tasksUnassigned;

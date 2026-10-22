@@ -1,6 +1,7 @@
 import { estimateTravelMinutes, TaskInput } from './phase1';
 import { isTaskEquivalentToStraordinaria } from '../../utils/straordinaria-utils';
 import { cleanerCanTakeTriadeTask } from '../triade-assignment';
+import type { HkConstraintSettings } from '../../../shared/hk-constraint-settings';
 
 export interface CleanerInput {
   cleanerId: number;
@@ -122,6 +123,7 @@ export interface Phase2Params {
   initialLoadByCleanerMin?: Map<number, number>; // Pre-existing load from timeline (minutes)
   initialLastPositionByCleaner?: Map<number, { lat: number; lng: number }>; // Last known geographic position from timeline
   initialFixedStatsByCleaner?: Map<number, CleanerFixedStats>; // Pre-existing task/OT counts from timeline
+  hkConstraints?: HkConstraintSettings;
 }
 
 export const DEFAULT_PHASE2_PARAMS: Phase2Params = {
@@ -320,14 +322,6 @@ export function isCleanerCompatible(
     return { compatible: false, reason: 'TRIADE_LEVEL' };
   }
 
-  if (task.premium && normalizedRole !== 'premium_cleaner') {
-    return { compatible: false, reason: 'ROLE_MISMATCH_PREMIUM_REQUIRED' };
-  }
-  
-  if (isRealStraordinariaTask(task, officeOperationIds) && normalizedRole !== 'straordinario_cleaner') {
-    return { compatible: false, reason: 'CANNOT_DO_STRAORDINARIA' };
-  }
-  
   if (!canCleanerHandleApartment(cleaner.role, task.typeApt, apartmentTypes)) {
     return { compatible: false, reason: `ROLE_APT_MISMATCH_${cleaner.role}_vs_${task.typeApt}` };
   }
@@ -603,13 +597,7 @@ export function runPhase2Algorithm(
   let groupsAssigned = 0;
   let groupsUnassigned = 0;
   let tasksDropped = 0;
-  
-  const otTaskIds = new Set<number>();
-  tasksMap.forEach((task, taskId) => {
-    if (isRealStraordinariaTask(task, officeOperationIds)) otTaskIds.add(taskId);
-  });
-  const assignedOtTaskIds = new Set<number>();
-  
+
   for (let groupIndex = 0; groupIndex < sortedGroups.length; groupIndex++) {
     const group = sortedGroups[groupIndex];
     let currentTaskIds = [...group.taskIds];
@@ -762,10 +750,6 @@ export function runPhase2Algorithm(
         }
       }
       
-      // Calcola quante OT TASK REALI sono ancora da assegnare
-      // Usa otTaskIds (task reali) invece di gruppi candidati per evitare blocchi eccessivi
-      const remainingOtTasks = otTaskIds.size - assignedOtTaskIds.size;
-      
       // For anchored groups, try the anchor cleaner first.
       // If the anchor is already at/above maxTarget, fall back to all cleaners
       // so the task isn't forced onto an overloaded cleaner.
@@ -803,14 +787,6 @@ export function runPhase2Algorithm(
         // Straordinaria constraints
         const hasStraordinaria = cleanerHasStraordinaria.get(cleaner.cleanerId) || false;
         const straordinariaDuration = cleanerStraordinariaDuration.get(cleaner.cleanerId) || 0;
-        
-        // Rule 0: Riserva cleaner straordinari per OT TASK REALI non ancora assegnate
-        // Skip OT reservation for anchored groups (the cleaner is fixed by the timeline)
-        if (!groupHasStraordinaria && remainingOtTasks > 0 && normalizeCleanerRole(cleaner.role) === 'straordinario_cleaner'
-            && group.anchoredCleanerId === undefined) {
-          incompatibleReasons.push({ cleanerId: cleaner.cleanerId, reasons: ['RESERVED_FOR_PENDING_OT'] });
-          continue;
-        }
         
         // Rule 1: If cleaner already has straordinaria, they cannot take any more tasks
         if (hasStraordinaria) {
@@ -911,10 +887,6 @@ export function runPhase2Algorithm(
           cleanerHasStraordinaria.set(assignedCleaner.cleanerId, true);
           const existingStraDuration = cleanerStraordinariaDuration.get(assignedCleaner.cleanerId) || 0;
           cleanerStraordinariaDuration.set(assignedCleaner.cleanerId, existingStraDuration + groupStraordinariaDuration);
-          // Marca le OT task come assegnate per rilasciare riserva cleaner straordinari
-          tasks
-            .filter(t => isRealStraordinariaTask(t, officeOperationIds))
-            .forEach(t => assignedOtTaskIds.add(t.taskId));
         }
         const existingCleaningTime = cleanerTotalCleaningTime.get(assignedCleaner.cleanerId) || 0;
         cleanerTotalCleaningTime.set(assignedCleaner.cleanerId, existingCleaningTime + groupTotalCleaningTime);
@@ -993,16 +965,6 @@ export function runPhase2Algorithm(
             }
           });
           groupsUnassigned++;
-          // SOLO se questo è un gruppo OT singolo (solo l'OT task) che fallisce,
-          // marca l'OT come "processata" per rilasciare la riserva
-          // Se è un gruppo OT+altri task, altri gruppi candidati potrebbero avere successo
-          if (
-            groupHasStraordinaria &&
-            tasks.length === 1 &&
-            isRealStraordinariaTask(tasks[0], officeOperationIds)
-          ) {
-            assignedOtTaskIds.add(tasks[0].taskId);
-          }
           break;
         }
       }

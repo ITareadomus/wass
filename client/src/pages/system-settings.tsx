@@ -6,11 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Home, Loader2 } from "lucide-react";
+import { Save, Loader2 } from "lucide-react";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { HkAlgorithmSettings } from "@/components/settings/hk-algorithm-settings";
+import { parseHkConstraintSettings, parseHkProfileLibrary, type HkConstraintSettings, type HkProfileLibrary } from "@shared/hk-constraint-settings";
 
 interface Client {
   client_id: number;
@@ -60,6 +63,8 @@ interface SettingsData {
     straordinario_cleaner: CleanerPriorityRules;
     formatore_cleaner: CleanerPriorityRules;
   };
+  hk_constraints: HkConstraintSettings;
+  hk_profiles: HkProfileLibrary;
 }
 
 function withSettingsDefaults(data: Partial<SettingsData>): SettingsData {
@@ -104,6 +109,8 @@ function withSettingsDefaults(data: Partial<SettingsData>): SettingsData {
       straordinario_cleaner: { ...defaultPriorityRules, ...data.priority_types?.straordinario_cleaner },
       formatore_cleaner: { ...defaultPriorityRules, ...data.priority_types?.formatore_cleaner },
     },
+    hk_constraints: parseHkConstraintSettings(data.hk_constraints),
+    hk_profiles: parseHkProfileLibrary(data.hk_profiles, data.hk_constraints),
   };
 }
 
@@ -307,22 +314,45 @@ export default function SystemSettings() {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
-      <div className="w-full px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Settings</h1>
+      <div className="mx-auto w-full max-w-5xl px-4 py-8">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight">Impostazioni</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              L'assegnazione dei task usa questi vincoli. Si salvano nelle impostazioni già presenti, senza modifiche al database.
+            </p>
+          </div>
+          <Button onClick={handleSave} disabled={isSaving}>
+            <Save className="mr-2 h-4 w-4" />
+            {isSaving ? "Salvataggio..." : "Salva"}
+          </Button>
         </div>
 
-        <div className="space-y-4">
+        <Tabs defaultValue="algoritmo" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="algoritmo">Algoritmo</TabsTrigger>
+            <TabsTrigger value="priorita">Priorità</TabsTrigger>
+            <TabsTrigger value="ruoli">Ruoli</TabsTrigger>
+          </TabsList>
+          <TabsContent value="algoritmo">
+            <HkAlgorithmSettings
+              value={settings.hk_constraints}
+              profiles={settings.hk_profiles}
+              onChange={({ constraints, profiles }) =>
+                setSettings((prev) => (prev ? { ...prev, hk_constraints: constraints, hk_profiles: profiles } : prev))
+              }
+            />
+          </TabsContent>
+          <TabsContent value="priorita" className="space-y-4">
           {/* Algoritmo priorità hp-centrico */}
-          <Card className="bg-custom-blue-light border-2 border-custom-blue">
-            <CardHeader className="bg-custom-blue-light py-3">
-              <CardTitle className="text-lg">Priority Types</CardTitle>
-              <CardDescription className="text-s">
-              </CardDescription>
-              <CardDescription className="text-xs">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Finestre e clienti</CardTitle>
+              <CardDescription>
+                Orario HP, strategia dei task doppi e clienti Early Out o High Priority.
               </CardDescription>
             </CardHeader>
-            <CardContent className="bg-custom-blue-light">
+            <CardContent>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -444,16 +474,17 @@ export default function SystemSettings() {
 
             </CardContent>
           </Card>
-
+          </TabsContent>
+          <TabsContent value="ruoli" className="space-y-4">
           {/* Apartment Types + Task Types - Card unificata */}
-          <Card className="bg-custom-blue-light border-2 border-custom-blue">
-            <CardHeader className="bg-custom-blue-light py-3">
-              <CardTitle className="text-lg">Apartment Types & Task Types</CardTitle>
-              <CardDescription className="text-s">
-                Tipi di task, appartamento e priorità che ogni categoria di cleaner può gestire
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Cosa può fare ogni ruolo</CardTitle>
+              <CardDescription>
+                Tipi di task, appartamento e priorità che ogni categoria di cleaner può gestire.
               </CardDescription>
             </CardHeader>
-            <CardContent className="bg-custom-blue-light">
+            <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 w-full">
                 {/* Cleaner STANDARD */}
                 <div className="space-y-3">
@@ -926,17 +957,8 @@ export default function SystemSettings() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Save Button */}
-          <Button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="w-full bg-background border-2 border-custom-blue text-black dark:text-white hover:opacity-80"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {isSaving ? "Salvataggio..." : "Salva Impostazioni"}
-          </Button>
-        </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

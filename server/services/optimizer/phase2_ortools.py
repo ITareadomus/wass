@@ -3,7 +3,7 @@
 Phase 2 assignment: assign candidate groups to cleaners using OR-Tools CP-SAT.
 Reads JSON from stdin, writes JSON to stdout.
 Business rules (see plan): compatibility, load cap, max tasks per cleaner,
-straordinaria (reserve, existing OT, long OT empty cleaner, short OT + 1 extra <=2h), anchored.
+straordinaria duration (long OT on an empty cleaner, short OT + 1 extra <=2h), anchored.
 """
 
 import json
@@ -97,26 +97,81 @@ def task_triade_weight(value):
     return min(weight, 3)
 
 
-def task_cleaner_compatible(cleaner, task, apartment_types, office_operation_ids, task_types_by_cleaner):
-    role_key = normalize_role(cleaner.get("role"))
-    _ = task_types_by_cleaner
-    office_task = is_office_task(task, office_operation_ids)
-    if office_task:
-        return role_key == "ufficio_cleaner"
+def constraint_mode(constraints, key, default="hard"):
+    raw = (constraints or {}).get(key, default)
+    if raw in ("off", "soft", "hard"):
+        return raw
+    return default
 
-    if role_key == "ufficio_cleaner":
-        return False
+
+def apply_pair(mode, violated, penalty):
+    """None blocks the pair. An int is a soft penalty and the pair stays allowed."""
+    if not violated or mode == "off":
+        return 0
+    if mode == "soft":
+        return int(penalty)
+    return None
+
+
+def task_pair_penalty(cleaner, task, apartment_types, office_operation_ids, constraints, formatore_rules):
+    role_key = normalize_role(cleaner.get("role"))
+    office_task = is_office_task(task, office_operation_ids)
+    penalty = 0
+
+    if office_task:
+        office_penalty = apply_pair(constraint_mode(constraints, "officeRole"), role_key != "ufficio_cleaner", 40000)
+        if office_penalty is None:
+            return None
+        return office_penalty
+
+    office_penalty = apply_pair(constraint_mode(constraints, "officeRole"), role_key == "ufficio_cleaner", 40000)
+    if office_penalty is None:
+        return None
+    penalty += office_penalty
+
     cleaner_weight = task_triade_weight(cleaner.get("triadeWeight"))
     task_weight = task_triade_weight(task.get("triadeWeight"))
-    if cleaner_weight < task_weight:
-        return False
-    if task.get("premium") and role_key != "premium_cleaner":
-        return False
-    if is_real_straordinaria(task, office_operation_ids) and role_key != "straordinario_cleaner":
-        return False
-    if not can_handle_apt(role_key, task.get("typeApt"), apartment_types):
-        return False
-    return True
+    ceiling = apply_pair(
+        constraint_mode(constraints, "triadeCeiling"),
+        cleaner_weight < task_weight,
+        15000 * max(1, task_weight - cleaner_weight),
+    )
+    if ceiling is None:
+        return None
+    penalty += ceiling
+
+    apt = apply_pair(
+        constraint_mode(constraints, "apartmentType"),
+        not can_handle_apt(role_key, task.get("typeApt"), apartment_types),
+        12000,
+    )
+    if apt is None:
+        return None
+    penalty += apt
+
+    if role_key == "formatore_cleaner":
+        priority_blocked = not task_formatore_priority_ok(task, formatore_rules)
+        priority = apply_pair(constraint_mode(constraints, "formatorePriority"), priority_blocked, 12000)
+        if priority is None:
+            return None
+        penalty += priority
+        standard_blocked = (
+            not task.get("premium")
+            and not is_real_straordinaria(task, office_operation_ids)
+            and formatore_rules
+            and not formatore_rules.get("standardApt", True)
+        )
+        standard = apply_pair(constraint_mode(constraints, "formatoreStandard"), bool(standard_blocked), 12000)
+        if standard is None:
+            return None
+        penalty += standard
+        if not can_handle_apt("formatore_cleaner", task.get("typeApt"), apartment_types):
+            apt_formatore = apply_pair(constraint_mode(constraints, "apartmentType"), True, 12000)
+            if apt_formatore is None:
+                return None
+            penalty += apt_formatore
+
+    return penalty
 
 
 def normalize_task_priority(priority):
@@ -131,6 +186,27 @@ def normalize_task_priority(priority):
     if s in ("low_priority", "lowpriority", "lp", "low"):
         return "low_priority"
     return s if s else None
+
+
+def task_formatore_priority_ok(task, formatore_rules):
+    if not formatore_rules:
+        return True
+    allowed_priorities = formatore_rules.get("allowedPriorities") or []
+    if not allowed_priorities:
+        return True
+    task_pri = normalize_task_priority(task.get("priority"))
+    allowed_set = set()
+    for p in allowed_priorities:
+        n = normalize_task_priority(p)
+        if n:
+            allowed_set.add(n)
+        elif p:
+            allowed_set.add(p.lower().replace("-", "_"))
+    if not allowed_set:
+        return True
+    if task_pri is None or task_pri not in allowed_set:
+        return False
+    return True
 
 
 def task_formatore_compatible(task, formatore_rules, apartment_types, office_operation_ids):
@@ -156,10 +232,6 @@ def task_formatore_compatible(task, formatore_rules, apartment_types, office_ope
             return False
         elif task_pri not in allowed_set:
             return False
-    if task.get("premium") and not formatore_rules.get("premiumApt", False):
-        return False
-    if is_real_straordinaria(task, office_operation_ids) and not formatore_rules.get("straordinarioApt", False):
-        return False
     if not task.get("premium") and not is_real_straordinaria(task, office_operation_ids) and not formatore_rules.get("standardApt", True):
         return False
     if not can_handle_apt("formatore_cleaner", task.get("typeApt"), apartment_types):
@@ -193,9 +265,17 @@ def main():
     min_target_scaled = int((targets.get("minTarget") or 0) * SCALE)
     target_load_scaled = int((targets.get("targetLoadMin") or 0) * SCALE)
     travel_to_first = data.get("travelToFirstTaskMin") or []  # [g][c] in minutes
-    travel_weight = float(data.get("travelWeight", 2))
-    triad_level_bonus = int(data.get("triadLevelBonus", 8000))
-    triad_overqual_penalty = int(data.get("triadOverqualPenalty", 3000))
+    constraints = data.get("constraints") or {}
+    travel_mode = constraint_mode(constraints, "travel", "soft")
+    match_mode = constraint_mode(constraints, "triadeMatch", "soft")
+    travel_weight = 0.0 if travel_mode == "off" else float(constraints.get("travelWeight", data.get("travelWeight", 2)))
+    travel_hard_max = int(constraints.get("travelHardMaxMin", 45))
+    triad_level_bonus = 0 if match_mode != "soft" else int(constraints.get("triadeMatchBonus", data.get("triadLevelBonus", 8000)))
+    triad_overqual_penalty = 0 if match_mode != "soft" else int(constraints.get("triadeOverqualPenalty", data.get("triadOverqualPenalty", 3000)))
+    load_mode = constraint_mode(constraints, "loadCap", "hard")
+    count_mode = constraint_mode(constraints, "taskCount", "hard")
+    long_mode = constraint_mode(constraints, "longOt", "hard")
+    short_mode = constraint_mode(constraints, "shortOt", "hard")
     k_under = float(fairness.get("k_under", 6))
     k_balance = float(fairness.get("k_balance", 2))
     k_over = float(fairness.get("k_over", 0.05))
@@ -277,10 +357,20 @@ def main():
         stats = fixed_stats.get(str(cid)) or fixed_stats.get(cid) or {}
         return int(stats.get("fixedWorkMinutes") or 0)
 
-    # Allowed (g, c): compatibility + straordinaria rules (business rules)
+    # Allowed (g, c) plus soft penalty collected while checking modes.
     allowed = [[False] * n_c for _ in range(n_g)]
+    pair_soft = [[0] * n_c for _ in range(n_g)]
 
     cleaner_is_formatore = [normalize_role(cleaners[c].get("role")) == "formatore_cleaner" for c in range(n_c)]
+    cleaner_triade = [task_triade_weight(cleaners[c].get("triadeWeight")) for c in range(n_c)]
+
+    def ot_violation(mode, amount, g_idx, c_idx):
+        if mode == "off":
+            return False
+        if mode == "soft":
+            pair_soft[g_idx][c_idx] += amount
+            return False
+        return True
 
     for g_idx in range(n_g):
         group = groups[g_idx]
@@ -289,55 +379,54 @@ def main():
         group_has_straordinaria = group_has_ot[g_idx]
         group_long = group_long_ot[g_idx]
         group_work_min = (group_work[g_idx] // SCALE) if SCALE else 0
-        anchored = group_anchored[g_idx]
 
         for c_idx in range(n_c):
             cleaner = cleaners[c_idx]
-
-            # Compatibility: all tasks in group compatible with cleaner.
-            # For formatori, also enforce formatore_rules (priority + task type).
-            compat = True
+            pair_penalty = 0
+            blocked = False
             for task in tasks:
-                if not task_cleaner_compatible(cleaner, task, apartment_types, office_operation_ids, task_types_by_cleaner):
-                    compat = False
+                one = task_pair_penalty(
+                    cleaner, task, apartment_types, office_operation_ids, constraints, formatore_rules
+                )
+                if one is None:
+                    blocked = True
                     break
-                if cleaner_is_formatore[c_idx] and not task_formatore_compatible(task, formatore_rules, apartment_types, office_operation_ids):
-                    compat = False
-                    break
-            if not compat:
+                pair_penalty += one
+            if blocked:
                 continue
+            if match_mode == "hard" and cleaner_triade[c_idx] != group_triade[g_idx]:
+                continue
+            if travel_mode == "hard":
+                travel_first = float(travel_to_first[g_idx][c_idx] if g_idx < len(travel_to_first) and c_idx < len(travel_to_first[g_idx]) else 0) or 0
+                if travel_first + (group_travel[g_idx] / SCALE) > travel_hard_max:
+                    continue
 
+            pair_soft[g_idx][c_idx] += pair_penalty
             fixed_count = fixed_task_count(c_idx)
             has_ot_c = has_any_ot(c_idx)
             long_ot_c = has_long_ot(c_idx)
             existing_work = existing_work_min(c_idx)
 
-            # Business: long OT group only to empty cleaner (no other tasks)
-            if group_has_straordinaria and group_long:
-                if fixed_count > 0:
-                    continue
-                # This cleaner can only get this one group (enforced by constraint: if assigned this group, no other)
-                allowed[g_idx][c_idx] = True
-                continue
-
-            # Business: cleaner already has straordinaria
-            if has_ot_c:
-                if long_ot_c:
-                    continue  # no more tasks
-                # Short OT: can add exactly 1 task with duration <= 2h, no OT in group
-                if fixed_count != 1:
-                    continue
-                if group_has_straordinaria or group_work_min > extra_task_max:
+            if group_has_straordinaria and group_long and fixed_count > 0:
+                if ot_violation(long_mode, 25000, g_idx, c_idx):
                     continue
                 allowed[g_idx][c_idx] = True
                 continue
 
-            # Business: cleaner has non-OT tasks; can add short OT only if 1 task <= 2h
-            if group_has_straordinaria and fixed_count > 0:
-                if fixed_count != 1 or existing_work > extra_task_max or group_long:
+            if has_ot_c and long_ot_c:
+                if ot_violation(long_mode, 25000, g_idx, c_idx):
                     continue
-                allowed[g_idx][c_idx] = True
-                continue
+
+            if has_ot_c and not long_ot_c:
+                short_bad = fixed_count != 1 or group_has_straordinaria or group_work_min > extra_task_max
+                if short_bad and ot_violation(short_mode, 12000, g_idx, c_idx):
+                    continue
+
+            if group_has_straordinaria and fixed_count > 0 and not has_ot_c:
+                short_bad = fixed_count != 1 or existing_work > extra_task_max or group_long
+                mode_for_bad = long_mode if group_long else short_mode
+                if short_bad and ot_violation(mode_for_bad, 25000 if group_long else 12000, g_idx, c_idx):
+                    continue
 
             allowed[g_idx][c_idx] = True
 
@@ -378,28 +467,54 @@ def main():
         for g in range(n_g):
             if x[g][c] is not None:
                 load_expr = load_expr + x[g][c] * (group_work[g] + int(w_t * group_travel[g]))
-        model.add(load_expr <= max_target)
+        if load_mode == "hard":
+            model.add(load_expr <= max_target)
 
     # Constraint: task count per cleaner <= maxTasksPerCleaner
+    extra_task_slack = []
     for c in range(n_c):
         count_expr = fixed_task_count(c)
         for g in range(n_g):
             if x[g][c] is not None:
                 count_expr += x[g][c] * group_ntasks[g]
-        model.add(count_expr <= max_tasks_per_cleaner)
+        if count_mode == "hard":
+            model.add(count_expr <= max_tasks_per_cleaner)
+        elif count_mode == "soft":
+            slack = model.new_int_var(0, 30, f"extra_tasks_{c}")
+            model.add(count_expr <= max_tasks_per_cleaner + slack)
+            extra_task_slack.append(slack)
 
-    # Business: long OT group -> cleaner gets only that group (no other group to same cleaner)
-    for g in range(n_g):
-        if not group_long_ot[g]:
-            continue
-        for c in range(n_c):
-            if x[g][c] is None:
+    long_soft_vars = []
+    if long_mode == "hard":
+        for g in range(n_g):
+            if not group_long_ot[g]:
                 continue
-            for g2 in range(n_g):
-                if g2 == g:
+            for c in range(n_c):
+                if x[g][c] is None:
                     continue
-                if x[g2][c] is not None:
-                    model.add(x[g][c] + x[g2][c] <= 1)
+                for g2 in range(n_g):
+                    if g2 == g:
+                        continue
+                    if x[g2][c] is not None:
+                        model.add(x[g][c] + x[g2][c] <= 1)
+    elif long_mode == "soft":
+        for g in range(n_g):
+            if not group_long_ot[g]:
+                continue
+            for c in range(n_c):
+                if x[g][c] is None:
+                    continue
+                others = [x[g2][c] for g2 in range(n_g) if g2 != g and x[g2][c] is not None]
+                if not others:
+                    continue
+                together = model.new_bool_var(f"long_with_other_{g}_{c}")
+                model.add(sum(others) >= 1).OnlyEnforceIf(together)
+                model.add(sum(others) == 0).OnlyEnforceIf(together.Not())
+                both = model.new_bool_var(f"long_soft_{g}_{c}")
+                model.add(both <= x[g][c])
+                model.add(both <= together)
+                model.add(both >= x[g][c] + together - 1)
+                long_soft_vars.append(both)
 
     # Build load expression per cleaner (scaled) for fairness auxiliary variables
     def load_expr(c_idx):
@@ -411,10 +526,15 @@ def main():
 
     # Auxiliary variables for legacy fairness weights
     max_aux = max(max_target, min_target_scaled, target_load_scaled)
-    under_c = [model.new_int_var(0, max_aux, f"under_{c}") for c in range(n_c)]
-    balance_c = [model.new_int_var(0, max_aux, f"balance_{c}") for c in range(n_c)]
-    over_c = [model.new_int_var(0, max_aux, f"over_{c}") for c in range(n_c)]
-    product_over_c = [model.new_int_var(0, max_aux * max_aux, f"product_over_{c}") for c in range(n_c)]
+    load_bound = max_aux if load_mode == "hard" else 20000 * SCALE
+    under_c = [model.new_int_var(0, load_bound, f"under_{c}") for c in range(n_c)]
+    balance_c = [model.new_int_var(0, load_bound, f"balance_{c}") for c in range(n_c)]
+    over_c = [model.new_int_var(0, load_bound, f"over_{c}") for c in range(n_c)]
+    product_over_c = (
+        [model.new_int_var(0, load_bound * load_bound, f"product_over_{c}") for c in range(n_c)]
+        if load_mode == "hard"
+        else []
+    )
     for c in range(n_c):
         load_c = load_expr(c)
         model.add(under_c[c] >= min_target_scaled - load_c)
@@ -423,7 +543,8 @@ def main():
         model.add(balance_c[c] >= 0)
         model.add(over_c[c] >= load_c - max_target)
         model.add(over_c[c] >= 0)
-        model.add_multiplication_equality(product_over_c[c], [over_c[c], over_c[c]])
+        if load_mode == "hard":
+            model.add_multiplication_equality(product_over_c[c], [over_c[c], over_c[c]])
 
     has_any_c = []
     for c in range(n_c):
@@ -435,11 +556,8 @@ def main():
         else:
             has_any_c.append((c, None))
 
-    # Objective: assign as many tasks as possible, then prefer a higher triad
-    # task on a cleaner of the same level. The level bonus stays below one
-    # extra task, so a feasible assignment is never dropped only to match levels.
+    # Objective: cover tasks first. Soft constraints cost less than one dropped task.
     task_weight = 100000
-    cleaner_triade = [task_triade_weight(cleaners[c].get("triadeWeight")) for c in range(n_c)]
     obj_terms = []
 
     for g in range(n_g):
@@ -447,6 +565,7 @@ def main():
             if x[g][c] is None:
                 continue
             obj_terms.append(task_weight * x[g][c] * group_ntasks[g])
+            obj_terms.append(-pair_soft[g][c] * x[g][c])
             group_weight = group_triade[g]
             level_gap = max(0, cleaner_triade[c] - group_weight)
             obj_terms.append((triad_level_bonus * group_weight - triad_overqual_penalty * level_gap) * x[g][c])
@@ -456,9 +575,17 @@ def main():
             if c < len(cleaner_is_formatore) and cleaner_is_formatore[c] and g < len(group_is_formatore_compatible) and group_is_formatore_compatible[g]:
                 obj_terms.append(FORMATORE_BONUS * x[g][c])
     for c in range(n_c):
-        obj_terms.append((k_under / SCALE) * under_c[c])
-        obj_terms.append(-(k_balance / SCALE) * balance_c[c])
-        obj_terms.append(-(k_over / (SCALE * SCALE)) * product_over_c[c])
+        if load_mode != "off":
+            obj_terms.append((k_under / SCALE) * under_c[c])
+            obj_terms.append(-(k_balance / SCALE) * balance_c[c])
+        if load_mode == "hard":
+            obj_terms.append(-(k_over / (SCALE * SCALE)) * product_over_c[c])
+        elif load_mode == "soft":
+            obj_terms.append(-(20 / SCALE) * over_c[c])
+    for slack in extra_task_slack:
+        obj_terms.append(-8000 * slack)
+    for both in long_soft_vars:
+        obj_terms.append(-25000 * both)
     for (c, h) in has_any_c:
         if h is not None:
             obj_terms.append(zero_bonus)

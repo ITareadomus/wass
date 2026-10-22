@@ -21,7 +21,9 @@ import path from 'path';
 import { TimelineContext } from './timelineContext';
 import { CONTINUAZIONE_PS_OPERATION_ID, isTaskEquivalentToStraordinaria } from '../../utils/straordinaria-utils';
 import { buildSchedulingWindows, parsePrioritySettings } from '../../../shared/taskPriorityClassification';
-import { hkHypothesisProfileById, type HkHypothesisId } from '../../../shared/hk-assignment-hypotheses';
+import { type HkHypothesisId } from '../../../shared/hk-assignment-hypotheses';
+import { hkSettingsForHypothesis, parseHkConstraintSettings, type HkConstraintSettings } from '../../../shared/hk-constraint-settings';
+import { loadHkConstraintSettings } from './load-hk-constraints';
 
 export type WavePriority = 'early_out' | 'high_priority' | 'low_priority';
 
@@ -272,6 +274,7 @@ export interface RunAllPhasesOptions {
   forceFullPipeline?: boolean;
   anchorTaskIds?: number[];
   hypothesisId?: HkHypothesisId;
+  hkConstraints?: HkConstraintSettings;
   recordPlan?: boolean;
 }
 
@@ -449,9 +452,9 @@ export async function runAllPhases(
     forceFullPipeline = false,
     anchorTaskIds = [],
     hypothesisId,
+    hkConstraints: hkConstraintsOverride,
     recordPlan = true,
   } = options;
-  const hypothesisProfile = hypothesisId ? hkHypothesisProfileById(hypothesisId) : null;
 
   const result: AllPhasesRunResult = {
     runId,
@@ -584,18 +587,18 @@ export async function runAllPhases(
     console.log(`[runAllPhases] Phase 1 complete: ${result.phase1.groupsGenerated} groups generated`);
 
     console.log(`[runAllPhases] === PHASE 2: Cleaner Assignment ===`);
-    // Passa baseMax - il bonus travel (+1) viene applicato per-cleaner basato su avgTravel ≤ 10min
-    // Passa timelineContext per fairness scoring (pre-existing load)
+    const hkConstraints: HkConstraintSettings = hkConstraintsOverride
+      ? parseHkConstraintSettings(hkConstraintsOverride)
+      : hypothesisId
+        ? hkSettingsForHypothesis(hypothesisId)
+        : await loadHkConstraintSettings();
     result.phase2 = await runPhase2(workDate, runId, { 
       params: {
         dynamicMaxTasks: dynamicLimits.baseMax,
-        ...(hypothesisProfile
-          ? {
-              travelWeight: hypothesisProfile.travelWeight,
-              triadLevelBonus: hypothesisProfile.triadLevelBonus,
-              triadOverqualPenalty: hypothesisProfile.triadOverqualPenalty,
-            }
-          : {}),
+        hkConstraints,
+        travelWeight: hkConstraints.travelWeight,
+        triadLevelBonus: hkConstraints.triadeMatchBonus,
+        triadOverqualPenalty: hkConstraints.triadeOverqualPenalty,
       },
       timelineContext: phase2TimelineContext
     });
@@ -611,7 +614,8 @@ export async function runAllPhases(
     console.log(`[runAllPhases] === PHASE 3: Scheduling ===`);
     // Passa timelineContext per collision avoidance (occupiedBlocks)
     result.phase3 = await runPhase3(workDate, runId, { 
-      timelineContext: result.phase0?.timelineContext 
+      timelineContext: result.phase0?.timelineContext,
+      hkConstraints,
     });
     if (result.phase3.status === 'failed') {
       result.status = 'failed';
@@ -627,14 +631,11 @@ export async function runAllPhases(
       result.phase4 = await runPhase4(workDate, runId, { 
         params: {
           dynamicMaxTasks: dynamicLimits.baseMax,
+          hkConstraints,
+          triadSwap: hkConstraints.triadSwap,
+          triadLevelBonus: hkConstraints.phase4LevelBonus,
+          triadOverqualPenalty: hkConstraints.phase4OverqualPenalty,
           ...(hasExistingTimeline ? { appendOnly: true, travelPolicy: DEFAULT_TRAVEL_POLICY } : {}),
-          ...(hypothesisProfile
-            ? {
-                triadSwap: hypothesisProfile.triadSwap,
-                triadLevelBonus: hypothesisProfile.phase4LevelBonus,
-                triadOverqualPenalty: hypothesisProfile.phase4OverqualPenalty,
-              }
-            : {}),
         },
         timelineContext: result.phase0?.timelineContext
       });
@@ -650,12 +651,9 @@ export async function runAllPhases(
     result.phase5 = await runPhase5(workDate, runId, {
       params: {
         dynamicMaxTasks: dynamicLimits.baseMax,
-        ...(hypothesisProfile
-          ? {
-              maxIterations: hypothesisProfile.phase5MaxIterations,
-              maxFairnessIterations: hypothesisProfile.phase5MaxFairnessIterations,
-            }
-          : {}),
+        hkConstraints,
+        maxIterations: hkConstraints.shortenRoutes ? hkConstraints.phase5Iterations : 0,
+        maxFairnessIterations: hkConstraints.rebalanceLoads ? hkConstraints.fairnessIterations : 0,
       },
       timelineContext: result.phase0?.timelineContext
     });

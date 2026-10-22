@@ -9,6 +9,7 @@ import {
   Phase5CandidateSwap,
   Phase5NeighborhoodCleaner
 } from './phase5OrTools';
+import { HK_CONSTRAINT_PRESETS, type HkConstraintSettings } from '../../../shared/hk-constraint-settings';
 
 export interface Phase5Params {
   maxIterations: number;
@@ -24,6 +25,7 @@ export interface Phase5Params {
   ortoolsNeighborhoodMaxCandidates?: number;   // max relocations + swaps to send (e.g. 40)
   ortoolsNeighborhoodEveryNIterations?: number; // call every N iterations (e.g. 1 or 5)
   ortoolsTimeoutMs?: number;
+  hkConstraints?: HkConstraintSettings;
 }
 
 export const DEFAULT_PHASE5_PARAMS: Phase5Params = {
@@ -79,18 +81,19 @@ interface MoveCandidate {
 function isTaskMovableToCleaner(
   task: TaskForScheduling,
   target: CleanerSchedule,
-  tasksMap: Map<number, TaskForScheduling>
+  tasksMap: Map<number, TaskForScheduling>,
+  rules: HkConstraintSettings = HK_CONSTRAINT_PRESETS.balanced
 ): boolean {
-  if (task.straordinaria) return false;
+  if (task.straordinaria && (rules.longOt !== "off" || rules.shortOt !== "off")) return false;
 
-  if (!cleanerCanTakeTriadeTask(target.triadeWeight, task.triadeWeight)) return false;
-
-  if (task.premium) {
-    const role = (target.role || 'Standard').toLowerCase();
-    if (!role.includes('premium')) return false;
+  if (rules.triadeCeiling === "hard" && !cleanerCanTakeTriadeTask(target.triadeWeight, task.triadeWeight)) return false;
+  if (rules.triadeMatch === "hard") {
+    const cleanerLevel = Number(target.triadeWeight ?? 1);
+    const taskLevel = Number(task.triadeWeight ?? 1);
+    if (cleanerLevel !== taskLevel) return false;
   }
 
-  if (target.fixedHasAnyOT || target.fixedHasLongOT) return false;
+  if ((rules.longOt === "hard" || rules.shortOt === "hard") && (target.fixedHasAnyOT || target.fixedHasLongOT)) return false;
 
   const hasExistingOT = target.tasks.some(r => {
     const t = tasksMap.get(r.taskId);
@@ -249,7 +252,7 @@ export async function runPhase5Algorithm(
         const cA = constraintsByCleaner.get(String(schedA.cleanerId)) || null;
         const simAWithout = simulateSequence(
           workDate, listAWithout, schedA.startTime, tasksMap,
-          schedA.anchorTask ?? null, priorityWindows, cA
+          schedA.anchorTask ?? null, priorityWindows, cA, undefined, params.hkConstraints
         );
         if (!simAWithout.ok && listAWithout.length > 0) continue;
 
@@ -260,7 +263,7 @@ export async function runPhase5Algorithm(
           const schedB = current[bIdx];
           if (lockedSet.has(schedB.cleanerId)) continue;
 
-          if (!isTaskMovableToCleaner(task, schedB, tasksMap)) continue;
+          if (!isTaskMovableToCleaner(task, schedB, tasksMap, params.hkConstraints)) continue;
 
           const fixedB = schedB.fixedTaskCount ?? 0;
           const maxLoad = params.dynamicMaxTasks ?? 6;
@@ -272,7 +275,7 @@ export async function runPhase5Algorithm(
             const listBWith = tasksWithInsert(schedB, tasksMap, task, pos);
             const simBWith = simulateSequence(
               workDate, listBWith, schedB.startTime, tasksMap,
-              schedB.anchorTask ?? null, priorityWindows, cB
+              schedB.anchorTask ?? null, priorityWindows, cB, undefined, params.hkConstraints
             );
             if (!simBWith.ok) continue;
 
@@ -334,14 +337,14 @@ export async function runPhase5Algorithm(
             const taskB = tasksMap.get(schedB.tasks[tB].taskId);
             if (!taskB || taskB.straordinaria) continue;
 
-            if (!isTaskMovableToCleaner(taskA, schedB, tasksMap)) continue;
-            if (!isTaskMovableToCleaner(taskB, schedA, tasksMap)) continue;
+            if (!isTaskMovableToCleaner(taskA, schedB, tasksMap, params.hkConstraints)) continue;
+            if (!isTaskMovableToCleaner(taskB, schedA, tasksMap, params.hkConstraints)) continue;
 
             const cA = constraintsByCleaner.get(String(schedA.cleanerId)) || null;
             const listASwapped = tasksWithReplace(schedA, tasksMap, tA, taskB);
             const simASwapped = simulateSequence(
               workDate, listASwapped, schedA.startTime, tasksMap,
-              schedA.anchorTask ?? null, priorityWindows, cA
+              schedA.anchorTask ?? null, priorityWindows, cA, undefined, params.hkConstraints
             );
             if (!simASwapped.ok) continue;
 
@@ -349,7 +352,7 @@ export async function runPhase5Algorithm(
             const listBSwapped = tasksWithReplace(schedB, tasksMap, tB, taskA);
             const simBSwapped = simulateSequence(
               workDate, listBSwapped, schedB.startTime, tasksMap,
-              schedB.anchorTask ?? null, priorityWindows, cB
+              schedB.anchorTask ?? null, priorityWindows, cB, undefined, params.hkConstraints
             );
             if (!simBSwapped.ok) continue;
 
@@ -431,13 +434,13 @@ export async function runPhase5Algorithm(
           const cA = constraintsByCleaner.get(String(fromSched.cleanerId)) || null;
           const simA = simulateSequence(
             workDate, listA, fromSched.startTime, tasksMap,
-            fromSched.anchorTask ?? null, priorityWindows, cA
+            fromSched.anchorTask ?? null, priorityWindows, cA, undefined, params.hkConstraints
           );
           const listB = tasksWithInsert(toSched, tasksMap, task, toPosition);
           const cB = constraintsByCleaner.get(String(toSched.cleanerId)) || null;
           const simB = simulateSequence(
             workDate, listB, toSched.startTime, tasksMap,
-            toSched.anchorTask ?? null, priorityWindows, cB
+            toSched.anchorTask ?? null, priorityWindows, cB, undefined, params.hkConstraints
           );
           if (simA.ok || listA.length === 0) {
             current[m.fromIdx!] = applySimResult(
@@ -487,13 +490,13 @@ export async function runPhase5Algorithm(
           const listA = tasksWithReplace(schedA, tasksMap, taskAIdx, taskB);
           const simA = simulateSequence(
             workDate, listA, schedA.startTime, tasksMap,
-            schedA.anchorTask ?? null, priorityWindows, cA
+            schedA.anchorTask ?? null, priorityWindows, cA, undefined, params.hkConstraints
           );
           const cB = constraintsByCleaner.get(String(schedB.cleanerId)) || null;
           const listB = tasksWithReplace(schedB, tasksMap, taskBIdx, taskA);
           const simB = simulateSequence(
             workDate, listB, schedB.startTime, tasksMap,
-            schedB.anchorTask ?? null, priorityWindows, cB
+            schedB.anchorTask ?? null, priorityWindows, cB, undefined, params.hkConstraints
           );
           if (simA.ok && simB.ok) {
             current[aIdx] = applySimResult(schedA, simA, listA);
@@ -530,11 +533,11 @@ export async function runPhase5Algorithm(
 
       const listA = tasksWithout(fromSched, tasksMap, bestMove.fromTaskIdx!);
       const cA = constraintsByCleaner.get(String(fromSched.cleanerId)) || null;
-      const simA = simulateSequence(workDate, listA, fromSched.startTime, tasksMap, fromSched.anchorTask ?? null, priorityWindows, cA);
+      const simA = simulateSequence(workDate, listA, fromSched.startTime, tasksMap, fromSched.anchorTask ?? null, priorityWindows, cA, undefined, params.hkConstraints);
 
       const listB = tasksWithInsert(toSched, tasksMap, task, bestMove.toPosition!);
       const cB = constraintsByCleaner.get(String(toSched.cleanerId)) || null;
-      const simB = simulateSequence(workDate, listB, toSched.startTime, tasksMap, toSched.anchorTask ?? null, priorityWindows, cB);
+      const simB = simulateSequence(workDate, listB, toSched.startTime, tasksMap, toSched.anchorTask ?? null, priorityWindows, cB, undefined, params.hkConstraints);
 
       if (simA.ok || listA.length === 0) {
         current[bestMove.fromIdx!] = applySimResult(fromSched, simA.ok ? simA : { scheduleRows: [], totalTravel: 0, totalWait: 0, totalPriorityPenalty: 0, endTime: null }, listA);
@@ -566,11 +569,11 @@ export async function runPhase5Algorithm(
 
       const cA = constraintsByCleaner.get(String(schedA.cleanerId)) || null;
       const listA = tasksWithReplace(schedA, tasksMap, bestMove.taskAIdx!, taskB);
-      const simA = simulateSequence(workDate, listA, schedA.startTime, tasksMap, schedA.anchorTask ?? null, priorityWindows, cA);
+      const simA = simulateSequence(workDate, listA, schedA.startTime, tasksMap, schedA.anchorTask ?? null, priorityWindows, cA, undefined, params.hkConstraints);
 
       const cB = constraintsByCleaner.get(String(schedB.cleanerId)) || null;
       const listB = tasksWithReplace(schedB, tasksMap, bestMove.taskBIdx!, taskA);
-      const simB = simulateSequence(workDate, listB, schedB.startTime, tasksMap, schedB.anchorTask ?? null, priorityWindows, cB);
+      const simB = simulateSequence(workDate, listB, schedB.startTime, tasksMap, schedB.anchorTask ?? null, priorityWindows, cB, undefined, params.hkConstraints);
 
       if (simA.ok && simB.ok) {
         current[bestMove.cleanerAIdx!] = applySimResult(schedA, simA, listA);
@@ -648,7 +651,7 @@ export async function runPhase5Algorithm(
         const cA = constraintsByCleaner.get(String(schedA.cleanerId)) || null;
         const simAWithout = simulateSequence(
           workDate, listAWithout, schedA.startTime, tasksMap,
-          schedA.anchorTask ?? null, priorityWindows, cA
+          schedA.anchorTask ?? null, priorityWindows, cA, undefined, params.hkConstraints
         );
         if (!simAWithout.ok && listAWithout.length > 0) continue;
 
@@ -663,7 +666,7 @@ export async function runPhase5Algorithm(
           if (lockedSet.has(schedB.cleanerId)) continue;
           if (over.idx === under.idx) continue;
 
-          if (!isTaskMovableToCleaner(task, schedB, tasksMap)) continue;
+          if (!isTaskMovableToCleaner(task, schedB, tasksMap, params.hkConstraints)) continue;
 
           const fixedB = schedB.fixedTaskCount ?? 0;
           const maxLoad = params.dynamicMaxTasks ?? 6;
@@ -675,7 +678,7 @@ export async function runPhase5Algorithm(
             const listBWith = tasksWithInsert(schedB, tasksMap, task, pos);
             const simBWith = simulateSequence(
               workDate, listBWith, schedB.startTime, tasksMap,
-              schedB.anchorTask ?? null, priorityWindows, cB
+              schedB.anchorTask ?? null, priorityWindows, cB, undefined, params.hkConstraints
             );
             if (!simBWith.ok) continue;
 
@@ -724,11 +727,11 @@ export async function runPhase5Algorithm(
 
     const listA = tasksWithout(fromSched, tasksMap, bestFairness.fromTaskIdx);
     const cA = constraintsByCleaner.get(String(fromSched.cleanerId)) || null;
-    const simA = simulateSequence(workDate, listA, fromSched.startTime, tasksMap, fromSched.anchorTask ?? null, priorityWindows, cA);
+    const simA = simulateSequence(workDate, listA, fromSched.startTime, tasksMap, fromSched.anchorTask ?? null, priorityWindows, cA, undefined, params.hkConstraints);
 
     const listB = tasksWithInsert(toSched, tasksMap, task, bestFairness.toPosition);
     const cB = constraintsByCleaner.get(String(toSched.cleanerId)) || null;
-    const simB = simulateSequence(workDate, listB, toSched.startTime, tasksMap, toSched.anchorTask ?? null, priorityWindows, cB);
+    const simB = simulateSequence(workDate, listB, toSched.startTime, tasksMap, toSched.anchorTask ?? null, priorityWindows, cB, undefined, params.hkConstraints);
 
     if ((simA.ok || listA.length === 0) && simB.ok) {
       current[bestFairness.fromIdx] = applySimResult(fromSched, simA.ok ? simA : { scheduleRows: [], totalTravel: 0, totalWait: 0, totalPriorityPenalty: 0, endTime: null }, listA);

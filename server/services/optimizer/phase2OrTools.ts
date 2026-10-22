@@ -6,7 +6,7 @@
  * - Task-cleaner compatibility → (g,c) allowed only if compatible
  * - Load cap → sum(workMin + wT*travelMin) + initialLoad_c <= maxTarget
  * - Max tasks per cleaner → dynamicMaxTasks+1 or 4
- * - Straordinaria: reserve, existing OT, long OT empty cleaner, short OT + 1 extra <=2h
+ * - Straordinaria: long OT empty cleaner, short OT + 1 extra <=2h
  * - Anchored group → only that cleaner (or unassigned)
  * - Each group at most one cleaner → sum_c x[g,c] <= 1
  */
@@ -165,9 +165,10 @@ function buildPayload(
     straordinariaLongThresholdMin: STRAORDINARIA_LONG_THRESHOLD_MIN,
     straordinariaExtraTaskMaxMin: STRAORDINARIA_EXTRA_TASK_MAX_MIN,
     travelToFirstTaskMin,
-    travelWeight: params.travelWeight ?? 2,
-    triadLevelBonus: params.triadLevelBonus ?? 8000,
-    triadOverqualPenalty: params.triadOverqualPenalty ?? 3000
+    travelWeight: params.hkConstraints?.travel === "off" ? 0 : (params.hkConstraints?.travelWeight ?? params.travelWeight ?? 2),
+    triadLevelBonus: params.hkConstraints?.triadeMatch === "soft" ? params.hkConstraints.triadeMatchBonus : (params.triadLevelBonus ?? 8000),
+    triadOverqualPenalty: params.hkConstraints?.triadeMatch === "soft" ? params.hkConstraints.triadeOverqualPenalty : (params.triadOverqualPenalty ?? 3000),
+    constraints: params.hkConstraints ?? null
   };
 
   return JSON.stringify(payload);

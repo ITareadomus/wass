@@ -69,6 +69,9 @@ async function rejectIfTriadeLevelBlocks(
   taskId: unknown
 ): Promise<boolean> {
   if (isLogisticsScopeRequest(req) || resolveScopeFromReq(req) === "office") return false;
+  const { loadHkConstraintSettings } = await import("./services/optimizer/load-hk-constraints");
+  const hkConstraints = await loadHkConstraintSettings();
+  if (hkConstraints.triadeCeiling !== "hard") return false;
   const cleaner = Number(cleanerId);
   const task = Number(taskId);
   if (!Number.isFinite(cleaner) || cleaner <= 0 || !Number.isFinite(task) || task <= 0) return false;

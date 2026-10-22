@@ -72,7 +72,7 @@ export interface HkHypothesisAssignment {
 }
 
 export interface HkHypothesisSummary {
-  id: HkHypothesisId;
+  id: string;
   title: string;
   description: string;
   assignedTaskCount: number;

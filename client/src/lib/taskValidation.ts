@@ -2,6 +2,8 @@
  * Utility per validare la compatibilità tra cleaner e task basata su settings.json
  */
 
+import { HK_CONSTRAINT_PRESETS, parseHkConstraintSettings, type HkConstraintSettings } from "@shared/hk-constraint-settings";
+
 interface CleanerTaskRules {
   standard_apt: boolean;
   premium_apt: boolean;
@@ -35,6 +37,7 @@ interface SettingsSchema {
 
 let cachedRules: TaskTypesByCleaner | null = null;
 let cachedApartmentTypes: ApartmentTypesConfig | null = null;
+let cachedHkConstraints: HkConstraintSettings = HK_CONSTRAINT_PRESETS.balanced;
 let cachedPriorityTypes: PriorityTypesConfig | null = null;
 let cachedOfficeOperationIds: Set<number> | null = null;
 const CONTINUAZIONE_PS_OPERATION_ID = 37;
@@ -94,6 +97,7 @@ export async function loadValidationRules(): Promise<TaskTypesByCleaner> {
     cachedRules = settings.task_types ?? {};
     cachedApartmentTypes = settings.apartment_types ?? null;
     cachedPriorityTypes = settings.priority_types ?? null;
+    cachedHkConstraints = parseHkConstraintSettings((settings as { hk_constraints?: unknown }).hk_constraints);
     await loadOfficeOperationIds();
 
     return cachedRules;
@@ -311,13 +315,13 @@ export function explainCleanerTaskIncompatibility(
   const reasons: string[] = [];
   const officeTask = isOfficeTask(task);
 
-  if (officeTask && roleKey !== "ufficio_cleaner") {
+  if (officeTask && roleKey !== "ufficio_cleaner" && cachedHkConstraints.officeRole === "hard") {
     reasons.push(
       `Task ufficio: solo un cleaner con ruolo Ufficio può gestirla (ruolo attuale: ${roleName}).`
     );
     return reasons;
   }
-  if (!officeTask && roleKey === "ufficio_cleaner") {
+  if (!officeTask && roleKey === "ufficio_cleaner" && cachedHkConstraints.officeRole === "hard") {
     reasons.push("Il cleaner Ufficio non può gestire task non-ufficio.");
     return reasons;
   }
@@ -325,23 +329,16 @@ export function explainCleanerTaskIncompatibility(
   const taskType = determineTaskType(task);
   if (!taskType) return reasons;
 
-  if (taskType === "straordinario_apt" && roleKey !== "straordinario_cleaner") {
-    reasons.push(
-      `Task straordinaria: solo un cleaner Straordinario può gestirla (ruolo attuale: ${roleName}).`
-    );
-  }
-
+  const levelDecidedByTriade = taskType === "premium_apt" || taskType === "straordinario_apt";
   const roleRules = rules[roleKey];
-  if (roleRules && !roleRules[taskType] && taskType !== "straordinario_apt") {
+  if (!levelDecidedByTriade && roleRules && !roleRules[taskType]) {
     reasons.push(
       `Il ruolo ${roleName} non può gestire task di tipo ${taskTypeLabel(taskType)}.`
     );
-  } else if (!roleRules && taskType === "straordinario_apt" && roleKey !== "straordinario_cleaner") {
-    // already pushed
   }
 
   const aptType = normalizeApartmentValue(task.apt_type || task.aptType || task.type_apt);
-  if (aptType && cachedApartmentTypes) {
+  if (cachedHkConstraints.apartmentType === "hard" && aptType && cachedApartmentTypes) {
     let allowedApts: string[] = [];
     if (roleKey === "standard_cleaner") {
       allowedApts = cachedApartmentTypes.standard_apt || [];
@@ -400,10 +397,12 @@ export function canCleanerHandleTaskSync(
   const roleKey = normalizeCleanerRole(cleanerRole);
   const officeTask = isOfficeTask(task);
 
-  // Regola semplificata ufficio: task ufficio solo a cleaner con ruolo Ufficio.
-  if (officeTask) return roleKey === 'ufficio_cleaner';
-  // Cleaner ufficio non gestisce task non-ufficio.
-  if (roleKey === 'ufficio_cleaner') return false;
+  if (officeTask && roleKey !== "ufficio_cleaner") {
+    if (cachedHkConstraints.officeRole === "hard") return false;
+  } else if (!officeTask && roleKey === "ufficio_cleaner") {
+    if (cachedHkConstraints.officeRole === "hard") return false;
+  }
+  if (officeTask && roleKey === "ufficio_cleaner") return true;
 
   const taskType = determineTaskType(task);
   // If the task type cannot be determined, assume it can be handled.
@@ -414,20 +413,15 @@ export function canCleanerHandleTaskSync(
   // If there are no specific rules for this role, assume it can handle the task.
   if (!roleRules) return true;
 
-  // Straordinario tasks: only cleaners with role "Straordinario" can handle them
-  if (taskType === "straordinario_apt") {
-    return roleKey === 'straordinario_cleaner';
-  }
-
-  // Check if the cleaner's role is allowed to handle this specific task type based on task_types rules.
-  const allowedByTaskType = roleRules[taskType];
-  if (!allowedByTaskType) return false;
+  // Premium e straordinaria non dipendono dal ruolo: il livello lo decide la triade.
+  const levelDecidedByTriade = taskType === "premium_apt" || taskType === "straordinario_apt";
+  if (!levelDecidedByTriade && !roleRules[taskType]) return false;
 
   // CRITICAL: Check apartment type compatibility FIRST (before priority)
   // Extract apt_type from task (checking common field names)
   const aptType = normalizeApartmentValue(task.apt_type || task.aptType || task.type_apt);
   
-  if (aptType && cachedApartmentTypes) {
+  if (cachedHkConstraints.apartmentType === "hard" && aptType && cachedApartmentTypes) {
     let allowedApts: string[] = [];
     
     if (roleKey === 'standard_cleaner') {

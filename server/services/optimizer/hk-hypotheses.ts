@@ -1,10 +1,15 @@
 import pool from "../../../shared/pg-db";
 import {
-  HK_HYPOTHESIS_IDS,
-  hkHypothesisProfileById,
+  HK_HYPOTHESIS_PROFILES,
   type HkHypothesisAssignment,
   type HkHypothesisPickerItem,
 } from "../../../shared/hk-assignment-hypotheses";
+import {
+  HK_CONSTRAINT_PRESETS,
+  sameHkConstraintSettings,
+  type HkNamedProfile,
+} from "../../../shared/hk-constraint-settings";
+import { loadHkProfileLibrary } from "./load-hk-constraints";
 import { runAllPhases } from "./runAllPhases";
 
 async function loadHypothesisAssignments(runId: string): Promise<{
@@ -40,26 +45,35 @@ async function loadHypothesisAssignments(runId: string): Promise<{
   return { assignments, totalTravelMin };
 }
 
+function descriptionFor(profile: HkNamedProfile): string {
+  if (profile.builtin) {
+    const preset = HK_CONSTRAINT_PRESETS[profile.builtin];
+    const stock = HK_HYPOTHESIS_PROFILES.find((item) => item.id === profile.builtin);
+    if (stock && sameHkConstraintSettings(profile.settings, preset)) return stock.description;
+  }
+  return "Profilo salvato nelle impostazioni.";
+}
+
 export async function runHkAssignmentHypotheses(workDate: string): Promise<HkHypothesisPickerItem[]> {
+  const library = await loadHkProfileLibrary();
   const hypotheses: HkHypothesisPickerItem[] = [];
-  for (const hypothesisId of HK_HYPOTHESIS_IDS) {
-    const profile = hkHypothesisProfileById(hypothesisId);
-    console.log(`[hk-hypotheses] Calcolo ipotesi ${profile.title} per ${workDate}`);
+  for (const profile of library.profiles) {
+    console.log(`[hk-hypotheses] Calcolo ipotesi ${profile.name} per ${workDate}`);
     const result = await runAllPhases(workDate, {
-      hypothesisId,
+      hkConstraints: profile.settings,
       applyToProduction: false,
       recordPlan: false,
       skipPhase4: false,
     });
     if (result.status === "failed") {
-      throw new Error(result.error || `Ipotesi ${profile.title} non calcolata`);
+      throw new Error(result.error || `Ipotesi ${profile.name} non calcolata`);
     }
     const loaded = await loadHypothesisAssignments(result.runId);
     hypotheses.push({
       summary: {
         id: profile.id,
-        title: profile.title,
-        description: profile.description,
+        title: profile.name,
+        description: descriptionFor(profile),
         assignedTaskCount: result.summary.tasksAssigned,
         droppedTaskCount: result.summary.tasksUnassigned,
         totalTravelMin: Math.round(loaded.totalTravelMin),
