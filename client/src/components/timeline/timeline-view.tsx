@@ -1,5 +1,9 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
 import { formatClockFromMinutes } from "@shared/clock-display";
+import {
+  layoutHousekeepingTimelineTask,
+  renderedHousekeepingCardMinutes,
+} from "@shared/housekeeping-timeline-layout";
 import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, UserMinus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap, Lock, Unlock, AlertCircle, BarChart3, Map as MapIcon, CheckSquare } from "lucide-react";
 import { TimelineActionHistoryButton } from "@/components/timeline/timeline-action-history-button";
 import { useState, useEffect, useRef } from "react";
@@ -3011,6 +3015,12 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                   />
                                 ) : null;
 
+                              const gridStartMinutes = timeToMinutes(globalTimeSlots[0] || "10:00");
+                              const timelineMinCardPx = hideRouteSpacers
+                                ? COMPACT_DRAG_MIN_TIMELINE_TASK_WIDTH_PX
+                                : MIN_TIMELINE_TASK_WIDTH_PX;
+                              let layoutCursorMinutes = gridStartMinutes;
+
                               return (
                                 <>
                                   {cleanerTasks.map((task, idx) => {
@@ -3037,8 +3047,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                       travelTime = 0;
                                     }
 
-                                    // Helper: normalizza date "2025-12-15T..." -> "2025-12-15"
-                                    const normDate = (d?: string | null) => (d ? String(d).slice(0, 10) : null);
                                     const parseClockToMinutes = (value?: string | null) => {
                                       if (!value) return null;
                                       const parts = String(value).split(':');
@@ -3052,69 +3060,43 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     // Usa sequence se disponibile, altrimenti fallback su idx+1
                                     const seq = (taskObj as any).sequence ?? (idx + 1);
 
-                                    // Calcola offset iniziale: per la prima task usa SEMPRE lo start_time della task
-                                    // (quando presente), così la posizione riflette il dato reale calcolato dal backend.
-                                    let timeOffset = 0;
-                                    if (seq === 1) {
-                                      const gridStartMinutes = timeToMinutes(globalTimeSlots[0] || "10:00");
-                                      const previewMinutes =
-                                        firstAptTimeShiftPreview?.cleanerId === cleaner.id
-                                          ? firstAptTimeShiftPreview.startMinutes
-                                          : null;
-                                      const taskStartMinutes = previewMinutes ?? parseClockToMinutes(
-                                        taskObj.start_time || taskObj.fw_start_time || taskObj.startTime
-                                      );
-                                      const cleanerStartMinutes = parseClockToMinutes(cleanerStartTime);
-                                      const firstBlockStartMinutes = taskStartMinutes ?? cleanerStartMinutes ?? gridStartMinutes;
+                                    // Il bordo sinistro della barra è lo start time.
+                                    // L'attesa è solo lo spazio fra la fine disegnata della barra precedente
+                                    // (più il travel) e questo start: non si ricalcola dall'end time.
+                                    const previewMinutes =
+                                      idx === 0 && firstAptTimeShiftPreview?.cleanerId === cleaner.id
+                                        ? firstAptTimeShiftPreview.startMinutes
+                                        : null;
+                                    const taskStartMinutes = previewMinutes ?? parseClockToMinutes(
+                                      taskObj.start_time || taskObj.fw_start_time || taskObj.startTime
+                                    );
+                                    const cardMinutes = renderedHousekeepingCardMinutes(
+                                      hideRouteSpacers ? "0.15" : (taskObj.duration || "0.0"),
+                                      timelinePxPerMinute,
+                                      timelineMinCardPx,
+                                    );
+                                    const slot = layoutHousekeepingTimelineTask({
+                                      isFirst: idx === 0,
+                                      gridStartMinutes,
+                                      cursorMinutes: layoutCursorMinutes,
+                                      startMinutes: taskStartMinutes,
+                                      fallbackStartMinutes: parseClockToMinutes(cleanerStartTime),
+                                      travelMinutes: idx === 0 || hideRouteSpacers ? 0 : travelTime,
+                                      cardMinutes,
+                                    });
+                                    layoutCursorMinutes = slot.nextCursorMinutes;
 
-                                      if (firstBlockStartMinutes > gridStartMinutes) {
-                                        timeOffset = firstBlockStartMinutes - gridStartMinutes;
-                                      }
-                                    }
-
-                                    // Calcola le larghezze con la stessa scala temporale usata da task e griglia.
-                                    const effectiveTravelMinutes =
-                                      seq >= 2 && travelTime > 0
-                                        ? travelTime
-                                        : 0;
+                                    const effectiveTravelMinutes = slot.travelMinutes;
                                     const travelWidthPx = effectiveTravelMinutes > 0 && timelinePxPerMinute > 0
                                       ? effectiveTravelMinutes * timelinePxPerMinute
                                       : 0;
-                                    const initialOffsetWidthPx = seq === 1 && timeOffset > 0 && timelinePxPerMinute > 0
-                                      ? timeOffset * timelinePxPerMinute
+                                    const initialOffsetWidthPx = slot.initialOffsetMinutes > 0 && timelinePxPerMinute > 0
+                                      ? slot.initialOffsetMinutes * timelinePxPerMinute
                                       : 0;
-                                    const shouldShowInitialOffset = true;
-
-                                    // CRITICAL FIX: Calcola il "waitingGap" per task con sequence >= 2
-                                    // Il waitingGap rappresenta l'attesa del cleaner quando arriva prima che l'appartamento si liberi
-                                    // IMPORTANTE: Mostra il waitingGap SOLO se la task corrente ha un checkout_time reale
-                                    let waitingGap = 0;
-                                    if (seq >= 2 && taskObj.start_time && taskObj.checkout_time) {
-                                      // CRITICAL: L'array è ordinato per sequence, quindi idx-1 è la vera task precedente
-                                      const prevTask = idx > 0 ? cleanerTasks[idx - 1] as any : null;
-
-                                      const workDateStr = workDate;
-
-                                      // CRITICAL: Normalizza le date per evitare mismatch di formato (es. "2025-12-15T00:00:00Z" vs "2025-12-15")
-                                      const prevTaskDate = normDate(prevTask?.checkin_date);
-                                      const prevTaskHasDifferentDate = !!(prevTaskDate && prevTaskDate !== workDateStr);
-                                      
-                                      if (prevTask && prevTask.end_time && !prevTaskHasDifferentDate) {
-                                        // Calcola la fine prevista: end_time della task precedente + travel_time
-                                        const [prevEndH, prevEndM] = prevTask.end_time.split(':').map(Number);
-                                        const prevEndMinutes = prevEndH * 60 + prevEndM;
-                                        const expectedStartMinutes = prevEndMinutes + travelTime;
-
-                                        // Calcola lo start effettivo di questa task
-                                        const [taskStartH, taskStartM] = taskObj.start_time.split(':').map(Number);
-                                        const actualStartMinutes = taskStartH * 60 + taskStartM;
-
-                                        // Se lo start effettivo è DOPO quello previsto, c'è un gap (attesa)
-                                        if (actualStartMinutes > expectedStartMinutes) {
-                                          waitingGap = actualStartMinutes - expectedStartMinutes;
-                                        }
-                                      }
-                                    }
+                                    const alignShiftPx = slot.alignGapMinutes < 0 && timelinePxPerMinute > 0
+                                      ? slot.alignGapMinutes * timelinePxPerMinute
+                                      : 0;
+                                    const waitingGap = slot.alignGapMinutes > 0 ? slot.alignGapMinutes : 0;
                                     const waitingGapWidthPx = waitingGap > 0 && timelinePxPerMinute > 0
                                       ? waitingGap * timelinePxPerMinute
                                       : 0;
@@ -3171,8 +3153,17 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
                                     return (
                                       <React.Fragment key={uniqueKey}>
+                                        {/* Riporta la barra sullo start time se la card precedente lo ha già superato */}
+                                        {!hideRouteSpacers && alignShiftPx < 0 && (
+                                          <div
+                                            className="flex-shrink-0"
+                                            style={{ width: 0, marginLeft: `${alignShiftPx}px` }}
+                                            aria-hidden="true"
+                                          />
+                                        )}
+
                                         {/* Offset iniziale prima della prima task - FUORI dal Draggable */}
-                                        {seq === 1 && initialOffsetWidthPx > 0 && shouldShowInitialOffset && (
+                                        {initialOffsetWidthPx > 0 && (
                                           <div
                                             className="flex-shrink-0"
                                             style={{ width: `${initialOffsetWidthPx}px`, minHeight: '50px' }}
@@ -3181,7 +3172,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                         )}
 
                                         {/* Travel time marker - FUORI dal Draggable (solo per sequence >= 2) */}
-                                        {!hideRouteSpacers && seq >= 2 && travelTime > 0 && travelWidthPx > 0 && (
+                                        {!hideRouteSpacers && travelWidthPx > 0 && (
                                           <div
                                             className="flex flex-shrink-0 cursor-pointer items-center"
                                             style={{ width: `${travelWidthPx}px`, minHeight: '50px' }}
@@ -3195,7 +3186,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                         )}
 
                                         {/* Waiting gap spacer - FUORI dal Draggable (solo per sequence >= 2) */}
-                                        {!hideRouteSpacers && seq >= 2 && waitingGap > 0 && waitingGapWidthPx > 0 && (
+                                        {!hideRouteSpacers && waitingGap > 0 && waitingGapWidthPx > 0 && (
                                           <div
                                             className="flex items-center justify-center flex-shrink-0 py-3 bg-amber-100/50 dark:bg-amber-900/20 border-y border-dashed border-amber-400"
                                             style={{ width: `${waitingGapWidthPx}px`, minHeight: '50px' }}
