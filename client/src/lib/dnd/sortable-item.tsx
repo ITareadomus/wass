@@ -83,17 +83,13 @@ export function SortableItem({
 
   const shouldPullSiblings =
     collapsePullPx > 0 && sortable.isDragging;
-  const hideSource = sortable.isDragging && hideWhileDragging;
 
   const transformStyle: CSSProperties = {
-    // Con l'overlay la card originale non va trasformata: su alcuni browser
-    // transform + visibility lascia una copia ferma nel punto di partenza.
-    transform: disableTransform || hideSource ? undefined : CSS.Transform.toString(sortable.transform),
-    transition: disableTransform || hideSource ? undefined : sortable.transition,
-    opacity: hideSource ? 0 : sortable.isDragging ? draggingOpacity : undefined,
-    visibility: hideSource ? "hidden" : undefined,
-    pointerEvents: hideSource ? "none" : undefined,
-    zIndex: sortable.isDragging && !hideSource ? 999 : undefined,
+    transform: disableTransform ? undefined : CSS.Transform.toString(sortable.transform),
+    transition: disableTransform ? undefined : sortable.transition,
+    opacity: sortable.isDragging && !hideWhileDragging ? draggingOpacity : undefined,
+    visibility: sortable.isDragging && hideWhileDragging ? "hidden" : undefined,
+    zIndex: sortable.isDragging ? 999 : undefined,
     // Mantieni la larghezza per active.rect; il margin negativo chiude il buco.
     ...(shouldPullSiblings ? { marginRight: -collapsePullPx } : null),
     ...style,
