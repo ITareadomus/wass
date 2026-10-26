@@ -15,7 +15,7 @@ import {
   setPlanRunIdForDate
 } from './db';
 import { DEFAULT_PHASE1_PARAMS, TaskInput } from './phase1';
-import { calculateDynamicLimits } from './phase2';
+import { calculateDynamicLimits, DEFAULT_FAIRNESS_PARAMS } from './phase2';
 import { DEFAULT_TRAVEL_POLICY } from './travelPolicy';
 import path from 'path';
 import { TimelineContext } from './timelineContext';
@@ -592,10 +592,15 @@ export async function runAllPhases(
       : hypothesisId
         ? hkSettingsForHypothesis(hypothesisId)
         : await loadHkConstraintSettings();
+    const fairness = {
+      ...DEFAULT_FAIRNESS_PARAMS,
+      maxTargetRatio: hkConstraints.loadCapPercent / 100,
+    };
     result.phase2 = await runPhase2(workDate, runId, { 
       params: {
         dynamicMaxTasks: dynamicLimits.baseMax,
         hkConstraints,
+        fairness,
         travelWeight: hkConstraints.travelWeight,
         triadLevelBonus: hkConstraints.triadeMatchBonus,
         triadOverqualPenalty: hkConstraints.triadeOverqualPenalty,
@@ -632,6 +637,7 @@ export async function runAllPhases(
         params: {
           dynamicMaxTasks: dynamicLimits.baseMax,
           hkConstraints,
+          fairness,
           triadSwap: hkConstraints.triadSwap,
           triadLevelBonus: hkConstraints.phase4LevelBonus,
           triadOverqualPenalty: hkConstraints.phase4OverqualPenalty,
@@ -652,6 +658,7 @@ export async function runAllPhases(
       params: {
         dynamicMaxTasks: dynamicLimits.baseMax,
         hkConstraints,
+        fairness,
         maxIterations: hkConstraints.shortenRoutes ? hkConstraints.phase5Iterations : 0,
         maxFairnessIterations: hkConstraints.rebalanceLoads ? hkConstraints.fairnessIterations : 0,
       },

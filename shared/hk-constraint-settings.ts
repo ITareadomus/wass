@@ -11,6 +11,8 @@ export interface HkConstraintSettings {
   travelWeight: number;
   travelHardMaxMin: number;
   loadCap: ConstraintMode;
+  /** Percentuale dei minuti medi della giornata. 125 = 125%. */
+  loadCapPercent: number;
   taskCount: ConstraintMode;
   longOt: ConstraintMode;
   shortOt: ConstraintMode;
@@ -55,6 +57,7 @@ export const HK_CONSTRAINT_PRESETS = {
     travelWeight: 2,
     travelHardMaxMin: 45,
     loadCap: "hard",
+    loadCapPercent: 125,
     taskCount: "hard",
     longOt: "hard",
     shortOt: "hard",
@@ -82,6 +85,7 @@ export const HK_CONSTRAINT_PRESETS = {
     travelWeight: 0.5,
     travelHardMaxMin: 45,
     loadCap: "hard",
+    loadCapPercent: 125,
     taskCount: "hard",
     longOt: "hard",
     shortOt: "hard",
@@ -109,6 +113,7 @@ export const HK_CONSTRAINT_PRESETS = {
     travelWeight: 8,
     travelHardMaxMin: 45,
     loadCap: "hard",
+    loadCapPercent: 125,
     taskCount: "hard",
     longOt: "hard",
     shortOt: "hard",
@@ -157,49 +162,7 @@ export const HK_CONSTRAINT_FIELDS: Array<{
     id: "loadCap",
     group: "Giornata",
     title: "Tetto di carico",
-    detail: "Il cleaner non supera il 125% dei minuti medi della giornata.",
-  },
-  {
-    id: "taskCount",
-    group: "Giornata",
-    title: "Numero massimo di task",
-    detail: "Limite di appartamenti per cleaner, calcolato sui task del giorno.",
-  },
-  {
-    id: "longOt",
-    group: "Straordinarie",
-    title: "Straordinaria lunga da sola",
-    detail: "Da 6 ore in su il cleaner non riceve altri task.",
-  },
-  {
-    id: "shortOt",
-    group: "Straordinarie",
-    title: "Straordinaria corta con un solo extra",
-    detail: "Sotto le 6 ore può stare con un solo task, di al massimo 2 ore e 25 minuti.",
-  },
-  {
-    id: "officeRole",
-    group: "Ruoli",
-    title: "Ufficio solo ai cleaner ufficio",
-    detail: "I task ufficio restano sui cleaner ufficio, e quelli non prendono appartamenti.",
-  },
-  {
-    id: "apartmentType",
-    group: "Ruoli",
-    title: "Tipo appartamento per ruolo",
-    detail: "Ogni ruolo tiene solo i tipi appartamento abilitati nelle impostazioni.",
-  },
-  {
-    id: "formatorePriority",
-    group: "Ruoli",
-    title: "Priorità del formatore",
-    detail: "Il formatore riceve solo le priorità abilitate per il suo ruolo.",
-  },
-  {
-    id: "formatoreStandard",
-    group: "Ruoli",
-    title: "Task standard del formatore",
-    detail: "Il formatore riceve un task standard solo se quel tipo è abilitato.",
+    detail: "Il cleaner non supera la percentuale scelta dei minuti medi della giornata.",
   },
   {
     id: "priorityWindow",
@@ -220,6 +183,23 @@ export const HK_CONSTRAINT_FIELDS: Array<{
     detail: "Nessun task può terminare dopo l'orario di fine del cleaner.",
   },
 ];
+
+function withStandardWeights(
+  settings: HkConstraintSettings,
+  presetId: HkConstraintPresetId | null,
+): HkConstraintSettings {
+  if (!presetId) return settings;
+  const preset = HK_CONSTRAINT_PRESETS[presetId];
+  return {
+    ...settings,
+    triadeMatchBonus: preset.triadeMatchBonus,
+    triadeOverqualPenalty: preset.triadeOverqualPenalty,
+    phase4LevelBonus: preset.phase4LevelBonus,
+    phase4OverqualPenalty: preset.phase4OverqualPenalty,
+    travelWeight: preset.travelWeight,
+    travelHardMaxMin: preset.travelHardMaxMin,
+  };
+}
 
 function asMode(value: unknown, fallback: ConstraintMode): ConstraintMode {
   return MODES.includes(value as ConstraintMode) ? (value as ConstraintMode) : fallback;
@@ -249,13 +229,14 @@ export function parseHkConstraintSettings(raw: unknown): HkConstraintSettings {
     travelWeight: asNumber(source.travelWeight, base.travelWeight, 0, 50),
     travelHardMaxMin: asNumber(source.travelHardMaxMin, base.travelHardMaxMin, 5, 180),
     loadCap: asMode(source.loadCap, base.loadCap),
-    taskCount: asMode(source.taskCount, base.taskCount),
-    longOt: asMode(source.longOt, base.longOt),
-    shortOt: asMode(source.shortOt, base.shortOt),
-    officeRole: asMode(source.officeRole, base.officeRole),
-    apartmentType: asMode(source.apartmentType, base.apartmentType),
-    formatorePriority: asMode(source.formatorePriority, base.formatorePriority),
-    formatoreStandard: asMode(source.formatoreStandard, base.formatoreStandard),
+    loadCapPercent: asNumber(source.loadCapPercent, base.loadCapPercent, 100, 200),
+    taskCount: "hard",
+    longOt: "hard",
+    shortOt: "hard",
+    officeRole: "hard",
+    apartmentType: "hard",
+    formatorePriority: "hard",
+    formatoreStandard: "hard",
     priorityWindow: asMode(source.priorityWindow, base.priorityWindow),
     checkin: asMode(source.checkin, base.checkin),
     shiftEnd: asMode(source.shiftEnd, base.shiftEnd),
@@ -355,7 +336,7 @@ export function parseHkProfileLibrary(raw: unknown, activeSettings?: unknown): H
       id,
       name: cleanProfileName(row.name, fallbackName),
       builtin,
-      settings: parseHkConstraintSettings(row.settings),
+      settings: withStandardWeights(parseHkConstraintSettings(row.settings), builtin),
     });
     if (profiles.length >= MAX_PROFILES) break;
   }

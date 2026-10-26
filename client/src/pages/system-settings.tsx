@@ -79,6 +79,10 @@ function withSettingsDefaults(data: Partial<SettingsData>): SettingsData {
     low_priority: false,
   };
 
+  const hk_profiles = parseHkProfileLibrary(data.hk_profiles, data.hk_constraints);
+  const activeProfile =
+    hk_profiles.profiles.find((profile) => profile.id === hk_profiles.activeId) ?? hk_profiles.profiles[0];
+
   return {
     "early-out": {
       eo_start_time: data["early-out"]?.eo_start_time ?? "",
@@ -109,8 +113,8 @@ function withSettingsDefaults(data: Partial<SettingsData>): SettingsData {
       straordinario_cleaner: { ...defaultPriorityRules, ...data.priority_types?.straordinario_cleaner },
       formatore_cleaner: { ...defaultPriorityRules, ...data.priority_types?.formatore_cleaner },
     },
-    hk_constraints: parseHkConstraintSettings(data.hk_constraints),
-    hk_profiles: parseHkProfileLibrary(data.hk_profiles, data.hk_constraints),
+    hk_constraints: activeProfile ? { ...activeProfile.settings } : parseHkConstraintSettings(data.hk_constraints),
+    hk_profiles,
   };
 }
 

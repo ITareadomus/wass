@@ -16,6 +16,9 @@ async function readAppSettings(): Promise<Record<string, unknown> | null> {
 export async function loadHkConstraintSettings(): Promise<HkConstraintSettings> {
   try {
     const value = await readAppSettings();
+    const library = parseHkProfileLibrary(value?.hk_profiles, value?.hk_constraints);
+    const active = library.profiles.find((profile) => profile.id === library.activeId) ?? library.profiles[0];
+    if (active) return { ...active.settings };
     return parseHkConstraintSettings(value?.hk_constraints);
   } catch (error) {
     console.warn("[hk-constraints] Impostazioni non lette, uso il profilo bilanciato:", error);

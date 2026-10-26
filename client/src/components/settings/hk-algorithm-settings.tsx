@@ -251,98 +251,41 @@ export function HkAlgorithmSettings({
                     <div className="font-medium">{field.title}</div>
                     <p className="text-sm text-muted-foreground">{field.detail}</p>
                   </div>
-                  <ModeSwitch value={mode} onChange={(next) => setMode(field.id, next)} />
+                  <div className="flex flex-wrap items-center gap-3">
+                    {field.id === "loadCap" && (
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="load-cap-percent" className="whitespace-nowrap text-sm">
+                          Percentuale
+                        </Label>
+                        <Input
+                          id="load-cap-percent"
+                          type="number"
+                          min={100}
+                          max={200}
+                          step={5}
+                          disabled={value.loadCap === "off"}
+                          value={value.loadCapPercent}
+                          className="w-24"
+                          onChange={(event) => {
+                            const next = Number(event.target.value);
+                            if (!Number.isFinite(next)) return;
+                            writeActive({
+                              ...value,
+                              loadCapPercent: Math.min(200, Math.max(100, Math.round(next))),
+                            });
+                          }}
+                        />
+                        <span className="text-sm text-muted-foreground">%</span>
+                      </div>
+                    )}
+                    <ModeSwitch value={mode} onChange={(next) => setMode(field.id, next)} />
+                  </div>
                 </div>
               );
             })}
           </div>
         </section>
       ))}
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Pesi, quando il vincolo è preferibile</h2>
-        <div className="grid gap-4 rounded-xl border p-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="triade-bonus">Peso dello stesso livello</Label>
-            <Input
-              id="triade-bonus"
-              type="number"
-              min={0}
-              disabled={value.triadeMatch !== "soft"}
-              value={value.triadeMatchBonus}
-              onChange={(event) =>
-                writeActive({ ...value, triadeMatchBonus: Number(event.target.value) || 0 })
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="triade-over">Penalità se il cleaner è sopra il livello</Label>
-            <Input
-              id="triade-over"
-              type="number"
-              min={0}
-              disabled={value.triadeMatch !== "soft"}
-              value={value.triadeOverqualPenalty}
-              onChange={(event) =>
-                writeActive({ ...value, triadeOverqualPenalty: Number(event.target.value) || 0 })
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phase4-bonus">Peso livello nel recupero dei task rimasti</Label>
-            <Input
-              id="phase4-bonus"
-              type="number"
-              min={0}
-              disabled={value.triadeMatch !== "soft"}
-              value={value.phase4LevelBonus}
-              onChange={(event) =>
-                writeActive({ ...value, phase4LevelBonus: Number(event.target.value) || 0 })
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phase4-over">Penalità di livello nel recupero</Label>
-            <Input
-              id="phase4-over"
-              type="number"
-              min={0}
-              disabled={value.triadeMatch !== "soft"}
-              value={value.phase4OverqualPenalty}
-              onChange={(event) =>
-                writeActive({ ...value, phase4OverqualPenalty: Number(event.target.value) || 0 })
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="travel-weight">Peso del viaggio</Label>
-            <Input
-              id="travel-weight"
-              type="number"
-              min={0}
-              step={0.5}
-              disabled={value.travel !== "soft"}
-              value={value.travelWeight}
-              onChange={(event) =>
-                writeActive({ ...value, travelWeight: Number(event.target.value) || 0 })
-              }
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="travel-hard">Minuti massimi di viaggio, se i giri sono obbligatori</Label>
-            <Input
-              id="travel-hard"
-              type="number"
-              min={5}
-              disabled={value.travel !== "hard"}
-              value={value.travelHardMaxMin}
-              onChange={(event) =>
-                writeActive({ ...value, travelHardMaxMin: Number(event.target.value) || 45 })
-              }
-            />
-          </div>
-        </div>
-      </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Dopo la prima assegnazione</h2>
