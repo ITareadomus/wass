@@ -1969,7 +1969,7 @@ export default function GenerateLogisticsAssignments() {
 
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-background text-foreground">
-      <div className="mx-auto flex w-full min-h-0 max-w-[1920px] flex-1 flex-col overflow-x-hidden px-4 pb-6 pt-3">
+      <div className="mx-auto flex w-full min-h-0 max-w-[1920px] flex-1 flex-col overflow-x-hidden px-4 pb-6 pt-14">
         {!isExtractingLogistics && (
           <div className="mb-[17px] flex w-full flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-4">
@@ -2002,7 +2002,10 @@ export default function GenerateLogisticsAssignments() {
                 </PopoverContent>
               </Popover>
             </div>
-            <HousekeepingLogisticsSwitch active="logistics" />
+            <HousekeepingLogisticsSwitch
+              active="logistics"
+              workDate={format(selectedDate, "yyyy-MM-dd")}
+            />
           </div>
         )}
 

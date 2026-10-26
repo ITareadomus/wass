@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Home, Loader2 } from "lucide-react";
+import { Save, Loader2, Lock } from "lucide-react";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -308,8 +308,19 @@ export default function SystemSettings() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
       <div className="w-full px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-8 gap-3">
           <h1 className="text-3xl font-bold">Settings</h1>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setLocation("/appartamenti-preassegnati")}
+            className="gap-2"
+          >
+            <span className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-amber-700 bg-amber-600 text-white">
+              <Lock className="h-3 w-3" strokeWidth={2.5} />
+            </span>
+            Appartamenti Pre-Assegnati
+          </Button>
         </div>
 
         <div className="space-y-4">

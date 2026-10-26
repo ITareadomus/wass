@@ -658,7 +658,7 @@ export default function GenerateAssignments() {
   const [isTransferringToAdam, setIsTransferringToAdam] = useState(false);
   const [lastSavedTimestamp, setLastSavedTimestamp] = useState<string | null>(null); // Renamed from lastSavedAssignment
   const { toast } = useToast();
-  const [location, setLocation] = useLocation();
+  const [location] = useLocation();
   const isOfficeScope = useMemo(() => {
     if (!OFFICE_SCOPE_ENABLED) return false;
     if (typeof window !== "undefined") {
@@ -1368,14 +1368,12 @@ export default function GenerateAssignments() {
       }
     };
 
-    // CRITICAL: Se la data è cambiata (non al primo mount), redirect a unconfirmed-tasks
     const isDateChange = prevDateRef.current !== null && prevDateRef.current !== currentDateStr;
-    
+
     if (isDateChange) {
-      console.log(`🔄 Data cambiata da ${prevDateRef.current} a ${currentDateStr}, redirect a unconfirmed-tasks...`);
       prevDateRef.current = currentDateStr;
-      setLocation(`/unconfirmed-tasks?date=${currentDateStr}`);
-      return; // Non eseguire refreshAssignments se stiamo reindirizzando
+      refreshAssignments("date-change", selectedDate);
+      return;
     }
 
     // Al primo mount, carica i dati
@@ -1393,7 +1391,7 @@ export default function GenerateAssignments() {
       setIsInitialMount(false);
       prevDateRef.current = currentDateStr;
     }
-  }, [selectedDate, isInitialMount, setLocation]);
+  }, [selectedDate, isInitialMount]);
 
   // Funzione per convertire cleaning_time (minuti) in formato ore.minuti
   const formatDuration = (minutes: number): string => {
@@ -2690,7 +2688,7 @@ export default function GenerateAssignments() {
 
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-background text-foreground">
-      <div className="mx-auto flex w-full min-h-0 max-w-[1920px] flex-1 flex-col overflow-x-hidden px-4 pb-6 pt-3">
+      <div className="mx-auto flex w-full min-h-0 max-w-[1920px] flex-1 flex-col overflow-x-hidden px-4 pb-6 pt-14">
         {!(isExtracting || isLoadingTasks || isLoading) && (
           <div className="mx-auto mb-3 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-4">
@@ -2722,7 +2720,10 @@ export default function GenerateAssignments() {
                 </PopoverContent>
               </Popover>
             </div>
-            <HousekeepingLogisticsSwitch active={isOfficeScope ? "office" : "housekeeping"} />
+            <HousekeepingLogisticsSwitch
+              active={isOfficeScope ? "office" : "housekeeping"}
+              workDate={format(selectedDate, "yyyy-MM-dd")}
+            />
           </div>
         )}
 

@@ -4,8 +4,18 @@ import {
   layoutHousekeepingTimelineTask,
   renderedHousekeepingCardMinutes,
 } from "@shared/housekeeping-timeline-layout";
-import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, UserMinus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap, Lock, Unlock, AlertCircle, BarChart3, Map as MapIcon, CheckSquare } from "lucide-react";
+import {
+  applyHkPreassignedSchedule,
+  parseHkPreassignedSchedules,
+  type HkPreassignedSchedule,
+} from "@shared/hk-preassigned-schedules";
+import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, UserMinus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap, Lock, Unlock, AlertCircle, BarChart3, Map as MapIcon, CheckSquare, SlidersHorizontal } from "lucide-react";
 import { TimelineActionHistoryButton } from "@/components/timeline/timeline-action-history-button";
+import {
+  readTimelineHourScale,
+  TIMELINE_HOUR_SCALE_KEY,
+  TimelineScaleDialog,
+} from "@/components/timeline/timeline-scale-dialog";
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
 import { useMutation } from "@tanstack/react-query";
@@ -299,6 +309,8 @@ export default function TimelineView({
     }
     return true;
   });
+  const [timelineHourScale, setTimelineHourScale] = useState(readTimelineHourScale);
+  const [isTimelineScaleOpen, setIsTimelineScaleOpen] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const [confirmUnavailableDialog, setConfirmUnavailableDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
@@ -315,6 +327,22 @@ export default function TimelineView({
   const [showResetDialog, setShowResetDialog] = useState(false); // Stato per il dialog di reset assegnazioni
   const [lastAdamTransfer, setLastAdamTransfer] = useState<string | null>(null); // Timestamp ultimo trasferimento ADAM
   const [lockedCleaners, setLockedCleaners] = useState<Set<number>>(new Set()); // Set degli ID dei cleaner bloccati
+  const [preassignedSchedules, setPreassignedSchedules] = useState<HkPreassignedSchedule[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/hk-preassigned-schedules", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : { entries: [] }))
+      .then((data) => {
+        if (!cancelled) setPreassignedSchedules(parseHkPreassignedSchedules(data));
+      })
+      .catch(() => {
+        if (!cancelled) setPreassignedSchedules([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDate]);
 
   const displayInputClass =
    "h-9 border-transparent bg-transparent shadow-none focus-visible:ring-0 px-0 pointer-events-none select-none";
@@ -1075,10 +1103,11 @@ export default function TimelineView({
   const globalTimeSlots = generateGlobalTimeSlots();
   const globalTimelineMinutes = getGlobalTimelineMinutes();
   const minimumTimelineContentWidthPx = globalTimelineMinutes * minimumTimelinePxPerMinute;
-  const timelineContentWidthPx = Math.max(
-    timelineWidthPx,
-    minimumTimelineContentWidthPx
-  );
+  const automaticContentWidthPx = Math.max(timelineWidthPx, minimumTimelineContentWidthPx);
+  const timelineContentWidthPx =
+    timelineHourScale === 1
+      ? automaticContentWidthPx
+      : Math.max(1, automaticContentWidthPx * timelineHourScale);
   const timelinePxPerMinute = timelineContentWidthPx / globalTimelineMinutes;
   const timelineScaledWidth = timelineContentWidthPx > 0 ? `${timelineContentWidthPx}px` : "100%";
   const timelineTaskWidthPx = timelineContentWidthPx;
@@ -2411,6 +2440,18 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 <CalendarIcon className="w-5 h-5 mr-2 text-custom-blue" />
                 {isOfficeScope ? "Timeline Ufficio" : "Timeline Housekeeping"} - {allCleanersToShow.length} Cleaners
               </h2>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                data-viewer-allow=""
+                className="h-8 w-8 shrink-0 border-2 border-custom-blue print:hidden"
+                onClick={() => setIsTimelineScaleOpen(true)}
+                title="Allarga o stringi gli orari della timeline"
+                aria-label="Scala degli orari"
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+              </Button>
               {!isOfficeScope && (
                 <Popover>
                   <PopoverTrigger asChild>
@@ -2538,6 +2579,20 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             </div>
           </div>
         </div>
+        <TimelineScaleDialog
+          open={isTimelineScaleOpen}
+          scale={timelineHourScale}
+          onOpenChange={setIsTimelineScaleOpen}
+          onApply={(nextScale) => {
+            setTimelineHourScale(nextScale);
+            try {
+              localStorage.setItem(TIMELINE_HOUR_SCALE_KEY, String(nextScale));
+            } catch {
+              /* ignore */
+            }
+            setIsTimelineScaleOpen(false);
+          }}
+        />
         <div ref={setScrollRootRef} className="flex min-h-0 flex-col overflow-hidden px-1 pt-4 pb-4">
 
           <TimelineHorizontalScrollbar
@@ -2910,7 +2965,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                         .filter((task) =>
                           (task as any).assignedCleaner === cleaner.id
                         )
-                        .map(normalizeTask)
+                        .map((task) =>
+                          applyHkPreassignedSchedule(normalizeTask(task) as Record<string, unknown>, preassignedSchedules) as typeof task
+                        )
                         .sort((a, b) => {
                           const taskA = a as any;
                           const taskB = b as any;

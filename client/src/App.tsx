@@ -12,12 +12,13 @@ import HomeGate from "@/pages/home-gate";
 import Login from "@/pages/login";
 import Settings from "@/pages/settings";
 import SystemSettings from "@/pages/system-settings";
+import PreassignedApartments from "@/pages/preassigned-apartments";
 import NotFound from "@/pages/not-found";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { WassSiteHeader } from "@/components/wass-site-header";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { HelpCircle, Home } from "lucide-react";
+import { Home } from "lucide-react";
 import { ViewerLock } from "@/components/viewer-lock";
 import {
   getStoredUserRole,
@@ -35,35 +36,13 @@ function GlobalHeader() {
   const role = getStoredUserRole();
   const logisticsOnly = isLogisticaRole(role);
   const assignmentsHomeHref = homePathForRole(role);
-  const [selectedDate, setSelectedDate] = useState<string | null>(() =>
-    typeof window !== "undefined" ? localStorage.getItem("selected_work_date") : null
-  );
-  const unconfirmedHref = selectedDate
-    ? `/unconfirmed-tasks?date=${selectedDate}`
-    : "/unconfirmed-tasks";
   const isConvocazioniPage =
     location === "/convocazioni" || location.startsWith("/convocazioni?");
-  const isUnconfirmedTasksPage =
-    location === "/unconfirmed-tasks" || location.startsWith("/unconfirmed-tasks?");
   const showHomeButton =
-    isConvocazioniPage || location === "/settings" || location === "/account-settings";
-  const showUnconfirmedButton =
-    !logisticsOnly && !showHomeButton && !isUnconfirmedTasksPage;
-
-  useEffect(() => {
-    const refreshSelectedDate = () => {
-      setSelectedDate(localStorage.getItem("selected_work_date"));
-    };
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === "selected_work_date") refreshSelectedDate();
-    };
-    window.addEventListener("selected-work-date-change", refreshSelectedDate);
-    window.addEventListener("storage", onStorage);
-    return () => {
-      window.removeEventListener("selected-work-date-change", refreshSelectedDate);
-      window.removeEventListener("storage", onStorage);
-    };
-  }, []);
+    isConvocazioniPage ||
+    location === "/settings" ||
+    location === "/account-settings" ||
+    location === "/appartamenti-preassegnati";
 
   useEffect(() => {
     if (typeof window === "undefined" || OFFICE_SCOPE_ENABLED) return;
@@ -112,19 +91,6 @@ function GlobalHeader() {
                 data-viewer-allow=""
               >
                 <Home className="h-5 w-5" />
-              </Button>
-            </Link>
-          ) : showUnconfirmedButton ? (
-            <Link href={unconfirmedHref}>
-              <Button
-                variant="outline"
-                size="icon"
-                className="rounded-full"
-                title="Task Non Confermate"
-                data-testid="link-unconfirmed-tasks-global"
-                data-viewer-allow=""
-              >
-                <HelpCircle className="h-5 w-5" />
               </Button>
             </Link>
           ) : null}
@@ -227,6 +193,9 @@ function Router() {
       </Route>
       <Route path="/settings">
         {() => <ProtectedRoute component={SystemSettings} />}
+      </Route>
+      <Route path="/appartamenti-preassegnati">
+        {() => <ProtectedRoute component={PreassignedApartments} />}
       </Route>
       <Route component={NotFound} />
     </Switch>

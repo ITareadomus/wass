@@ -1,43 +1,12 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
-import { getStoredUserRole, isLogisticaRole, isViewerRole, LOGISTICS_HOME_PATH } from "@/lib/auth-role";
-
-interface UnconfirmedSummary {
-  unconfirmedCount: number;
-  date: string;
-  total?: number;
-  error?: string;
-}
+import { getStoredUserRole, isLogisticaRole, LOGISTICS_HOME_PATH } from "@/lib/auth-role";
 
 export default function HomeGate() {
   const [, setLocation] = useLocation();
   const [hasRedirected, setHasRedirected] = useState(false);
-
-  const selectedDate = (() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const dateParam = urlParams.get("date");
-    if (dateParam) return dateParam;
-
-    const savedDate = localStorage.getItem("selected_work_date");
-    if (savedDate) return savedDate;
-
-    return format(new Date(), "yyyy-MM-dd");
-  })();
-
-  const { data, isLoading, isError } = useQuery<UnconfirmedSummary>({
-    queryKey: ["/api/unconfirmed-tasks-summary", selectedDate],
-    queryFn: async () => {
-      const response = await fetch(`/api/unconfirmed-tasks-summary?date=${selectedDate}`);
-      if (!response.ok) throw new Error("Failed to fetch summary");
-      return response.json();
-    },
-    staleTime: 30000,
-    retry: 1,
-  });
 
   useEffect(() => {
     if (hasRedirected) return;
@@ -47,12 +16,8 @@ export default function HomeGate() {
       setLocation(LOGISTICS_HOME_PATH);
       return;
     }
-    if (isViewerRole(role)) {
-      setLocation("/generate-assignments");
-      return;
-    }
-    setLocation(`/unconfirmed-tasks?date=${selectedDate}`);
-  }, [hasRedirected, setLocation, selectedDate]);
+    setLocation("/generate-assignments");
+  }, [hasRedirected, setLocation]);
 
   return (
     <PageViewportCentered

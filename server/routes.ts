@@ -18,6 +18,7 @@ import {
   priorityToContainerFormat,
   PrioritySettingsError,
 } from "../shared/taskPriorityClassification";
+import { parseHkPreassignedSchedules } from "../shared/hk-preassigned-schedules";
 import {
   applyWassCleaningTimeOverride,
   hasManualCleaningSplit,
@@ -10352,6 +10353,35 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       if (error instanceof PrioritySettingsError) {
         return res.status(400).json({ success: false, error: error.message });
       }
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Orari base housekeeping per codice ADAM (pagina Appartamenti Pre-Assegnati)
+  app.get("/api/hk-preassigned-schedules", async (_req, res) => {
+    try {
+      const { pgSettingsService } = await import("./services/pg-settings-service");
+      await pgSettingsService.ensureTables();
+      const data = await pgSettingsService.getSettings("hk_preassigned_schedules");
+      res.json({ entries: parseHkPreassignedSchedules(data) });
+    } catch (error: any) {
+      console.error("Errore nel caricamento degli orari pre-assegnati:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.put("/api/hk-preassigned-schedules", async (req, res) => {
+    try {
+      const entries = parseHkPreassignedSchedules(req.body);
+      const { pgSettingsService } = await import("./services/pg-settings-service");
+      await pgSettingsService.ensureTables();
+      const saved = await pgSettingsService.saveSettings("hk_preassigned_schedules", { entries });
+      if (!saved) {
+        return res.status(500).json({ success: false, error: "Salvataggio non riuscito" });
+      }
+      res.json({ success: true, entries });
+    } catch (error: any) {
+      console.error("Errore nel salvataggio degli orari pre-assegnati:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });

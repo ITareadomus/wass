@@ -17,13 +17,19 @@ const segmentInactive = "text-muted-foreground hover:text-foreground";
 interface HousekeepingLogisticsSwitchProps {
   active: AssignmentsFlow;
   className?: string;
+  workDate?: string | null;
 }
 
 export function HousekeepingLogisticsSwitch({
   active,
   className,
+  workDate,
 }: HousekeepingLogisticsSwitchProps) {
   const logisticsOnly = isLogisticaRole(getStoredUserRole());
+  const date =
+    workDate ||
+    (typeof window !== "undefined" ? localStorage.getItem("selected_work_date") : null);
+  const unconfirmedHref = date ? `/unconfirmed-tasks?date=${date}` : "/unconfirmed-tasks";
 
   const goHousekeeping = (e: MouseEvent) => {
     e.preventDefault();
@@ -63,19 +69,31 @@ export function HousekeepingLogisticsSwitch({
       role="tablist"
       aria-label="Passa tra Housekeeping e Logistica"
     >
-      <Link
-        href="/generate-assignments"
-        className={cn(
-          segmentCommon,
-          active === "housekeeping" ? segmentActive : segmentInactive
-        )}
-        aria-current={active === "housekeeping" ? "page" : undefined}
-        data-testid="switch-housekeeping"
-        onClick={goHousekeeping}
-      >
-        <Building2 className="h-4 w-4 shrink-0" aria-hidden />
-        Housekeeping
-      </Link>
+      <div className="group/hk relative">
+        <Link
+          href="/generate-assignments"
+          className={cn(
+            segmentCommon,
+            active === "housekeeping" ? segmentActive : segmentInactive
+          )}
+          aria-current={active === "housekeeping" ? "page" : undefined}
+          data-testid="switch-housekeeping"
+          onClick={goHousekeeping}
+        >
+          <Building2 className="h-4 w-4 shrink-0" aria-hidden />
+          Housekeeping
+        </Link>
+        <div className="pointer-events-none absolute bottom-full right-0 z-30 pb-1 opacity-0 transition-opacity group-hover/hk:pointer-events-auto group-hover/hk:opacity-100 group-focus-within/hk:pointer-events-auto group-focus-within/hk:opacity-100">
+          <Link
+            href={unconfirmedHref}
+            data-testid="link-unconfirmed-tasks-hover"
+            data-viewer-allow=""
+            className="inline-flex cursor-pointer items-center justify-center whitespace-nowrap rounded-md border-2 border-custom-blue bg-background px-2 py-1 text-xs font-medium text-custom-blue transition-colors hover:bg-custom-blue hover:text-white"
+          >
+            Tipologie Non-Migrate
+          </Link>
+        </div>
+      </div>
       <Link
         href="/generate-logistics-assignments"
         className={cn(
