@@ -77,8 +77,10 @@ export async function loadStructureAccessBundlesByLogisticCodes(
         SELECT logistic_code, structure_keys
         FROM app_structures
         WHERE logistic_code IN (${placeholders})
+          AND active = 1
           AND structure_keys IS NOT NULL
           AND structure_keys <> ''
+        ORDER BY id DESC
       `,
       missing
     );

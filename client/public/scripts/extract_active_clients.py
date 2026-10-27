@@ -30,6 +30,7 @@ def extract_active_clients():
             FROM app_structures s
             JOIN app_customers c ON c.id = s.customer_id
             WHERE s.customer_id IS NOT NULL AND c.active = 1
+              AND s.active = 1
               AND c.name IS NOT NULL
               AND s.deleted_at IS NULL
             ORDER BY c.name

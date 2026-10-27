@@ -59,7 +59,9 @@ export async function attachAptCodesFromStructures(tasks: TaskWithLogisticCode[]
         const [rows] = await connection.execute(
           `SELECT logistic_code, apt_code
            FROM app_structures
-           WHERE logistic_code IN (${chunk.map(() => "?").join(",")})`,
+           WHERE logistic_code IN (${chunk.map(() => "?").join(",")})
+             AND active = 1
+           ORDER BY id DESC`,
           chunk
         );
         const found = new Set<number>();

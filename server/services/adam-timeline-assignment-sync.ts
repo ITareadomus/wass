@@ -1,6 +1,7 @@
 import * as mysql from "mysql2/promise";
 import { formatInTimeZone } from "date-fns-tz";
 import { databaseConfig } from "../../config/database";
+import { ADAM_ACTIVE_STRUCTURE_JOIN_FROM_HOUSEKEEPING } from "./adam-active-structure-join";
 import * as workspaceFiles from "./workspace-files";
 import { pgDailyAssignmentsService } from "./pg-daily-assignments-service";
 import {
@@ -193,7 +194,7 @@ async function fetchAdamAssignmentsForDate(
           h.sequence AS adam_sequence,
           COALESCE(o.enable_wass_readonly, 0) AS enable_wass_readonly
         FROM app_housekeeping h
-        JOIN app_structures s ON h.structure_id = s.id
+        ${ADAM_ACTIVE_STRUCTURE_JOIN_FROM_HOUSEKEEPING}
         LEFT JOIN app_customers c ON s.customer_id = c.id
         LEFT JOIN app_structure_operation o ON o.id = h.operation_id
         WHERE h.checkout = ?

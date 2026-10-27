@@ -19,6 +19,7 @@ import {
   PrioritySettingsError,
 } from "../shared/taskPriorityClassification";
 import { parseHkPreassignedSchedules } from "../shared/hk-preassigned-schedules";
+import { ADAM_ACTIVE_STRUCTURE_JOIN_FROM_HOUSEKEEPING } from "./services/adam-active-structure-join";
 import {
   applyWassCleaningTimeOverride,
   hasManualCleaningSplit,
@@ -405,7 +406,7 @@ async function fetchPreassignedTaskSeedsFromAdam(workDate: string): Promise<Arra
           COALESCE(o.enable_wass, 0) AS enable_wass,
           COALESCE(o.enable_wass_readonly, 0) AS enable_wass_readonly
         FROM app_housekeeping h
-        JOIN app_structures s ON h.structure_id = s.id
+        ${ADAM_ACTIVE_STRUCTURE_JOIN_FROM_HOUSEKEEPING}
         LEFT JOIN app_customers c ON s.customer_id = c.id
         LEFT JOIN app_structure_operation o ON o.id = h.operation_id
         WHERE h.checkout = ?
@@ -3440,6 +3441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     alert_keys
                   FROM app_structures
                   WHERE id = ?
+                    AND active = 1
                   LIMIT 1
                 `,
                 [structureId]
@@ -3469,6 +3471,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       alert_keys
                     FROM app_structures
                     WHERE logistic_code = ?
+                      AND active = 1
+                    ORDER BY id DESC
                     LIMIT 1
                   `,
                   [logisticCode]
@@ -8582,7 +8586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [rows]: any = await connection.execute(
         `SELECT h.id AS task_id, s.premium, h.operation_id
          FROM app_housekeeping h
-         JOIN app_structures s ON h.structure_id = s.id
+         ${ADAM_ACTIVE_STRUCTURE_JOIN_FROM_HOUSEKEEPING}
          WHERE h.checkout = ?
            AND h.deleted_at IS NULL
            AND h.deleted_at_client IS NULL
@@ -9452,7 +9456,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           BIT_XOR(${signatureExpr}) AS sig_xor,
           SUM(${signatureExpr}) AS sig_sum
         FROM app_housekeeping h
-        JOIN app_structures s ON h.structure_id = s.id
+        ${ADAM_ACTIVE_STRUCTURE_JOIN_FROM_HOUSEKEEPING}
         WHERE ${hkWhere}
       `;
 
@@ -9463,7 +9467,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           SUM(CRC32(CONCAT_WS('|', c.housekeeping_id, COALESCE(c.user_id, 0)))) AS sig_sum
         FROM app_housekeeping_collaborations c
         JOIN app_housekeeping h ON h.id = c.housekeeping_id
-        JOIN app_structures s ON h.structure_id = s.id
+        ${ADAM_ACTIVE_STRUCTURE_JOIN_FROM_HOUSEKEEPING}
         WHERE ${hkWhere}
           AND c.deleted_at IS NULL
           AND c.user_id IS NOT NULL
@@ -9633,7 +9637,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           BIT_XOR(${signatureExpr}) AS sig_xor,
           SUM(${signatureExpr}) AS sig_sum
         FROM app_housekeeping h
-        JOIN app_structures s ON h.structure_id = s.id
+        ${ADAM_ACTIVE_STRUCTURE_JOIN_FROM_HOUSEKEEPING}
         WHERE h.checkout = ?
           AND h.deleted_at IS NULL
           AND h.deleted_at_client IS NULL

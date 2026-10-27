@@ -34,13 +34,15 @@ export async function loadStructureSofabedsByLogisticCodes(
         SELECT logistic_code, single_sofabeds, double_sofabeds
         FROM app_structures
         WHERE logistic_code IN (${placeholders})
+          AND active = 1
+        ORDER BY id DESC
       `,
       codes
     );
 
     for (const row of rows as any[]) {
       const code = String(row?.logistic_code ?? "").trim();
-      if (!code) continue;
+      if (!code || out.has(code)) continue;
       out.set(code, {
         single_sofabeds: toNullableInt(row.single_sofabeds),
         double_sofabeds: toNullableInt(row.double_sofabeds),

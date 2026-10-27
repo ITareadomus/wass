@@ -2638,13 +2638,15 @@ export class PgDailyAssignmentsService {
           const [rows] = await adamConnection.execute(
             `SELECT logistic_code, customer_structure_reference 
              FROM app_structures 
-             WHERE logistic_code IN (${logisticCodes.map(() => '?').join(',')})`,
+             WHERE logistic_code IN (${logisticCodes.map(() => '?').join(',')})
+               AND active = 1
+             ORDER BY id DESC`,
             logisticCodes
           );
           
           const refMap = new Map<number, string>();
           for (const row of rows as any[]) {
-            if (row.customer_structure_reference) {
+            if (row.customer_structure_reference && !refMap.has(row.logistic_code)) {
               refMap.set(row.logistic_code, row.customer_structure_reference);
             }
           }
@@ -2858,12 +2860,14 @@ export class PgDailyAssignmentsService {
           const [rows] = await adamConnection.execute(
             `SELECT logistic_code, customer_structure_reference 
              FROM app_structures 
-             WHERE logistic_code IN (${logisticCodes.map(() => '?').join(',')})`,
+             WHERE logistic_code IN (${logisticCodes.map(() => '?').join(',')})
+               AND active = 1
+             ORDER BY id DESC`,
             logisticCodes
           );
           const refMap = new Map<number, string>();
           for (const row of rows as any[]) {
-            if (row.customer_structure_reference) {
+            if (row.customer_structure_reference && !refMap.has(row.logistic_code)) {
               refMap.set(row.logistic_code, row.customer_structure_reference);
             }
           }

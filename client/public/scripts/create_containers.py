@@ -267,7 +267,18 @@ def get_tasks_from_db(selected_date, assigned_task_ids=None, workflow="housekeep
             c.name AS customer_name,
             s.customer_structure_reference AS customer_reference
         FROM app_housekeeping h
-        JOIN app_structures s ON h.structure_id = s.id
+        JOIN app_structures linked ON linked.id = h.structure_id
+        JOIN app_structures s ON s.id = COALESCE(
+          (
+            SELECT preferred.id
+            FROM app_structures preferred
+            WHERE preferred.logistic_code = linked.logistic_code
+              AND preferred.active = 1
+            ORDER BY (preferred.id = linked.id) DESC, preferred.id DESC
+            LIMIT 1
+          ),
+          linked.id
+        )
         LEFT JOIN app_customers c ON s.customer_id = c.id
         WHERE h.checkout = %s
           AND h.deleted_at IS NULL
@@ -774,7 +785,18 @@ def extract_tasks_from_db(work_date=None, assigned_task_ids=None, workflow="hous
             c.name AS customer_name,
             s.customer_structure_reference AS customer_reference
         FROM app_housekeeping h
-        JOIN app_structures s ON h.structure_id = s.id
+        JOIN app_structures linked ON linked.id = h.structure_id
+        JOIN app_structures s ON s.id = COALESCE(
+          (
+            SELECT preferred.id
+            FROM app_structures preferred
+            WHERE preferred.logistic_code = linked.logistic_code
+              AND preferred.active = 1
+            ORDER BY (preferred.id = linked.id) DESC, preferred.id DESC
+            LIMIT 1
+          ),
+          linked.id
+        )
         LEFT JOIN app_customers c ON s.customer_id = c.id
         WHERE h.checkout = %s
           AND h.deleted_at IS NULL
