@@ -29,6 +29,12 @@ import {
   hasManualCleaningTime,
   splitCleaningTimeAcrossCollaborators,
 } from "@shared/wass-cleaning-time";
+import {
+  formatScheduleDurationLabel,
+  hasManualSchedule,
+  manualScheduleSpanMinutes,
+  normalizeScheduleClock,
+} from "@shared/wass-manual-schedule";
 import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
 import { StructureAccessKeyTypeField } from "@/components/structure-access-key-type";
 import {
@@ -1012,6 +1018,10 @@ const displayClickableInputClass =
   const [durationDialogOpen, setDurationDialogOpen] = useState(false);
   const [editingDurationInDialog, setEditingDurationInDialog] = useState("");
   const [isSavingDuration, setIsSavingDuration] = useState(false);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [editingScheduleStart, setEditingScheduleStart] = useState("");
+  const [editingScheduleEnd, setEditingScheduleEnd] = useState("");
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false);
 
   // Dialog Tipologia intervento
   const [operationDialogOpen, setOperationDialogOpen] = useState(false);
@@ -1144,6 +1154,12 @@ const displayClickableInputClass =
     !Boolean((displayTask as any).is_finished ?? (displayTask as any).isFinished);
   const canEditDuration =
     operationsScope !== "logistics" && (!displayTaskReadOnly || canEditZeroDurationOnReadonly);
+  const canEditReadonlySchedule =
+    operationsScope !== "logistics" &&
+    isInTimeline &&
+    resolvePreAssignedModeFromTask(displayTask) === "readonly" &&
+    !isReadOnly &&
+    !Boolean((displayTask as any).is_finished ?? (displayTask as any).isFinished);
   const shownDialogLocked =
     dialogLockTaskKey === dialogTaskKey ? dialogIsLocked : displayTaskLocked;
   const shownDialogLockedReason =
@@ -2175,6 +2191,60 @@ const displayClickableInputClass =
     }
   };
 
+  const handleOpenScheduleDialog = () => {
+    const start = normalizeScheduleClock(
+      (displayTask as any).start_time ?? (displayTask as any).startTime
+    );
+    const end = normalizeScheduleClock(
+      (displayTask as any).end_time ?? (displayTask as any).endTime
+    );
+    setEditingScheduleStart(start || "");
+    setEditingScheduleEnd(end || "");
+    setScheduleDialogOpen(true);
+  };
+
+  const saveReadonlySchedule = async (clearManualSchedule: boolean) => {
+    setIsSavingSchedule(true);
+    try {
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const response = await fetch("/api/update-task-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withMutationScope({
+          taskId: (displayTask as any).task_id || displayTask.id,
+          logisticCode: displayTask.name,
+          date: effectiveWorkDate,
+          modified_by: currentUser.username || "unknown",
+          ...(clearManualSchedule
+            ? { clearManualSchedule: true }
+            : { scheduleStart: editingScheduleStart, scheduleEnd: editingScheduleEnd }),
+        }, operationsScope)),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || "Errore nel salvataggio");
+      }
+      toast({
+        title: clearManualSchedule ? "Orario ADAM ripristinato" : "Orario aggiornato",
+        description: clearManualSchedule
+          ? "La sincronizzazione ADAM può aggiornare di nuovo questo orario."
+          : "La barra in timeline si sposta su questo orario e i tempi di spostamento del giro vengono ricalcolati. Non viene inviato ad ADAM.",
+      });
+      setScheduleDialogOpen(false);
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile salvare l'orario",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingSchedule(false);
+    }
+  };
+
   const handleOpenDurationDialog = () => {
     setEditingDurationInDialog(String(getTotalCleaningMinutes(displayTask) || ""));
     setDurationDialogOpen(true);
@@ -2570,9 +2640,13 @@ const displayClickableInputClass =
   };
 
   // LOGISTICS (sempre) / HK durante DnD: in timeline ogni task vale 15 minuti (solo UI)
+  const pinnedScheduleLabel = (() => {
+    const span = manualScheduleSpanMinutes(task);
+    return span != null ? formatScheduleDurationLabel(span) : null;
+  })();
   const effectiveDurationForUi = showCompactAdamTimelineUi
     ? "0.15"
-    : (task.duration || "0.0");
+    : (pinnedScheduleLabel || task.duration || "0.0");
 
   const effectiveDurationMinutesForUi = (() => {
     const durationStr = String(effectiveDurationForUi ?? "0.0");
@@ -3300,15 +3374,64 @@ const displayClickableInputClass =
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground">Start Time</p>
-                  <Input value={housekeepingStartDisplayValue} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
+                  <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                    Start Time
+                    {canEditReadonlySchedule && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  </p>
+                  <Input
+                    readOnly
+                    value={housekeepingStartDisplayValue}
+                    className={
+                      canEditReadonlySchedule
+                        ? cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
+                        : displayInputClass
+                    }
+                    tabIndex={canEditReadonlySchedule ? 0 : -1}
+                    onFocus={(e) => {
+                      if (!canEditReadonlySchedule) e.currentTarget.blur();
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (canEditReadonlySchedule) handleOpenScheduleDialog();
+                    }}
+                  />
                 </div>
 
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground">End Time</p>
-                  <Input value={housekeepingEndDisplayValue} readOnly className={displayInputClass} tabIndex={-1} onFocus={(e) => e.currentTarget.blur()} />
+                  <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                    End Time
+                    {canEditReadonlySchedule && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                  </p>
+                  <Input
+                    readOnly
+                    value={housekeepingEndDisplayValue}
+                    className={
+                      canEditReadonlySchedule
+                        ? cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
+                        : displayInputClass
+                    }
+                    tabIndex={canEditReadonlySchedule ? 0 : -1}
+                    onFocus={(e) => {
+                      if (!canEditReadonlySchedule) e.currentTarget.blur();
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (canEditReadonlySchedule) handleOpenScheduleDialog();
+                    }}
+                  />
                 </div>
               </div>
+              {canEditReadonlySchedule && (
+                <p className="col-span-2 text-[11px] text-muted-foreground">
+                  Sposta solo la barra in timeline e ricalcola i tempi di spostamento, così non si sovrappone. L'orario resta su WASS e non viene inviato ad ADAM.
+                </p>
+              )}
             </div>
     </>
   );
@@ -4347,6 +4470,82 @@ const displayClickableInputClass =
             </Button>
             <Button onClick={handleSaveCollaboratorShare} disabled={isSavingShare}>
               {isSavingShare ? "Salvataggio..." : "Salva"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={scheduleDialogOpen} onOpenChange={(open) => !open && setScheduleDialogOpen(false)}>
+        <DialogContent className="sm:max-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-custom-blue" />
+              Modifica orario
+            </DialogTitle>
+            <DialogDescription>
+              Task <strong>#{getTaskKey(displayTask)}</strong> — L'orario resta solo su WASS e non viene inviato ad ADAM.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="text-sm font-semibold text-muted-foreground mb-2 block">Start Time</label>
+              <Input
+                type="time"
+                value={editingScheduleStart}
+                onChange={(e) => setEditingScheduleStart(e.target.value)}
+                className="w-full"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-muted-foreground mb-2 block">End Time</label>
+              <Input
+                type="time"
+                value={editingScheduleEnd}
+                onChange={(e) => setEditingScheduleEnd(e.target.value)}
+                className="w-full"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-6">
+            {hasManualSchedule(displayTask) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => saveReadonlySchedule(true)}
+                disabled={isSavingSchedule}
+                className="mr-auto border-2 border-custom-blue"
+              >
+                Ripristina orario ADAM
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setScheduleDialogOpen(false)}
+              disabled={isSavingSchedule}
+              className="border-2 border-custom-blue"
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => saveReadonlySchedule(false)}
+              disabled={isSavingSchedule}
+              className="border-2 border-custom-blue"
+            >
+              {isSavingSchedule ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Salvataggio...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Salva
+                </>
+              )}
             </Button>
           </div>
         </DialogContent>

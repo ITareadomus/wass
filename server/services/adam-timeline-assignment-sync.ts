@@ -14,6 +14,10 @@ import {
   withManualCleaningSplitReason,
   withManualCleaningTimeReason,
 } from "../../shared/wass-cleaning-time";
+import {
+  hasManualSchedule,
+  withManualScheduleReason,
+} from "../../shared/wass-manual-schedule";
 
 export type RefreshSyncMode = "apt" | "assignments";
 
@@ -371,6 +375,11 @@ function buildTaskFromAdam(row: AdamAssignmentRow, existing?: any): any {
       }
     : row;
   const payload = cloneTaskPayload(source);
+  if (hasManualSchedule(existing)) {
+    payload.start_time = existing?.start_time ?? existing?.startTime ?? null;
+    payload.end_time = existing?.end_time ?? existing?.endTime ?? null;
+    payload.reasons = withManualScheduleReason(payload.reasons);
+  }
   return applyPreassignedMode(payload, row.enableWassReadonly ? "readonly" : "normal");
 }
 
@@ -887,6 +896,12 @@ export async function syncTimelineAssignmentsFromAdam(
           is_primary: isPrimary,
           collaborator_ids: collaboratorIds,
           collaborator_count: collabCount,
+          ...(hasManualSchedule(taskPayload)
+            ? {
+                start_time: taskPayload.start_time ?? null,
+                end_time: taskPayload.end_time ?? null,
+              }
+            : {}),
           ...(keepWassDuration || keepWassSplit
             ? {
                 reasons: keepWassSplit

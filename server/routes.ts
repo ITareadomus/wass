@@ -29,6 +29,12 @@ import {
   WASS_CLEANING_SPLIT_MANUAL_REASON,
   type ManualCleaningTimeOverride,
 } from "../shared/wass-cleaning-time";
+import {
+  normalizeScheduleClock,
+  scheduleClockToMinutes,
+  withManualScheduleReason,
+  withoutManualScheduleReason,
+} from "../shared/wass-manual-schedule";
 
 const isTrue = (v: any) => v === true || v === 1 || v === "1" || v === "true";
 const OFFICE_SCOPE_ENABLED = false;
@@ -275,6 +281,30 @@ function applyPreassignedModeToTask(task: any, mode: PreassignedMode): any {
 
 function isReadonlyPreassignedTask(task: any): boolean {
   return resolvePreassignedModeFromTask(task) === "readonly";
+}
+
+/**
+ * Scambia solo le task gestite da WASS.
+ * Quelle pre-assegnate readonly restano nella posizione originale del cleaner ADAM.
+ */
+function replaceMovableKeepingReadonly(originalTasks: any[], incomingMovable: any[]): any[] {
+  const result: any[] = [];
+  let incomingIndex = 0;
+  for (const task of originalTasks) {
+    if (isReadonlyPreassignedTask(task)) {
+      result.push(task);
+      continue;
+    }
+    if (incomingIndex < incomingMovable.length) {
+      result.push(incomingMovable[incomingIndex]);
+      incomingIndex += 1;
+    }
+  }
+  while (incomingIndex < incomingMovable.length) {
+    result.push(incomingMovable[incomingIndex]);
+    incomingIndex += 1;
+  }
+  return result;
 }
 
 function mapStructureTypeToLetter(structureTypeId: number | null | undefined): string | null {
@@ -1768,20 +1798,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timelineData.cleaners_assignments.push(destEntry);
       }
 
-      // Scambia SOLO le task array tra i due cleaner specificati
-      const sourceTasks = sourceEntry.tasks;
-      const destTasks = destEntry.tasks;
+      // Si scambiano solo le task gestite da WASS. Quelle con tipologia non gestita
+      // (pre-assegnate readonly da ADAM) restano sul cleaner a cui sono state assegnate.
+      const originalSourceTasks = Array.isArray(sourceEntry.tasks) ? sourceEntry.tasks : [];
+      const originalDestTasks = Array.isArray(destEntry.tasks) ? destEntry.tasks : [];
+      const sourceMovable = originalSourceTasks.filter((task: any) => !isReadonlyPreassignedTask(task));
+      const destMovable = originalDestTasks.filter((task: any) => !isReadonlyPreassignedTask(task));
+      const readonlyKeptSource = originalSourceTasks.length - sourceMovable.length;
+      const readonlyKeptDest = originalDestTasks.length - destMovable.length;
+
+      if (sourceMovable.length === 0 && destMovable.length === 0) {
+        const readonlyKeptTotal = readonlyKeptSource + readonlyKeptDest;
+        return res.json({
+          success: true,
+          message: readonlyKeptTotal > 0
+            ? "Le task con tipologia non gestita da WASS restano sul cleaner assegnato da ADAM"
+            : "Task scambiate con successo tra cleaners",
+          readonlyKept: {
+            source: readonlyKeptSource,
+            dest: readonlyKeptDest,
+          },
+          moved: { source: 0, dest: 0 },
+          swapped: {
+            source: { cleanerId: sourceCleanerId, tasksCount: originalSourceTasks.length },
+            dest: { cleanerId: destCleanerId, tasksCount: originalDestTasks.length },
+          },
+        });
+      }
 
       // Preserve current primary mapping for swapped tasks to maintain the rule:
       // if a primary collaborator is replaced by the destination cleaner, the destination becomes primary.
       const swappedTaskIds = Array.from(new Set([
-        ...sourceTasks.map((t: any) => Number(t.task_id ?? t.id)).filter((x: any) => Number.isFinite(x)),
-        ...destTasks.map((t: any) => Number(t.task_id ?? t.id)).filter((x: any) => Number.isFinite(x)),
+        ...sourceMovable.map((t: any) => Number(t.task_id ?? t.id)).filter((x: any) => Number.isFinite(x)),
+        ...destMovable.map((t: any) => Number(t.task_id ?? t.id)).filter((x: any) => Number.isFinite(x)),
       ]));
 
       if (await rejectIfHousekeepingTasksCleaned(res, [
-        ...sourceTasks,
-        ...destTasks,
+        ...sourceMovable,
+        ...destMovable,
         ...swappedTaskIds,
       ])) return;
 
@@ -1799,10 +1853,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      sourceEntry.tasks = destTasks;
-      destEntry.tasks = sourceTasks;
+      sourceEntry.tasks = replaceMovableKeepingReadonly(originalSourceTasks, destMovable);
+      destEntry.tasks = replaceMovableKeepingReadonly(originalDestTasks, sourceMovable);
 
-      // Marca tutte le task come manual_assignment
+      // Marca come manuali solo le task che hanno davvero cambiato cleaner.
       const markTasksAsManual = (tasks: any[]) => {
         tasks.forEach((task: any) => {
           task.reasons = task.reasons || [];
@@ -1816,10 +1870,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       };
 
-      markTasksAsManual(sourceEntry.tasks);
-      markTasksAsManual(destEntry.tasks);
-      for (const task of sourceEntry.tasks) task.manually_moved = true;
-      for (const task of destEntry.tasks) task.manually_moved = true;
+      markTasksAsManual(sourceMovable);
+      markTasksAsManual(destMovable);
+      for (const task of sourceMovable) task.manually_moved = true;
+      for (const task of destMovable) task.manually_moved = true;
 
       // CRITICAL: Non modificare timelineData.cleaners_assignments
       // Gli entry sourceEntry e destEntry sono riferimenti diretti agli oggetti nell'array
@@ -1918,10 +1972,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn("⚠️ Swap: errore nel ripristino primary (best-effort):", primaryErr);
       }
 
-      console.log(`✅ Task scambiate tra cleaner ${sourceCleanerId} e cleaner ${destCleanerId}`);
+      console.log(`✅ Task scambiate tra cleaner ${sourceCleanerId} e cleaner ${destCleanerId} (readonly tenute: ${readonlyKeptSource}+${readonlyKeptDest})`);
+      const readonlyKeptTotal = readonlyKeptSource + readonlyKeptDest;
       res.json({
         success: true,
-        message: "Task scambiate con successo tra cleaners",
+        message: readonlyKeptTotal > 0
+          ? "Task scambiate. Le task con tipologia non gestita da WASS sono rimaste sul cleaner assegnato da ADAM"
+          : "Task scambiate con successo tra cleaners",
+        readonlyKept: {
+          source: readonlyKeptSource,
+          dest: readonlyKeptDest,
+        },
+        moved: {
+          source: sourceMovable.length,
+          dest: destMovable.length,
+        },
         swapped: {
           source: { cleanerId: sourceCleanerId, tasksCount: sourceEntry.tasks.length },
           dest: { cleanerId: destCleanerId, tasksCount: destEntry.tasks.length }
@@ -8065,6 +8130,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
       const currentUsername = modified_by || getCurrentUsername(req);
       const scopeValue = resolveScopeFromReq(req);
+
+      const clearManualSchedule = req.body?.clearManualSchedule === true;
+      const scheduleStartRaw = req.body?.scheduleStart;
+      const scheduleEndRaw = req.body?.scheduleEnd;
+      const isManualScheduleEdit =
+        clearManualSchedule || scheduleStartRaw !== undefined || scheduleEndRaw !== undefined;
+      if (isManualScheduleEdit) {
+        if (isLogisticsScopeRequest(req)) {
+          return res.status(403).json({
+            success: false,
+            error: "Dalla logistica non si modifica l'orario delle task housekeeping",
+          });
+        }
+        if (!taskId && !logisticCode) {
+          return res.status(400).json({ success: false, error: "taskId o logisticCode richiesto" });
+        }
+        const scheduleStart = clearManualSchedule ? null : normalizeScheduleClock(scheduleStartRaw);
+        const scheduleEnd = clearManualSchedule ? null : normalizeScheduleClock(scheduleEndRaw);
+        if (!clearManualSchedule) {
+          const startMinutes = scheduleClockToMinutes(scheduleStart);
+          const endMinutes = scheduleClockToMinutes(scheduleEnd);
+          if (startMinutes == null || endMinutes == null || endMinutes <= startMinutes) {
+            return res.status(400).json({
+              success: false,
+              error: "Inserisci uno start time e un end time validi, con la fine dopo l'inizio",
+            });
+          }
+        }
+        if (await rejectIfHousekeepingTasksCleaned(res, [taskId])) return;
+
+        const timelineData = await workspaceFiles.loadTimeline(workDate, scopeValue)
+          || { cleaners_assignments: [] };
+        const hasTaskIdFilter = String(taskId ?? "").trim().length > 0;
+        const hasLogisticCodeFilter = String(logisticCode ?? "").trim().length > 0;
+        const matchesScheduleTarget = (task: any): boolean => {
+          if (hasTaskIdFilter) {
+            return String(task?.task_id ?? task?.id ?? "") === String(taskId);
+          }
+          if (hasLogisticCodeFilter) {
+            return String(task?.logistic_code ?? "") === String(logisticCode);
+          }
+          return false;
+        };
+
+        let updated = 0;
+        let sawOtherTask = false;
+        const touchedCleanerIds = new Set<number>();
+        for (const cleanerEntry of timelineData.cleaners_assignments || []) {
+          for (const task of cleanerEntry.tasks || []) {
+            if (!matchesScheduleTarget(task)) continue;
+            if (!isReadonlyPreassignedTask(task)) {
+              sawOtherTask = true;
+              continue;
+            }
+            if (clearManualSchedule) {
+              task.reasons = withoutManualScheduleReason(task.reasons);
+            } else {
+              task.start_time = scheduleStart;
+              task.end_time = scheduleEnd;
+              task.reasons = withManualScheduleReason(task.reasons);
+            }
+            updated += 1;
+            const cleanerId = Number(cleanerEntry?.cleaner?.id);
+            if (Number.isFinite(cleanerId)) touchedCleanerIds.add(cleanerId);
+          }
+        }
+        if (updated === 0) {
+          return res.status(sawOtherTask ? 423 : 404).json({
+            success: false,
+            error: sawOtherTask
+              ? "L'orario si può correggere solo sulle task con tipologia non gestita da WASS"
+              : "Task non trovata in timeline",
+          });
+        }
+
+        for (const cleanerEntry of timelineData.cleaners_assignments || []) {
+          const cleanerId = Number(cleanerEntry?.cleaner?.id);
+          if (!touchedCleanerIds.has(cleanerId) || !Array.isArray(cleanerEntry.tasks) || cleanerEntry.tasks.length === 0) {
+            continue;
+          }
+          try {
+            if (!clearManualSchedule) {
+              cleanerEntry.tasks.sort((a: any, b: any) => {
+                const startA = scheduleClockToMinutes(a?.start_time ?? a?.startTime) ?? 24 * 60;
+                const startB = scheduleClockToMinutes(b?.start_time ?? b?.startTime) ?? 24 * 60;
+                if (startA !== startB) return startA - startB;
+                return Number(a?.task_id ?? a?.id) - Number(b?.task_id ?? b?.id);
+              });
+              cleanerEntry.keep_existing_schedule = true;
+            }
+            await hydrateTasksFromContainers(cleanerEntry, workDate);
+            const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate);
+            cleanerEntry.tasks = updatedCleanerData?.tasks || cleanerEntry.tasks;
+            delete cleanerEntry.keep_existing_schedule;
+          } catch (pythonError: any) {
+            delete cleanerEntry.keep_existing_schedule;
+            console.error(`⚠️ Ricalcolo tempi di spostamento fallito per cleaner ${cleanerId}:`, pythonError?.message || pythonError);
+            return res.status(500).json({
+              success: false,
+              error: clearManualSchedule
+                ? "Impossibile ricalcolare l'orario dalla sync ADAM"
+                : "Impossibile ricalcolare i tempi di spostamento",
+            });
+          }
+        }
+
+        await workspaceFiles.saveTimeline(
+          workDate,
+          timelineData,
+          false,
+          currentUsername,
+          "task_edit",
+          {
+            editedField: "start_time, end_time",
+            oldValue: clearManualSchedule ? "manual" : "",
+            newValue: clearManualSchedule ? "adam" : `${scheduleStart}, ${scheduleEnd}`,
+          },
+          scopeValue
+        );
+        return res.json({
+          success: true,
+          message: clearManualSchedule
+            ? "Orario ricalcolato. Le prossime sync ADAM possono aggiornarlo di nuovo."
+            : "Orario aggiornato sulla timeline e tempi di spostamento ricalcolati. Non viene inviato ad ADAM.",
+        });
+      }
       const noteEventAt = new Date().toISOString();
       const normalizeDateYmd = (value: unknown): string | null => {
         if (value == null) return null;
@@ -8833,6 +9024,14 @@ app.post("/api/transfer-to-adam", async (req, res) => {
             const collaborationBy = isCollab ? (secondaryCleanerIdForAdam || null) : null;
             const collaborationAt = isCollab ? nowRome : null;  
             
+            // Le task non gestite da WASS tengono l'orario solo in WASS:
+            // il trasferimento non scrive start_time/end_time su ADAM.
+            const keepAdamSchedule = isReadonlyPreassignedTask(task);
+            const scheduleColumns = keepAdamSchedule
+              ? "travel_time = ?,"
+              : `travel_time = ?,
+                start_time = ?,
+                end_time = ?,`;
             const updateQuery = `
               UPDATE app_housekeeping
               SET
@@ -8851,9 +9050,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
                 assigned_at_us = ?,
                 assigned_at_milliseconds = ?,
 
-                travel_time = ?,
-                start_time = ?,
-                end_time = ?,
+                ${scheduleColumns}
 
                 collaboration = 0,
                 collaboration_by = NULL,
@@ -8890,11 +9087,18 @@ app.post("/api/transfer-to-adam", async (req, res) => {
               assignedAtMilliseconds,
 
               task.travel_time != null ? Number(task.travel_time) : (task as any).travelTime != null ? Number((task as any).travelTime) : null,
-              formatTimeForMySQL(task.start_time ?? (task as any).startTime),
-              formatTimeForMySQL(task.end_time ?? (task as any).endTime),
+              ...(keepAdamSchedule
+                ? []
+                : [
+                    formatTimeForMySQL(task.start_time ?? (task as any).startTime),
+                    formatTimeForMySQL(task.end_time ?? (task as any).endTime),
+                  ]),
 
               taskId
             ];
+            if (keepAdamSchedule) {
+              console.log(`ℹ️ Task ${taskLabel}: start/end non inviati ad ADAM (tipologia non gestita da WASS)`);
+            }
 
             await connection.execute(updateQuery, updateValues);
 

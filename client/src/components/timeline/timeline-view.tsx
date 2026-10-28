@@ -5,6 +5,10 @@ import {
   renderedHousekeepingCardMinutes,
 } from "@shared/housekeeping-timeline-layout";
 import {
+  formatScheduleDurationLabel,
+  manualScheduleSpanMinutes,
+} from "@shared/wass-manual-schedule";
+import {
   applyHkPreassignedSchedule,
   parseHkPreassignedSchedules,
   type HkPreassignedSchedule,
@@ -949,9 +953,20 @@ export default function TimelineView({
       const sourceCleanerName = sourceCleaner ? `${sourceCleaner.name} ${sourceCleaner.lastname}` : `ID ${variables.sourceCleanerId}`;
       const destCleanerName = destCleaner ? `${destCleaner.name} ${destCleaner.lastname}` : `ID ${variables.destCleanerId}`;
 
+      const keptReadonly =
+        Number(data?.readonlyKept?.source ?? 0) + Number(data?.readonlyKept?.dest ?? 0);
+      const moved =
+        Number(data?.moved?.source ?? 0) + Number(data?.moved?.dest ?? 0);
+      const keptLabel = keptReadonly === 1
+        ? "1 task non gestita da WASS è rimasta sul cleaner assegnato da ADAM."
+        : `${keptReadonly} task non gestite da WASS sono rimaste sul cleaner assegnato da ADAM.`;
       toast({
         title: "Successo",
-        description: `Task di ${sourceCleanerName} scambiate con successo con le task di ${destCleanerName}`,
+        description: moved === 0 && keptReadonly > 0
+          ? keptLabel
+          : keptReadonly > 0
+            ? `Task di ${sourceCleanerName} scambiate con le task di ${destCleanerName}. ${keptLabel}`
+            : `Task di ${sourceCleanerName} scambiate con successo con le task di ${destCleanerName}`,
         variant: "success",
       });
       setSelectedSwapCleaner("");
@@ -3127,8 +3142,13 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     const taskStartMinutes = previewMinutes ?? parseClockToMinutes(
                                       taskObj.start_time || taskObj.fw_start_time || taskObj.startTime
                                     );
+                                    const pinnedScheduleSpan = manualScheduleSpanMinutes(taskObj);
                                     const cardMinutes = renderedHousekeepingCardMinutes(
-                                      hideRouteSpacers ? "0.15" : (taskObj.duration || "0.0"),
+                                      hideRouteSpacers
+                                        ? "0.15"
+                                        : pinnedScheduleSpan != null
+                                          ? formatScheduleDurationLabel(pinnedScheduleSpan)
+                                          : (taskObj.duration || "0.0"),
                                       timelinePxPerMinute,
                                       timelineMinCardPx,
                                     );
@@ -3271,7 +3291,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           enabled={
                                             seq === 1 &&
                                             !hideRouteSpacers &&
-                                            !isTimelineInteractionDisabled
+                                            !isTimelineInteractionDisabled &&
+                                            !isReadonlyPreassignedTask(task)
                                           }
                                           isPinned={Boolean(taskObj.manual_start_time)}
                                           startTime={
@@ -4492,7 +4513,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               <div className="border-t pt-4 mt-4">
                 <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-3">Scambia Cleaner</p>
                 <p className="text-xs text-gray-700 dark:text-muted-foreground mb-3">
-                  Seleziona un altro cleaner per scambiare le task assegnate.
+                  Seleziona un altro cleaner per scambiare le task assegnate. Le task con tipologia non gestita da WASS restano sul cleaner a cui le ha assegnate ADAM.
                 </p>
                 <div className="flex gap-3 items-end">
                   <div className="flex-1">

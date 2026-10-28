@@ -32,6 +32,8 @@ PRIORITY_ALIASES = {
     "LP": "LP",
 }
 
+MANUAL_SCHEDULE_REASON = "wass_manual_schedule"
+
 
 def get_priority_min_start(priority_str: Optional[str],
                            priority_windows: Dict[str, Any]) -> Optional[int]:
@@ -123,6 +125,21 @@ def travel_minutes(lat1: float, lng1: float, lat2: float, lng2: float,
     return max(2.0, min(45.0, total_time))
 
 
+def pinned_manual_schedule(task: Dict[str, Any]) -> Optional[Tuple[int, int]]:
+    """Start/end fissati in WASS: non vanno ricalcolati."""
+    reasons = task.get("reasons") or []
+    if not isinstance(reasons, list) or MANUAL_SCHEDULE_REASON not in reasons:
+        return None
+    try:
+        start_min = time_to_minutes(str(task.get("start_time") or "").strip())
+        end_min = time_to_minutes(str(task.get("end_time") or "").strip())
+    except (ValueError, AttributeError, TypeError, IndexError):
+        return None
+    if end_min <= start_min:
+        return None
+    return start_min, end_min
+
+
 def time_to_minutes(time_str: str) -> int:
     """Converte una stringa HH:MM o HH:MM:SS in minuti dall'inizio della giornata."""
     parts = time_str.split(':')
@@ -185,6 +202,8 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
     prev_lat: Optional[float] = None
     prev_lng: Optional[float] = None
     prev_addr: Optional[str] = None
+    # Orario manuale: aggiorna solo i tempi di spostamento, non gli start/end delle altre task.
+    keep_existing_schedule = bool(cleaner_data.get("keep_existing_schedule"))
 
     for i, task in enumerate(tasks):
         # Estrai dati task (gestisci null values)
@@ -214,6 +233,15 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
             travel_time = int(round(travel_minutes(
                 prev_lat, prev_lng, lat, lng, prev_addr, addr
             )))
+
+        if keep_existing_schedule:
+            task["travel_time"] = travel_time
+            task["sequence"] = i + 1
+            task["followup"] = i > 0
+            prev_lat = lat
+            prev_lng = lng
+            prev_addr = addr
+            continue
 
         # Aggiungi travel time al tempo corrente
         current_time_min += travel_time
@@ -309,10 +337,16 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
             # Non feasible, ma salviamo comunque i tempi calcolati
             pass
 
-        # Aggiorna task
+        # Aggiorna task. L'orario corretto a mano resta quello di WASS e non sposta le task successive:
+        # serve solo a disegnare la barra e a ricalcolare il viaggio.
+        pinned = pinned_manual_schedule(task)
         task["travel_time"] = travel_time
-        task["start_time"] = minutes_to_time(start_time_min)
-        task["end_time"] = minutes_to_time(end_time_min)
+        if pinned is not None:
+            task["start_time"] = minutes_to_time(pinned[0])
+            task["end_time"] = minutes_to_time(pinned[1])
+        else:
+            task["start_time"] = minutes_to_time(start_time_min)
+            task["end_time"] = minutes_to_time(end_time_min)
         task["sequence"] = i + 1
         task["followup"] = i > 0
 
