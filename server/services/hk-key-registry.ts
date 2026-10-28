@@ -33,6 +33,7 @@ export type LostKeyRow = {
   workDate: string;
   taskId: number;
   logisticCode: string;
+  cleanerId: number | null;
   cleanerName: string;
   matricola: string | null;
   aptCode: string | null;
@@ -544,7 +545,7 @@ async function loadOutstandingKeys(
       : "delivered = TRUE AND returned = FALSE AND lost = FALSE";
   const result = await query(
     `
-      SELECT to_char(work_date, 'YYYY-MM-DD') AS work_date, task_id, logistic_code, cleaner_name, matricola, apt_code, customer_name
+      SELECT to_char(work_date, 'YYYY-MM-DD') AS work_date, task_id, cleaner_id, logistic_code, cleaner_name, matricola, apt_code, customer_name
       FROM hk_key_handovers
       WHERE ${filter}
         AND work_date < $1::date
@@ -556,10 +557,12 @@ async function loadOutstandingKeys(
   for (const row of result.rows) {
     const workDate = asWorkDate(row.work_date);
     if (!isLostKeyVisible(workDate, today)) continue;
+    const cleanerId = Number(row.cleaner_id);
     keys.push({
       workDate,
       taskId: Number(row.task_id),
       logisticCode: String(row.logistic_code ?? ""),
+      cleanerId: Number.isInteger(cleanerId) && cleanerId > 0 ? cleanerId : null,
       cleanerName: asText(row.cleaner_name) ?? "",
       matricola: asText(row.matricola),
       aptCode: asText(row.apt_code),
