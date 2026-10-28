@@ -1678,7 +1678,7 @@ export default function Convocazioni() {
                           event.stopPropagation();
                           setHeldKeysCleanerId(cleaner.id);
                         }}
-                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-red-300 bg-red-50 text-red-800 transition-colors hover:bg-red-100 dark:border-red-900 dark:bg-red-950/40"
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-red-600 bg-red-500/30 text-red-800 transition-colors hover:bg-red-500/40 dark:border-red-400 dark:bg-red-500/40 dark:text-red-200 dark:hover:bg-red-500/50"
                       >
                         <KeyRound className="h-4 w-4" aria-hidden />
                       </button>

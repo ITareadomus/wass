@@ -430,6 +430,15 @@ export default function KeyRegistry() {
             </div>
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
               <Link
+                href="/generate-logistics-assignments"
+                data-testid="button-logistics"
+                data-viewer-allow=""
+                onClick={() => localStorage.setItem("selected_work_date", date)}
+                className="inline-flex h-12 items-center rounded-md border-2 border-custom-blue px-3 text-sm font-medium text-custom-blue"
+              >
+                Logistica
+              </Link>
+              <Link
                 href="/chiavi-non-restituite"
                 data-testid="button-unreturned-keys"
                 data-viewer-allow=""
@@ -506,12 +515,6 @@ export default function KeyRegistry() {
               onChange={(event) => setSearch(event.target.value)}
             />
           </label>
-
-          <p className="text-sm text-muted-foreground">
-            Tocca il codice ADAM: la prima volta la chiave risulta consegnata, la seconda restituita.
-            Un altro tocco la rimette in magazzino. Scorri a sinistra per segnarla smarrita.
-            Scorri a destra se è stata presa la chiave dell'autista: risulta consegnata.
-          </p>
 
           {payload && (
             <div className="grid grid-cols-3 gap-2 text-center">

@@ -26,19 +26,34 @@ export function isViewerRole(role?: string | null): boolean {
   return String(role ?? "").toLowerCase() === "viewer";
 }
 
+function pathWithoutQuery(pathname: string): string {
+  const query = pathname.search(/[?#]/);
+  return query >= 0 ? pathname.slice(0, query) : pathname;
+}
+
 /** True se l'utente logistica può restare su path+search correnti. */
 export function isLogisticaPathAllowed(pathname: string, search = ""): boolean {
+  const path = pathWithoutQuery(pathname);
   if (
-    pathname === LOGISTICS_HOME_PATH ||
-    pathname.startsWith(`${LOGISTICS_HOME_PATH}/`)
+    path === LOGISTICS_HOME_PATH ||
+    path.startsWith(`${LOGISTICS_HOME_PATH}/`)
   ) {
     return true;
   }
 
-  if (pathname === "/keys" || pathname === "/chiavi-smarrite" || pathname === "/chiavi-non-restituite") return true;
+  if (
+    path === "/keys" ||
+    path === "/registro-chiavi" ||
+    path === "/chiavi-smarrite" ||
+    path === "/chiavi-non-restituite"
+  ) {
+    return true;
+  }
 
-  if (pathname === "/convocazioni") {
-    const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  if (path === "/convocazioni") {
+    const embedded = pathname.includes("?") ? pathname.slice(pathname.indexOf("?") + 1).split("#")[0] : "";
+    const extra = search.startsWith("?") ? search.slice(1) : search;
+    const params = new URLSearchParams(embedded || extra);
     return params.get("kind") === "drivers";
   }
 
