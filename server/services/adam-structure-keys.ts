@@ -112,13 +112,9 @@ export async function loadStructureAccessBundlesByLogisticCodes(
   return out;
 }
 
-export async function loadDialogAccessBundles(
-  logisticCode: string
-): Promise<StructureAccessBundle[]> {
-  const code = String(logisticCode ?? "").trim();
-  if (!code) return [];
-  const byCode = await loadStructureAccessBundlesByLogisticCodes([code]);
-  return selectDriverAccessBundles(byCode.get(code) ?? []).map((bundle) => ({
+/** Stesse specifiche del dialog task: mazzi autista, senza il valore segreto della chiave. */
+export function toDialogAccessBundles(bundles: StructureAccessBundle[]): StructureAccessBundle[] {
+  return selectDriverAccessBundles(bundles).map((bundle) => ({
     ...bundle,
     choices: bundle.choices.map((choice) => ({
       name: choice.name,
@@ -127,6 +123,15 @@ export async function loadDialogAccessBundles(
       value: null,
     })),
   }));
+}
+
+export async function loadDialogAccessBundles(
+  logisticCode: string
+): Promise<StructureAccessBundle[]> {
+  const code = String(logisticCode ?? "").trim();
+  if (!code) return [];
+  const byCode = await loadStructureAccessBundlesByLogisticCodes([code]);
+  return toDialogAccessBundles(byCode.get(code) ?? []);
 }
 
 export async function enrichLogisticsTimelineStructureKeys(timeline: any): Promise<void> {

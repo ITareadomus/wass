@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, type PointerEvent as ReactPointerEvent } from "react";
 import { DndContext, MeasuringStrategy } from "@dnd-kit/core";
 import { HousekeepingLogisticsSwitch } from "@/components/housekeeping-logistics-switch";
+import { Link } from "wouter";
 import { getStoredUserRole, isLogisticaRole } from "@/lib/auth-role";
 import { useToast } from "@/hooks/use-toast";
 import PriorityColumn from "@/components/drag-drop/priority-column";
@@ -29,6 +30,7 @@ import {
 import { ensureProgramPollClock, flushProgramPollTick } from "@/lib/program-poll-clock";
 import {
   CalendarIcon,
+  KeyRound,
   RefreshCw,
   Search,
   Map as MapIcon,
@@ -2002,10 +2004,21 @@ export default function GenerateLogisticsAssignments() {
                 </PopoverContent>
               </Popover>
             </div>
-            <HousekeepingLogisticsSwitch
-              active="logistics"
-              workDate={format(selectedDate, "yyyy-MM-dd")}
-            />
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href={`/keys?date=${format(selectedDate, "yyyy-MM-dd")}`}
+                data-testid="button-key-registry"
+                data-viewer-allow=""
+                className="inline-flex h-9 items-center gap-2 rounded-md border-2 border-custom-blue bg-background px-3 text-sm font-medium text-custom-blue transition-colors hover:bg-custom-blue hover:text-white"
+              >
+                <KeyRound className="h-4 w-4 shrink-0" aria-hidden />
+                Registro Chiavi
+              </Link>
+              <HousekeepingLogisticsSwitch
+                active="logistics"
+                workDate={format(selectedDate, "yyyy-MM-dd")}
+              />
+            </div>
           </div>
         )}
 

@@ -1,7 +1,7 @@
 import { Building2, Truck } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
-import type { MouseEvent } from "react";
+import { type MouseEvent } from "react";
 import { getStoredUserRole, isLogisticaRole } from "@/lib/auth-role";
 
 export type AssignmentsFlow = "housekeeping" | "office" | "logistics";

@@ -6,7 +6,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Users, CalendarIcon, ArrowLeft, Save, UserPlus, Search, RefreshCw, AlertTriangle, Truck, Bike, BarChart3 } from "lucide-react";
+import { Users, CalendarIcon, ArrowLeft, Save, UserPlus, Search, RefreshCw, AlertTriangle, Truck, Bike, BarChart3, KeyRound } from "lucide-react";
 import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
 import AssignmentTaskStatisticsPanel, {
   computeAssignmentTaskStatisticsFromTasks,
@@ -17,7 +17,7 @@ import {
   useTimelineFloatingPanel,
 } from "@/hooks/use-timeline-floating-panel";
 import type { TaskType } from "@shared/schema";
-import { format, differenceInCalendarDays } from "date-fns";
+import { format, differenceInCalendarDays, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
@@ -33,6 +33,15 @@ interface LogisticsVehicleOption {
   id: number;
   name: string;
   pms_code: string | null;
+}
+
+interface HeldKey {
+  workDate: string;
+  taskId: number;
+  logisticCode: string;
+  cleanerId: number | null;
+  aptCode: string | null;
+  customerName: string | null;
 }
 
 interface Cleaner {
@@ -401,6 +410,43 @@ export default function Convocazioni() {
   const isDrivers = convKind === "drivers";
   const isOffice = convKind === "office";
   const isHousekeeping = !isDrivers && !isOffice;
+  const [heldKeysByCleaner, setHeldKeysByCleaner] = useState<Map<number, HeldKey[]>>(new Map());
+  const [heldKeysCleanerId, setHeldKeysCleanerId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!isHousekeeping) {
+      setHeldKeysByCleaner(new Map());
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/key-registry/unreturned", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : { keys: [] }))
+      .then((data) => {
+        if (cancelled) return;
+        const grouped = new Map<number, HeldKey[]>();
+        for (const key of Array.isArray(data?.keys) ? data.keys : []) {
+          const cleanerId = Number(key?.cleanerId);
+          if (!Number.isInteger(cleanerId) || cleanerId <= 0) continue;
+          const list = grouped.get(cleanerId) ?? [];
+          list.push({
+            workDate: String(key.workDate ?? ""),
+            taskId: Number(key.taskId),
+            logisticCode: String(key.logisticCode ?? ""),
+            cleanerId,
+            aptCode: key.aptCode ?? null,
+            customerName: key.customerName ?? null,
+          });
+          grouped.set(cleanerId, list);
+        }
+        setHeldKeysByCleaner(grouped);
+      })
+      .catch(() => {
+        if (!cancelled) setHeldKeysByCleaner(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isHousekeeping]);
   const scopeValue: "housekeeping" | "office" = isOffice ? "office" : "housekeeping";
   const withScope = (url: string) =>
     `${url}${url.includes("?") ? "&" : "?"}scope=${scopeValue}`;
@@ -461,6 +507,7 @@ export default function Convocazioni() {
   // Aggiunto uno stato per i cleaners filtrati per evitare che vengano sovrascritti quando cambia la data
   const [filteredCleaners, setFilteredCleaners] = useState<Cleaner[]>([]);
   const [showOnlyNotConvocatiDaDueGiorni, setShowOnlyNotConvocatiDaDueGiorni] = useState(false);
+  const [showOnlyHeldKeys, setShowOnlyHeldKeys] = useState(false);
 
   // Blocca lo scroll della pagina mentre Convocazioni e montata
   useEffect(() => {
@@ -831,7 +878,10 @@ export default function Convocazioni() {
 
   const driversRoster = useMemo(() => filteredCleaners, [filteredCleaners]);
 
-  const visibleRoster = useMemo(() => cleanersToShow, [cleanersToShow]);
+  const visibleRoster = useMemo(() => {
+    if (!isHousekeeping || !showOnlyHeldKeys) return cleanersToShow;
+    return cleanersToShow.filter((cleaner) => (heldKeysByCleaner.get(cleaner.id)?.length ?? 0) > 0);
+  }, [cleanersToShow, heldKeysByCleaner, isHousekeeping, showOnlyHeldKeys]);
 
   const selectedDrivers = useMemo(
     () => (isDrivers ? driversRoster.filter((c) => selectedCleaners.has(c.id)) : []),
@@ -1334,6 +1384,33 @@ export default function Convocazioni() {
                 </button>
                 {(isHousekeeping || isDrivers) && (
                   <div className="flex shrink-0 items-center gap-2">
+                    {isHousekeeping ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        data-viewer-allow=""
+                        data-testid="button-filter-held-keys"
+                        aria-pressed={showOnlyHeldKeys}
+                        aria-label={
+                          showOnlyHeldKeys
+                            ? "Mostra tutti i cleaners"
+                            : "Mostra solo i cleaners con chiavi non restituite"
+                        }
+                        title={
+                          showOnlyHeldKeys
+                            ? "Mostra tutti i cleaners"
+                            : "Solo chiavi non restituite"
+                        }
+                        onClick={() => setShowOnlyHeldKeys((prev) => !prev)}
+                        className={cn(
+                          "border-2 border-custom-blue px-2",
+                          showOnlyHeldKeys && "bg-custom-blue-light",
+                        )}
+                      >
+                        <KeyRound className="h-4 w-4" />
+                      </Button>
+                    ) : null}
                     <Button
                       type="button"
                       variant="outline"
@@ -1402,13 +1479,20 @@ export default function Convocazioni() {
             </div>
 
             <div className="convocazioni-roster-scroll flex-1 min-h-0 space-y-2.5 overflow-y-auto">
-              {visibleRoster
-                .filter((cleaner) =>
+              {(() => {
+                const rosterRows = visibleRoster.filter((cleaner) =>
                   `${cleaner.name} ${cleaner.lastname}`
                     .toUpperCase()
                     .includes(searchCleaner.toUpperCase())
-                )
-                .map((cleaner) => {
+                );
+                if (rosterRows.length === 0 && isHousekeeping && showOnlyHeldKeys) {
+                  return (
+                    <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                      Nessun cleaner ha chiavi non restituite.
+                    </p>
+                  );
+                }
+                return rosterRows.map((cleaner) => {
                   const isAvailable = cleaner.available !== false;
                   const isPremium = cleaner.role === "Premium";
                   const isFormatore = cleaner.role === "Formatore";
@@ -1583,6 +1667,22 @@ export default function Convocazioni() {
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
+                    {isHousekeeping && (heldKeysByCleaner.get(cleaner.id)?.length ?? 0) > 0 ? (
+                      <button
+                        type="button"
+                        data-viewer-allow=""
+                        data-testid="button-cleaner-held-keys"
+                        title="Chiavi non restituite"
+                        aria-label={`Chiavi non restituite di ${cleaner.name} ${cleaner.lastname}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setHeldKeysCleanerId(cleaner.id);
+                        }}
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-red-300 bg-red-50 text-red-800 transition-colors hover:bg-red-100 dark:border-red-900 dark:bg-red-950/40"
+                      >
+                        <KeyRound className="h-4 w-4" aria-hidden />
+                      </button>
+                    ) : null}
                     {isDrivers && selectedCleaners.has(cleaner.id) && (
                       <Button
                         type="button"
@@ -1713,9 +1813,43 @@ export default function Convocazioni() {
                   </div>
                 </div>
               );
-            })}
+            });
+              })()}
           </div>
 
+          <Dialog
+            open={heldKeysCleanerId != null}
+            onOpenChange={(open) => {
+              if (!open) setHeldKeysCleanerId(null);
+            }}
+          >
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Chiavi non restituite</DialogTitle>
+                <DialogDescription>
+                  {(() => {
+                    const cleaner = cleaners.find((item) => item.id === heldKeysCleanerId);
+                    const name = cleaner ? `${cleaner.name} ${cleaner.lastname}`.trim() : "Cleaner";
+                    return `${name} ha ancora queste chiavi.`;
+                  })()}
+                </DialogDescription>
+              </DialogHeader>
+              <ul className="space-y-2">
+                {(heldKeysByCleaner.get(heldKeysCleanerId ?? -1) ?? []).map((key) => (
+                  <li key={`${key.workDate}-${key.taskId}`} className="rounded-xl border px-4 py-3">
+                    <p className="text-lg font-semibold tabular-nums">{key.logisticCode}</p>
+                    <p className="text-sm">{key.aptCode || "—"}</p>
+                    <p className="text-sm text-muted-foreground">{key.customerName || "—"}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {/^\d{4}-\d{2}-\d{2}$/.test(key.workDate)
+                        ? `Da ${format(parseISO(key.workDate), "EEEE d MMMM yyyy", { locale: it })}`
+                        : key.workDate}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </DialogContent>
+          </Dialog>
           <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog({ open, cleanerId: null })}>
             <DialogContent>
               <DialogHeader>
