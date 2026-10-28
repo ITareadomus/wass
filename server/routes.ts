@@ -1194,6 +1194,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Dopo ensureLogisticsWorkspaceTables: su un database nuovo lg_timeline non
     // esiste ancora prima di quella chiamata.
     await pgDailyAssignmentsService.ensureLogisticsTimelineNoDuplicates();
+    const { ensureHkKeyHandoverTable } = await import("./services/hk-key-registry");
+    await ensureHkKeyHandoverTable();
     
     // Migrate existing users from JSON if table is empty
     const existingUsers = await pgUsersService.getAllUsers();
@@ -2009,6 +2011,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("GET /api/structure-access-bundles:", error);
       res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/key-registry", async (req, res) => {
+    try {
+      const workDate = String(req.query.date ?? "");
+      if (!isValidWorkDate(workDate)) {
+        return res.status(400).json({ success: false, error: "Data non valida" });
+      }
+      const { loadKeyRegistry } = await import("./services/hk-key-registry");
+      const registry = await loadKeyRegistry(workDate);
+      res.json(registry);
+    } catch (error: any) {
+      console.error("GET /api/key-registry:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/key-registry/unreturned", async (_req, res) => {
+    try {
+      const { loadUnreturnedKeys } = await import("./services/hk-key-registry");
+      const payload = await loadUnreturnedKeys();
+      res.json(payload);
+    } catch (error: any) {
+      console.error("GET /api/key-registry/unreturned:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/key-registry/lost", async (_req, res) => {
+    try {
+      const { loadLostKeys } = await import("./services/hk-key-registry");
+      const payload = await loadLostKeys();
+      res.json(payload);
+    } catch (error: any) {
+      console.error("GET /api/key-registry/lost:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/key-registry/lost", async (req, res) => {
+    try {
+      const workDate = String(req.body?.date ?? "");
+      const taskId = Number(req.body?.taskId);
+      if (!isValidWorkDate(workDate) || !Number.isInteger(taskId) || taskId <= 0) {
+        return res.status(400).json({ success: false, error: "Dati non validi" });
+      }
+      const { setKeyLost } = await import("./services/hk-key-registry");
+      const result = await setKeyLost(workDate, taskId);
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      const message = error?.message || "Salvataggio non riuscito";
+      const status = message.includes("non presente") ? 404 : 500;
+      console.error("POST /api/key-registry/lost:", error);
+      res.status(status).json({ success: false, error: message });
+    }
+  });
+
+  app.post("/api/key-registry/driver", async (req, res) => {
+    try {
+      const workDate = String(req.body?.date ?? "");
+      const taskId = Number(req.body?.taskId);
+      const taken = req.body?.taken;
+      if (!isValidWorkDate(workDate) || !Number.isInteger(taskId) || taskId <= 0 || typeof taken !== "boolean") {
+        return res.status(400).json({ success: false, error: "Dati non validi" });
+      }
+      const { setKeyDriver } = await import("./services/hk-key-registry");
+      const result = await setKeyDriver(workDate, taskId, taken);
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      const message = error?.message || "Salvataggio non riuscito";
+      const status = message.includes("non presente") ? 404 : 500;
+      console.error("POST /api/key-registry/driver:", error);
+      res.status(status).json({ success: false, error: message });
+    }
+  });
+
+  app.post("/api/key-registry/recovered", async (req, res) => {
+    try {
+      const workDate = String(req.body?.date ?? "");
+      const taskId = Number(req.body?.taskId);
+      if (!isValidWorkDate(workDate) || !Number.isInteger(taskId) || taskId <= 0) {
+        return res.status(400).json({ success: false, error: "Dati non validi" });
+      }
+      const { setKeyRecovered } = await import("./services/hk-key-registry");
+      const result = await setKeyRecovered(workDate, taskId);
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      const message = error?.message || "Salvataggio non riuscito";
+      const status = message.includes("non presente") ? 404 : 500;
+      console.error("POST /api/key-registry/recovered:", error);
+      res.status(status).json({ success: false, error: message });
+    }
+  });
+
+  app.post("/api/key-registry/delivered", async (req, res) => {
+    try {
+      const workDate = String(req.body?.date ?? "");
+      const taskId = Number(req.body?.taskId);
+      if (!isValidWorkDate(workDate) || !Number.isInteger(taskId) || taskId <= 0) {
+        return res.status(400).json({ success: false, error: "Dati non validi" });
+      }
+      const { setKeyHandover } = await import("./services/hk-key-registry");
+      const status = String(req.body?.status ?? "");
+      if (status !== "warehouse" && status !== "with_cleaner" && status !== "returned") {
+        return res.status(400).json({ success: false, error: "Dati non validi" });
+      }
+      const result = await setKeyHandover(workDate, taskId, status);
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      const message = error?.message || "Salvataggio non riuscito";
+      const status = message.includes("non presente") ? 404 : 500;
+      console.error("POST /api/key-registry/delivered:", error);
+      res.status(status).json({ success: false, error: message });
     }
   });
 

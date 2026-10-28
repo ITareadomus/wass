@@ -35,6 +35,8 @@ export function isLogisticaPathAllowed(pathname: string, search = ""): boolean {
     return true;
   }
 
+  if (pathname === "/keys" || pathname === "/chiavi-smarrite" || pathname === "/chiavi-non-restituite") return true;
+
   if (pathname === "/convocazioni") {
     const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
     return params.get("kind") === "drivers";

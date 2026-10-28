@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation, Link } from "wouter";
+import { Switch, Route, useLocation, Link, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -13,6 +13,8 @@ import Login from "@/pages/login";
 import Settings from "@/pages/settings";
 import SystemSettings from "@/pages/system-settings";
 import PreassignedApartments from "@/pages/preassigned-apartments";
+import KeyRegistry from "@/pages/key-registry";
+import LostKeys, { UnreturnedKeys } from "@/pages/lost-keys";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 import { WassSiteHeader } from "@/components/wass-site-header";
@@ -42,7 +44,13 @@ function GlobalHeader() {
     isConvocazioniPage ||
     location === "/settings" ||
     location === "/account-settings" ||
-    location === "/appartamenti-preassegnati";
+    location === "/appartamenti-preassegnati" ||
+    location === "/keys" ||
+    location.startsWith("/keys?") ||
+    location === "/registro-chiavi" ||
+    location.startsWith("/registro-chiavi?") ||
+    location === "/chiavi-smarrite" ||
+    location === "/chiavi-non-restituite";
 
   useEffect(() => {
     if (typeof window === "undefined" || OFFICE_SCOPE_ENABLED) return;
@@ -196,6 +204,18 @@ function Router() {
       </Route>
       <Route path="/appartamenti-preassegnati">
         {() => <ProtectedRoute component={PreassignedApartments} />}
+      </Route>
+      <Route path="/keys">
+        {() => <ProtectedRoute component={KeyRegistry} />}
+      </Route>
+      <Route path="/registro-chiavi">
+        {() => <Redirect to={`/keys${window.location.search}`} />}
+      </Route>
+      <Route path="/chiavi-non-restituite">
+        {() => <ProtectedRoute component={UnreturnedKeys} />}
+      </Route>
+      <Route path="/chiavi-smarrite">
+        {() => <ProtectedRoute component={LostKeys} />}
       </Route>
       <Route component={NotFound} />
     </Switch>

@@ -1,0 +1,222 @@
+import { resolveStructureAccessKeyKind, type StructureAccessBundle } from "./structure-access-keys";
+
+export type KeyRegistryCleanerInput = {
+  id: number;
+  name: string;
+  lastname: string;
+  matricola?: string | null;
+};
+
+export type KeyRegistryTaskInput = {
+  taskId: number;
+  logisticCode: string;
+  cleanerId: number;
+  sequence: number;
+  startTime: string | null;
+  address: string | null;
+  aptCode: string | null;
+  customerName?: string | null;
+  interventionType?: string | null;
+  keyBundles?: StructureAccessBundle[];
+  operationId?: number | null;
+  confirmedOperation?: boolean;
+  /** true = cleaner primario della collaborazione, false = collaboratore, null = task singola. */
+  isPrimary: boolean | null;
+};
+
+export type KeyRegistryApartment = {
+  taskId: number;
+  logisticCode: string;
+  aptCode: string | null;
+  customerName: string | null;
+  interventionType: string | null;
+  keyBundles: StructureAccessBundle[];
+  sequence: number;
+  startTime: string | null;
+  delivered: boolean;
+  returned: boolean;
+  lost: boolean;
+  /** Chiave dell'autista presa per questa task. */
+  driverKey: boolean;
+  priorAlerts: KeyPriorAlert[];
+};
+
+export type KeyPriorAlert = {
+  kind: "lost" | "unreturned";
+  workDate: string;
+  logisticCode: string;
+  cleanerName: string;
+  matricola: string | null;
+  aptCode: string | null;
+  customerName: string | null;
+};
+
+export function priorAlertTone(alerts: KeyPriorAlert[] | null | undefined): "lost" | "unreturned" | null {
+  if (!alerts?.length) return null;
+  if (alerts.some((alert) => alert.kind === "lost")) return "lost";
+  return "unreturned";
+}
+
+export type KeyHandoverStatus = "warehouse" | "with_cleaner" | "returned";
+
+/** Grigio = in magazzino, ambra = consegnata, verde = restituita. */
+export function keyHandoverStatus(flags: {
+  delivered: boolean;
+  returned?: boolean;
+  lost?: boolean;
+}): KeyHandoverStatus {
+  if (flags.returned) return "returned";
+  if (flags.delivered) return "with_cleaner";
+  return "warehouse";
+}
+
+export function nextKeyHandoverStatus(status: KeyHandoverStatus): KeyHandoverStatus {
+  if (status === "warehouse") return "with_cleaner";
+  if (status === "with_cleaner") return "returned";
+  return "warehouse";
+}
+
+export type KeyRegistryCleaner = {
+  cleanerId: number;
+  name: string;
+  lastname: string;
+  matricola: string | null;
+  apartments: KeyRegistryApartment[];
+};
+
+/** Data di calendario a Roma, nel formato YYYY-MM-DD. */
+export function calendarDateInRome(now = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Rome",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+/** Le chiavi non restituite compaiono solo se il giorno del registro è già passato. */
+export function isLostKeyVisible(workDate: string, today: string): boolean {
+  return workDate < today;
+}
+
+export function daysSinceWorkDate(workDate: string, today: string): number {
+  const [year, month, day] = workDate.split("-").map(Number);
+  const [todayYear, todayMonth, todayDay] = today.split("-").map(Number);
+  const start = Date.UTC(year, month - 1, day);
+  const end = Date.UTC(todayYear, todayMonth - 1, todayDay);
+  return Math.max(0, Math.round((end - start) / 86_400_000));
+}
+
+/** Un appartamento conta come una sola chiave classica, anche con più mazzi classici. */
+export function hasClassicKey(bundles: StructureAccessBundle[] | null | undefined): boolean {
+  return (bundles ?? []).some((bundle) => resolveStructureAccessKeyKind(bundle) === "classico");
+}
+
+export function logisticCodeKeys(code: string): string[] {
+  const trimmed = String(code ?? "").trim();
+  if (!trimmed || trimmed === "0") return [];
+  const keys = [trimmed];
+  if (/^\d+$/.test(trimmed)) {
+    const canonical = String(Number(trimmed));
+    if (canonical !== trimmed && canonical !== "0") keys.push(canonical);
+  }
+  return keys;
+}
+
+function matchesClassicCode(logisticCode: string, classicCodes: Set<string>): boolean {
+  return logisticCodeKeys(logisticCode).some((key) => classicCodes.has(key));
+}
+
+/**
+ * Una task condivisa tra più cleaner compare una volta sola:
+ * sul cleaner primario, altrimenti su quello con sequenza più bassa.
+ */
+export function selectKeyRegistryTasks(tasks: KeyRegistryTaskInput[]): KeyRegistryTaskInput[] {
+  const byTask = new Map<number, KeyRegistryTaskInput[]>();
+  for (const task of tasks) {
+    const group = byTask.get(task.taskId) ?? [];
+    group.push(task);
+    byTask.set(task.taskId, group);
+  }
+
+  const selected: KeyRegistryTaskInput[] = [];
+  for (const group of byTask.values()) {
+    const primary = group.find((task) => task.isPrimary === true);
+    if (primary) {
+      selected.push(primary);
+      continue;
+    }
+    const solo = group.filter((task) => task.isPrimary == null);
+    const pool = solo.length > 0 ? solo : group;
+    pool.sort((a, b) => a.sequence - b.sequence || a.cleanerId - b.cleanerId);
+    selected.push(pool[0]);
+  }
+  return selected;
+}
+
+function compareCleaners(a: KeyRegistryCleaner, b: KeyRegistryCleaner): number {
+  const byLastname = a.lastname.localeCompare(b.lastname, "it", { sensitivity: "base" });
+  if (byLastname !== 0) return byLastname;
+  const byName = a.name.localeCompare(b.name, "it", { sensitivity: "base" });
+  if (byName !== 0) return byName;
+  return a.cleanerId - b.cleanerId;
+}
+
+function compareApartments(a: KeyRegistryApartment, b: KeyRegistryApartment): number {
+  if (a.sequence !== b.sequence) return a.sequence - b.sequence;
+  const aTime = a.startTime ?? "99:99";
+  const bTime = b.startTime ?? "99:99";
+  if (aTime !== bTime) return aTime.localeCompare(bTime);
+  return a.logisticCode.localeCompare(b.logisticCode, "it", { numeric: true });
+}
+
+export function buildKeyRegistry(input: {
+  cleaners: KeyRegistryCleanerInput[];
+  tasks: KeyRegistryTaskInput[];
+  classicCodes: Set<string>;
+  deliveredTaskIds: Set<number>;
+  returnedTaskIds?: Set<number>;
+  lostTaskIds?: Set<number>;
+  driverTaskIds?: Set<number>;
+}): KeyRegistryCleaner[] {
+  const cleanerById = new Map(input.cleaners.map((cleaner) => [cleaner.id, cleaner]));
+  const classicTasks = input.tasks.filter((task) => matchesClassicCode(task.logisticCode, input.classicCodes));
+  const selected = selectKeyRegistryTasks(classicTasks);
+  const grouped = new Map<number, KeyRegistryApartment[]>();
+
+  for (const task of selected) {
+    const apartments = grouped.get(task.cleanerId) ?? [];
+    apartments.push({
+      taskId: task.taskId,
+      logisticCode: task.logisticCode,
+      aptCode: task.aptCode,
+      customerName: task.customerName ?? null,
+      interventionType: task.interventionType?.trim() || null,
+      keyBundles: task.keyBundles ?? [],
+      sequence: task.sequence,
+      startTime: task.startTime,
+      delivered: input.deliveredTaskIds.has(task.taskId),
+      returned: input.returnedTaskIds?.has(task.taskId) ?? false,
+      lost: input.lostTaskIds?.has(task.taskId) ?? false,
+      driverKey: input.driverTaskIds?.has(task.taskId) ?? false,
+      priorAlerts: [],
+    });
+    grouped.set(task.cleanerId, apartments);
+  }
+
+  const rows: KeyRegistryCleaner[] = [];
+  for (const [cleanerId, apartments] of grouped) {
+    const cleaner = cleanerById.get(cleanerId);
+    apartments.sort(compareApartments);
+    rows.push({
+      cleanerId,
+      name: cleaner?.name?.trim() ?? "",
+      lastname: cleaner?.lastname?.trim() ?? "",
+      matricola: cleaner?.matricola?.trim() || null,
+      apartments,
+    });
+  }
+
+  rows.sort(compareCleaners);
+  return rows;
+}
