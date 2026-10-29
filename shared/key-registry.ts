@@ -33,6 +33,8 @@ export type KeyRegistryApartment = {
   keyBundles: StructureAccessBundle[];
   sequence: number;
   startTime: string | null;
+  /** Chiave classica: è la vista «solo chiavi fisiche». */
+  physicalKey: boolean;
   delivered: boolean;
   returned: boolean;
   lost: boolean;
@@ -99,6 +101,11 @@ export function isLostKeyVisible(workDate: string, today: string): boolean {
   return workDate < today;
 }
 
+/** Le chiavi smarrite compaiono anche se sono state segnate oggi. */
+export function isLostKeyListed(workDate: string, today: string): boolean {
+  return workDate <= today;
+}
+
 export function daysSinceWorkDate(workDate: string, today: string): number {
   const [year, month, day] = workDate.split("-").map(Number);
   const [todayYear, todayMonth, todayDay] = today.split("-").map(Number);
@@ -110,6 +117,29 @@ export function daysSinceWorkDate(workDate: string, today: string): number {
 /** Un appartamento conta come una sola chiave classica, anche con più mazzi classici. */
 export function hasClassicKey(bundles: StructureAccessBundle[] | null | undefined): boolean {
   return (bundles ?? []).some((bundle) => resolveStructureAccessKeyKind(bundle) === "classico");
+}
+
+/** Simbolo nel registro: la classica vince; senza classica, Smart e KBox insieme usano la KBox. */
+export type RegistryKeyIcon = "classico" | "smart" | "kbox" | "smart-kbox" | "unknown" | "none";
+
+export function registryKeyIcon(bundles: StructureAccessBundle[] | null | undefined): RegistryKeyIcon {
+  const list = bundles ?? [];
+  if (list.length === 0) return "none";
+  let hasClassic = false;
+  let hasSmart = false;
+  let hasKbox = false;
+  for (const bundle of list) {
+    if (bundle.keysType == null) continue;
+    const kind = resolveStructureAccessKeyKind(bundle);
+    if (kind === "classico") hasClassic = true;
+    else if (kind === "smart") hasSmart = true;
+    else if (kind === "kbox") hasKbox = true;
+  }
+  if (hasClassic) return "classico";
+  if (hasSmart && hasKbox) return "smart-kbox";
+  if (hasKbox) return "kbox";
+  if (hasSmart) return "smart";
+  return "unknown";
 }
 
 export function logisticCodeKeys(code: string): string[] {
@@ -154,12 +184,47 @@ export function selectKeyRegistryTasks(tasks: KeyRegistryTaskInput[]): KeyRegist
   return selected;
 }
 
+function firstStartTime(cleaner: KeyRegistryCleaner): string {
+  return cleaner.apartments[0]?.startTime?.trim() || "99:99";
+}
+
 function compareCleaners(a: KeyRegistryCleaner, b: KeyRegistryCleaner): number {
+  const byTime = firstStartTime(a).localeCompare(firstStartTime(b));
+  if (byTime !== 0) return byTime;
   const byLastname = a.lastname.localeCompare(b.lastname, "it", { sensitivity: "base" });
   if (byLastname !== 0) return byLastname;
   const byName = a.name.localeCompare(b.name, "it", { sensitivity: "base" });
   if (byName !== 0) return byName;
   return a.cleanerId - b.cleanerId;
+}
+
+/** Solo chiavi fisiche, riordinate sullo start time del primo appartamento rimasto. */
+export function cleanersWithPhysicalKeys<
+  T extends {
+    cleanerId: number;
+    name: string;
+    lastname: string;
+    apartments: { physicalKey?: boolean; startTime: string | null }[];
+  },
+>(cleaners: T[]): T[] {
+  const filtered = cleaners
+    .map((cleaner) => ({
+      ...cleaner,
+      apartments: cleaner.apartments.filter((apartment) => apartment.physicalKey),
+    }))
+    .filter((cleaner) => cleaner.apartments.length > 0);
+  filtered.sort((a, b) => {
+    const byTime = (a.apartments[0]?.startTime?.trim() || "99:99").localeCompare(
+      b.apartments[0]?.startTime?.trim() || "99:99",
+    );
+    if (byTime !== 0) return byTime;
+    const byLastname = a.lastname.localeCompare(b.lastname, "it", { sensitivity: "base" });
+    if (byLastname !== 0) return byLastname;
+    const byName = a.name.localeCompare(b.name, "it", { sensitivity: "base" });
+    if (byName !== 0) return byName;
+    return a.cleanerId - b.cleanerId;
+  });
+  return filtered;
 }
 
 function compareApartments(a: KeyRegistryApartment, b: KeyRegistryApartment): number {
@@ -180,11 +245,13 @@ export function buildKeyRegistry(input: {
   driverTaskIds?: Set<number>;
 }): KeyRegistryCleaner[] {
   const cleanerById = new Map(input.cleaners.map((cleaner) => [cleaner.id, cleaner]));
-  const classicTasks = input.tasks.filter((task) => matchesClassicCode(task.logisticCode, input.classicCodes));
-  const selected = selectKeyRegistryTasks(classicTasks);
+  const selected = selectKeyRegistryTasks(input.tasks);
   const grouped = new Map<number, KeyRegistryApartment[]>();
 
   for (const task of selected) {
+    const bundles = task.keyBundles ?? [];
+    const physicalKey = matchesClassicCode(task.logisticCode, input.classicCodes);
+    if (!physicalKey && registryKeyIcon(bundles) === "none") continue;
     const apartments = grouped.get(task.cleanerId) ?? [];
     apartments.push({
       taskId: task.taskId,
@@ -192,9 +259,10 @@ export function buildKeyRegistry(input: {
       aptCode: task.aptCode,
       customerName: task.customerName ?? null,
       interventionType: task.interventionType?.trim() || null,
-      keyBundles: task.keyBundles ?? [],
+      keyBundles: bundles,
       sequence: task.sequence,
       startTime: task.startTime,
+      physicalKey,
       delivered: input.deliveredTaskIds.has(task.taskId),
       returned: input.returnedTaskIds?.has(task.taskId) ?? false,
       lost: input.lostTaskIds?.has(task.taskId) ?? false,

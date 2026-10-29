@@ -4,6 +4,7 @@ import {
   resolveStructureAccessBundlePresentation,
   type StructureAccessBundle,
 } from "@shared/structure-access-keys";
+import { registryKeyIcon } from "@shared/key-registry";
 import {
   Dialog,
   DialogContent,
@@ -115,17 +116,20 @@ export function StructureAccessKeyButtons({
   bundles,
   size = "sm",
   layout = "separate",
+  physicalKey = false,
 }: {
   bundles: StructureAccessBundle[];
   size?: "sm" | "md";
   /** Nel registro chiavi un solo simbolo, con il numero dei mazzi. Nei dialog dei task resta un'icona per mazzo. */
   layout?: "separate" | "badge";
+  /** Nel registro, una chiave classica usa sempre il simbolo classico anche se il mazzo visibile è un altro. */
+  physicalKey?: boolean;
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [badgeOpen, setBadgeOpen] = useState(false);
   const openBundle = openIndex != null ? bundles[openIndex] ?? null : null;
 
-  if (bundles.length === 0) return null;
+  if (bundles.length === 0 && !physicalKey) return null;
 
   const buttonSize = size === "md" ? "h-11 w-11" : "h-9 w-9";
   const iconSize = size === "md" ? "h-5 w-5" : "h-4 w-4";
@@ -133,6 +137,29 @@ export function StructureAccessKeyButtons({
   if (layout === "badge") {
     const countLabel = bundles.length === 1 ? "1 mazzo" : `${bundles.length} mazzi`;
     const tone = badgeTone(bundles);
+    const icon = physicalKey ? "classico" : registryKeyIcon(bundles);
+    const badgeIcon =
+      icon === "smart" ? (
+        <Keyboard className={cn(iconSize, "text-red-600")} aria-hidden />
+      ) : icon === "kbox" ? (
+        <Lock className={cn(iconSize, "text-yellow-500")} aria-hidden />
+      ) : icon === "smart-kbox" ? (
+        <Lock className={cn(iconSize, "text-pink-500")} aria-hidden />
+      ) : icon === "unknown" ? (
+        <span className="text-lg font-bold leading-none text-slate-500" aria-hidden>
+          ?
+        </span>
+      ) : (
+        <KeyRound className={cn(iconSize, "text-slate-500")} aria-hidden />
+      );
+    const badgeClass =
+      icon === "smart"
+        ? bundleButtonClass("smart")
+        : icon === "kbox"
+          ? bundleButtonClass("kbox")
+          : icon === "smart-kbox"
+            ? "border-pink-300 bg-pink-50 hover:bg-pink-100 dark:border-pink-800 dark:bg-pink-950/40"
+            : bundleButtonClass("classico");
     return (
       <>
         <button
@@ -142,13 +169,13 @@ export function StructureAccessKeyButtons({
           className={cn(
             "relative inline-flex items-center justify-center rounded-full border transition-colors",
             buttonSize,
-            bundleButtonClass("classico")
+            badgeClass
           )}
           aria-label={`Apri specifiche chiavi, ${countLabel}`}
           onClick={() => setBadgeOpen(true)}
         >
-          <KeyRound className={cn(iconSize, "text-slate-500")} aria-hidden />
-          {bundles.length > 1 ? (
+          {badgeIcon}
+          {icon === "classico" && bundles.length > 1 ? (
             <span
               className={cn(
                 "absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-semibold leading-none",

@@ -2,13 +2,15 @@ import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDays, format, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Loader2, RefreshCw, Search, TriangleAlert, Undo2 } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, KeyRound, Loader2, RefreshCw, Search, TriangleAlert, Undo2 } from "lucide-react";
 import { Link } from "wouter";
 import { StructureAccessKeyButtons } from "@/components/structure-access-key-type";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { StructureAccessBundle } from "@shared/structure-access-keys";
 import {
+  calendarDateInRome,
+  cleanersWithPhysicalKeys,
   keyHandoverStatus,
   nextKeyHandoverStatus,
   priorAlertTone,
@@ -29,6 +31,7 @@ type Apartment = {
   keyBundles?: StructureAccessBundle[];
   sequence: number;
   startTime: string | null;
+  physicalKey?: boolean;
   delivered: boolean;
   returned?: boolean;
   lost?: boolean;
@@ -246,6 +249,7 @@ export default function KeyRegistry() {
   const [pendingIds, setPendingIds] = useState<Set<number>>(new Set());
   const [alertApartment, setAlertApartment] = useState<Apartment | null>(null);
   const [search, setSearch] = useState("");
+  const [physicalOnly, setPhysicalOnly] = useState(false);
   const queryKey = useMemo(() => [`/api/key-registry?date=${date}`] as const, [date]);
 
   const registryQuery = useQuery<RegistryPayload>({
@@ -264,7 +268,7 @@ export default function KeyRegistry() {
   };
 
   const cycleStatus = async (apartment: Apartment) => {
-    if (viewer || pendingIds.has(apartment.taskId)) return;
+    if (viewer || apartment.physicalKey === false || pendingIds.has(apartment.taskId)) return;
     const status = nextKeyHandoverStatus(keyHandoverStatus(apartment));
     const previous = queryClient.getQueryData<RegistryPayload>(queryKey);
     setPendingIds((current) => new Set(current).add(apartment.taskId));
@@ -295,7 +299,7 @@ export default function KeyRegistry() {
   };
 
   const markLost = async (apartment: Apartment) => {
-    if (viewer || pendingIds.has(apartment.taskId) || apartment.lost) return;
+    if (viewer || apartment.physicalKey === false || pendingIds.has(apartment.taskId) || apartment.lost) return;
     const previous = queryClient.getQueryData<RegistryPayload>(queryKey);
     setPendingIds((current) => new Set(current).add(apartment.taskId));
     if (previous) {
@@ -332,7 +336,7 @@ export default function KeyRegistry() {
   };
 
   const markDriver = async (apartment: Apartment, taken: boolean) => {
-    if (viewer || pendingIds.has(apartment.taskId) || Boolean(apartment.driverKey) === taken) return;
+    if (viewer || apartment.physicalKey === false || pendingIds.has(apartment.taskId) || Boolean(apartment.driverKey) === taken) return;
     const previous = queryClient.getQueryData<RegistryPayload>(queryKey);
     setPendingIds((current) => new Set(current).add(apartment.taskId));
     if (previous) {
@@ -372,7 +376,7 @@ export default function KeyRegistry() {
   };
 
   const recoverLost = async (apartment: Apartment) => {
-    if (viewer || pendingIds.has(apartment.taskId)) return;
+    if (viewer || apartment.physicalKey === false || pendingIds.has(apartment.taskId)) return;
     const previous = queryClient.getQueryData<RegistryPayload>(queryKey);
     setPendingIds((current) => new Set(current).add(apartment.taskId));
     if (previous) queryClient.setQueryData(queryKey, patchStatus(previous, apartment.taskId, "returned"));
@@ -399,9 +403,25 @@ export default function KeyRegistry() {
 
   const payload = registryQuery.data;
   const headingDate = format(parseISO(date), "EEEE d MMMM yyyy", { locale: it });
+  const today = calendarDateInRome();
   const searchQuery = search.trim().toLowerCase();
-  const visibleCleaners = useMemo(() => {
+  const roster = useMemo(() => {
     const cleaners = payload?.cleaners ?? [];
+    if (!physicalOnly) return cleaners;
+    return cleanersWithPhysicalKeys(cleaners);
+  }, [payload, physicalOnly]);
+  const displayTotals = useMemo(() => {
+    const apartments = roster
+      .flatMap((cleaner) => cleaner.apartments)
+      .filter((apartment) => apartment.physicalKey !== false);
+    return {
+      warehouse: apartments.filter((apartment) => keyHandoverStatus(apartment) === "warehouse").length,
+      withCleaner: apartments.filter((apartment) => keyHandoverStatus(apartment) === "with_cleaner").length,
+      returned: apartments.filter((apartment) => keyHandoverStatus(apartment) === "returned").length,
+    };
+  }, [roster]);
+  const visibleCleaners = useMemo(() => {
+    const cleaners = roster;
     if (!searchQuery) return cleaners;
     return cleaners
       .map((cleaner) => {
@@ -417,7 +437,7 @@ export default function KeyRegistry() {
         return { ...cleaner, apartments };
       })
       .filter((cleaner) => cleaner.apartments.length > 0);
-  }, [payload, searchQuery]);
+  }, [roster, searchQuery]);
 
   return (
     <div className="min-h-[calc(100dvh-3.5rem)] bg-background text-foreground md:min-h-[calc(100dvh-3.75rem)]">
@@ -493,6 +513,34 @@ export default function KeyRegistry() {
               type="button"
               variant="outline"
               size="icon"
+              data-viewer-allow=""
+              data-testid="button-physical-keys"
+              aria-pressed={physicalOnly}
+              title={physicalOnly ? "Mostra tutti i tipi di chiave" : "Solo chiavi fisiche"}
+              aria-label={physicalOnly ? "Mostra tutti i tipi di chiave" : "Solo chiavi fisiche"}
+              onClick={() => setPhysicalOnly((current) => !current)}
+              className={cn("h-12 w-12 shrink-0", physicalOnly && "border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white")}
+            >
+              <KeyRound className="h-5 w-5" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              data-viewer-allow=""
+              data-testid="button-today"
+              title="Oggi"
+              aria-label="Vai alla giornata di oggi"
+              disabled={date === today}
+              onClick={() => changeDate(today)}
+              className="h-12 w-12 shrink-0"
+            >
+              <Calendar className="h-5 w-5" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
               className="h-12 w-12 shrink-0"
               data-viewer-allow=""
               aria-label="Giorno successivo"
@@ -520,16 +568,16 @@ export default function KeyRegistry() {
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="rounded-xl border-2 border-slate-300 bg-slate-100 px-2 py-3 dark:border-slate-600 dark:bg-slate-800">
                 <p className="text-2xl font-semibold tabular-nums text-slate-800 dark:text-slate-100">
-                  {payload.totals.warehouse}
+                  {displayTotals.warehouse}
                 </p>
                 <p className="text-xs font-medium text-slate-700 dark:text-slate-200">In magazzino</p>
               </div>
               <div className="rounded-xl border-2 border-amber-500 bg-amber-400 px-2 py-3">
-                <p className="text-2xl font-semibold tabular-nums text-amber-950">{payload.totals.withCleaner}</p>
+                <p className="text-2xl font-semibold tabular-nums text-amber-950">{displayTotals.withCleaner}</p>
                 <p className="text-xs font-medium text-amber-950">Consegnate</p>
               </div>
               <div className="rounded-xl border-2 border-emerald-700 bg-emerald-600 px-2 py-3">
-                <p className="text-2xl font-semibold tabular-nums text-white">{payload.totals.returned}</p>
+                <p className="text-2xl font-semibold tabular-nums text-white">{displayTotals.returned}</p>
                 <p className="text-xs font-medium text-white">Restituite</p>
               </div>
             </div>
@@ -550,21 +598,22 @@ export default function KeyRegistry() {
               {registryQuery.error instanceof Error ? registryQuery.error.message : "Errore di caricamento"}
             </p>
           </div>
-        ) : payload && payload.cleaners.length === 0 ? (
-          <p className="py-16 text-center text-muted-foreground">
-            Nessuna chiave classica assegnata in questa giornata.
-          </p>
         ) : visibleCleaners.length === 0 ? (
           <p className="py-16 text-center text-muted-foreground">
-            Nessuna chiave corrisponde alla ricerca.
+            {searchQuery
+              ? "Nessuna chiave corrisponde alla ricerca."
+              : physicalOnly
+                ? "Nessuna chiave fisica assegnata in questa giornata."
+                : "Nessuna chiave assegnata in questa giornata."}
           </p>
         ) : (
           <div className="space-y-4 pb-8">
             {visibleCleaners.map((cleaner) => {
-              const withCleaner = cleaner.apartments.filter(
+              const tracked = cleaner.apartments.filter((apartment) => apartment.physicalKey !== false);
+              const withCleaner = tracked.filter(
                 (apartment) => keyHandoverStatus(apartment) === "with_cleaner"
               ).length;
-              const returned = cleaner.apartments.filter(
+              const returned = tracked.filter(
                 (apartment) => keyHandoverStatus(apartment) === "returned"
               ).length;
               return (
@@ -581,6 +630,25 @@ export default function KeyRegistry() {
                   <ul className="space-y-2 p-3">
                     {cleaner.apartments.map((apartment) => {
                       const pending = pendingIds.has(apartment.taskId);
+                      const handover = apartment.physicalKey !== false;
+                      if (!handover) {
+                        return (
+                          <li
+                            key={apartment.taskId}
+                            className="flex min-h-[4.75rem] items-center gap-3 rounded-xl border-2 border-border bg-card px-3 py-3"
+                          >
+                            <span className="shrink-0 text-2xl font-semibold tabular-nums">{apartment.logisticCode}</span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium">{apartment.aptCode || "—"}</span>
+                              <span className="block truncate text-sm text-muted-foreground">{apartment.customerName || "—"}</span>
+                              {apartment.interventionType ? (
+                                <span className="block truncate text-sm text-muted-foreground">{apartment.interventionType}</span>
+                              ) : null}
+                            </span>
+                            <StructureAccessKeyButtons bundles={apartment.keyBundles ?? []} size="md" layout="badge" physicalKey={false} />
+                          </li>
+                        );
+                      }
                       const lostToday = Boolean(apartment.lost);
                       const status = keyHandoverStatus(apartment);
                       const alertTone = lostToday ? null : priorAlertTone(apartment.priorAlerts);
@@ -671,7 +739,7 @@ export default function KeyRegistry() {
                               Ripristina
                             </button>
                           ) : null}
-                          <StructureAccessKeyButtons bundles={apartment.keyBundles ?? []} size="md" layout="badge" />
+                          <StructureAccessKeyButtons bundles={apartment.keyBundles ?? []} size="md" layout="badge" physicalKey />
                         </SwipeKeyRow>
                       );
                     })}

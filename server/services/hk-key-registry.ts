@@ -6,6 +6,7 @@ import {
   calendarDateInRome,
   daysSinceWorkDate,
   hasClassicKey,
+  isLostKeyListed,
   isLostKeyVisible,
   keyHandoverStatus,
   logisticCodeKeys,
@@ -543,12 +544,13 @@ async function loadOutstandingKeys(
     kind === "lost"
       ? "lost = TRUE"
       : "delivered = TRUE AND returned = FALSE AND lost = FALSE";
+  const dateFilter = kind === "lost" ? "work_date <= $1::date" : "work_date < $1::date";
   const result = await query(
     `
       SELECT to_char(work_date, 'YYYY-MM-DD') AS work_date, task_id, cleaner_id, logistic_code, cleaner_name, matricola, apt_code, customer_name
       FROM hk_key_handovers
       WHERE ${filter}
-        AND work_date < $1::date
+        AND ${dateFilter}
       ORDER BY work_date ASC, cleaner_name ASC NULLS LAST, logistic_code ASC
     `,
     [today]
@@ -556,7 +558,8 @@ async function loadOutstandingKeys(
   const keys: LostKeyRow[] = [];
   for (const row of result.rows) {
     const workDate = asWorkDate(row.work_date);
-    if (!isLostKeyVisible(workDate, today)) continue;
+    const visible = kind === "lost" ? isLostKeyListed(workDate, today) : isLostKeyVisible(workDate, today);
+    if (!visible) continue;
     const cleanerId = Number(row.cleaner_id);
     keys.push({
       workDate,

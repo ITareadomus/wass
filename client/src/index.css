@@ -25,6 +25,30 @@
   animation: blink-border 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* Avviso chiavi in convocazioni: un respiro lento, senza il bagliore della timeline. */
+@keyframes held-key-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.08);
+    box-shadow: 0 0 0 6px rgba(220, 38, 38, 0.4);
+  }
+}
+
+.animate-held-key {
+  animation: held-key-pulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-held-key {
+    animation: none;
+  }
+}
+
 /* Stesso ritmo del blink rosso timeline, in giallo (es. task logistici senza tipologia) */
 @keyframes blink-border-yellow {
   0%, 100% {

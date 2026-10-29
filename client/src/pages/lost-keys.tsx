@@ -43,9 +43,9 @@ const LIST_COPY: Record<
   lost: {
     path: "/api/key-registry/lost",
     title: "Chiavi smarrite",
-    description: "Chiavi segnate smarrite nei giorni già passati.",
+    description: "Chiavi segnate smarrite, anche nella giornata di oggi.",
     loading: "Caricamento chiavi smarrite",
-    empty: "Nessuna chiave smarrita dei giorni passati.",
+    empty: "Nessuna chiave smarrita.",
     action: "Ripristina",
     errorTitle: "Chiave non ripristinata",
   },
