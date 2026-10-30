@@ -89,6 +89,7 @@ const ROW_TONE: Record<KeyHandoverStatus, string> = {
 function SwipeKeyRow({
   disabled,
   lostBlocked,
+  driverMarked,
   onCommitLost,
   onCommitDriver,
   className,
@@ -96,6 +97,8 @@ function SwipeKeyRow({
 }: {
   disabled: boolean;
   lostBlocked: boolean;
+  /** Chiave già segnata come autista: lo scorrimento a destra la toglie. */
+  driverMarked: boolean;
   onCommitLost: () => Promise<void>;
   onCommitDriver: () => Promise<void>;
   className?: string;
@@ -191,7 +194,7 @@ function SwipeKeyRow({
           offset > 0 ? "justify-start" : "invisible"
         )}
       >
-        Autista
+        {driverMarked ? "Togli autista" : "Autista"}
       </div>
       <div
         className={cn(
@@ -202,7 +205,11 @@ function SwipeKeyRow({
         Smarrita
       </div>
       <div
-        className={cn("relative flex min-h-[4.75rem] w-full items-center gap-2 px-3 py-3", className)}
+        className={cn(
+          "relative flex min-h-[4.75rem] w-full items-center gap-2 px-3 py-3",
+          offset > 0 && "[&_[data-driver-key]]:invisible",
+          className
+        )}
         style={{
           transform: `translateX(${offset}px)`,
           transition: dragging ? "none" : "transform 180ms ease",
@@ -659,8 +666,9 @@ export default function KeyRegistry() {
                           key={apartment.taskId}
                           disabled={viewer || pending}
                           lostBlocked={lostToday}
+                          driverMarked={Boolean(apartment.driverKey)}
                           onCommitLost={() => markLost(apartment)}
-                          onCommitDriver={() => markDriver(apartment, true)}
+                          onCommitDriver={() => markDriver(apartment, !apartment.driverKey)}
                           className={cn(
                             "rounded-xl border-2",
                             lostToday ? "border-red-600 bg-red-600 text-white" : ROW_TONE[status]
@@ -679,17 +687,15 @@ export default function KeyRegistry() {
                               {apartment.logisticCode}
                             </button>
                             {apartment.driverKey ? (
-                              <button
-                                type="button"
+                              <span
                                 data-testid="button-driver-key"
-                                title="Chiave autista"
-                                aria-label={`Togli la chiave dell'autista, ${apartment.logisticCode}`}
-                                disabled={pending || viewer}
-                                onClick={() => markDriver(apartment, false)}
-                                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-violet-900 bg-violet-800 text-lg font-semibold leading-none text-violet-100 disabled:opacity-100"
+                                data-driver-key=""
+                                title="Chiave autista. Scorri la riga verso destra per toglierla."
+                                aria-label={`Chiave dell'autista, ${apartment.logisticCode}`}
+                                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-violet-900 bg-violet-800 text-lg font-semibold leading-none text-violet-100"
                               >
                                 A
-                              </button>
+                              </span>
                             ) : null}
                           </span>
                           <button
