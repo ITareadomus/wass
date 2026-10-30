@@ -3296,18 +3296,13 @@ export default function LogisticsTimelineView({
                 <div className="col-span-2">
                   <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1 flex items-center gap-1">
                     Alias
-                    {!isReadOnly && (
-                      <Pencil className="w-3 h-3 text-gray-700 dark:text-muted-foreground/60" />
-                    )}
+                    <Pencil className="w-3 h-3 text-gray-700 dark:text-muted-foreground/60" />
                   </p>
                   <p
-                    className={cn(
-                      "text-sm p-2 rounded border border-border",
-                      !isReadOnly && "cursor-pointer hover:bg-muted/50 hover:border-custom-blue"
-                    )}
+                    className="text-sm p-2 rounded border border-border cursor-pointer hover:bg-muted/50 hover:border-custom-blue"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!isReadOnly) handleOpenAliasDialogForDriver(selectedDriverForDetails);
+                      handleOpenAliasDialogForDriver(selectedDriverForDetails);
                     }}
                   >
                     {driversAliases[selectedDriverForDetails.id]?.alias ||

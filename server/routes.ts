@@ -6769,7 +6769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const workDate = date || format(new Date(), "yyyy-MM-dd");
-      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+      // L'alias è permanente e resta modificabile anche a giornata avviata o passata.
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
 
       // Aggiorna alias direttamente in PostgreSQL
@@ -11347,7 +11347,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       }
 
       const workDate = date || format(new Date(), "yyyy-MM-dd");
-      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+      // L'alias è permanente e resta modificabile anche a giornata avviata o passata.
 
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
 

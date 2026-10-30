@@ -171,6 +171,82 @@ const formatCleaningHours = (minutes: unknown): string => {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 };
 
+const minutesToHourMinuteFields = (totalMinutes: number): { hours: string; minutes: string } => {
+  const total = Math.max(0, Math.round(Number(totalMinutes) || 0));
+  return {
+    hours: String(Math.floor(total / 60)),
+    minutes: String(total % 60).padStart(2, "0"),
+  };
+};
+
+/** Minuti totali da ore e minuti. null se i minuti superano 59. */
+const hourMinuteFieldsToMinutes = (hoursRaw: string, minutesRaw: string): number | null => {
+  const hoursText = hoursRaw.trim();
+  const minutesText = minutesRaw.trim();
+  if (hoursText === "" && minutesText === "") return null;
+  if ((hoursText !== "" && !/^\d+$/.test(hoursText)) || (minutesText !== "" && !/^\d+$/.test(minutesText))) {
+    return null;
+  }
+  const hours = hoursText === "" ? 0 : Number(hoursText);
+  const minutes = minutesText === "" ? 0 : Number(minutesText);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || minutes > 59) return null;
+  return hours * 60 + minutes;
+};
+
+function HourMinuteDurationFields({
+  hours,
+  minutes,
+  onHoursChange,
+  onMinutesChange,
+  onSubmit,
+}: {
+  hours: string;
+  minutes: string;
+  onHoursChange: (value: string) => void;
+  onMinutesChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  const keepDigits = (value: string, maxLen: number) => value.replace(/\D/g, "").slice(0, maxLen);
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <div>
+        <label className="text-sm font-semibold text-muted-foreground mb-2 block">Ore</label>
+        <Input
+          type="text"
+          inputMode="numeric"
+          value={hours}
+          onChange={(e) => onHoursChange(keepDigits(e.target.value, 2))}
+          placeholder="1"
+          className="w-full"
+          autoFocus
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onSubmit();
+          }}
+        />
+      </div>
+      <div>
+        <label className="text-sm font-semibold text-muted-foreground mb-2 block">Minuti</label>
+        <Input
+          type="text"
+          inputMode="numeric"
+          value={minutes}
+          onChange={(e) => {
+            const next = keepDigits(e.target.value, 2);
+            if (next.length === 2 && Number(next) > 59) return;
+            onMinutesChange(next);
+          }}
+          placeholder="30"
+          className="w-full"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onSubmit();
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 // Normalizza data nel formato YYYY-MM-DD per il picker HTML5
 const normalizeDate = (dateStr: any): string => {
   if (!dateStr) return "";
@@ -1016,7 +1092,8 @@ const displayClickableInputClass =
   const [isSavingCheckin, setIsSavingCheckin] = useState(false);
 
   const [durationDialogOpen, setDurationDialogOpen] = useState(false);
-  const [editingDurationInDialog, setEditingDurationInDialog] = useState("");
+  const [editingDurationHours, setEditingDurationHours] = useState("");
+  const [editingDurationMinutes, setEditingDurationMinutes] = useState("");
   const [isSavingDuration, setIsSavingDuration] = useState(false);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [editingScheduleStart, setEditingScheduleStart] = useState("");
@@ -1045,6 +1122,7 @@ const displayClickableInputClass =
 
   // Dialog per sbilanciare la quota di un singolo collaboratore
   const [shareDialogCleaner, setShareDialogCleaner] = useState<any | null>(null);
+  const [editingShareHours, setEditingShareHours] = useState("");
   const [editingShareMinutes, setEditingShareMinutes] = useState("");
   const [isSavingShare, setIsSavingShare] = useState(false);
 
@@ -2246,16 +2324,18 @@ const displayClickableInputClass =
   };
 
   const handleOpenDurationDialog = () => {
-    setEditingDurationInDialog(String(getTotalCleaningMinutes(displayTask) || ""));
+    const parts = minutesToHourMinuteFields(getTotalCleaningMinutes(displayTask) || 0);
+    setEditingDurationHours(parts.hours);
+    setEditingDurationMinutes(parts.minutes);
     setDurationDialogOpen(true);
   };
 
   const handleSaveDuration = async () => {
-    const value = parseInt(editingDurationInDialog, 10);
-    if (isNaN(value) || value <= 0) {
+    const value = hourMinuteFieldsToMinutes(editingDurationHours, editingDurationMinutes);
+    if (value == null || value <= 0) {
       toast({
         title: "Errore di validazione",
-        description: "La durata della pulizia deve essere maggiore di 0 minuti",
+        description: "Inserisci ore e minuti validi. I minuti vanno da 0 a 59 e la durata deve essere maggiore di zero.",
         variant: "destructive",
       });
       return;
@@ -2307,16 +2387,18 @@ const displayClickableInputClass =
   };
 
   const handleOpenShareDialog = (collaborator: any) => {
+    const parts = minutesToHourMinuteFields(Number(collaborator?.cleaningTime) || 0);
     setShareDialogCleaner(collaborator);
-    setEditingShareMinutes(String(Number(collaborator?.cleaningTime) || ""));
+    setEditingShareHours(parts.hours);
+    setEditingShareMinutes(parts.minutes);
   };
 
   const handleSaveCollaboratorShare = async () => {
-    const value = parseInt(editingShareMinutes, 10);
-    if (isNaN(value) || value <= 0) {
+    const value = hourMinuteFieldsToMinutes(editingShareHours, editingShareMinutes);
+    if (value == null || value <= 0) {
       toast({
         title: "Errore di validazione",
-        description: "La durata del collaboratore deve essere maggiore di 0 minuti",
+        description: "Inserisci ore e minuti validi. I minuti vanno da 0 a 59 e la durata deve essere maggiore di zero.",
         variant: "destructive",
       });
       return;
@@ -4429,31 +4511,20 @@ const displayClickableInputClass =
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4">
-            <div>
-              <label className="text-sm font-semibold text-muted-foreground mb-2 block">
-                Durata di questo cleaner (minuti)
-              </label>
-              <Input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={editingShareMinutes}
-                onChange={(e) => setEditingShareMinutes(e.target.value.replace(/\D/g, ""))}
-                placeholder="es. 180"
-                className="w-full"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSaveCollaboratorShare();
-                }}
-              />
-            </div>
+            <HourMinuteDurationFields
+              hours={editingShareHours}
+              minutes={editingShareMinutes}
+              onHoursChange={setEditingShareHours}
+              onMinutesChange={setEditingShareMinutes}
+              onSubmit={handleSaveCollaboratorShare}
+            />
             <p className="text-xs text-purple-600 dark:text-purple-400">
               {(() => {
-                const next = parseInt(editingShareMinutes, 10);
+                const next = hourMinuteFieldsToMinutes(editingShareHours, editingShareMinutes);
                 const others = taskCollaborators
                   .filter((c: any) => Number(c.id) !== Number(shareDialogCleaner?.id))
                   .reduce((sum: number, c: any) => sum + (Number(c.cleaningTime) || 0), 0);
-                if (!Number.isFinite(next) || next <= 0) {
+                if (next == null || next <= 0) {
                   return "Gli altri collaboratori mantengono la loro quota attuale.";
                 }
                 return `Durata distribuita: ${formatCleaningHours(others + next)} ore in totale.`;
@@ -4560,44 +4631,30 @@ const displayClickableInputClass =
               Modifica Durata pulizia
             </DialogTitle>
             <DialogDescription>
-              Task <strong>#{getTaskKey(displayTask)}</strong> — Inserisci la durata dell'appartamento in minuti. Il valore resta solo su WASS.
+              Task <strong>#{getTaskKey(displayTask)}</strong> — Inserisci la durata dell'appartamento in ore e minuti. Il valore resta solo su WASS.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4">
-            <div>
-              <label className="text-sm font-semibold text-muted-foreground mb-2 block">
-                Durata totale (minuti)
-              </label>
-              <Input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={editingDurationInDialog}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/\D/g, "");
-                  setEditingDurationInDialog(v);
-                }}
-                placeholder="es. 90"
-                className="w-full"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSaveDuration();
-                }}
-              />
-            </div>
+            <HourMinuteDurationFields
+              hours={editingDurationHours}
+              minutes={editingDurationMinutes}
+              onHoursChange={setEditingDurationHours}
+              onMinutesChange={setEditingDurationMinutes}
+              onSubmit={handleSaveDuration}
+            />
             {hasCollaboration && (
               <p className="text-xs text-purple-600 dark:text-purple-400">
                 {(() => {
-                  const total = parseInt(editingDurationInDialog, 10);
+                  const total = hourMinuteFieldsToMinutes(editingDurationHours, editingDurationMinutes);
                   const count = getCollaboratorCount(displayTask);
-                  if (!Number.isFinite(total) || total <= 0) {
+                  if (total == null || total <= 0) {
                     return `Durata divisa fra i ${count} cleaner in collaborazione. Non verrà più presa da ADAM.`;
                   }
                   const perCleaner = splitCleaningTimeAcrossCollaborators(total, count);
                   const resplitWarning = collaborationTotals?.hasManualSplit
                     ? " Le quote sbilanciate a mano tornano alla divisione equa."
                     : "";
-                  return `${total} minuti in totale → ${formatCleaningHours(perCleaner)} ore a testa su ${count} cleaner. Non verrà più presa da ADAM.${resplitWarning}`;
+                  return `${formatCleaningHours(total)} ore in totale → ${formatCleaningHours(perCleaner)} ore a testa su ${count} cleaner. Non verrà più presa da ADAM.${resplitWarning}`;
                 })()}
               </p>
             )}

@@ -26,7 +26,11 @@ const FAKE_TASKS = [
 
 export function readTimelineHourScale(): number {
   try {
-    const raw = Number(localStorage.getItem(TIMELINE_HOUR_SCALE_KEY));
+    const stored = localStorage.getItem(TIMELINE_HOUR_SCALE_KEY);
+    // Nessuna preferenza salvata (nuovo accesso): scala automatica, non il minimo.
+    // Number(null) vale 0 e verrebbe clampato a TIMELINE_HOUR_SCALE_MIN.
+    if (stored == null || stored.trim() === "") return 1;
+    const raw = Number(stored);
     if (!Number.isFinite(raw)) return 1;
     return clampTimelineHourScale(raw);
   } catch {
