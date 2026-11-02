@@ -363,7 +363,9 @@ function patchStatus(payload: RegistryPayload, taskId: number, status: KeyHandov
   const cleaners = payload.cleaners.map((cleaner) => ({
     ...cleaner,
     apartments: cleaner.apartments.map((apartment) =>
-      apartment.taskId === taskId ? { ...apartment, ...flags } : apartment
+      apartment.taskId === taskId
+        ? { ...apartment, ...flags, internalNote: flags.returned ? null : apartment.internalNote }
+        : apartment
     ),
   }));
   const apartments = cleaners.flatMap((cleaner) => cleaner.apartments);
@@ -968,7 +970,7 @@ export default function KeyRegistry() {
                               {apartment.interventionType ? (
                                 <span className={cn("block truncate text-sm", quiet)}>{apartment.interventionType}</span>
                               ) : null}
-                              {apartment.internalNote ? (
+                              {apartment.internalNote && status !== "returned" ? (
                                 <span className={cn("block truncate text-sm", quiet)}>{apartment.internalNote}</span>
                               ) : null}
                             </span>
@@ -1009,8 +1011,8 @@ export default function KeyRegistry() {
                             size="md"
                             layout="badge"
                             physicalKey
-                            showInternalNote
-                            internalNote={apartment.internalNote}
+                            showInternalNote={status !== "returned"}
+                            internalNote={status === "returned" ? null : apartment.internalNote}
                             internalNoteReadOnly={viewer}
                             onSaveInternalNote={(note) => saveNote(apartment, note)}
                           />

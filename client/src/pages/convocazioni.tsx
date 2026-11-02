@@ -1831,16 +1831,17 @@ export default function Convocazioni() {
                     <p className="text-lg font-semibold tabular-nums">{key.logisticCode}</p>
                     <p className="text-sm">{key.aptCode || "—"}</p>
                     <p className="text-sm text-muted-foreground">{key.customerName || "—"}</p>
-                    {key.internalNote ? (
-                      <p className="mt-2 whitespace-pre-wrap rounded-lg bg-amber-50 px-2 py-1 text-sm text-amber-950 dark:bg-amber-950/40 dark:text-amber-100">
-                        {key.internalNote}
-                      </p>
-                    ) : null}
                     <p className="mt-1 text-sm text-muted-foreground">
                       {/^\d{4}-\d{2}-\d{2}$/.test(key.workDate)
                         ? `Da ${format(parseISO(key.workDate), "EEEE d MMMM yyyy", { locale: it })}`
                         : key.workDate}
                     </p>
+                    {key.internalNote ? (
+                      <div className="mt-2">
+                        <p className="text-sm font-semibold text-amber-600 dark:text-amber-300">Note</p>
+                        <p className="whitespace-pre-wrap text-sm">{key.internalNote}</p>
+                      </div>
+                    ) : null}
                   </li>
                 ))}
               </ul>

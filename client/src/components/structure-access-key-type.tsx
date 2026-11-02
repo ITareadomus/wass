@@ -114,7 +114,7 @@ function BundleCard({ bundle }: { bundle: StructureAccessBundle }) {
   );
 }
 
-function KeyInternalNote({
+export function KeyInternalNote({
   note,
   readOnly,
   onSave,
@@ -124,35 +124,69 @@ function KeyInternalNote({
   onSave?: (note: string) => Promise<void>;
 }) {
   const [draft, setDraft] = useState(note);
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  useEffect(() => setDraft(note), [note]);
+  useEffect(() => {
+    setDraft(note);
+    setEditing(false);
+  }, [note]);
 
   const save = async () => {
     if (!onSave || readOnly || saving) return;
     setSaving(true);
     try {
       await onSave(draft);
+      setEditing(false);
     } finally {
       setSaving(false);
     }
   };
 
+  const text = note.trim();
+
   return (
     <div className="space-y-2 border-t pt-3">
       <p className="text-sm font-semibold">Nota interna</p>
-      <Textarea
-        value={draft}
-        maxLength={1000}
-        readOnly={readOnly || saving}
-        aria-label="Nota interna"
-        placeholder="Informazione per chi usa il registro"
-        className="min-h-24 text-base"
-        onChange={(event) => setDraft(event.target.value)}
-      />
-      {readOnly ? null : (
-        <Button type="button" onClick={save} disabled={saving} className="w-full">
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salva nota"}
-        </Button>
+      {editing && !readOnly ? (
+        <>
+          <Textarea
+            value={draft}
+            maxLength={1000}
+            readOnly={saving}
+            aria-label="Nota interna"
+            placeholder="Informazione per chi usa il registro"
+            className="min-h-24 text-base"
+            onChange={(event) => setDraft(event.target.value)}
+          />
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              disabled={saving}
+              onClick={() => {
+                setDraft(note);
+                setEditing(false);
+              }}
+            >
+              Annulla
+            </Button>
+            <Button type="button" onClick={save} disabled={saving} className="flex-1">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salva nota"}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className={cn("whitespace-pre-wrap text-sm", text ? "text-foreground" : "text-muted-foreground")}>
+            {text || "Nessuna nota"}
+          </p>
+          {readOnly ? null : (
+            <Button type="button" variant="outline" className="w-full" onClick={() => setEditing(true)}>
+              {text ? "Modifica nota" : "Scrivi nota"}
+            </Button>
+          )}
+        </>
       )}
     </div>
   );

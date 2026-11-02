@@ -5,6 +5,8 @@ import { it } from "date-fns/locale";
 import { Check, ChevronLeft, Loader2, RefreshCw, Undo2 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { KeyInternalNote } from "@/components/structure-access-key-type";
 import { useToast } from "@/hooks/use-toast";
 import { getStoredUserRole, isViewerRole } from "@/lib/auth-role";
 import { apiRequest } from "@/lib/queryClient";
@@ -80,7 +82,38 @@ function KeyListPage({ kind }: { kind: ListKind }) {
   const queryClient = useQueryClient();
   const viewer = isViewerRole(getStoredUserRole());
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [openKey, setOpenKey] = useState<LostKey | null>(null);
   const listQuery = useQuery<LostKeysPayload>({ queryKey: [...queryKey] });
+
+  const saveNote = async (key: LostKey, draft: string) => {
+    if (viewer) return;
+    const note = draft.trim();
+    try {
+      await apiRequest("POST", "/api/key-registry/note", { date: key.workDate, taskId: key.taskId, note });
+    } catch (error) {
+      toast({
+        title: "Nota non salvata",
+        description: error instanceof Error ? error.message : "Errore",
+        variant: "destructive",
+      });
+      throw error;
+    }
+    const internalNote = note || null;
+    queryClient.setQueryData<LostKeysPayload>(queryKey, (current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        keys: current.keys.map((item) =>
+          item.workDate === key.workDate && item.taskId === key.taskId ? { ...item, internalNote } : item
+        ),
+      };
+    });
+    setOpenKey((current) =>
+      current && current.workDate === key.workDate && current.taskId === key.taskId
+        ? { ...current, internalNote }
+        : current
+    );
+  };
 
   const resolveKey = async (key: LostKey) => {
     const pendingKey = `${key.workDate}:${key.taskId}`;
@@ -192,20 +225,22 @@ function KeyListPage({ kind }: { kind: ListKind }) {
                         key={`${key.workDate}-${key.taskId}`}
                         className="flex items-center gap-3 rounded-xl border-2 border-border bg-background px-4 py-3"
                       >
-                        <div className="min-w-0 flex-1">
+                        <button
+                          type="button"
+                          className="min-w-0 flex-1 text-left"
+                          onClick={() => setOpenKey(key)}
+                        >
                           <p className="text-2xl font-semibold tabular-nums">{key.logisticCode}</p>
                           <p className="mt-1 text-sm font-medium">{key.aptCode || "—"}</p>
                           <p className="truncate text-sm text-muted-foreground">{key.customerName || "—"}</p>
                           {key.internalNote ? (
-                            <p className="mt-2 whitespace-pre-wrap rounded-lg bg-amber-50 px-2 py-1 text-sm text-amber-950 dark:bg-amber-950/40 dark:text-amber-100">
-                              {key.internalNote}
-                            </p>
+                            <p className="mt-2 truncate text-sm text-amber-800 dark:text-amber-200">Nota presente</p>
                           ) : null}
                           <p className="mt-1 text-sm">
                             {key.cleanerName || "Cleaner"}
                             {key.matricola ? ` · Matricola ${key.matricola}` : ""}
                           </p>
-                        </div>
+                        </button>
                         {viewer ? null : kind === "unreturned" ? (
                           <button
                             type="button"
@@ -245,6 +280,31 @@ function KeyListPage({ kind }: { kind: ListKind }) {
           </div>
         )}
       </div>
+      <Dialog open={openKey != null} onOpenChange={(open) => { if (!open) setOpenKey(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Chiave {openKey?.logisticCode}</DialogTitle>
+          </DialogHeader>
+          {openKey ? (
+            <div className="space-y-1">
+              <p className="text-sm font-medium">{openKey.aptCode || "—"}</p>
+              <p className="text-sm text-muted-foreground">{openKey.customerName || "—"}</p>
+              <p className="text-sm">
+                {openKey.cleanerName || "Cleaner"}
+                {openKey.matricola ? ` · Matricola ${openKey.matricola}` : ""}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {format(parseISO(openKey.workDate), "EEEE d MMMM yyyy", { locale: it })}
+              </p>
+              <KeyInternalNote
+                note={openKey.internalNote ?? ""}
+                readOnly={viewer}
+                onSave={(note) => saveNote(openKey, note)}
+              />
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

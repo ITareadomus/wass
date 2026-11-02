@@ -363,7 +363,10 @@ export async function loadKeyRegistry(workDate: string): Promise<KeyRegistryPayl
   });
   for (const cleaner of rows) {
     for (const apartment of cleaner.apartments) {
-      apartment.internalNote = handover.noteByTaskId.get(apartment.taskId) ?? null;
+      apartment.internalNote =
+        keyHandoverStatus(apartment) === "returned"
+          ? null
+          : handover.noteByTaskId.get(apartment.taskId) ?? null;
     }
   }
   const priorAlerts = await loadPriorAlerts(
@@ -625,12 +628,26 @@ export async function setKeyNote(
   taskId: number,
   note: string
 ): Promise<{ taskId: number; internalNote: string | null }> {
+  const internalNote = note.trim().slice(0, KEY_NOTE_MAX) || null;
   const registry = await loadKeyRegistry(workDate);
   const found = findRegistryApartment(registry, taskId);
   if (!found) {
-    throw new Error("Appartamento non presente nel registro di questa giornata");
+    await ensureHkKeyHandoverTable();
+    const updated = await query(
+      `
+        UPDATE hk_key_handovers
+        SET internal_note = $3, updated_at = NOW()
+        WHERE work_date = $1
+          AND task_id = $2
+          AND (lost = TRUE OR (delivered = TRUE AND returned = FALSE AND lost = FALSE))
+      `,
+      [workDate, taskId, internalNote]
+    );
+    if (!updated.rowCount) {
+      throw new Error("Appartamento non presente nel registro di questa giornata");
+    }
+    return { taskId, internalNote };
   }
-  const internalNote = note.trim().slice(0, KEY_NOTE_MAX) || null;
   const cleanerName = [found.cleaner.name, found.cleaner.lastname].filter(Boolean).join(" ").trim();
   await query(
     `
@@ -684,6 +701,7 @@ export async function setKeyRecovered(
           delivered_at = COALESCE(delivered_at, NOW()),
           returned = TRUE,
           returned_at = COALESCE(returned_at, NOW()),
+          internal_note = NULL,
           updated_at = NOW()
       WHERE work_date = $1 AND task_id = $2 AND lost = TRUE
     `,
@@ -860,6 +878,7 @@ export async function setKeyHandover(
         matricola = EXCLUDED.matricola,
         apt_code = EXCLUDED.apt_code,
         customer_name = EXCLUDED.customer_name,
+        internal_note = CASE WHEN EXCLUDED.returned THEN NULL ELSE hk_key_handovers.internal_note END,
         updated_at = NOW()
     `,
     [
