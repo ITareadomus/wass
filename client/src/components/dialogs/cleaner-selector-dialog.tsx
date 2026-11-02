@@ -12,8 +12,6 @@ import { RefreshCw, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CleanerTriadMark, type CleanerTriadeLevel } from "@/components/triad-mark";
 import { DayCleanerTriadLevel } from "@/components/day-cleaner-triad-level";
-import { CleanerRoleBadge } from "@/components/cleaner-role-mark";
-import { useTriadeEnabled } from "@/lib/triade-enabled";
 
 interface Cleaner {
   id: number;
@@ -63,7 +61,6 @@ export function CleanerSelectorDialog({
   primaryCleanerId = null,
   isLoading = false,
 }: CleanerSelectorDialogProps) {
-  const triadeEnabled = useTriadeEnabled();
   const scopeValue: "housekeeping" | "office" =
     typeof window !== "undefined" &&
     (() => {
@@ -322,7 +319,7 @@ export function CleanerSelectorDialog({
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
                                 Ufficio
                               </span>
-                            ) : triadeEnabled && scopeValue === "housekeeping" ? (
+                            ) : scopeValue === "housekeeping" ? (
                               <DayCleanerTriadLevel
                                 workDate={workDate}
                                 cleanerId={cleaner.id}
@@ -330,10 +327,8 @@ export function CleanerSelectorDialog({
                                 enabled
                                   size="md"
                               />
-                            ) : triadeEnabled ? (
-                              <CleanerTriadMark triade={cleaner.triade} />
                             ) : (
-                              <CleanerRoleBadge role={cleaner.role} />
+                              <CleanerTriadMark triade={cleaner.triade} />
                             )}
                           </div>
                         </label>
@@ -398,7 +393,7 @@ export function CleanerSelectorDialog({
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
                                 Ufficio
                               </span>
-                            ) : triadeEnabled && scopeValue === "housekeeping" ? (
+                            ) : scopeValue === "housekeeping" ? (
                               <DayCleanerTriadLevel
                                 workDate={workDate}
                                 cleanerId={cleaner.id}
@@ -406,10 +401,8 @@ export function CleanerSelectorDialog({
                                 enabled
                                   size="md"
                               />
-                            ) : triadeEnabled ? (
-                              <CleanerTriadMark triade={cleaner.triade} />
                             ) : (
-                              <CleanerRoleBadge role={cleaner.role} />
+                              <CleanerTriadMark triade={cleaner.triade} />
                             )}
                           </div>
                         </label>

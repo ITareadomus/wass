@@ -101,52 +101,6 @@ export async function isActiveTriadeWeight(weight: number): Promise<boolean> {
   return levels.some((level) => level.weight === weight);
 }
 
-export type TriadeRole = {
-  id: number;
-  name: string;
-};
-
-/** Ruoli ADAM con la triade attiva. Non hanno un numero di rombi: quello sta sul livello. */
-export async function loadTriadeRoles(): Promise<TriadeRole[]> {
-  if (!databaseConfig.isMysqlConfigured()) return [];
-  let connection: mysql.Connection | null = null;
-  try {
-    connection = await mysql.createConnection({
-      host: databaseConfig.mysql.host,
-      port: databaseConfig.mysql.port,
-      user: databaseConfig.mysql.user,
-      password: databaseConfig.mysql.password,
-      database: databaseConfig.mysql.database,
-    });
-    const [rows] = await connection.execute(
-      `SELECT id, name
-       FROM app_user_roles
-       WHERE active = 1 AND enable_triade = 1
-       ORDER BY name ASC, id ASC`
-    );
-    const roles: TriadeRole[] = [];
-    for (const row of Array.isArray(rows) ? rows : []) {
-      const record = row as Record<string, unknown>;
-      const id = Number(record.id);
-      const name = String(record.name ?? "").trim();
-      if (!Number.isFinite(id) || id <= 0 || !name) continue;
-      roles.push({ id, name });
-    }
-    return roles;
-  } catch (error: any) {
-    console.warn("⚠️ loadTriadeRoles:", error?.message || error);
-    return [];
-  } finally {
-    if (connection) {
-      try {
-        await connection.end();
-      } catch {
-        /* ignore */
-      }
-    }
-  }
-}
-
 /** Catalogo attivo, dal peso più basso. Serve al selettore di giornata. */
 export async function loadActiveTriadeLevels(): Promise<CleanerTriadeLevel[]> {
   if (!databaseConfig.isMysqlConfigured()) return [];

@@ -14,10 +14,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HkAlgorithmSettings } from "@/components/settings/hk-algorithm-settings";
 import { parseHkConstraintSettings, parseHkProfileLibrary, type HkConstraintSettings, type HkProfileLibrary } from "@shared/hk-constraint-settings";
-import { Switch } from "@/components/ui/switch";
-import { CleanerTriadMark, type CleanerTriadeLevel } from "@/components/triad-mark";
-import { setTriadeEnabledCache } from "@/lib/triade-enabled";
-import { setAlgorithmAssignEnabledCache } from "@/lib/algorithm-assign-enabled";
 
 interface Client {
   client_id: number;
@@ -70,8 +66,6 @@ interface SettingsData {
   hk_constraints: HkConstraintSettings;
   hk_profiles: HkProfileLibrary;
   key_registry_exceptions: number[];
-  triade_enabled: boolean;
-  algorithm_assign_enabled: boolean;
 }
 
 function withSettingsDefaults(data: Partial<SettingsData>): SettingsData {
@@ -123,8 +117,6 @@ function withSettingsDefaults(data: Partial<SettingsData>): SettingsData {
     hk_constraints: activeProfile ? { ...activeProfile.settings } : parseHkConstraintSettings(data.hk_constraints),
     hk_profiles,
     key_registry_exceptions: data.key_registry_exceptions ?? [],
-    triade_enabled: data.triade_enabled !== false,
-    algorithm_assign_enabled: data.algorithm_assign_enabled !== false,
   };
 }
 
@@ -135,8 +127,6 @@ export default function SystemSettings() {
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [triadeLevels, setTriadeLevels] = useState<CleanerTriadeLevel[]>([]);
-  const [triadeRoles, setTriadeRoles] = useState<Array<{ id: number; name: string }>>([]);
 
   useEffect(() => {
     const user = localStorage.getItem("user");
@@ -158,7 +148,6 @@ export default function SystemSettings() {
 
     loadSettings();
     loadClients();
-    loadTriadeCatalog();
   }, [setLocation, toast]);
 
   const loadSettings = async () => {
@@ -185,19 +174,6 @@ export default function SystemSettings() {
       });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const loadTriadeCatalog = async () => {
-    try {
-      const response = await fetch("/api/triade/catalog");
-      if (!response.ok) return;
-      const data = await response.json();
-      setTriadeLevels(Array.isArray(data.levels) ? data.levels : []);
-      setTriadeRoles(Array.isArray(data.roles) ? data.roles : []);
-    } catch {
-      setTriadeLevels([]);
-      setTriadeRoles([]);
     }
   };
 
@@ -232,8 +208,6 @@ export default function SystemSettings() {
       });
 
       if (response.ok) {
-        setTriadeEnabledCache(settings.triade_enabled);
-        setAlgorithmAssignEnabledCache(settings.algorithm_assign_enabled);
         toast({
           title: "Impostazioni salvate",
           description: "Le modifiche sono state salvate con successo",
@@ -376,31 +350,11 @@ export default function SystemSettings() {
         <Tabs defaultValue="algoritmo" className="space-y-6">
           <TabsList>
             <TabsTrigger value="algoritmo">Algoritmo</TabsTrigger>
-            <TabsTrigger value="triade">Triade</TabsTrigger>
             <TabsTrigger value="priorita">Priorità</TabsTrigger>
             <TabsTrigger value="ruoli">Ruoli</TabsTrigger>
             <TabsTrigger value="chiavi">Chiavi</TabsTrigger>
           </TabsList>
-          <TabsContent value="algoritmo" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Assegna</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between gap-4">
-                  <Label htmlFor="algorithm-assign-enabled" className="text-sm">
-                    Pulsante Assegna
-                  </Label>
-                  <Switch
-                    id="algorithm-assign-enabled"
-                    checked={settings.algorithm_assign_enabled}
-                    onCheckedChange={(checked) =>
-                      setSettings((prev) => (prev ? { ...prev, algorithm_assign_enabled: checked } : prev))
-                    }
-                  />
-                </div>
-              </CardContent>
-            </Card>
+          <TabsContent value="algoritmo">
             <HkAlgorithmSettings
               value={settings.hk_constraints}
               profiles={settings.hk_profiles}
@@ -408,60 +362,6 @@ export default function SystemSettings() {
                 setSettings((prev) => (prev ? { ...prev, hk_constraints: constraints, hk_profiles: profiles } : prev))
               }
             />
-          </TabsContent>
-          <TabsContent value="triade" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Triade</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between gap-4">
-                  <Label htmlFor="triade-enabled" className="text-sm">
-                    Triade attiva
-                  </Label>
-                  <Switch
-                    id="triade-enabled"
-                    checked={settings.triade_enabled}
-                    onCheckedChange={(checked) =>
-                      setSettings((prev) => (prev ? { ...prev, triade_enabled: checked } : prev))
-                    }
-                  />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Livelli</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {triadeLevels.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nessun livello attivo.</p>
-                ) : (
-                  triadeLevels.map((level) => (
-                    <div key={level.level_id ?? level.name} className="flex items-center justify-between gap-4">
-                      <span className="text-sm font-medium text-foreground">{level.name}</span>
-                      <CleanerTriadMark triade={level} size="lg" />
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Ruoli</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {triadeRoles.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nessun ruolo con la triade attiva.</p>
-                ) : (
-                  triadeRoles.map((role) => (
-                    <p key={role.id} className="text-sm text-foreground">
-                      {role.name}
-                    </p>
-                  ))
-                )}
-              </CardContent>
-            </Card>
           </TabsContent>
           <TabsContent value="priorita" className="space-y-4">
           {/* Algoritmo priorità hp-centrico */}

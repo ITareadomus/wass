@@ -69,8 +69,6 @@ import { openTimelineMapPanel } from "@/lib/timeline-map-panel";
 import { getPersonnelHexColor } from "@/lib/cleaner-colors";
 import { CleanerTriadMark, parseCleanerTriade, type CleanerTriadeLevel } from "@/components/triad-mark";
 import { DayCleanerTriadLevel } from "@/components/day-cleaner-triad-level";
-import { CleanerRoleBadge, CleanerRoleLetter } from "@/components/cleaner-role-mark";
-import { useTriadeEnabled } from "@/lib/triade-enabled";
 import { useSyncedTimelineScroll } from "@/hooks/use-synced-timeline-scroll";
 import {
   AlertDialog,
@@ -297,7 +295,6 @@ export default function TimelineView({
   mapOpen = false,
   timelineMultiSelect,
 }: TimelineViewProps) {
-  const triadeEnabled = useTriadeEnabled();
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -2963,7 +2960,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                             U
                           </div>
                         )}
-                        {!isRemoved && cleanerRole !== "Ufficio" && triadeEnabled && (
+                        {!isRemoved && cleanerRole !== "Ufficio" && (
                           isOfficeScope ? (
                             <CleanerTriadMark triade={cleanerDisplay.triade} size="sm" />
                           ) : (
@@ -2976,7 +2973,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                             />
                           )
                         )}
-                        {!isRemoved && !triadeEnabled && <CleanerRoleLetter role={cleanerRole} />}
                       </div>
                     </div>
                     {/* Timeline per questo cleaner - area unica droppable */}
@@ -3979,9 +3975,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
                             Ufficio
                           </span>
-                        ) : triadeEnabled && isOfficeScope ? (
+                        ) : isOfficeScope ? (
                           <CleanerTriadMark triade={cleaner.triade} />
-                        ) : triadeEnabled ? (
+                        ) : (
                           <DayCleanerTriadLevel
                             workDate={workDate}
                             cleanerId={cleaner.id}
@@ -3989,8 +3985,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                             enabled
                             size="md"
                           />
-                        ) : (
-                          <CleanerRoleBadge role={cleaner.role} />
                         )}
                       </div>
                     </div>
@@ -4109,9 +4103,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
                           Ufficio
                         </span>
-                      ) : triadeEnabled && isOfficeScope ? (
+                      ) : isOfficeScope ? (
                         <CleanerTriadMark triade={cleaner.triade} />
-                      ) : triadeEnabled ? (
+                      ) : (
                         <DayCleanerTriadLevel
                           workDate={workDate}
                           cleanerId={cleaner.id}
@@ -4119,8 +4113,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           enabled
                           size="md"
                         />
-                      ) : (
-                        <CleanerRoleBadge role={cleaner.role} />
                       )}
                     </div>
                   </div>
@@ -4288,9 +4280,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     Ufficio
                   </span>
                 )}
-                {selectedCleaner && !triadeEnabled && getCleanerDisplayData(selectedCleaner).role !== "Ufficio" && (
-                  <CleanerRoleBadge role={getCleanerDisplayData(selectedCleaner).role} className="text-sm" />
-                )}
               </div>
 
               {selectedCleaner && (
@@ -4401,7 +4390,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                   />
                 </div>
 
-                {!isOfficeScope && triadeEnabled && getCleanerDisplayData(selectedCleaner).role !== "Ufficio" && (
+                {!isOfficeScope && getCleanerDisplayData(selectedCleaner).role !== "Ufficio" && (
                   <div className="col-span-4">
                     <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1 flex items-center gap-1">
                       Livello Triade

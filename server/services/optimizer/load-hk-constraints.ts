@@ -13,15 +13,6 @@ async function readAppSettings(): Promise<Record<string, unknown> | null> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
 }
 
-export async function isAlgorithmAssignEnabled(): Promise<boolean> {
-  try {
-    const value = await readAppSettings();
-    return value?.algorithm_assign_enabled !== false;
-  } catch {
-    return true;
-  }
-}
-
 export async function loadHkConstraintSettings(): Promise<HkConstraintSettings> {
   try {
     const value = await readAppSettings();
