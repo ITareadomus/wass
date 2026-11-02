@@ -32,6 +32,19 @@ export function clampFirstApartmentStart(
   return Math.max(cleanerStartMin, Math.min(maxStart, snapped));
 }
 
+/** Sposta un blocco con durata fissa: lo start scatta di 30 minuti e la fine resta dentro il turno. */
+export function clampShiftedBlockStart(
+  minutes: number,
+  cleanerStartMin: number,
+  cleanerEndMin: number,
+  spanMinutes: number,
+): number {
+  const snapped = snapToHalfHour(minutes);
+  const span = Math.max(FIRST_APT_SNAP_MINUTES, Math.round(spanMinutes));
+  const maxStart = Math.max(cleanerStartMin, cleanerEndMin - span);
+  return Math.max(cleanerStartMin, Math.min(maxStart, snapped));
+}
+
 export function isPointOnFirstAptTimeShift(x: number, y: number): boolean {
   if (typeof document === "undefined") return false;
   const stack =

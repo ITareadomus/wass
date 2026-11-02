@@ -3,6 +3,7 @@ import { ChevronsLeftRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   clampFirstApartmentStart,
+  clampShiftedBlockStart,
   clockToMinutes,
   minutesToClock,
   FIRST_APT_TIME_SHIFT_ATTRIBUTE,
@@ -17,8 +18,12 @@ type FirstApartmentTimeShiftProps = {
   cleanerEndTime?: string | null;
   pxPerMinute: number;
   disabled?: boolean;
-  /** Pixels of empty timeline before the first card. If too small, dock the handle on the right. */
+  /** Pixels of empty timeline before the card. If too small, dock the handle on the right. */
   leftSpacePx?: number;
+  /** Blue shifts the first apartment. Orange shifts an unmanaged task, keeping its duration. */
+  tone?: "blue" | "orange";
+  /** Minutes between start and end. When set, the drag moves both. */
+  spanMinutes?: number;
   children: ReactNode;
   onPreview: (startMinutes: number) => void;
   onCommit: (startTime: string) => void | Promise<void>;
@@ -37,6 +42,8 @@ export function FirstApartmentTimeShift({
   pxPerMinute,
   disabled = false,
   leftSpacePx = 0,
+  tone = "blue",
+  spanMinutes,
   children,
   onPreview,
   onCommit,
@@ -89,14 +96,28 @@ export function FirstApartmentTimeShift({
     return <>{children}</>;
   }
 
+  const blockSpan = spanMinutes != null && spanMinutes > 0 ? spanMinutes : 0;
+  const orange = tone === "orange";
+  const toneClass = orange
+    ? "border-orange-500 text-orange-600 dark:text-orange-400"
+    : "border-custom-blue text-custom-blue";
+  const dragClass = orange ? "bg-orange-100 dark:bg-orange-950/50" : "bg-custom-blue-light";
+
   const resolveMinutes = (clientX: number, originX: number, baseMinutes: number) => {
     const deltaPx = clientX - originX;
     const deltaMinutes = pxPerMinute > 0 ? deltaPx / pxPerMinute : 0;
-    return clampFirstApartmentStart(
-      baseMinutes + deltaMinutes,
-      cleanerStartMin,
-      cleanerEndMin,
-    );
+    const raw = baseMinutes + deltaMinutes;
+    if (blockSpan > 0) {
+      return clampShiftedBlockStart(raw, cleanerStartMin, cleanerEndMin, blockSpan);
+    }
+    return clampFirstApartmentStart(raw, cleanerStartMin, cleanerEndMin);
+  };
+
+  const previewText = (startClock: string) => {
+    if (!orange || blockSpan <= 0) return startClock;
+    const startMin = clockToMinutes(startClock);
+    if (startMin == null) return startClock;
+    return `${startClock}–${minutesToClock(startMin + blockSpan)}`;
   };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -113,7 +134,7 @@ export function FirstApartmentTimeShift({
     };
     setIsDragging(true);
     setLockedDock(dock);
-    setPreviewLabel(minutesToClock(originMinutes));
+    setPreviewLabel(previewText(minutesToClock(originMinutes)));
     onPreview(originMinutes);
   };
 
@@ -128,7 +149,7 @@ export function FirstApartmentTimeShift({
     const nextMinutes = resolveMinutes(event.clientX, drag.originX, drag.originMinutes);
     if (nextMinutes === drag.lastMinutes) return;
     drag.lastMinutes = nextMinutes;
-    setPreviewLabel(minutesToClock(nextMinutes));
+    setPreviewLabel(previewText(minutesToClock(nextMinutes)));
     onPreview(nextMinutes);
   };
 
@@ -174,19 +195,28 @@ export function FirstApartmentTimeShift({
       <div
         {...{ [FIRST_APT_TIME_SHIFT_ATTRIBUTE]: "true" }}
         role="slider"
-        aria-label="Sposta inizio primo appartamento a scatti di 30 minuti"
+        aria-label={
+          orange
+            ? "Sposta inizio e fine della task non gestita a scatti di 30 minuti"
+            : "Sposta inizio primo appartamento a scatti di 30 minuti"
+        }
         aria-valuetext={previewLabel || startTime || undefined}
         aria-hidden={!showHandle}
         title={
-          isPinned
-            ? "Trascina per spostare l'inizio (scatti da 30 min). Doppio click per tornare all'orario calcolato."
-            : "Trascina per spostare l'inizio del primo appartamento (scatti da 30 min)"
+          orange
+            ? isPinned
+              ? "Trascina per spostare inizio e fine (scatti da 30 min). Doppio click per tornare all'orario ADAM."
+              : "Trascina per spostare inizio e fine (scatti da 30 min)"
+            : isPinned
+              ? "Trascina per spostare l'inizio (scatti da 30 min). Doppio click per tornare all'orario calcolato."
+              : "Trascina per spostare l'inizio del primo appartamento (scatti da 30 min)"
         }
         className={cn(
-          "absolute top-1/2 z-30 flex h-9 w-9 -translate-y-1/2 cursor-ew-resize touch-none select-none items-center justify-center rounded-md border-2 border-custom-blue bg-background text-custom-blue shadow-md transition-opacity",
+          "absolute top-1/2 z-40 flex h-9 w-9 -translate-y-1/2 cursor-ew-resize touch-none select-none items-center justify-center rounded-md border-2 bg-background shadow-md transition-opacity",
+          toneClass,
           dockOnRight ? "right-0" : "left-0",
           showHandle ? "opacity-100" : "opacity-0",
-          isDragging && "bg-custom-blue-light",
+          isDragging && dragClass,
           disabled && "pointer-events-none",
         )}
         onPointerDown={handlePointerDown}
@@ -196,11 +226,12 @@ export function FirstApartmentTimeShift({
         onDoubleClick={handleDoubleClick}
         onMouseEnter={reveal}
       >
-        <ChevronsLeftRight className="h-5 w-5 text-custom-blue" />
+        <ChevronsLeftRight className="h-5 w-5" />
         {previewLabel && (
           <span
             className={cn(
-              "pointer-events-none absolute whitespace-nowrap rounded border-2 border-custom-blue bg-background px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-custom-blue shadow",
+              "pointer-events-none absolute whitespace-nowrap rounded border-2 bg-background px-1.5 py-0.5 text-[10px] font-semibold tabular-nums shadow",
+              toneClass,
               dockOnRight ? "left-full ml-1" : "right-full mr-1",
             )}
           >

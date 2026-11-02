@@ -6,8 +6,11 @@ import {
 } from "@shared/housekeeping-timeline-layout";
 import {
   formatScheduleDurationLabel,
+  hasManualSchedule,
   manualScheduleSpanMinutes,
+  scheduleClockToMinutes,
 } from "@shared/wass-manual-schedule";
+import { clockToMinutes, minutesToClock } from "@/lib/first-apartment-time-shift";
 import {
   applyHkPreassignedSchedule,
   parseHkPreassignedSchedules,
@@ -451,6 +454,7 @@ export default function TimelineView({
   const [isSavingEndTime, setIsSavingEndTime] = useState(false);
   const [firstAptTimeShiftPreview, setFirstAptTimeShiftPreview] = useState<{
     cleanerId: number;
+    taskId: string;
     startMinutes: number;
   } | null>(null);
   const [isSavingFirstAptTime, setIsSavingFirstAptTime] = useState(false);
@@ -2040,6 +2044,53 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     }
   };
 
+  const persistUnmanagedSchedule = async (
+    taskId: string | number,
+    logisticCode: string | number | null,
+    startTime: string | null,
+    spanMinutes: number,
+  ) => {
+    setIsSavingFirstAptTime(true);
+    try {
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const startMinutes = startTime ? clockToMinutes(startTime) : null;
+      const scheduleEnd =
+        startTime && startMinutes != null
+          ? minutesToClock(startMinutes + Math.max(1, Math.round(spanMinutes)))
+          : null;
+      const response = await fetch("/api/update-task-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId,
+          logisticCode,
+          date: workDate,
+          scope: scopeValue,
+          modified_by: currentUser.username || "unknown",
+          ...(startTime && scheduleEnd
+            ? { scheduleStart: startTime, scheduleEnd }
+            : { clearManualSchedule: true }),
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || result.message || "Errore nello spostamento dell'orario");
+      }
+      if ((window as any).reloadAllTasks) {
+        await (window as any).reloadAllTasks();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile spostare l'orario della task",
+        variant: "destructive",
+      });
+    } finally {
+      setFirstAptTimeShiftPreview(null);
+      setIsSavingFirstAptTime(false);
+    }
+  };
+
   const handleSaveEndTime = async () => {
     if (!endTimeEditDialog.cleanerId) return;
 
@@ -3131,14 +3182,36 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
                                     // Usa sequence se disponibile, altrimenti fallback su idx+1
                                     const seq = (taskObj as any).sequence ?? (idx + 1);
+                                    const taskId = taskObj.task_id || taskObj.id;
+                                    const unmanagedTask = isReadonlyPreassignedTask(task);
+                                    const scheduleStartMin = scheduleClockToMinutes(
+                                      taskObj.start_time || taskObj.fw_start_time || taskObj.startTime
+                                    );
+                                    const scheduleEndMin = scheduleClockToMinutes(
+                                      taskObj.end_time || taskObj.endTime
+                                    );
+                                    const cleaningMinutes = Number(taskObj.cleaning_time ?? taskObj.cleaningTime);
+                                    const positiveScheduleSpan =
+                                      scheduleStartMin != null && scheduleEndMin != null && scheduleEndMin > scheduleStartMin
+                                        ? scheduleEndMin - scheduleStartMin
+                                        : null;
+                                    const unmanagedSpanMinutes = unmanagedTask
+                                      ? manualScheduleSpanMinutes(taskObj)
+                                        ?? positiveScheduleSpan
+                                        ?? (Number.isFinite(cleaningMinutes) && cleaningMinutes > 0
+                                          ? cleaningMinutes
+                                          : 60)
+                                      : 0;
 
                                     // Il bordo sinistro della barra è lo start time.
                                     // L'attesa è solo lo spazio fra la fine disegnata della barra precedente
                                     // (più il travel) e questo start: non si ricalcola dall'end time.
-                                    const previewMinutes =
-                                      idx === 0 && firstAptTimeShiftPreview?.cleanerId === cleaner.id
-                                        ? firstAptTimeShiftPreview.startMinutes
-                                        : null;
+                                    const previewingThis =
+                                      firstAptTimeShiftPreview?.cleanerId === cleaner.id
+                                      && String(firstAptTimeShiftPreview.taskId) === String(taskId);
+                                    const previewMinutes = previewingThis
+                                      ? firstAptTimeShiftPreview.startMinutes
+                                      : null;
                                     const taskStartMinutes = previewMinutes ?? parseClockToMinutes(
                                       taskObj.start_time || taskObj.fw_start_time || taskObj.startTime
                                     );
@@ -3146,9 +3219,11 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     const cardMinutes = renderedHousekeepingCardMinutes(
                                       hideRouteSpacers
                                         ? "0.15"
-                                        : pinnedScheduleSpan != null
-                                          ? formatScheduleDurationLabel(pinnedScheduleSpan)
-                                          : (taskObj.duration || "0.0"),
+                                        : previewingThis && unmanagedTask && unmanagedSpanMinutes > 0
+                                          ? formatScheduleDurationLabel(unmanagedSpanMinutes)
+                                          : pinnedScheduleSpan != null
+                                            ? formatScheduleDurationLabel(pinnedScheduleSpan)
+                                            : (taskObj.duration || "0.0"),
                                       timelinePxPerMinute,
                                       timelineMinCardPx,
                                     );
@@ -3179,7 +3254,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                       : 0;
 
                                     // Chiave univoca per task collaborative: include cleaner.id
-                                    const taskId = taskObj.task_id || taskObj.id;
                                     const uniqueKey = `${taskId}-cleaner-${cleaner.id}`;
                                     const taskKey = getTaskDndKey(task);
                                     const dndId = taskDndId("housekeeping", taskKey, cleaner.id, "timeline");
@@ -3289,12 +3363,17 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                         {/* TaskCard: in DnD tutti a 15'; lo slot di insert segue la card */}
                                         <FirstApartmentTimeShift
                                           enabled={
-                                            seq === 1 &&
                                             !hideRouteSpacers &&
                                             !isTimelineInteractionDisabled &&
-                                            !isReadonlyPreassignedTask(task)
+                                            (unmanagedTask || seq === 1)
                                           }
-                                          isPinned={Boolean(taskObj.manual_start_time)}
+                                          tone={unmanagedTask ? "orange" : "blue"}
+                                          spanMinutes={unmanagedTask ? unmanagedSpanMinutes : undefined}
+                                          isPinned={
+                                            unmanagedTask
+                                              ? hasManualSchedule(taskObj)
+                                              : Boolean(taskObj.manual_start_time)
+                                          }
                                           startTime={
                                             taskObj.start_time ||
                                             taskObj.fw_start_time ||
@@ -3303,27 +3382,42 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           cleanerStartTime={cleanerStartTime}
                                           cleanerEndTime={cleaner.end_time || "20:00"}
                                           pxPerMinute={timelinePxPerMinute}
-                                          leftSpacePx={initialOffsetWidthPx}
+                                          leftSpacePx={initialOffsetWidthPx + travelWidthPx + waitingGapWidthPx}
                                           disabled={isSavingFirstAptTime}
                                           onPreview={(startMinutes) =>
                                             setFirstAptTimeShiftPreview({
                                               cleanerId: cleaner.id,
+                                              taskId: String(taskId),
                                               startMinutes,
                                             })
                                           }
                                           onCommit={(nextStart) =>
-                                            persistFirstApartmentStart(
-                                              cleaner.id,
-                                              taskObj.task_id || taskObj.id,
-                                              nextStart,
-                                            )
+                                            unmanagedTask
+                                              ? persistUnmanagedSchedule(
+                                                  taskId,
+                                                  taskObj.logistic_code ?? taskObj.name ?? null,
+                                                  nextStart,
+                                                  unmanagedSpanMinutes,
+                                                )
+                                              : persistFirstApartmentStart(
+                                                  cleaner.id,
+                                                  taskId,
+                                                  nextStart,
+                                                )
                                           }
                                           onReset={() =>
-                                            persistFirstApartmentStart(
-                                              cleaner.id,
-                                              taskObj.task_id || taskObj.id,
-                                              null,
-                                            )
+                                            unmanagedTask
+                                              ? persistUnmanagedSchedule(
+                                                  taskId,
+                                                  taskObj.logistic_code ?? taskObj.name ?? null,
+                                                  null,
+                                                  unmanagedSpanMinutes,
+                                                )
+                                              : persistFirstApartmentStart(
+                                                  cleaner.id,
+                                                  taskId,
+                                                  null,
+                                                )
                                           }
                                           onCancel={() => setFirstAptTimeShiftPreview(null)}
                                         >
