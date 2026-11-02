@@ -126,12 +126,13 @@ function Diamond({
 
 function EmptyDiamond({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 10 12" className={cn("shrink-0", className)} aria-hidden>
+    <svg viewBox="0 0 10 12" className={cn("shrink-0 text-foreground", className)} aria-hidden>
       <path
         d="M5 0.6 L9.25 6 L5 11.4 L0.75 6 Z"
-        fill="#F8F9FB"
-        stroke="#C5CAD3"
-        strokeWidth="0.55"
+        fill="currentColor"
+        fillOpacity={0.12}
+        stroke="currentColor"
+        strokeWidth="0.7"
         strokeLinejoin="round"
       />
     </svg>
@@ -175,28 +176,17 @@ export function TriadDiamondRow({
 
 const UNKNOWN_LABEL = "Livello Triade non determinato";
 
-function UnknownTriadDiamond({ className }: { className?: string }) {
+function UnknownTriadMark({ size }: { size: "sm" | "md" | "lg" }) {
   return (
-    <svg viewBox="0 0 10 12" className={cn("shrink-0", className)} aria-hidden>
-      <path
-        d="M5 0.6 L9.25 6 L5 11.4 L0.75 6 Z"
-        fill="#F3F4F6"
-        stroke="#4B5563"
-        strokeWidth="0.55"
-        strokeLinejoin="round"
-      />
-      <text
-        x="5"
-        y="8.05"
-        textAnchor="middle"
-        fontSize="6.4"
-        fontWeight="700"
-        fill="#1F2937"
-        fontFamily="ui-sans-serif, system-ui, sans-serif"
-      >
-        ?
-      </text>
-    </svg>
+    <span
+      className={cn(
+        "font-bold leading-none text-foreground",
+        size === "sm" ? "text-[15px]" : size === "lg" ? "text-3xl" : "text-lg"
+      )}
+      aria-hidden
+    >
+      ?
+    </span>
   );
 }
 
@@ -212,16 +202,14 @@ export function TaskTriadMark({
 }) {
   if (triade === undefined) return null;
   const level = parseCleanerTriade(triade);
-  const dim =
-    size === "sm" ? "h-[11px] w-[9px]" : size === "lg" ? "h-10 w-8" : "h-3.5 w-[11px]";
   if (!level) {
     return (
       <span
-        className={cn("inline-flex shrink-0", className)}
+        className={cn("inline-flex shrink-0 items-center", className)}
         title={UNKNOWN_LABEL}
         aria-label={UNKNOWN_LABEL}
       >
-        <UnknownTriadDiamond className={dim} />
+        <UnknownTriadMark size={size} />
       </span>
     );
   }

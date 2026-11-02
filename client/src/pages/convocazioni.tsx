@@ -28,6 +28,8 @@ import { getStoredUserRole, isReadOnlySession } from "@/lib/auth-role";
 import { isTaskLocked } from "@/lib/taskValidation";
 import { type CleanerTriadeLevel } from "@/components/triad-mark";
 import { DayCleanerTriadLevel } from "@/components/day-cleaner-triad-level";
+import { CleanerRoleBadge } from "@/components/cleaner-role-mark";
+import { useTriadeEnabled } from "@/lib/triade-enabled";
 
 const OFFICE_SCOPE_ENABLED = false;
 
@@ -410,6 +412,7 @@ function useConvocationKind(): "cleaners" | "drivers" | "office" {
 }
 
 export default function Convocazioni() {
+  const triadeEnabled = useTriadeEnabled();
   const convKind = useConvocationKind();
   const isDrivers = convKind === "drivers";
   const isOffice = convKind === "office";
@@ -1593,7 +1596,7 @@ export default function Convocazioni() {
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-500/30 text-sky-800 dark:bg-sky-500/40 dark:text-sky-200 border-sky-600 dark:border-sky-400">
                               Ufficio
                             </span>
-                          ) : (
+                          ) : triadeEnabled ? (
                             <DayCleanerTriadLevel
                               workDate={format(selectedDate, "yyyy-MM-dd")}
                               cleanerId={cleaner.id}
@@ -1601,6 +1604,8 @@ export default function Convocazioni() {
                                 enabled
                                 size="md"
                             />
+                          ) : (
+                            <CleanerRoleBadge role={cleaner.role} />
                           )}
                         </div>
                       </div>

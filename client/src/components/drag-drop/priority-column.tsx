@@ -2,7 +2,7 @@ import { TaskType as Task } from "@shared/schema";
 import { isWorkDateHistoricallyLocked } from "@shared/work-date-access";
 import DraggableTaskCard from "./draggable-task-card";
 import { ContainerTaskClip } from "./container-task-clip";
-import { Clock, AlertCircle, ArrowDown, CheckSquare, Loader2, Lock, LockOpen } from "lucide-react";
+import { Clock, AlertCircle, ArrowDown, Calendar, CheckSquare, Loader2, Lock, LockOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { useState, useMemo } from "react";
 import { useDroppable } from "@dnd-kit/core";
+import { useAlgorithmAssignEnabled } from "@/lib/algorithm-assign-enabled";
 import { cn } from "@/lib/utils";
 import {
   getTaskDndKey,
@@ -41,6 +42,8 @@ interface PriorityColumnProps {
   workDate: string;
   droppableId: string;
   icon: "clock" | "alert-circle" | "arrow-down";
+  assignAction?: () => Promise<void>;
+  assignButtonDisabled?: boolean;
   isDragDisabled?: boolean;
   containerMultiSelectState?: ContainerMultiSelectState;
   /** Blocca o sblocca tutte le task selezionate, anche quelle degli altri container. */
@@ -69,6 +72,8 @@ export default function PriorityColumn({
   workDate,
   droppableId,
   icon,
+  assignAction,
+  assignButtonDisabled = false,
   isDragDisabled = false,
   containerMultiSelectState,
   onLockSelected,
@@ -83,6 +88,19 @@ export default function PriorityColumn({
   isContentLoading = false,
   loadingMessage,
 }: PriorityColumnProps) {
+  const algorithmAssignEnabled = useAlgorithmAssignEnabled();
+  const [isAssigning, setIsAssigning] = useState(false);
+  const handleAssign = async () => {
+    if (!assignAction) return;
+    try {
+      setIsAssigning(true);
+      await assignAction();
+    } catch (error) {
+      console.error("Errore durante l'assegnazione:", error);
+    } finally {
+      setIsAssigning(false);
+    }
+  };
   const [duplicateDialog, setDuplicateDialog] = useState<{
     logisticCode: string;
   } | null>(null);
@@ -420,6 +438,26 @@ export default function PriorityColumn({
               <span className="ml-1">{lockSelectedAction === "unlock" ? "Sblocca" : "Blocca"}</span>
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAssign}
+            disabled={
+              !assignAction ||
+              assignButtonDisabled ||
+              tasks.length === 0 ||
+              isHistoricalDateLocked ||
+              isAssigning ||
+              disableToolbar ||
+              !algorithmAssignEnabled
+            }
+            className="text-xs px-2 py-1 h-7 border-2 border-custom-blue"
+            title="Assegna"
+            data-testid="button-assign-priority"
+          >
+            <Calendar className="w-3 h-3 mr-1" />
+            <span>{isAssigning ? "Assegnando..." : "Assegna"}</span>
+          </Button>
         </div>
       </div>
       <div

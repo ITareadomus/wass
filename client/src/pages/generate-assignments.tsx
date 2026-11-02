@@ -69,6 +69,7 @@ import {
   pickHousekeepingExecutionStatusFields,
 } from "@shared/housekeeping-task-execution-status";
 import { useHousekeepingExecutionStatusPoll } from "@/hooks/use-housekeeping-execution-status-poll";
+import { useAlgorithmAssignEnabled } from "@/lib/algorithm-assign-enabled";
 
 type AdamFingerprint = {
   count: number;
@@ -360,6 +361,7 @@ const getCurrentUsername = (): string => {
 };
 
 export default function GenerateAssignments() {
+  const algorithmAssignEnabled = useAlgorithmAssignEnabled();
   // Ripristina l'ultima data selezionata da localStorage, altrimenti usa oggi
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     const savedDate = localStorage.getItem('selected_work_date');
@@ -2963,7 +2965,7 @@ export default function GenerateAssignments() {
                     setIsAssigning(false);
                   }
                 }}
-                disabled={isAssigning || isWassManualLocked || isRefreshingContainers || isHkHypothesisPreview}
+                disabled={isAssigning || isWassManualLocked || isRefreshingContainers || isHkHypothesisPreview || !algorithmAssignEnabled}
                 className="flex items-center gap-2 rounded-none text-black dark:text-white hover:bg-custom-blue/80 px-3"
               >
                 {isAssigning ? (

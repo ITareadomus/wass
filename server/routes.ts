@@ -69,39 +69,15 @@ function isLogisticsScopeRequest(req: any): boolean {
   return raw === "logistics";
 }
 
-async function rejectIfTriadeLevelBlocks(
-  req: any,
-  res: any,
-  workDate: string,
-  cleanerId: unknown,
-  taskId: unknown
-): Promise<boolean> {
-  if (isLogisticsScopeRequest(req) || resolveScopeFromReq(req) === "office") return false;
-  const { loadHkConstraintSettings } = await import("./services/optimizer/load-hk-constraints");
-  const hkConstraints = await loadHkConstraintSettings();
-  if (hkConstraints.triadeCeiling !== "hard") return false;
-  const cleaner = Number(cleanerId);
-  const task = Number(taskId);
-  if (!Number.isFinite(cleaner) || cleaner <= 0 || !Number.isFinite(task) || task <= 0) return false;
-  try {
-    const { triadeAssignmentBlock } = await import("./services/triade-assignment");
-    const block = await triadeAssignmentBlock(workDate, cleaner, task);
-    if (!block.blocked) return false;
-    res.status(409).json({
-      success: false,
-      error: "TRIADE_LEVEL",
-      message: `Cleaner livello ${block.cleanerWeight}: non può prendere un task di livello ${block.taskWeight}.`,
-    });
-    return true;
-  } catch (error) {
-    console.warn("⚠️ triade-level guard:", error);
-    res.status(503).json({
-      success: false,
-      error: "TRIADE_LEVEL_UNAVAILABLE",
-      message: "Impossibile verificare il livello Triade: assegnazione bloccata.",
-    });
-    return true;
-  }
+async function rejectIfAlgorithmAssignDisabled(res: any): Promise<boolean> {
+  const { isAlgorithmAssignEnabled } = await import("./services/optimizer/load-hk-constraints");
+  if (await isAlgorithmAssignEnabled()) return false;
+  res.status(403).json({
+    success: false,
+    error: "ALGORITHM_ASSIGN_DISABLED",
+    message: "L'assegnazione automatica è disattivata.",
+  });
+  return true;
 }
 
 async function rejectIfOperationalDayStarted(
@@ -1441,10 +1417,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       if (await rejectIfHousekeepingTasksCleaned(res, [taskId])) return;
-      if (
-        Number(destCleanerId) !== Number(sourceCleanerId) &&
-        await rejectIfTriadeLevelBlocks(req, res, workDate, destCleanerId, taskId)
-      ) return;
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
       
@@ -2119,6 +2091,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ bundles });
     } catch (error: any) {
       console.error("GET /api/structure-access-bundles:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/triade/catalog", async (_req, res) => {
+    try {
+      const { loadActiveTriadeLevels, loadTriadeRoles } = await import("./services/adam-triade");
+      const [levels, roles] = await Promise.all([loadActiveTriadeLevels(), loadTriadeRoles()]);
+      res.json({ success: true, levels, roles });
+    } catch (error: any) {
+      console.error("GET /api/triade/catalog:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -5247,7 +5230,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       if (await rejectIfHousekeepingTasksCleaned(res, [taskId, taskData])) return;
-      if (await rejectIfTriadeLevelBlocks(req, res, workDate, cleanerId, taskId)) return;
       console.log(`🔍 CHECKING: save-timeline-assignment for cleanerId=${cleanerId}, workDate=${workDate}`);
       if (cleanerId && Number.isFinite(Number(cleanerId))) {
         const locked = await isCleanerLocked(workDate, Number(cleanerId));
@@ -11055,10 +11037,6 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       if (await rejectIfHousekeepingTasksCleaned(res, [taskId])) return;
-      if (
-        Number(toCleanerId) !== Number(fromCleanerId) &&
-        await rejectIfTriadeLevelBlocks(req, res, workDate, toCleanerId, taskId)
-      ) return;
       if (fromContainer && taskId) {
         const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
         const isLocked = await pgDailyAssignmentsService.isTaskLocked(workDate, Number(taskId));
@@ -12501,6 +12479,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     try {
       const { date } = req.body || {};
       const workDate = date || format(new Date(), "yyyy-MM-dd");
+      if (await rejectIfAlgorithmAssignDisabled(res)) return;
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
 
       const { runHkAssignmentHypotheses } = await import("./services/optimizer/hk-hypotheses");
@@ -12554,6 +12533,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       const { date, skipPhase4 = false, applyToProduction = false } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
 
+      if (await rejectIfAlgorithmAssignDisabled(res)) return;
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       console.log(`   skipPhase4=${skipPhase4}, applyToProduction=${applyToProduction}`);
       
@@ -12591,6 +12571,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       }
 
       const workDate = date || format(new Date(), "yyyy-MM-dd");
+      if (await rejectIfAlgorithmAssignDisabled(res)) return;
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       console.log(`POST /api/optimizer/run-wave - Wave ${priority} for ${workDate}`);
 

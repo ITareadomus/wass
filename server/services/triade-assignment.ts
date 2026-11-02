@@ -58,22 +58,3 @@ export async function loadTriadeAssignmentWeights(
   }
   return { taskWeight, cleanerWeight };
 }
-
-export async function triadeAssignmentBlock(
-  workDate: string,
-  cleanerId: number,
-  taskId: number
-): Promise<{ blocked: boolean; cleanerWeight: number; taskWeight: number }> {
-  const weights = await loadTriadeAssignmentWeights(
-    workDate,
-    [{ taskId }],
-    [cleanerId]
-  );
-  const cleanerWeight = weights.cleanerWeight.get(cleanerId) ?? TRIADE_BASE_WEIGHT;
-  const taskWeight = weights.taskWeight.get(taskId) ?? TRIADE_BASE_WEIGHT;
-  return {
-    blocked: !cleanerCanTakeTriadeTask(cleanerWeight, taskWeight),
-    cleanerWeight,
-    taskWeight,
-  };
-}
