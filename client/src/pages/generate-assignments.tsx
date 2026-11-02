@@ -69,6 +69,7 @@ import {
   pickHousekeepingExecutionStatusFields,
 } from "@shared/housekeeping-task-execution-status";
 import { useHousekeepingExecutionStatusPoll } from "@/hooks/use-housekeeping-execution-status-poll";
+import { useAlgorithmAssignEnabled } from "@/lib/algorithm-assign-enabled";
 
 type AdamFingerprint = {
   count: number;
@@ -360,6 +361,7 @@ const getCurrentUsername = (): string => {
 };
 
 export default function GenerateAssignments() {
+  const algorithmAssignEnabled = useAlgorithmAssignEnabled();
   // Ripristina l'ultima data selezionata da localStorage, altrimenti usa oggi
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     const savedDate = localStorage.getItem('selected_work_date');
@@ -2963,7 +2965,7 @@ export default function GenerateAssignments() {
                     setIsAssigning(false);
                   }
                 }}
-                disabled={isAssigning || isWassManualLocked || isRefreshingContainers || isHkHypothesisPreview}
+                disabled={isAssigning || isWassManualLocked || isRefreshingContainers || isHkHypothesisPreview || !algorithmAssignEnabled}
                 className="flex items-center gap-2 rounded-none text-black dark:text-white hover:bg-custom-blue/80 px-3"
               >
                 {isAssigning ? (
@@ -3059,8 +3061,6 @@ export default function GenerateAssignments() {
                     workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="early-out"
                     icon="clock"
-                    assignAction={assignEarlyOutToTimeline}
-                    assignButtonDisabled={hasRunAssignEo || isRefreshingContainers || isWassManualLocked || isHkHypothesisPreview}
                     isDragDisabled={isWassManualLocked || isLoadingDragDrop || isRefreshingContainers || isHkHypothesisPreview}
                     containerMultiSelectState={getContainerMultiSelectState('early_out')}
                     onLockSelected={() => void lockSelectedContainerTasks()}
@@ -3076,8 +3076,6 @@ export default function GenerateAssignments() {
                     workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="high"
                     icon="alert-circle"
-                    assignAction={assignHighPriorityToTimeline}
-                    assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || hasRunAssignHp || isRefreshingContainers || isWassManualLocked || isHkHypothesisPreview}
                     isDragDisabled={isWassManualLocked || isLoadingDragDrop || isRefreshingContainers || isHkHypothesisPreview}
                     containerMultiSelectState={getContainerMultiSelectState('high_priority')}
                     onLockSelected={() => void lockSelectedContainerTasks()}
@@ -3094,8 +3092,6 @@ export default function GenerateAssignments() {
                     workDate={format(selectedDate, "yyyy-MM-dd")}
                     droppableId="low"
                     icon="arrow-down"
-                    assignAction={assignLowPriorityToTimeline}
-                    assignButtonDisabled={!timelinePriorityState.hasEoOnTimeline || !timelinePriorityState.hasHpOnTimeline || hasRunAssignLp || isRefreshingContainers || isWassManualLocked || isHkHypothesisPreview}
                     isDragDisabled={isWassManualLocked || isLoadingDragDrop || isRefreshingContainers || isHkHypothesisPreview}
                     containerMultiSelectState={getContainerMultiSelectState('low_priority')}
                     onLockSelected={() => void lockSelectedContainerTasks()}
@@ -3152,11 +3148,6 @@ export default function GenerateAssignments() {
                   selectedDate={selectedDate}
                   hasUnsavedChanges={hasUnsavedChanges}
                   onTaskMoved={handleTaskMoved}
-                  onWaveAssignStateReset={() => {
-                    setHasRunAssignEo(false);
-                    setHasRunAssignHp(false);
-                    setHasRunAssignLp(false);
-                  }}
                   isReadOnly={isWassManualLocked || isHkHypothesisPreview}
                   isLoadingDragDrop={isLoadingDragDrop || isRefreshingContainers}
                   loadingMessage={

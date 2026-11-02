@@ -305,6 +305,7 @@ export function DayTriadMark({
   appearance?: "day" | "real";
   className?: string;
 }) {
+  const reactId = useId().replace(/[^a-zA-Z0-9]/g, "");
   if (original === undefined) return null;
   const base = parseCleanerTriade(original);
   const originalWeight = base?.weight ?? 0;
@@ -330,7 +331,6 @@ export function DayTriadMark({
     return <TaskTriadMark triade={null} size={size} className={className} />;
   }
 
-  const reactId = useId().replace(/[^a-zA-Z0-9]/g, "");
   const dim =
     size === "sm" ? "h-[11px] w-[9px]" : size === "lg" ? "h-10 w-8" : "h-3.5 w-[11px]";
   const current = levelForWeight(levels, currentWeight) ?? base;
