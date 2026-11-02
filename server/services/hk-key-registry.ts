@@ -9,6 +9,7 @@ import {
   isLostKeyListed,
   isLostKeyVisible,
   keyHandoverStatus,
+  keyRegistryExceptionClientIds,
   logisticCodeKeys,
   type KeyHandoverStatus,
   type KeyPriorAlert,
@@ -26,7 +27,7 @@ import { loadTimeline } from "./workspace-files";
 
 export type KeyRegistryPayload = {
   date: string;
-  totals: { keys: number; warehouse: number; withCleaner: number; returned: number };
+  totals: { keys: number; warehouse: number; prepared: number; withCleaner: number; returned: number };
   cleaners: KeyRegistryCleaner[];
 };
 
@@ -40,6 +41,7 @@ export type LostKeyRow = {
   aptCode: string | null;
   customerName: string | null;
   daysMissing: number;
+  internalNote: string | null;
 };
 
 export type LostKeysPayload = {
@@ -73,6 +75,11 @@ export async function ensureHkKeyHandoverTable(): Promise<void> {
   await query(`ALTER TABLE hk_key_handovers ADD COLUMN IF NOT EXISTS returned_at TIMESTAMPTZ`);
   await query(`ALTER TABLE hk_key_handovers ADD COLUMN IF NOT EXISTS driver_key BOOLEAN NOT NULL DEFAULT FALSE`);
   await query(`ALTER TABLE hk_key_handovers ADD COLUMN IF NOT EXISTS driver_key_at TIMESTAMPTZ`);
+  await query(`ALTER TABLE hk_key_handovers ADD COLUMN IF NOT EXISTS big_key BOOLEAN NOT NULL DEFAULT FALSE`);
+  await query(`ALTER TABLE hk_key_handovers ADD COLUMN IF NOT EXISTS big_key_at TIMESTAMPTZ`);
+  await query(`ALTER TABLE hk_key_handovers ADD COLUMN IF NOT EXISTS prepared BOOLEAN NOT NULL DEFAULT FALSE`);
+  await query(`ALTER TABLE hk_key_handovers ADD COLUMN IF NOT EXISTS prepared_at TIMESTAMPTZ`);
+  await query(`ALTER TABLE hk_key_handovers ADD COLUMN IF NOT EXISTS internal_note TEXT`);
   tableReady = true;
   console.log("✅ PG: Tabella hk_key_handovers verificata");
 }
@@ -136,6 +143,10 @@ function readTimelineInputs(timeline: any): {
         address: asText(task?.address),
         aptCode: asText(task?.apt_code),
         customerName: asText(task?.customer_name),
+        customerId: (() => {
+          const id = Number(task?.client_id);
+          return Number.isInteger(id) && id > 0 ? id : null;
+        })(),
         interventionType: null,
         isPrimary,
         operationId: operationIdOf(task),
@@ -180,29 +191,70 @@ async function loadMatricole(cleanerIds: number[]): Promise<Map<number, string>>
   return out;
 }
 
+async function loadExceptionCustomerNames(): Promise<Set<string>> {
+  const names = new Set<string>();
+  const ids = [...(await loadExceptionClientIds())];
+  if (ids.length === 0 || !databaseConfig.isMysqlConfigured()) return names;
+
+  let connection: mysql.Connection | null = null;
+  try {
+    connection = await mysql.createConnection({
+      host: databaseConfig.mysql.host,
+      port: databaseConfig.mysql.port,
+      user: databaseConfig.mysql.user,
+      password: databaseConfig.mysql.password,
+      database: databaseConfig.mysql.database,
+    });
+    const placeholders = ids.map(() => "?").join(",");
+    const [rows] = await connection.execute(
+      `SELECT name FROM app_customers WHERE id IN (${placeholders})`,
+      ids
+    );
+    for (const row of Array.isArray(rows) ? rows : []) {
+      const name = asText((row as { name?: unknown }).name);
+      if (name) names.add(name.toLocaleLowerCase("it"));
+    }
+  } catch (error: any) {
+    console.warn("⚠️ Registro chiavi: nomi eccezioni non caricati:", error?.message || error);
+  } finally {
+    await connection?.end();
+  }
+  return names;
+}
+
 async function loadHandoverFlags(workDate: string): Promise<{
+  preparedTaskIds: Set<number>;
   deliveredTaskIds: Set<number>;
   returnedTaskIds: Set<number>;
   lostTaskIds: Set<number>;
   driverTaskIds: Set<number>;
+  bigTaskIds: Set<number>;
+  noteByTaskId: Map<number, string>;
 }> {
   const result = await query(
-    `SELECT task_id, delivered, returned, lost, driver_key FROM hk_key_handovers WHERE work_date = $1`,
+    `SELECT task_id, prepared, delivered, returned, lost, driver_key, big_key, internal_note FROM hk_key_handovers WHERE work_date = $1`,
     [workDate]
   );
+  const preparedTaskIds = new Set<number>();
   const deliveredTaskIds = new Set<number>();
   const returnedTaskIds = new Set<number>();
   const lostTaskIds = new Set<number>();
   const driverTaskIds = new Set<number>();
+  const bigTaskIds = new Set<number>();
+  const noteByTaskId = new Map<number, string>();
   for (const row of result.rows) {
     const taskId = Number(row.task_id);
     if (!Number.isInteger(taskId)) continue;
+    if (row.prepared === true) preparedTaskIds.add(taskId);
     if (row.delivered === true) deliveredTaskIds.add(taskId);
     if (row.returned === true) returnedTaskIds.add(taskId);
     if (row.lost === true) lostTaskIds.add(taskId);
     if (row.driver_key === true) driverTaskIds.add(taskId);
+    if (row.big_key === true) bigTaskIds.add(taskId);
+    const note = asText(row.internal_note);
+    if (note) noteByTaskId.set(taskId, note);
   }
-  return { deliveredTaskIds, returnedTaskIds, lostTaskIds, driverTaskIds };
+  return { preparedTaskIds, deliveredTaskIds, returnedTaskIds, lostTaskIds, driverTaskIds, bigTaskIds, noteByTaskId };
 }
 
 async function loadOperationNames(operationIds: number[]): Promise<Map<number, string>> {
@@ -302,19 +354,28 @@ export async function loadKeyRegistry(workDate: string): Promise<KeyRegistryPayl
     tasks,
     classicCodes,
     deliveredTaskIds: handover.deliveredTaskIds,
+    preparedTaskIds: handover.preparedTaskIds,
     returnedTaskIds: handover.returnedTaskIds,
     lostTaskIds: handover.lostTaskIds,
     driverTaskIds: handover.driverTaskIds,
+    bigTaskIds: handover.bigTaskIds,
+    exceptionClientIds: await loadExceptionClientIds(),
   });
+  for (const cleaner of rows) {
+    for (const apartment of cleaner.apartments) {
+      apartment.internalNote = handover.noteByTaskId.get(apartment.taskId) ?? null;
+    }
+  }
   const priorAlerts = await loadPriorAlerts(
     workDate,
     rows.flatMap((cleaner) => cleaner.apartments.map((apartment) => apartment.logisticCode))
   );
   attachPriorAlerts(rows, priorAlerts);
-  const apartments = rows.flatMap((cleaner) => cleaner.apartments);
+  const apartments = rows.flatMap((cleaner) => cleaner.apartments).filter((apartment) => apartment.physicalKey);
   const totals = {
     keys: apartments.length,
     warehouse: apartments.filter((apartment) => keyHandoverStatus(apartment) === "warehouse").length,
+    prepared: apartments.filter((apartment) => keyHandoverStatus(apartment) === "prepared").length,
     withCleaner: apartments.filter((apartment) => keyHandoverStatus(apartment) === "with_cleaner").length,
     returned: apartments.filter((apartment) => keyHandoverStatus(apartment) === "returned").length,
   };
@@ -378,6 +439,24 @@ function attachPriorAlerts(rows: KeyRegistryCleaner[], byCode: Map<string, KeyPr
   }
 }
 
+async function loadExceptionClientIds(): Promise<Set<number>> {
+  try {
+    const { pgSettingsService } = await import("./pg-settings-service");
+    await pgSettingsService.ensureTables();
+    const settings = await pgSettingsService.getSettings("app_settings");
+    return keyRegistryExceptionClientIds(settings);
+  } catch (error: any) {
+    console.warn("⚠️ Registro chiavi: eccezioni cliente non caricate:", error?.message || error);
+    return new Set();
+  }
+}
+
+function assertKeyStatesEnabled(apartment: KeyRegistryApartment): void {
+  if (apartment.keyStatesLocked) {
+    throw new Error("Stati chiave disattivati per questo cliente");
+  }
+}
+
 function findRegistryApartment(
   registry: KeyRegistryPayload,
   taskId: number
@@ -398,6 +477,7 @@ export async function setKeyLost(
   if (!found) {
     throw new Error("Appartamento non presente nel registro di questa giornata");
   }
+  assertKeyStatesEnabled(found.apartment);
   const cleanerName = [found.cleaner.name, found.cleaner.lastname].filter(Boolean).join(" ").trim();
   await query(
     `
@@ -444,14 +524,17 @@ export async function setKeyDriver(
   if (!found) {
     throw new Error("Appartamento non presente nel registro di questa giornata");
   }
+  assertKeyStatesEnabled(found.apartment);
   const cleanerName = [found.cleaner.name, found.cleaner.lastname].filter(Boolean).join(" ").trim();
   await query(
     `
       INSERT INTO hk_key_handovers (
-        work_date, task_id, cleaner_id, logistic_code, delivered, delivered_at, returned, returned_at,
+        work_date, task_id, cleaner_id, logistic_code, prepared, prepared_at,
+        delivered, delivered_at, returned, returned_at,
         driver_key, driver_key_at, cleaner_name, matricola, apt_code, customer_name, updated_at
       ) VALUES (
-        $1, $2, $3, $4, $5, CASE WHEN $5 THEN NOW() ELSE NULL END, FALSE, NULL,
+        $1, $2, $3, $4, FALSE, NULL,
+        FALSE, NULL, FALSE, NULL,
         $5, CASE WHEN $5 THEN NOW() ELSE NULL END, $6, $7, $8, $9, NOW()
       )
       ON CONFLICT (work_date, task_id) DO UPDATE SET
@@ -462,13 +545,6 @@ export async function setKeyDriver(
           WHEN EXCLUDED.driver_key THEN COALESCE(hk_key_handovers.driver_key_at, NOW())
           ELSE NULL
         END,
-        delivered = CASE WHEN EXCLUDED.driver_key THEN TRUE ELSE hk_key_handovers.delivered END,
-        delivered_at = CASE
-          WHEN EXCLUDED.driver_key THEN COALESCE(hk_key_handovers.delivered_at, NOW())
-          ELSE hk_key_handovers.delivered_at
-        END,
-        returned = CASE WHEN EXCLUDED.driver_key THEN FALSE ELSE hk_key_handovers.returned END,
-        returned_at = CASE WHEN EXCLUDED.driver_key THEN NULL ELSE hk_key_handovers.returned_at END,
         cleaner_name = EXCLUDED.cleaner_name,
         matricola = EXCLUDED.matricola,
         apt_code = EXCLUDED.apt_code,
@@ -490,16 +566,120 @@ export async function setKeyDriver(
   return { taskId, driverKey: taken };
 }
 
+export async function setKeyBig(
+  workDate: string,
+  taskId: number,
+  taken: boolean
+): Promise<{ taskId: number; bigKey: boolean }> {
+  const registry = await loadKeyRegistry(workDate);
+  const found = findRegistryApartment(registry, taskId);
+  if (!found) {
+    throw new Error("Appartamento non presente nel registro di questa giornata");
+  }
+  assertKeyStatesEnabled(found.apartment);
+  const cleanerName = [found.cleaner.name, found.cleaner.lastname].filter(Boolean).join(" ").trim();
+  await query(
+    `
+      INSERT INTO hk_key_handovers (
+        work_date, task_id, cleaner_id, logistic_code, prepared, prepared_at,
+        delivered, delivered_at, returned, returned_at,
+        big_key, big_key_at, cleaner_name, matricola, apt_code, customer_name, updated_at
+      ) VALUES (
+        $1, $2, $3, $4, FALSE, NULL,
+        FALSE, NULL, FALSE, NULL,
+        $5, CASE WHEN $5 THEN NOW() ELSE NULL END, $6, $7, $8, $9, NOW()
+      )
+      ON CONFLICT (work_date, task_id) DO UPDATE SET
+        cleaner_id = EXCLUDED.cleaner_id,
+        logistic_code = EXCLUDED.logistic_code,
+        big_key = EXCLUDED.big_key,
+        big_key_at = CASE
+          WHEN EXCLUDED.big_key THEN COALESCE(hk_key_handovers.big_key_at, NOW())
+          ELSE NULL
+        END,
+        cleaner_name = EXCLUDED.cleaner_name,
+        matricola = EXCLUDED.matricola,
+        apt_code = EXCLUDED.apt_code,
+        customer_name = EXCLUDED.customer_name,
+        updated_at = NOW()
+    `,
+    [
+      workDate,
+      taskId,
+      found.cleaner.cleanerId,
+      found.apartment.logisticCode,
+      taken,
+      cleanerName || null,
+      found.cleaner.matricola,
+      found.apartment.aptCode,
+      found.apartment.customerName,
+    ]
+  );
+  return { taskId, bigKey: taken };
+}
+
+const KEY_NOTE_MAX = 1000;
+
+export async function setKeyNote(
+  workDate: string,
+  taskId: number,
+  note: string
+): Promise<{ taskId: number; internalNote: string | null }> {
+  const registry = await loadKeyRegistry(workDate);
+  const found = findRegistryApartment(registry, taskId);
+  if (!found) {
+    throw new Error("Appartamento non presente nel registro di questa giornata");
+  }
+  const internalNote = note.trim().slice(0, KEY_NOTE_MAX) || null;
+  const cleanerName = [found.cleaner.name, found.cleaner.lastname].filter(Boolean).join(" ").trim();
+  await query(
+    `
+      INSERT INTO hk_key_handovers (
+        work_date, task_id, cleaner_id, logistic_code, internal_note,
+        cleaner_name, matricola, apt_code, customer_name, updated_at
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW()
+      )
+      ON CONFLICT (work_date, task_id) DO UPDATE SET
+        cleaner_id = EXCLUDED.cleaner_id,
+        logistic_code = EXCLUDED.logistic_code,
+        internal_note = EXCLUDED.internal_note,
+        cleaner_name = EXCLUDED.cleaner_name,
+        matricola = EXCLUDED.matricola,
+        apt_code = EXCLUDED.apt_code,
+        customer_name = EXCLUDED.customer_name,
+        updated_at = NOW()
+    `,
+    [
+      workDate,
+      taskId,
+      found.cleaner.cleanerId,
+      found.apartment.logisticCode,
+      internalNote,
+      cleanerName || null,
+      found.cleaner.matricola,
+      found.apartment.aptCode,
+      found.apartment.customerName,
+    ]
+  );
+  return { taskId, internalNote };
+}
+
 export async function setKeyRecovered(
   workDate: string,
   taskId: number
 ): Promise<{ taskId: number; lost: false; delivered: true }> {
+  const registry = await loadKeyRegistry(workDate);
+  const found = findRegistryApartment(registry, taskId);
+  if (found) assertKeyStatesEnabled(found.apartment);
   await ensureHkKeyHandoverTable();
   const result = await query(
     `
       UPDATE hk_key_handovers
       SET lost = FALSE,
           lost_at = NULL,
+          prepared = TRUE,
+          prepared_at = COALESCE(prepared_at, NOW()),
           delivered = TRUE,
           delivered_at = COALESCE(delivered_at, NOW()),
           returned = TRUE,
@@ -540,14 +720,15 @@ async function loadOutstandingKeys(
 ): Promise<LostKeysPayload> {
   await ensureHkKeyHandoverTable();
   const today = calendarDateInRome(now);
+  const exceptionNames = await loadExceptionCustomerNames();
   const filter =
     kind === "lost"
       ? "lost = TRUE"
       : "delivered = TRUE AND returned = FALSE AND lost = FALSE";
-  const dateFilter = kind === "lost" ? "work_date <= $1::date" : "work_date < $1::date";
+  const dateFilter = "work_date <= $1::date";
   const result = await query(
     `
-      SELECT to_char(work_date, 'YYYY-MM-DD') AS work_date, task_id, cleaner_id, logistic_code, cleaner_name, matricola, apt_code, customer_name
+      SELECT to_char(work_date, 'YYYY-MM-DD') AS work_date, task_id, cleaner_id, logistic_code, cleaner_name, matricola, apt_code, customer_name, internal_note
       FROM hk_key_handovers
       WHERE ${filter}
         AND ${dateFilter}
@@ -560,6 +741,8 @@ async function loadOutstandingKeys(
     const workDate = asWorkDate(row.work_date);
     const visible = kind === "lost" ? isLostKeyListed(workDate, today) : isLostKeyVisible(workDate, today);
     if (!visible) continue;
+    const customerName = asText(row.customer_name);
+    if (customerName && exceptionNames.has(customerName.toLocaleLowerCase("it"))) continue;
     const cleanerId = Number(row.cleaner_id);
     keys.push({
       workDate,
@@ -571,6 +754,7 @@ async function loadOutstandingKeys(
       aptCode: asText(row.apt_code),
       customerName: asText(row.customer_name),
       daysMissing: daysSinceWorkDate(workDate, today),
+      internalNote: asText(row.internal_note),
     });
   }
   return { today, keys };
@@ -587,6 +771,7 @@ export async function setKeyDelivered(
   for (const cleaner of registry.cleaners) {
     const apartment = cleaner.apartments.find((item) => item.taskId === taskId);
     if (!apartment) continue;
+    assertKeyStatesEnabled(apartment);
     cleanerId = cleaner.cleanerId;
     logisticCode = apartment.logisticCode;
     break;
@@ -618,10 +803,11 @@ export async function setKeyDelivered(
   return { taskId, delivered };
 }
 
-const HANDOVER_FLAGS: Record<KeyHandoverStatus, { delivered: boolean; returned: boolean }> = {
-  warehouse: { delivered: false, returned: false },
-  with_cleaner: { delivered: true, returned: false },
-  returned: { delivered: true, returned: true },
+const HANDOVER_FLAGS: Record<KeyHandoverStatus, { prepared: boolean; delivered: boolean; returned: boolean }> = {
+  warehouse: { prepared: false, delivered: false, returned: false },
+  prepared: { prepared: true, delivered: false, returned: false },
+  with_cleaner: { prepared: true, delivered: true, returned: false },
+  returned: { prepared: true, delivered: true, returned: true },
 };
 
 export async function setKeyHandover(
@@ -634,22 +820,30 @@ export async function setKeyHandover(
   if (!found) {
     throw new Error("Appartamento non presente nel registro di questa giornata");
   }
+  assertKeyStatesEnabled(found.apartment);
   const flags = HANDOVER_FLAGS[status];
   const cleanerName = [found.cleaner.name, found.cleaner.lastname].filter(Boolean).join(" ").trim();
   await query(
     `
       INSERT INTO hk_key_handovers (
-        work_date, task_id, cleaner_id, logistic_code, delivered, delivered_at,
+        work_date, task_id, cleaner_id, logistic_code, prepared, prepared_at,
+        delivered, delivered_at,
         returned, returned_at, lost, lost_at,
         cleaner_name, matricola, apt_code, customer_name, updated_at
       ) VALUES (
         $1, $2, $3, $4, $5, CASE WHEN $5 THEN NOW() ELSE NULL END,
-        $6, CASE WHEN $6 THEN NOW() ELSE NULL END, FALSE, NULL,
-        $7, $8, $9, $10, NOW()
+        $6, CASE WHEN $6 THEN NOW() ELSE NULL END,
+        $7, CASE WHEN $7 THEN NOW() ELSE NULL END, FALSE, NULL,
+        $8, $9, $10, $11, NOW()
       )
       ON CONFLICT (work_date, task_id) DO UPDATE SET
         cleaner_id = EXCLUDED.cleaner_id,
         logistic_code = EXCLUDED.logistic_code,
+        prepared = EXCLUDED.prepared,
+        prepared_at = CASE
+          WHEN EXCLUDED.prepared THEN COALESCE(hk_key_handovers.prepared_at, NOW())
+          ELSE NULL
+        END,
         delivered = EXCLUDED.delivered,
         delivered_at = CASE
           WHEN EXCLUDED.delivered THEN COALESCE(hk_key_handovers.delivered_at, NOW())
@@ -673,6 +867,7 @@ export async function setKeyHandover(
       taskId,
       found.cleaner.cleanerId,
       found.apartment.logisticCode,
+      flags.prepared,
       flags.delivered,
       flags.returned,
       cleanerName || null,

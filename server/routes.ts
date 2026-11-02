@@ -2153,6 +2153,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/key-registry/big", async (req, res) => {
+    try {
+      const workDate = String(req.body?.date ?? "");
+      const taskId = Number(req.body?.taskId);
+      const taken = req.body?.taken;
+      if (!isValidWorkDate(workDate) || !Number.isInteger(taskId) || taskId <= 0 || typeof taken !== "boolean") {
+        return res.status(400).json({ success: false, error: "Dati non validi" });
+      }
+      const { setKeyBig } = await import("./services/hk-key-registry");
+      const result = await setKeyBig(workDate, taskId, taken);
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      const message = error?.message || "Salvataggio non riuscito";
+      const status = message.includes("non presente") ? 404 : 500;
+      console.error("POST /api/key-registry/big:", error);
+      res.status(status).json({ success: false, error: message });
+    }
+  });
+
   app.post("/api/key-registry/recovered", async (req, res) => {
     try {
       const workDate = String(req.body?.date ?? "");
@@ -2180,7 +2199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const { setKeyHandover } = await import("./services/hk-key-registry");
       const status = String(req.body?.status ?? "");
-      if (status !== "warehouse" && status !== "with_cleaner" && status !== "returned") {
+      if (status !== "warehouse" && status !== "prepared" && status !== "with_cleaner" && status !== "returned") {
         return res.status(400).json({ success: false, error: "Dati non validi" });
       }
       const result = await setKeyHandover(workDate, taskId, status);
@@ -2189,6 +2208,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const message = error?.message || "Salvataggio non riuscito";
       const status = message.includes("non presente") ? 404 : 500;
       console.error("POST /api/key-registry/delivered:", error);
+      res.status(status).json({ success: false, error: message });
+    }
+  });
+
+  app.post("/api/key-registry/note", async (req, res) => {
+    try {
+      const workDate = String(req.body?.date ?? "");
+      const taskId = Number(req.body?.taskId);
+      const note = req.body?.note;
+      if (!isValidWorkDate(workDate) || !Number.isInteger(taskId) || taskId <= 0 || typeof note !== "string") {
+        return res.status(400).json({ success: false, error: "Dati non validi" });
+      }
+      const { setKeyNote } = await import("./services/hk-key-registry");
+      const result = await setKeyNote(workDate, taskId, note);
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      const message = error?.message || "Salvataggio non riuscito";
+      const status = message.includes("non presente") ? 404 : 500;
+      console.error("POST /api/key-registry/note:", error);
       res.status(status).json({ success: false, error: message });
     }
   });

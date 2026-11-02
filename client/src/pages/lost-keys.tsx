@@ -19,6 +19,7 @@ type LostKey = {
   aptCode: string | null;
   customerName: string | null;
   daysMissing: number;
+  internalNote?: string | null;
 };
 
 type LostKeysPayload = {
@@ -52,9 +53,9 @@ const LIST_COPY: Record<
   unreturned: {
     path: "/api/key-registry/unreturned",
     title: "Chiavi non restituite",
-    description: "Chiavi consegnate e non tornate in magazzino, nei giorni già passati.",
+    description: "Chiavi consegnate e non tornate in magazzino, anche nella giornata di oggi.",
     loading: "Caricamento chiavi non restituite",
-    empty: "Nessuna chiave non restituita dei giorni passati.",
+    empty: "Nessuna chiave non restituita.",
     action: "Restituita",
     errorTitle: "Restituzione non salvata",
   },
@@ -195,6 +196,11 @@ function KeyListPage({ kind }: { kind: ListKind }) {
                           <p className="text-2xl font-semibold tabular-nums">{key.logisticCode}</p>
                           <p className="mt-1 text-sm font-medium">{key.aptCode || "—"}</p>
                           <p className="truncate text-sm text-muted-foreground">{key.customerName || "—"}</p>
+                          {key.internalNote ? (
+                            <p className="mt-2 whitespace-pre-wrap rounded-lg bg-amber-50 px-2 py-1 text-sm text-amber-950 dark:bg-amber-950/40 dark:text-amber-100">
+                              {key.internalNote}
+                            </p>
+                          ) : null}
                           <p className="mt-1 text-sm">
                             {key.cleanerName || "Cleaner"}
                             {key.matricola ? ` · Matricola ${key.matricola}` : ""}

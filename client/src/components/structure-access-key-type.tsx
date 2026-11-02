@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Keyboard, KeyRound, Lock } from "lucide-react";
+import { Keyboard, KeyRound, Loader2, Lock } from "lucide-react";
 import {
   resolveStructureAccessBundlePresentation,
   type StructureAccessBundle,
 } from "@shared/structure-access-keys";
 import { registryKeyIcon } from "@shared/key-registry";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 const EMPTY_INPUT_CLASS =
@@ -112,11 +114,59 @@ function BundleCard({ bundle }: { bundle: StructureAccessBundle }) {
   );
 }
 
+function KeyInternalNote({
+  note,
+  readOnly,
+  onSave,
+}: {
+  note: string;
+  readOnly: boolean;
+  onSave?: (note: string) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState(note);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => setDraft(note), [note]);
+
+  const save = async () => {
+    if (!onSave || readOnly || saving) return;
+    setSaving(true);
+    try {
+      await onSave(draft);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 border-t pt-3">
+      <p className="text-sm font-semibold">Nota interna</p>
+      <Textarea
+        value={draft}
+        maxLength={1000}
+        readOnly={readOnly || saving}
+        aria-label="Nota interna"
+        placeholder="Informazione per chi usa il registro"
+        className="min-h-24 text-base"
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      {readOnly ? null : (
+        <Button type="button" onClick={save} disabled={saving} className="w-full">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salva nota"}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function StructureAccessKeyButtons({
   bundles,
   size = "sm",
   layout = "separate",
   physicalKey = false,
+  showInternalNote = false,
+  internalNote = null,
+  internalNoteReadOnly = false,
+  onSaveInternalNote,
 }: {
   bundles: StructureAccessBundle[];
   size?: "sm" | "md";
@@ -124,6 +174,11 @@ export function StructureAccessKeyButtons({
   layout?: "separate" | "badge";
   /** Nel registro, una chiave classica usa sempre il simbolo classico anche se il mazzo visibile è un altro. */
   physicalKey?: boolean;
+  /** Nel registro, sotto la tipologia si può scrivere la nota interna. */
+  showInternalNote?: boolean;
+  internalNote?: string | null;
+  internalNoteReadOnly?: boolean;
+  onSaveInternalNote?: (note: string) => Promise<void>;
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [badgeOpen, setBadgeOpen] = useState(false);
@@ -185,6 +240,9 @@ export function StructureAccessKeyButtons({
               {bundles.length}
             </span>
           ) : null}
+          {showInternalNote && internalNote?.trim() ? (
+            <span className="absolute -left-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border border-white bg-amber-500" aria-hidden />
+          ) : null}
         </button>
         <Dialog open={badgeOpen} onOpenChange={setBadgeOpen}>
           <DialogContent className="sm:max-w-md">
@@ -199,6 +257,13 @@ export function StructureAccessKeyButtons({
                 />
               ))}
             </div>
+            {showInternalNote ? (
+              <KeyInternalNote
+                note={internalNote ?? ""}
+                readOnly={internalNoteReadOnly}
+                onSave={onSaveInternalNote}
+              />
+            ) : null}
           </DialogContent>
         </Dialog>
       </>

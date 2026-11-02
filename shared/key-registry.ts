@@ -16,6 +16,7 @@ export type KeyRegistryTaskInput = {
   address: string | null;
   aptCode: string | null;
   customerName?: string | null;
+  customerId?: number | null;
   interventionType?: string | null;
   keyBundles?: StructureAccessBundle[];
   operationId?: number | null;
@@ -29,17 +30,26 @@ export type KeyRegistryApartment = {
   logisticCode: string;
   aptCode: string | null;
   customerName: string | null;
+  customerId: number | null;
+  /** Cliente in eccezione: la chiave si vede, gli stati non si usano. */
+  keyStatesLocked: boolean;
   interventionType: string | null;
   keyBundles: StructureAccessBundle[];
   sequence: number;
   startTime: string | null;
   /** Chiave classica: è la vista «solo chiavi fisiche». */
   physicalKey: boolean;
+  /** Chiave preparata in magazzino, non ancora consegnata. */
+  prepared: boolean;
   delivered: boolean;
   returned: boolean;
   lost: boolean;
   /** Chiave dell'autista presa per questa task. */
   driverKey: boolean;
+  /** Chiave Big presa per questa task. Non cambia lo stato di consegna. */
+  bigKey: boolean;
+  /** Nota interna di questa chiave, visibile a chi usa il registro. */
+  internalNote: string | null;
   priorAlerts: KeyPriorAlert[];
 };
 
@@ -59,21 +69,24 @@ export function priorAlertTone(alerts: KeyPriorAlert[] | null | undefined): "los
   return "unreturned";
 }
 
-export type KeyHandoverStatus = "warehouse" | "with_cleaner" | "returned";
+export type KeyHandoverStatus = "warehouse" | "prepared" | "with_cleaner" | "returned";
 
-/** Grigio = in magazzino, ambra = consegnata, verde = restituita. */
+/** Grigio = in magazzino, azzurro = preparata, ambra = consegnata, verde = restituita. */
 export function keyHandoverStatus(flags: {
+  prepared?: boolean;
   delivered: boolean;
   returned?: boolean;
   lost?: boolean;
 }): KeyHandoverStatus {
   if (flags.returned) return "returned";
   if (flags.delivered) return "with_cleaner";
+  if (flags.prepared) return "prepared";
   return "warehouse";
 }
 
 export function nextKeyHandoverStatus(status: KeyHandoverStatus): KeyHandoverStatus {
-  if (status === "warehouse") return "with_cleaner";
+  if (status === "warehouse") return "prepared";
+  if (status === "prepared") return "with_cleaner";
   if (status === "with_cleaner") return "returned";
   return "warehouse";
 }
@@ -87,6 +100,20 @@ export type KeyRegistryCleaner = {
 };
 
 /** Data di calendario a Roma, nel formato YYYY-MM-DD. */
+export function keyRegistryExceptionClientIds(settings: unknown): Set<number> {
+  const raw =
+    settings && typeof settings === "object"
+      ? (settings as { key_registry_exceptions?: unknown }).key_registry_exceptions
+      : [];
+  const ids = new Set<number>();
+  if (!Array.isArray(raw)) return ids;
+  for (const value of raw) {
+    const id = Number(value);
+    if (Number.isInteger(id) && id > 0) ids.add(id);
+  }
+  return ids;
+}
+
 export function calendarDateInRome(now = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Rome",
@@ -96,9 +123,9 @@ export function calendarDateInRome(now = new Date()): string {
   }).format(now);
 }
 
-/** Le chiavi non restituite compaiono solo se il giorno del registro è già passato. */
+/** Le chiavi non restituite compaiono anche nella giornata stessa, non solo nei giorni passati. */
 export function isLostKeyVisible(workDate: string, today: string): boolean {
-  return workDate < today;
+  return workDate <= today;
 }
 
 /** Le chiavi smarrite compaiono anche se sono state segnate oggi. */
@@ -184,8 +211,48 @@ export function selectKeyRegistryTasks(tasks: KeyRegistryTaskInput[]): KeyRegist
   return selected;
 }
 
-function firstStartTime(cleaner: KeyRegistryCleaner): string {
+function firstStartTime(cleaner: { apartments: { startTime: string | null }[] }): string {
   return cleaner.apartments[0]?.startTime?.trim() || "99:99";
+}
+
+export type KeyRegistryOrder = "matricola" | "arrival";
+
+function compareMatricola(a?: string | null, b?: string | null): number {
+  const left = a?.trim() ?? "";
+  const right = b?.trim() ?? "";
+  if (!left && !right) return 0;
+  if (!left) return 1;
+  if (!right) return -1;
+  return left.localeCompare(right, "it", { numeric: true, sensitivity: "base" });
+}
+
+type SortableKeyCleaner = {
+  cleanerId: number;
+  name: string;
+  lastname: string;
+  matricola?: string | null;
+  apartments: { startTime: string | null }[];
+};
+
+/** Ordine dei cleaner nel registro: matricola numerica, oppure orario del primo appartamento. */
+export function sortKeyRegistryCleaners<T extends SortableKeyCleaner>(
+  cleaners: T[],
+  order: KeyRegistryOrder,
+): T[] {
+  return [...cleaners].sort((a, b) => {
+    if (order === "matricola") {
+      const byMatricola = compareMatricola(a.matricola, b.matricola);
+      if (byMatricola !== 0) return byMatricola;
+    } else {
+      const byTime = firstStartTime(a).localeCompare(firstStartTime(b));
+      if (byTime !== 0) return byTime;
+    }
+    const byLastname = a.lastname.localeCompare(b.lastname, "it", { sensitivity: "base" });
+    if (byLastname !== 0) return byLastname;
+    const byName = a.name.localeCompare(b.name, "it", { sensitivity: "base" });
+    if (byName !== 0) return byName;
+    return a.cleanerId - b.cleanerId;
+  });
 }
 
 function compareCleaners(a: KeyRegistryCleaner, b: KeyRegistryCleaner): number {
@@ -204,13 +271,13 @@ export function cleanersWithPhysicalKeys<
     cleanerId: number;
     name: string;
     lastname: string;
-    apartments: { physicalKey?: boolean; startTime: string | null }[];
+    apartments: { physicalKey?: boolean; keyStatesLocked?: boolean; startTime: string | null }[];
   },
 >(cleaners: T[]): T[] {
   const filtered = cleaners
     .map((cleaner) => ({
       ...cleaner,
-      apartments: cleaner.apartments.filter((apartment) => apartment.physicalKey),
+      apartments: cleaner.apartments.filter((apartment) => apartment.physicalKey && !apartment.keyStatesLocked),
     }))
     .filter((cleaner) => cleaner.apartments.length > 0);
   filtered.sort((a, b) => {
@@ -240,9 +307,12 @@ export function buildKeyRegistry(input: {
   tasks: KeyRegistryTaskInput[];
   classicCodes: Set<string>;
   deliveredTaskIds: Set<number>;
+  preparedTaskIds?: Set<number>;
   returnedTaskIds?: Set<number>;
   lostTaskIds?: Set<number>;
   driverTaskIds?: Set<number>;
+  bigTaskIds?: Set<number>;
+  exceptionClientIds?: Set<number>;
 }): KeyRegistryCleaner[] {
   const cleanerById = new Map(input.cleaners.map((cleaner) => [cleaner.id, cleaner]));
   const selected = selectKeyRegistryTasks(input.tasks);
@@ -250,23 +320,32 @@ export function buildKeyRegistry(input: {
 
   for (const task of selected) {
     const bundles = task.keyBundles ?? [];
-    const physicalKey = matchesClassicCode(task.logisticCode, input.classicCodes);
-    if (!physicalKey && registryKeyIcon(bundles) === "none") continue;
+    const hasPhysicalKey = matchesClassicCode(task.logisticCode, input.classicCodes);
+    if (!hasPhysicalKey && registryKeyIcon(bundles) === "none") continue;
+    const customerId = Number(task.customerId);
+    const normalizedCustomerId = Number.isInteger(customerId) && customerId > 0 ? customerId : null;
+    const keyStatesLocked =
+      normalizedCustomerId != null && (input.exceptionClientIds?.has(normalizedCustomerId) ?? false);
     const apartments = grouped.get(task.cleanerId) ?? [];
     apartments.push({
       taskId: task.taskId,
       logisticCode: task.logisticCode,
       aptCode: task.aptCode,
       customerName: task.customerName ?? null,
+      customerId: normalizedCustomerId,
+      keyStatesLocked,
       interventionType: task.interventionType?.trim() || null,
       keyBundles: bundles,
       sequence: task.sequence,
       startTime: task.startTime,
-      physicalKey,
+      physicalKey: hasPhysicalKey && !keyStatesLocked,
+      prepared: input.preparedTaskIds?.has(task.taskId) ?? false,
       delivered: input.deliveredTaskIds.has(task.taskId),
       returned: input.returnedTaskIds?.has(task.taskId) ?? false,
       lost: input.lostTaskIds?.has(task.taskId) ?? false,
       driverKey: input.driverTaskIds?.has(task.taskId) ?? false,
+      bigKey: input.bigTaskIds?.has(task.taskId) ?? false,
+      internalNote: null,
       priorAlerts: [],
     });
     grouped.set(task.cleanerId, apartments);

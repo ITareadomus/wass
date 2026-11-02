@@ -42,6 +42,7 @@ interface HeldKey {
   cleanerId: number | null;
   aptCode: string | null;
   customerName: string | null;
+  internalNote: string | null;
 }
 
 interface Cleaner {
@@ -435,6 +436,7 @@ export default function Convocazioni() {
             cleanerId,
             aptCode: key.aptCode ?? null,
             customerName: key.customerName ?? null,
+            internalNote: typeof key.internalNote === "string" && key.internalNote.trim() ? key.internalNote : null,
           });
           grouped.set(cleanerId, list);
         }
@@ -1840,6 +1842,11 @@ export default function Convocazioni() {
                     <p className="text-lg font-semibold tabular-nums">{key.logisticCode}</p>
                     <p className="text-sm">{key.aptCode || "—"}</p>
                     <p className="text-sm text-muted-foreground">{key.customerName || "—"}</p>
+                    {key.internalNote ? (
+                      <p className="mt-2 whitespace-pre-wrap rounded-lg bg-amber-50 px-2 py-1 text-sm text-amber-950 dark:bg-amber-950/40 dark:text-amber-100">
+                        {key.internalNote}
+                      </p>
+                    ) : null}
                     <p className="mt-1 text-sm text-muted-foreground">
                       {/^\d{4}-\d{2}-\d{2}$/.test(key.workDate)
                         ? `Da ${format(parseISO(key.workDate), "EEEE d MMMM yyyy", { locale: it })}`

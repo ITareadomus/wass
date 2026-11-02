@@ -60,6 +60,7 @@ interface SettingsData {
     straordinario_cleaner: CleanerPriorityRules;
     formatore_cleaner: CleanerPriorityRules;
   };
+  key_registry_exceptions: number[];
 }
 
 function withSettingsDefaults(data: Partial<SettingsData>): SettingsData {
@@ -104,6 +105,7 @@ function withSettingsDefaults(data: Partial<SettingsData>): SettingsData {
       straordinario_cleaner: { ...defaultPriorityRules, ...data.priority_types?.straordinario_cleaner },
       formatore_cleaner: { ...defaultPriorityRules, ...data.priority_types?.formatore_cleaner },
     },
+    key_registry_exceptions: data.key_registry_exceptions ?? [],
   };
 }
 
@@ -935,6 +937,39 @@ export default function SystemSettings() {
                 </div>
 
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-custom-blue-light border-2 border-custom-blue">
+            <CardHeader className="bg-custom-blue-light py-3">
+              <CardTitle className="text-lg">Registro chiavi</CardTitle>
+              <CardDescription className="text-s">
+                I clienti selezionati restano nel registro come le chiavi smart e kbox: visibili, senza stati, anche se hanno chiavi fisiche.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="bg-custom-blue-light">
+              <ScrollArea className="h-56 w-full rounded-md border p-4">
+                {clients.map((client) => (
+                  <div key={`key-exception-${client.client_id}`} className="flex items-center space-x-2 mb-2">
+                    <Checkbox
+                      id={`key-exception-${client.client_id}`}
+                      checked={settings.key_registry_exceptions.includes(client.client_id)}
+                      onCheckedChange={() => {
+                        setSettings((prev) => {
+                          if (!prev) return prev;
+                          const selected = prev.key_registry_exceptions.includes(client.client_id)
+                            ? prev.key_registry_exceptions.filter((id) => id !== client.client_id)
+                            : [...prev.key_registry_exceptions, client.client_id];
+                          return { ...prev, key_registry_exceptions: selected };
+                        });
+                      }}
+                    />
+                    <Label htmlFor={`key-exception-${client.client_id}`} className="text-sm cursor-pointer">
+                      {client.customer_name}
+                    </Label>
+                  </div>
+                ))}
+              </ScrollArea>
             </CardContent>
           </Card>
 

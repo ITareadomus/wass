@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildKeyRegistry,
   cleanersWithPhysicalKeys,
+  sortKeyRegistryCleaners,
   daysSinceWorkDate,
   hasClassicKey,
   isLostKeyVisible,
@@ -54,10 +55,13 @@ describe("hasClassicKey", () => {
 describe("stato consegna", () => {
   it("distingue magazzino, cleaner e restituzione", () => {
     expect(keyHandoverStatus({ delivered: false, returned: false })).toBe("warehouse");
+    expect(keyHandoverStatus({ prepared: true, delivered: false, returned: false })).toBe("prepared");
     expect(keyHandoverStatus({ delivered: true, returned: false })).toBe("with_cleaner");
+    expect(keyHandoverStatus({ prepared: true, delivered: true, returned: false })).toBe("with_cleaner");
     expect(keyHandoverStatus({ delivered: true, returned: true })).toBe("returned");
     expect(keyHandoverStatus({ delivered: false, returned: false, lost: true })).toBe("warehouse");
-    expect(nextKeyHandoverStatus("warehouse")).toBe("with_cleaner");
+    expect(nextKeyHandoverStatus("warehouse")).toBe("prepared");
+    expect(nextKeyHandoverStatus("prepared")).toBe("with_cleaner");
     expect(nextKeyHandoverStatus("with_cleaner")).toBe("returned");
     expect(nextKeyHandoverStatus("returned")).toBe("warehouse");
   });
@@ -73,9 +77,10 @@ describe("stato consegna", () => {
 });
 
 describe("chiavi non restituite", () => {
-  it("mostra solo i giorni già passati e conta i giorni mancanti", () => {
+  it("mostra i giorni passati e la giornata stessa, e conta i giorni mancanti", () => {
     expect(isLostKeyVisible("2026-10-17", "2026-10-18")).toBe(true);
-    expect(isLostKeyVisible("2026-10-18", "2026-10-18")).toBe(false);
+    expect(isLostKeyVisible("2026-10-18", "2026-10-18")).toBe(true);
+    expect(isLostKeyVisible("2026-10-19", "2026-10-18")).toBe(false);
     expect(isLostKeyListed("2026-10-18", "2026-10-18")).toBe(true);
     expect(isLostKeyListed("2026-10-19", "2026-10-18")).toBe(false);
     expect(daysSinceWorkDate("2026-10-15", "2026-10-18")).toBe(3);
@@ -151,6 +156,7 @@ describe("buildKeyRegistry", () => {
       classicCodes: new Set(["100", "200", "300"]),
       deliveredTaskIds: new Set([10]),
       driverTaskIds: new Set([10]),
+      bigTaskIds: new Set([11]),
     });
 
     expect(rows.map((row) => row.lastname)).toEqual(["Rossi", "Bianchi"]);
@@ -158,7 +164,9 @@ describe("buildKeyRegistry", () => {
     expect(rows[0].apartments.map((apartment) => apartment.logisticCode)).toEqual(["100", "200"]);
     expect(rows[0].apartments[1].delivered).toBe(true);
     expect(rows[0].apartments[1].driverKey).toBe(true);
+    expect(rows[0].apartments[1].bigKey).toBe(false);
     expect(rows[0].apartments[0].driverKey).toBe(false);
+    expect(rows[0].apartments[0].bigKey).toBe(true);
     expect(rows[0].apartments[1].aptCode).toBe("A2");
     expect(rows[0].apartments[1].customerName).toBe("Mario Rossi");
     expect(rows[0].apartments[1].interventionType).toBe("Partenza");
@@ -171,6 +179,31 @@ describe("buildKeyRegistry", () => {
     expect(rows[0].apartments.every((apartment) => apartment.physicalKey)).toBe(true);
     expect(rows[1].apartments.map((apartment) => apartment.logisticCode)).toEqual(["300", "999"]);
     expect(rows[1].apartments.map((apartment) => apartment.physicalKey)).toEqual([true, false]);
+  });
+
+  it("blocca gli stati per un cliente in eccezione anche se la chiave è fisica", () => {
+    const rows = buildKeyRegistry({
+      cleaners,
+      tasks: [
+        {
+          taskId: 20,
+          logisticCode: "100",
+          cleanerId: 1,
+          sequence: 1,
+          startTime: "10:00",
+          address: null,
+          aptCode: null,
+          customerId: 55,
+          isPrimary: null,
+        },
+      ],
+      classicCodes: new Set(["100"]),
+      deliveredTaskIds: new Set(),
+      exceptionClientIds: new Set([55]),
+    });
+    expect(rows[0].apartments[0].physicalKey).toBe(false);
+    expect(rows[0].apartments[0].keyStatesLocked).toBe(true);
+    expect(cleanersWithPhysicalKeys(rows)).toEqual([]);
   });
 
   it("mostra la task collaborativa solo sul cleaner primario", () => {
@@ -242,5 +275,42 @@ describe("buildKeyRegistry", () => {
     ]);
     expect(filtered.map((cleaner) => cleaner.lastname)).toEqual(["Neri", "Verdi"]);
     expect(filtered[1].apartments.map((apartment) => apartment.startTime)).toEqual(["15:00"]);
+  });
+
+  it("ordina i cleaner per matricola numerica e, in alternativa, per orario di arrivo", () => {
+    const cleaners = [
+      {
+        cleanerId: 1,
+        name: "Maria",
+        lastname: "Rossi",
+        matricola: "18",
+        apartments: [{ startTime: "08:00" }],
+      },
+      {
+        cleanerId: 2,
+        name: "Luca",
+        lastname: "Bianchi",
+        matricola: "2",
+        apartments: [{ startTime: "12:00" }],
+      },
+      {
+        cleanerId: 3,
+        name: "Anna",
+        lastname: "Verdi",
+        matricola: null,
+        apartments: [{ startTime: "09:00" }],
+      },
+    ];
+
+    expect(sortKeyRegistryCleaners(cleaners, "matricola").map((cleaner) => cleaner.lastname)).toEqual([
+      "Bianchi",
+      "Rossi",
+      "Verdi",
+    ]);
+    expect(sortKeyRegistryCleaners(cleaners, "arrival").map((cleaner) => cleaner.lastname)).toEqual([
+      "Rossi",
+      "Verdi",
+      "Bianchi",
+    ]);
   });
 });
