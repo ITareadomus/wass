@@ -11,6 +11,14 @@ import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, FairnessParams, DEFAULT_FAIRNE
 import { TravelPolicy, getWaveLevelConstraints } from './travelPolicy';
 import { runPhase4RepairBatch } from './phase4OrTools';
 import { isTaskEquivalentToStraordinaria } from '../../utils/straordinaria-utils';
+import { triadeWeightOrBase } from '../triade-assignment';
+import {
+  constraintDecision,
+  HK_CONSTRAINT_PRESETS,
+  HK_SOFT_PENALTY,
+  type ConstraintMode,
+  type HkConstraintSettings,
+} from '../../../shared/hk-constraint-settings';
 
 export interface Phase4Params {
   maxInsertionAttempts: number;
@@ -35,6 +43,10 @@ export interface Phase4Params {
   formatoreRules?: FormatoreRules | null;
   // Dynamic max tasks per cleaner (calcolato da totalTasks/numCleaners)
   dynamicMaxTasks?: number;
+  triadSwap?: boolean;
+  triadLevelBonus?: number;
+  triadOverqualPenalty?: number;
+  hkConstraints?: HkConstraintSettings;
   // Minutes-based fairness parameters
   fairness: FairnessParams;
   // Wave-only: per-leg travel policy (mirrors Phase 1 thresholds).
@@ -89,6 +101,7 @@ export interface CleanerSchedule {
   // Dati per vincoli hard (opzionali per retrocompatibilità)
   role?: string;
   contractType?: string;
+  triadeWeight?: number;
   // Fairness tracking: ore totali lavorate (in minuti)
   totalWorkMinutes?: number;
 }
@@ -229,6 +242,21 @@ function canCleanerHandleApartment(
 interface HardConstraintResult {
   compatible: boolean;
   reason?: string;
+  softPenalty?: number;
+}
+
+function gateMode(
+  mode: ConstraintMode,
+  reason: string,
+  amount: number,
+  softPenalty: { value: number },
+): HardConstraintResult | null {
+  const decision = constraintDecision(mode, true, amount);
+  if (!decision.blocked) {
+    softPenalty.value += decision.penalty;
+    return null;
+  }
+  return { compatible: false, reason, softPenalty: 0 };
 }
 
 function priorityTypeToKey(priorityType: Priority | null | undefined): string | null {
@@ -246,7 +274,8 @@ function checkHardConstraints(
   apartmentTypes: ApartmentTypes = DEFAULT_APARTMENT_TYPES,
   officeOperationIds: Set<number> = new Set<number>(),
   taskTypesByCleaner: TaskTypesByCleanerConfig | null = null,
-  formatoreRules?: FormatoreRules | null
+  formatoreRules?: FormatoreRules | null,
+  hk: HkConstraintSettings = HK_CONSTRAINT_PRESETS.balanced
 ): HardConstraintResult {
   const cleanerRole = schedule.role || 'Standard';
   const normalizedRole = normalizeCleanerRole(cleanerRole);
@@ -257,53 +286,58 @@ function checkHardConstraints(
   const totalExistingCount = fixedCount + (schedule.tasks?.length ?? 0);
   const fixedHasAnyOT = schedule.fixedHasAnyOT === true;
   const fixedHasLongOT = schedule.fixedHasLongOT === true;
+  const softPenalty = { value: 0 };
+  const rules = hk;
 
-  if (officeTask) {
-    return normalizedRole === 'ufficio_cleaner'
-      ? { compatible: true }
-      : { compatible: false, reason: 'OFFICE_TASK_REQUIRES_UFFICIO_CLEANER' };
+  if (officeTask && normalizedRole !== 'ufficio_cleaner') {
+    const blocked = gateMode(rules.officeRole, 'OFFICE_TASK_REQUIRES_UFFICIO_CLEANER', HK_SOFT_PENALTY.office, softPenalty);
+    if (blocked) return blocked;
+  } else if (!officeTask && normalizedRole === 'ufficio_cleaner') {
+    const blocked = gateMode(rules.officeRole, 'UFFICIO_CLEANER_NON_OFFICE_TASK', HK_SOFT_PENALTY.office, softPenalty);
+    if (blocked) return blocked;
   }
 
-  // Cleaner ufficio non prende task non-ufficio.
-  if (normalizedRole === 'ufficio_cleaner') {
-    return { compatible: false, reason: 'UFFICIO_CLEANER_NON_OFFICE_TASK' };
+  const cleanerLevel = triadeWeightOrBase(schedule.triadeWeight);
+  const taskLevel = triadeWeightOrBase(task.triadeWeight);
+  if (cleanerLevel < taskLevel) {
+    const blocked = gateMode(
+      rules.triadeCeiling,
+      'TRIADE_LEVEL',
+      HK_SOFT_PENALTY.triadeCeilingPerLevel * (taskLevel - cleanerLevel),
+      softPenalty,
+    );
+    if (blocked) return blocked;
+  } else if (rules.triadeMatch === 'hard' && cleanerLevel !== taskLevel) {
+    return { compatible: false, reason: 'TRIADE_MATCH', softPenalty: 0 };
   }
-  
-  // 0. Verifica premium: task premium richiede cleaner Premium
-  if (task.premium && normalizedRole !== 'premium_cleaner') {
-    return { compatible: false, reason: 'ROLE_MISMATCH_PREMIUM_REQUIRED' };
-  }
-  
-  // 0b. Verifica compatibilità typeApt con role del cleaner
+
   if (!canCleanerHandleApartment(cleanerRole, task.typeApt, apartmentTypes)) {
-    return { compatible: false, reason: `ROLE_APT_MISMATCH_${cleanerRole}_vs_${task.typeApt}` };
-  }
-  
-  // 1. Verifica straordinaria: solo cleaner con role "Straordinario"
-  if (taskIsStraordinaria && normalizedRole !== 'straordinario_cleaner') {
-    return { compatible: false, reason: 'CANNOT_DO_STRAORDINARIA' };
+    const blocked = gateMode(
+      rules.apartmentType,
+      `ROLE_APT_MISMATCH_${cleanerRole}_vs_${task.typeApt}`,
+      HK_SOFT_PENALTY.apartment,
+      softPenalty,
+    );
+    if (blocked) return blocked;
   }
 
-  // 1b. Formatori: vincoli da app_settings (priorità + tipo task ammessi)
   if (normalizedRole === 'formatore_cleaner' && formatoreRules) {
     const taskPriorityKey = priorityTypeToKey(task.priorityType ?? null);
     if (formatoreRules.allowedPriorities.length > 0) {
       if (taskPriorityKey == null) {
-        return { compatible: false, reason: 'FORMATORE_TASK_PRIORITY_MISSING' };
+        const blocked = gateMode(rules.formatorePriority, 'FORMATORE_TASK_PRIORITY_MISSING', HK_SOFT_PENALTY.formatore, softPenalty);
+        if (blocked) return blocked;
+      } else {
+        const allowedSet = new Set(formatoreRules.allowedPriorities.map(p => p.toLowerCase().replace(/-/g, '_')));
+        if (!allowedSet.has(taskPriorityKey)) {
+          const blocked = gateMode(rules.formatorePriority, `FORMATORE_PRIORITY_NOT_ALLOWED_${taskPriorityKey}`, HK_SOFT_PENALTY.formatore, softPenalty);
+          if (blocked) return blocked;
+        }
       }
-      const allowedSet = new Set(formatoreRules.allowedPriorities.map(p => p.toLowerCase().replace(/-/g, '_')));
-      if (!allowedSet.has(taskPriorityKey)) {
-        return { compatible: false, reason: `FORMATORE_PRIORITY_NOT_ALLOWED_${taskPriorityKey}` };
-      }
-    }
-    if (task.premium && !formatoreRules.premiumApt) {
-      return { compatible: false, reason: 'FORMATORE_TASK_TYPE_PREMIUM_NOT_ALLOWED' };
-    }
-    if (taskIsStraordinaria && !formatoreRules.straordinarioApt) {
-      return { compatible: false, reason: 'FORMATORE_TASK_TYPE_OT_NOT_ALLOWED' };
     }
     if (!task.premium && !taskIsStraordinaria && !formatoreRules.standardApt) {
-      return { compatible: false, reason: 'FORMATORE_TASK_TYPE_STANDARD_NOT_ALLOWED' };
+      const blocked = gateMode(rules.formatoreStandard, 'FORMATORE_TASK_TYPE_STANDARD_NOT_ALLOWED', HK_SOFT_PENALTY.formatore, softPenalty);
+      if (blocked) return blocked;
     }
   }
   
@@ -313,14 +347,16 @@ function checkHardConstraints(
     
     // OT lunga (≥6h = 360min) deve essere sola
     if (taskDurationMin >= 360 && totalExistingCount > 0) {
-      return { compatible: false, reason: 'LONG_OT_MUST_BE_ALONE' };
+      const blocked = gateMode(rules.longOt, 'LONG_OT_MUST_BE_ALONE', HK_SOFT_PENALTY.longOt, softPenalty);
+      if (blocked) return blocked;
     }
     
     // OT corta: cleaner può avere max 1 altro task (che non sia OT e ≤2h)
     if (taskDurationMin < 360 && totalExistingCount > 0) {
       // Se esiste già una OT fissa in timeline, non possiamo aggiungere un'altra OT
       if (fixedHasAnyOT) {
-        return { compatible: false, reason: 'ALREADY_HAS_OT' };
+        const blocked = gateMode(rules.shortOt, 'ALREADY_HAS_OT', HK_SOFT_PENALTY.shortOt, softPenalty);
+        if (blocked) return blocked;
       }
       // Conta quanti task non-OT ha già il cleaner
       const existingTasks = schedule.tasks.map(t => tasksMap.get(t.taskId)).filter(Boolean);
@@ -329,12 +365,14 @@ function checkHardConstraints(
       
       // Se c'è già una OT, non può prenderne un'altra
       if (existingOTs.length > 0) {
-        return { compatible: false, reason: 'ALREADY_HAS_OT' };
+        const blocked = gateMode(rules.shortOt, 'ALREADY_HAS_OT', HK_SOFT_PENALTY.shortOt, softPenalty);
+        if (blocked) return blocked;
       }
       
       // Con OT corta, max 1 task extra e deve essere ≤2h
       if (existingNonOTs.length > 1) {
-        return { compatible: false, reason: 'OT_SHORT_MAX_1_EXTRA' };
+        const blocked = gateMode(rules.shortOt, 'OT_SHORT_MAX_1_EXTRA', HK_SOFT_PENALTY.shortOt, softPenalty);
+        if (blocked) return blocked;
       }
       
       // Se c'è già 1 task extra, verifica che sia ≤2h (120 min) e ≤25 min di travel
@@ -342,7 +380,8 @@ function checkHardConstraints(
         const extraTask = existingNonOTs[0]!;
         const extraDur = extraTask.cleaningTimeMinutes ?? 60;
         if (extraDur > 120) {
-          return { compatible: false, reason: 'EXTRA_TASK_EXCEEDS_2H' };
+          const blocked = gateMode(rules.shortOt, 'EXTRA_TASK_EXCEEDS_2H', HK_SOFT_PENALTY.shortOt, softPenalty);
+          if (blocked) return blocked;
         }
         
         // Check distanza tra OT corta (nuovo task) e task extra esistente
@@ -351,7 +390,8 @@ function checkHardConstraints(
           extraTask as TaskInput
         );
         if (travelToExtra > 25) {
-          return { compatible: false, reason: 'OT_SHORT_EXTRA_TOO_FAR' };
+          const blocked = gateMode(rules.shortOt, 'OT_SHORT_EXTRA_TOO_FAR', HK_SOFT_PENALTY.shortOt, softPenalty);
+      if (blocked) return blocked;
         }
       }
     }
@@ -363,7 +403,8 @@ function checkHardConstraints(
   
   // Se in timeline esiste una OT lunga fissa, non aggiungere nulla (append-only non deve violare)
   if (fixedHasLongOT) {
-    return { compatible: false, reason: 'CLEANER_HAS_LONG_OT' };
+    const blocked = gateMode(rules.longOt, 'CLEANER_HAS_LONG_OT', HK_SOFT_PENALTY.longOt, softPenalty);
+    if (blocked) return blocked;
   }
 
   // Se c'è una OT fissa (short) in timeline, applichiamo una regola conservativa:
@@ -371,29 +412,35 @@ function checkHardConstraints(
   // - aggiungere un extra SOLO se l'ancora è proprio la OT (così possiamo stimare distanza)
   if (fixedHasAnyOT && existingOTs.length === 0) {
     if (taskIsStraordinaria) {
-      return { compatible: false, reason: 'CANNOT_ADD_OT_TO_OT_CLEANER' };
+      const blocked = gateMode(rules.shortOt, 'CANNOT_ADD_OT_TO_OT_CLEANER', HK_SOFT_PENALTY.shortOt, softPenalty);
+      if (blocked) return blocked;
     }
     // Se il cleaner ha già >=2 task fisse, significa che ha già extra oltre alla OT → non aggiungere altro
     if (fixedCount >= 2) {
-      return { compatible: false, reason: 'CLEANER_HAS_OT_MAX_REACHED' };
+      const blocked = gateMode(rules.shortOt, 'CLEANER_HAS_OT_MAX_REACHED', HK_SOFT_PENALTY.shortOt, softPenalty);
+      if (blocked) return blocked;
     }
     const newTaskDuration = task.cleaningTimeMinutes || 60;
     if (newTaskDuration > 120) {
-      return { compatible: false, reason: 'EXTRA_TASK_EXCEEDS_2H' };
+      const blocked = gateMode(rules.shortOt, 'EXTRA_TASK_EXCEEDS_2H', HK_SOFT_PENALTY.shortOt, softPenalty);
+      if (blocked) return blocked;
     }
     // Possiamo stimare travel solo se l'anchor è la OT con coordinate
     const otAnchor = schedule.anchorTask;
     if (!otAnchor || !isTaskEquivalentToStraordinaria(otAnchor)) {
-      return { compatible: false, reason: 'CLEANER_HAS_OT_ANCHOR_UNKNOWN' };
+      const blocked = gateMode(rules.shortOt, 'CLEANER_HAS_OT_ANCHOR_UNKNOWN', HK_SOFT_PENALTY.shortOt, softPenalty);
+      if (blocked) return blocked;
+    } else if (typeof otAnchor.lat !== 'number' || typeof otAnchor.lng !== 'number') {
+      const blocked = gateMode(rules.shortOt, 'CLEANER_HAS_OT_MISSING_COORDS', HK_SOFT_PENALTY.shortOt, softPenalty);
+      if (blocked) return blocked;
+    } else {
+      const travelToOT = estimateTravelMinutes(task as TaskInput, otAnchor as TaskInput);
+      if (travelToOT > 25) {
+        const blocked = gateMode(rules.shortOt, 'OT_SHORT_EXTRA_TOO_FAR', HK_SOFT_PENALTY.shortOt, softPenalty);
+        if (blocked) return blocked;
+      }
     }
-    if (typeof otAnchor.lat !== 'number' || typeof otAnchor.lng !== 'number') {
-      return { compatible: false, reason: 'CLEANER_HAS_OT_MISSING_COORDS' };
-    }
-    const travelToOT = estimateTravelMinutes(task as TaskInput, otAnchor as any as TaskInput);
-    if (travelToOT > 25) {
-      return { compatible: false, reason: 'OT_SHORT_EXTRA_TOO_FAR' };
-    }
-    return { compatible: true };
+    return { compatible: true, softPenalty: softPenalty.value };
   }
 
   if (existingOTs.length > 0) {
@@ -402,22 +449,26 @@ function checkHardConstraints(
     
     // OT lunga: nessun altro task
     if (otDuration >= 360) {
-      return { compatible: false, reason: 'CLEANER_HAS_LONG_OT' };
+      const blocked = gateMode(rules.longOt, 'CLEANER_HAS_LONG_OT', HK_SOFT_PENALTY.longOt, softPenalty);
+    if (blocked) return blocked;
     }
     
     // OT corta: max 1 task extra ≤2h
     if (existingTasks.length >= 2) {
-      return { compatible: false, reason: 'CLEANER_HAS_OT_MAX_REACHED' };
+      const blocked = gateMode(rules.shortOt, 'CLEANER_HAS_OT_MAX_REACHED', HK_SOFT_PENALTY.shortOt, softPenalty);
+      if (blocked) return blocked;
     }
     
     // Il nuovo task deve essere ≤2h e non OT
     if (taskIsStraordinaria) {
-      return { compatible: false, reason: 'CANNOT_ADD_OT_TO_OT_CLEANER' };
+      const blocked = gateMode(rules.shortOt, 'CANNOT_ADD_OT_TO_OT_CLEANER', HK_SOFT_PENALTY.shortOt, softPenalty);
+      if (blocked) return blocked;
     }
     
     const newTaskDuration = task.cleaningTimeMinutes || 60;
     if (newTaskDuration > 120) {
-      return { compatible: false, reason: 'EXTRA_TASK_EXCEEDS_2H' };
+      const blocked = gateMode(rules.shortOt, 'EXTRA_TASK_EXCEEDS_2H', HK_SOFT_PENALTY.shortOt, softPenalty);
+      if (blocked) return blocked;
     }
     
     // Check distanza tra OT corta esistente e nuovo task extra
@@ -426,11 +477,12 @@ function checkHardConstraints(
       otTask as TaskInput
     );
     if (travelToOT > 25) {
-      return { compatible: false, reason: 'OT_SHORT_EXTRA_TOO_FAR' };
+      const blocked = gateMode(rules.shortOt, 'OT_SHORT_EXTRA_TOO_FAR', HK_SOFT_PENALTY.shortOt, softPenalty);
+      if (blocked) return blocked;
     }
   }
   
-  return { compatible: true };
+  return { compatible: true, softPenalty: softPenalty.value };
 }
 
 // ============================================================================
@@ -506,7 +558,8 @@ function tryInsertTask(
     params.apartmentTypes,
     new Set<number>(params.officeOperationIds ?? []),
     params.taskTypesByCleaner ?? null,
-    params.formatoreRules
+    params.formatoreRules,
+    params.hkConstraints
   );
   if (!hardCheck.compatible) {
     return {
@@ -547,7 +600,9 @@ function tryInsertTask(
     tasksMap,
     previousTask,
     priorityWindows,
-    timelineConstraints
+    timelineConstraints,
+    schedule.endTime || '20:00',
+    params.hkConstraints
   );
   
   if (!simResult.ok) {
@@ -584,7 +639,9 @@ function tryInsertTask(
     // Fallback se dynamicMaxTasks non è definito (usa baseMax = 3)
     dynamicMaxLoad = 3;
   }
-  if (newTaskCount > dynamicMaxLoad) {
+  const assignmentRules = params.hkConstraints ?? HK_CONSTRAINT_PRESETS.balanced;
+  const overTaskCount = newTaskCount > dynamicMaxLoad;
+  if (overTaskCount && assignmentRules.taskCount === "hard") {
     return {
       cleanerId: schedule.cleanerId,
       position,
@@ -637,26 +694,26 @@ function tryInsertTask(
         reason: 'PRIORITY_VIOLATION_REJECTED'
       };
     }
-  } else {
-    // Normal optimizer: legacy deltaTravel check
-    if (deltaTravel > constraints.maxTravelMinutes) {
-      if (!constraints.allowHighTravel) {
-        return {
-          cleanerId: schedule.cleanerId,
-          position,
-          deltaTravel,
-          deltaWait,
-          deltaLateness: deltaPriorityPenalty,
-          priorityPenalty: simResult.totalPriorityPenalty,
-          underfilledBonus: 0,
-          totalScore: Infinity,
-          feasible: false,
-          reason: 'HIGH_TRAVEL_REJECTED'
-        };
-      }
+  } else if (assignmentRules.travel !== "off") {
+    const maxTravel = assignmentRules.travel === "hard"
+      ? assignmentRules.travelHardMaxMin
+      : constraints.maxTravelMinutes;
+    if (deltaTravel > maxTravel && (assignmentRules.travel === "hard" || !constraints.allowHighTravel)) {
+      return {
+        cleanerId: schedule.cleanerId,
+        position,
+        deltaTravel,
+        deltaWait,
+        deltaLateness: deltaPriorityPenalty,
+        priorityPenalty: simResult.totalPriorityPenalty,
+        underfilledBonus: 0,
+        totalScore: Infinity,
+        feasible: false,
+        reason: 'HIGH_TRAVEL_REJECTED'
+      };
     }
 
-    if (deltaPriorityPenalty > 50 && !constraints.allowLateness) {
+    if (assignmentRules.priorityWindow !== "off" && deltaPriorityPenalty > 50 && (assignmentRules.priorityWindow === "hard" || !constraints.allowLateness)) {
       return {
         cleanerId: schedule.cleanerId,
         position,
@@ -706,9 +763,13 @@ function tryInsertTask(
   const zeroBonus = currentLoadMin === 0 ? fairness.zeroBonus : 0;
   
   // Include relaxPenalty nel totalScore - così soluzioni a livello più basso vincono sempre
+  const taskCountSoftPenalty = overTaskCount && assignmentRules.taskCount === "soft"
+    ? HK_SOFT_PENALTY.taskCountExtra * (newTaskCount - dynamicMaxLoad)
+    : 0;
   const relaxPenaltyValue = relaxPenalty(relaxLevel, params);
   const totalScore = deltaTravel + (deltaWait * 0.5) + (deltaPriorityPenalty * 2) 
-    - underfilledBonus - minutesUnderBonus - zeroBonus + overloadPenalty + balancePenalty + relaxPenaltyValue;
+    - underfilledBonus - minutesUnderBonus - zeroBonus + overloadPenalty + balancePenalty + relaxPenaltyValue
+    + (hardCheck.softPenalty ?? 0) + taskCountSoftPenalty;
   
   return {
     cleanerId: schedule.cleanerId,
@@ -731,7 +792,8 @@ function applyInsertion(
   tasksMap: Map<number, TaskForScheduling>,
   priorityWindows: PriorityWindows | null,
   previousTask: TaskForScheduling | null = null,
-  timelineConstraints: Phase3TimelineConstraints | null = null
+  timelineConstraints: Phase3TimelineConstraints | null = null,
+  hk: HkConstraintSettings = HK_CONSTRAINT_PRESETS.balanced
 ): CleanerSchedule {
   const allTasksForSim: TaskForScheduling[] = [];
   
@@ -754,7 +816,9 @@ function applyInsertion(
     tasksMap,
     previousTask,
     priorityWindows,
-    timelineConstraints
+    timelineConstraints,
+    schedule.endTime || '20:00',
+    hk
   );
 
   // This should not happen if tryInsertTask was feasible with the same parameters.
@@ -828,6 +892,8 @@ function trySwapForTask(
       // Calcola il "valore" del task rimosso (approssimativo)
       // Un task normale vale circa la baseUnassignedPenalty
       const removedTaskScore = params.baseUnassignedPenalty;
+      const incomingWeight = triadeWeightOrBase(task.triadeWeight);
+      const removedWeight = triadeWeightOrBase(removedTask?.triadeWeight);
       
       // Crea schedule senza questo task
       const tasksWithoutRemoved = schedule.tasks.filter((_, idx) => idx !== i);
@@ -849,7 +915,8 @@ function trySwapForTask(
         params.apartmentTypes,
         new Set<number>(params.officeOperationIds ?? []),
         params.taskTypesByCleaner ?? null,
-        params.formatoreRules
+        params.formatoreRules,
+        params.hkConstraints
       );
       if (!hardCheck.compatible) {
         continue;
@@ -864,7 +931,10 @@ function trySwapForTask(
         schedule.startTime,
         tasksMap,
         schedule.anchorTask ?? null,
-        priorityWindows
+        priorityWindows,
+        null,
+        schedule.endTime || '20:00',
+        params.hkConstraints
       );
       
       if (!simResult.ok) continue;
@@ -887,7 +957,7 @@ function trySwapForTask(
         // Fallback se dynamicMaxTasks non è definito (usa baseMax = 3)
         dynamicMaxLoad = 3;
       }
-      if (newTaskCount > dynamicMaxLoad) {
+      if ((params.hkConstraints ?? HK_CONSTRAINT_PRESETS.balanced).taskCount === "hard" && newTaskCount > dynamicMaxLoad) {
         continue;
       }
       
@@ -912,7 +982,12 @@ function trySwapForTask(
       // Calcola guadagno netto (include relaxPenalty nel costo)
       // Guadagno: evito penalità del nuovo task
       // Perdita: devo poi riassegnare il task rimosso + relaxPenalty
-      const netGain = unassignedPenaltyValue - removedTaskScore - relaxPenaltyValue;
+      // Un task di triade più alta prende il posto di uno più basso sullo stesso cleaner.
+      const triadUpgradeGain =
+        params.triadSwap !== false && incomingWeight > removedWeight
+          ? (incomingWeight - removedWeight) * (params.baseUnassignedPenalty + relaxPenaltyValue + 1)
+          : 0;
+      const netGain = unassignedPenaltyValue - removedTaskScore - relaxPenaltyValue + triadUpgradeGain;
       
       // Accetta solo se il guadagno è positivo (vale la pena fare lo swap)
       if (netGain > 0) {
@@ -947,6 +1022,7 @@ function trySwapForTask(
               // Preserva i dati per vincoli hard
               role: schedule.role,
               contractType: schedule.contractType,
+              triadeWeight: schedule.triadeWeight,
               // Fairness tracking
               totalWorkMinutes: newTotalWorkMinutes
             },
@@ -1003,7 +1079,8 @@ function trySingleAssignment(
           tasksMap,
           priorityWindows,
           schedule.anchorTask ?? null,
-          cleanerConstraints
+          cleanerConstraints,
+          params.hkConstraints
         );
         
         bestOption = {
@@ -1147,6 +1224,10 @@ export async function runPhase4Algorithm(
     const straordA = taskA && isTaskEquivalentToStraordinaria(taskA) ? 0 : 1;
     const straordB = taskB && isTaskEquivalentToStraordinaria(taskB) ? 0 : 1;
     if (straordA !== straordB) return straordA - straordB;
+
+    const weightA = triadeWeightOrBase(taskA?.triadeWeight);
+    const weightB = triadeWeightOrBase(taskB?.triadeWeight);
+    if (weightA !== weightB) return weightB - weightA;
     
     // Then by scarcity (più rari prima - meno compatibili = priorità più alta)
     const scarcityA = taskScarcity.get(a.taskId) ?? schedules.length;
@@ -1208,7 +1289,7 @@ export async function runPhase4Algorithm(
     const queueForBatch = levelQueue.filter((u) => !finalizedTaskIds.has(u.taskId));
     if (queueForBatch.length > 0 && assignableSchedules.length > 0) {
       const allowed: { taskId: number; cleanerId: number; deltaTravel: number }[] = [];
-      const repairTasks: { taskId: number; cleaningTimeMinutes: number }[] = [];
+      const repairTasks: { taskId: number; cleaningTimeMinutes: number; triadeWeight?: number }[] = [];
       const seenTaskIds = new Set<number>();
       for (const u of queueForBatch) {
         const task = tasksMap.get(u.taskId);
@@ -1217,7 +1298,8 @@ export async function runPhase4Algorithm(
           seenTaskIds.add(task.taskId);
           repairTasks.push({
             taskId: task.taskId,
-            cleaningTimeMinutes: task.cleaningTimeMinutes ?? 60
+            cleaningTimeMinutes: task.cleaningTimeMinutes ?? 60,
+            triadeWeight: triadeWeightOrBase(task.triadeWeight)
           });
         }
         for (const schedule of assignableSchedules) {
@@ -1250,6 +1332,7 @@ export async function runPhase4Algorithm(
         currentTaskCount: number;
         maxLoad: number;
         maxTasks: number;
+        triadeWeight?: number;
       }[] = [];
       for (const schedule of assignableSchedules) {
         const currentWorkMinutes = (schedule.fixedWorkMinutes ?? 0) + (schedule.totalWorkMinutes ?? 0);
@@ -1260,12 +1343,14 @@ export async function runPhase4Algorithm(
         const travelBonus = avgTravel <= 10 ? 1 : 0;
         const maxTasks =
           (params.dynamicMaxTasks !== undefined ? params.dynamicMaxTasks : 3) + travelBonus;
+        const repairRules = params.hkConstraints ?? HK_CONSTRAINT_PRESETS.balanced;
         repairCleaners.push({
           cleanerId: schedule.cleanerId,
           currentLoadMin,
           currentTaskCount,
-          maxLoad: targets.maxTarget,
-          maxTasks
+          maxLoad: repairRules.loadCap === "hard" ? targets.maxTarget : 100000,
+          maxTasks: repairRules.taskCount === "hard" ? maxTasks : 99,
+          triadeWeight: triadeWeightOrBase(schedule.triadeWeight)
         });
       }
       try {
@@ -1274,7 +1359,11 @@ export async function runPhase4Algorithm(
           repairTasks,
           repairCleaners,
           params.fairness.wT,
-          { timeoutMs: 60000 }
+          {
+            timeoutMs: 60000,
+            triadLevelBonus: params.triadLevelBonus,
+            triadOverqualPenalty: params.triadOverqualPenalty,
+          }
         );
         const sortedAssignments = [...batchResult.assignments].sort(
           (a, b) => a.cleanerId - b.cleanerId || a.taskId - b.taskId
@@ -1309,7 +1398,8 @@ export async function runPhase4Algorithm(
             tasksMap,
             priorityWindows,
             schedule.anchorTask ?? null,
-            cleanerConstraints
+            cleanerConstraints,
+            params.hkConstraints
           );
           schedules[scheduleIdx] = updatedSchedule;
           taskResults.push({
@@ -1463,7 +1553,8 @@ export async function runPhase4Algorithm(
           tasksMap,
           priorityWindows,
           chosenSchedule.anchorTask ?? null,
-          chosenConstraints
+          chosenConstraints,
+          params.hkConstraints
         );
         
         schedules[bestScheduleIdx] = updatedSchedule;

@@ -69,6 +69,41 @@ function isLogisticsScopeRequest(req: any): boolean {
   return raw === "logistics";
 }
 
+async function rejectIfTriadeLevelBlocks(
+  req: any,
+  res: any,
+  workDate: string,
+  cleanerId: unknown,
+  taskId: unknown
+): Promise<boolean> {
+  if (isLogisticsScopeRequest(req) || resolveScopeFromReq(req) === "office") return false;
+  const { loadHkConstraintSettings } = await import("./services/optimizer/load-hk-constraints");
+  const hkConstraints = await loadHkConstraintSettings();
+  if (hkConstraints.triadeCeiling !== "hard") return false;
+  const cleaner = Number(cleanerId);
+  const task = Number(taskId);
+  if (!Number.isFinite(cleaner) || cleaner <= 0 || !Number.isFinite(task) || task <= 0) return false;
+  try {
+    const { triadeAssignmentBlock } = await import("./services/triade-assignment");
+    const block = await triadeAssignmentBlock(workDate, cleaner, task);
+    if (!block.blocked) return false;
+    res.status(409).json({
+      success: false,
+      error: "TRIADE_LEVEL",
+      message: `Cleaner livello ${block.cleanerWeight}: non può prendere un task di livello ${block.taskWeight}.`,
+    });
+    return true;
+  } catch (error) {
+    console.warn("⚠️ triade-level guard:", error);
+    res.status(503).json({
+      success: false,
+      error: "TRIADE_LEVEL_UNAVAILABLE",
+      message: "Impossibile verificare il livello Triade: assegnazione bloccata.",
+    });
+    return true;
+  }
+}
+
 async function rejectIfOperationalDayStarted(
   req: any,
   res: any,
@@ -1214,6 +1249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await pgDailyAssignmentsService.ensureCustomerNoteColumns();
     await pgDailyAssignmentsService.ensureManualStartTimeColumn();
     await pgDailyAssignmentsService.ensureTaskLocksTable();
+    await pgDailyAssignmentsService.ensureTriadeOverrideTable();
     await pgDailyAssignmentsService.ensureOperationalDayTable();
     await pgDailyAssignmentsService.ensureDailyAssignmentsRevisionsScopeUnique();
     await pgDailyAssignmentsService.ensureDailyContainersScopeUnique();
@@ -1349,6 +1385,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await query(`DELETE FROM task_collaborators WHERE work_date = $1`, [workDate]);
       console.log(`✅ Collaborazioni cancellate da task_collaborators per ${workDate}`);
 
+      await query(`DELETE FROM daily_task_triade_override WHERE work_date = $1`, [workDate]);
+      await query(`DELETE FROM daily_cleaner_triade_override WHERE work_date = $1`, [workDate]);
+      console.log(`✅ Eccezioni triade cancellate per ${workDate}`);
+
       // 3. Refresh containers direttamente da ADAM (fonte sorgente)
       console.log(`🔄 Refresh containers da ADAM per ${workDate}...`);
       const refreshResult = await refreshContainersFromAdam(workDate, currentUsername);
@@ -1401,6 +1441,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       if (await rejectIfHousekeepingTasksCleaned(res, [taskId])) return;
+      if (
+        Number(destCleanerId) !== Number(sourceCleanerId) &&
+        await rejectIfTriadeLevelBlocks(req, res, workDate, destCleanerId, taskId)
+      ) return;
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const { taskCollaborationService } = await import("./services/pg-task-collaboration-service");
       
@@ -2079,6 +2123,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/triade/tasks", async (req, res) => {
+    try {
+      const raw = Array.isArray(req.body?.tasks) ? req.body.tasks : [];
+      const tasks = raw.slice(0, 500).map((task: any) => ({
+        id: Number(task?.id),
+        operation_id: task?.operation_id == null || task?.operation_id === "" ? null : Number(task.operation_id),
+        client_id: task?.client_id == null || task?.client_id === "" ? null : Number(task.client_id),
+      }));
+      const { resolveTaskTriade } = await import("./services/adam-task-triade");
+      const results = await resolveTaskTriade(tasks);
+      res.json({ results });
+    } catch (error: any) {
+      console.error("POST /api/triade/tasks:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/triade/day-overrides", async (req, res) => {
+    try {
+      const workDate = String(req.query.date || "");
+      if (!isValidWorkDate(workDate)) {
+        return res.status(400).json({ success: false, error: "Data non valida" });
+      }
+      const { loadActiveTriadeLevels } = await import("./services/adam-triade");
+      const { listDayTriadeOverrides } = await import("./services/pg-task-triade-override");
+      const [levels, overrides] = await Promise.all([
+        loadActiveTriadeLevels(),
+        listDayTriadeOverrides(workDate),
+      ]);
+      res.json({ success: true, levels, overrides });
+    } catch (error: any) {
+      console.error("GET /api/triade/day-overrides:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.put("/api/triade/day-overrides", async (req, res) => {
+    try {
+      const workDate = String(req.body?.date || "");
+      const taskId = Number(req.body?.task_id);
+      const rawWeight = req.body?.weight;
+      const weight = rawWeight == null || rawWeight === "" ? null : Number(rawWeight);
+      if (!isValidWorkDate(workDate)) {
+        return res.status(400).json({ success: false, error: "Data non valida" });
+      }
+      if (!Number.isFinite(taskId) || taskId <= 0) {
+        return res.status(400).json({ success: false, error: "Task non valida" });
+      }
+      const { isActiveTriadeWeight } = await import("./services/adam-triade");
+      if (weight != null && !(await isActiveTriadeWeight(weight))) {
+        return res.status(400).json({ success: false, error: "Livello non valido" });
+      }
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+      const { saveDayTriadeOverride } = await import("./services/pg-task-triade-override");
+      await saveDayTriadeOverride(workDate, taskId, weight);
+      res.json({ success: true, task_id: taskId, weight });
+    } catch (error: any) {
+      console.error("PUT /api/triade/day-overrides:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/triade/cleaner-day-overrides", async (req, res) => {
+    try {
+      const workDate = String(req.query.date || "");
+      if (!isValidWorkDate(workDate)) {
+        return res.status(400).json({ success: false, error: "Data non valida" });
+      }
+      const { loadActiveTriadeLevels } = await import("./services/adam-triade");
+      const { listDayCleanerTriadeOverrides } = await import("./services/pg-cleaner-triade-override");
+      const [levels, overrides] = await Promise.all([
+        loadActiveTriadeLevels(),
+        listDayCleanerTriadeOverrides(workDate),
+      ]);
+      res.json({ success: true, levels, overrides });
+    } catch (error: any) {
+      console.error("GET /api/triade/cleaner-day-overrides:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.put("/api/triade/cleaner-day-overrides", async (req, res) => {
+    try {
+      const workDate = String(req.body?.date || "");
+      const cleanerId = Number(req.body?.cleaner_id);
+      const rawWeight = req.body?.weight;
+      const weight = rawWeight == null || rawWeight === "" ? null : Number(rawWeight);
+      if (!isValidWorkDate(workDate)) {
+        return res.status(400).json({ success: false, error: "Data non valida" });
+      }
+      if (!Number.isFinite(cleanerId) || cleanerId <= 0) {
+        return res.status(400).json({ success: false, error: "Cleaner non valido" });
+      }
+      const { isActiveTriadeWeight } = await import("./services/adam-triade");
+      if (weight != null && !(await isActiveTriadeWeight(weight))) {
+        return res.status(400).json({ success: false, error: "Livello non valido" });
+      }
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+      const { saveDayCleanerTriadeOverride } = await import("./services/pg-cleaner-triade-override");
+      await saveDayCleanerTriadeOverride(workDate, cleanerId, weight);
+      res.json({ success: true, cleaner_id: cleanerId, weight });
+    } catch (error: any) {
+      console.error("PUT /api/triade/cleaner-day-overrides:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   app.get("/api/key-registry", async (req, res) => {
     try {
       const workDate = String(req.query.date ?? "");
@@ -2230,6 +2381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(status).json({ success: false, error: message });
     }
   });
+
 
   // Endpoint per leggere i containers correnti da PostgreSQL
   // Il frontend dovrebbe usare questo endpoint invece di leggere direttamente containers.json
@@ -2409,6 +2561,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const { withCleanerTriade } = await import("./services/adam-triade");
+      selectedCleaners.cleaners = await withCleanerTriade(selectedCleaners.cleaners || []);
+
       console.log(`✅ Selected cleaners caricati per ${workDate}: ${selectedCleaners.cleaners?.length || 0} cleaners`);
       res.json(selectedCleaners);
     } catch (error: any) {
@@ -2558,6 +2713,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
+      const { withCleanerTriade } = await import("./services/adam-triade");
+      cleaners = await withCleanerTriade(cleaners);
+
       console.log(`✅ Cleaners caricati da PostgreSQL per ${workDate}: ${cleaners.length}`);
       res.json({
         cleaners,
@@ -2684,10 +2842,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uniqueIds = Array.from(new Set(cleanerIds));
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const cleaners = await pgDailyAssignmentsService.resolveCleanersByIds(uniqueIds);
+      const { withCleanerTriade } = await import("./services/adam-triade");
+      const enriched = await withCleanerTriade(Array.isArray(cleaners) ? cleaners : []);
 
       res.json({
-        cleaners: Array.isArray(cleaners) ? cleaners : [],
-        total: Array.isArray(cleaners) ? cleaners.length : 0,
+        cleaners: enriched,
+        total: enriched.length,
       });
     } catch (error: any) {
       console.error("Errore GET /api/cleaners-resolve:", error);
@@ -5087,6 +5247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       if (await rejectIfHousekeepingTasksCleaned(res, [taskId, taskData])) return;
+      if (await rejectIfTriadeLevelBlocks(req, res, workDate, cleanerId, taskId)) return;
       console.log(`🔍 CHECKING: save-timeline-assignment for cleanerId=${cleanerId}, workDate=${workDate}`);
       if (cleanerId && Number.isFinite(Number(cleanerId))) {
         const locked = await isCleanerLocked(workDate, Number(cleanerId));
@@ -10894,6 +11055,10 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       if (await rejectIfHousekeepingTasksCleaned(res, [taskId])) return;
+      if (
+        Number(toCleanerId) !== Number(fromCleanerId) &&
+        await rejectIfTriadeLevelBlocks(req, res, workDate, toCleanerId, taskId)
+      ) return;
       if (fromContainer && taskId) {
         const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
         const isLocked = await pgDailyAssignmentsService.isTaskLocked(workDate, Number(taskId));
@@ -12332,6 +12497,58 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
   // ========== OPTIMIZER RUN-ALL ENDPOINT ==========
   
+  app.post("/api/optimizer/hypotheses", async (req, res) => {
+    try {
+      const { date } = req.body || {};
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+
+      const { runHkAssignmentHypotheses } = await import("./services/optimizer/hk-hypotheses");
+      const hypotheses = await runHkAssignmentHypotheses(workDate);
+      res.json({ success: true, hypotheses });
+    } catch (error: any) {
+      console.error("❌ Errore optimizer hypotheses:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: error.message,
+      });
+    }
+  });
+
+  app.post("/api/optimizer/apply-hypothesis", async (req, res) => {
+    try {
+      const { date, runId } = req.body || {};
+      const workDate = date || format(new Date(), "yyyy-MM-dd");
+      if (!runId || typeof runId !== "string") {
+        return res.status(400).json({
+          success: false,
+          error: "MISSING_RUN",
+          message: "Manca l'ipotesi da applicare.",
+        });
+      }
+      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
+
+      const { applyOptimizerToProduction } = await import("./services/optimizer/runAllPhases");
+      const apply = await applyOptimizerToProduction(runId, workDate);
+      if (!apply.success) {
+        return res.status(409).json({
+          success: false,
+          error: apply.error || "APPLY_FAILED",
+          message: apply.error || "L'ipotesi scelta non può essere applicata.",
+        });
+      }
+      res.json({ success: true, apply });
+    } catch (error: any) {
+      console.error("❌ Errore optimizer apply-hypothesis:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: error.message,
+      });
+    }
+  });
+
   app.post("/api/optimizer/run-all", async (req, res) => {
     try {
       const { date, skipPhase4 = false, applyToProduction = false } = req.body;

@@ -15,12 +15,15 @@ import {
   setPlanRunIdForDate
 } from './db';
 import { DEFAULT_PHASE1_PARAMS, TaskInput } from './phase1';
-import { calculateDynamicLimits } from './phase2';
+import { calculateDynamicLimits, DEFAULT_FAIRNESS_PARAMS } from './phase2';
 import { DEFAULT_TRAVEL_POLICY } from './travelPolicy';
 import path from 'path';
 import { TimelineContext } from './timelineContext';
 import { CONTINUAZIONE_PS_OPERATION_ID, isTaskEquivalentToStraordinaria } from '../../utils/straordinaria-utils';
 import { buildSchedulingWindows, parsePrioritySettings } from '../../../shared/taskPriorityClassification';
+import { type HkHypothesisId } from '../../../shared/hk-assignment-hypotheses';
+import { hkSettingsForHypothesis, parseHkConstraintSettings, type HkConstraintSettings } from '../../../shared/hk-constraint-settings';
+import { loadHkConstraintSettings } from './load-hk-constraints';
 
 export type WavePriority = 'early_out' | 'high_priority' | 'low_priority';
 
@@ -270,6 +273,9 @@ export interface RunAllPhasesOptions {
   applyToProduction?: boolean;
   forceFullPipeline?: boolean;
   anchorTaskIds?: number[];
+  hypothesisId?: HkHypothesisId;
+  hkConstraints?: HkConstraintSettings;
+  recordPlan?: boolean;
 }
 
 interface TimelineAnchorBuildResult {
@@ -444,7 +450,10 @@ export async function runAllPhases(
     skipPhase4 = false,
     applyToProduction = false,
     forceFullPipeline = false,
-    anchorTaskIds = []
+    anchorTaskIds = [],
+    hypothesisId,
+    hkConstraints: hkConstraintsOverride,
+    recordPlan = true,
   } = options;
 
   const result: AllPhasesRunResult = {
@@ -578,10 +587,24 @@ export async function runAllPhases(
     console.log(`[runAllPhases] Phase 1 complete: ${result.phase1.groupsGenerated} groups generated`);
 
     console.log(`[runAllPhases] === PHASE 2: Cleaner Assignment ===`);
-    // Passa baseMax - il bonus travel (+1) viene applicato per-cleaner basato su avgTravel ≤ 10min
-    // Passa timelineContext per fairness scoring (pre-existing load)
+    const hkConstraints: HkConstraintSettings = hkConstraintsOverride
+      ? parseHkConstraintSettings(hkConstraintsOverride)
+      : hypothesisId
+        ? hkSettingsForHypothesis(hypothesisId)
+        : await loadHkConstraintSettings();
+    const fairness = {
+      ...DEFAULT_FAIRNESS_PARAMS,
+      maxTargetRatio: hkConstraints.loadCapPercent / 100,
+    };
     result.phase2 = await runPhase2(workDate, runId, { 
-      params: { dynamicMaxTasks: dynamicLimits.baseMax },
+      params: {
+        dynamicMaxTasks: dynamicLimits.baseMax,
+        hkConstraints,
+        fairness,
+        travelWeight: hkConstraints.travelWeight,
+        triadLevelBonus: hkConstraints.triadeMatchBonus,
+        triadOverqualPenalty: hkConstraints.triadeOverqualPenalty,
+      },
       timelineContext: phase2TimelineContext
     });
     if (result.phase2.status === 'failed') {
@@ -596,7 +619,8 @@ export async function runAllPhases(
     console.log(`[runAllPhases] === PHASE 3: Scheduling ===`);
     // Passa timelineContext per collision avoidance (occupiedBlocks)
     result.phase3 = await runPhase3(workDate, runId, { 
-      timelineContext: result.phase0?.timelineContext 
+      timelineContext: result.phase0?.timelineContext,
+      hkConstraints,
     });
     if (result.phase3.status === 'failed') {
       result.status = 'failed';
@@ -612,7 +636,12 @@ export async function runAllPhases(
       result.phase4 = await runPhase4(workDate, runId, { 
         params: {
           dynamicMaxTasks: dynamicLimits.baseMax,
-          ...(hasExistingTimeline ? { appendOnly: true, travelPolicy: DEFAULT_TRAVEL_POLICY } : {})
+          hkConstraints,
+          fairness,
+          triadSwap: hkConstraints.triadSwap,
+          triadLevelBonus: hkConstraints.phase4LevelBonus,
+          triadOverqualPenalty: hkConstraints.phase4OverqualPenalty,
+          ...(hasExistingTimeline ? { appendOnly: true, travelPolicy: DEFAULT_TRAVEL_POLICY } : {}),
         },
         timelineContext: result.phase0?.timelineContext
       });
@@ -626,7 +655,13 @@ export async function runAllPhases(
     // Phase 5: Inter-Cleaner Travel Optimization (relocations + swaps)
     console.log(`[runAllPhases] === PHASE 5: Inter-Cleaner Travel Optimization ===`);
     result.phase5 = await runPhase5(workDate, runId, {
-      params: { dynamicMaxTasks: dynamicLimits.baseMax },
+      params: {
+        dynamicMaxTasks: dynamicLimits.baseMax,
+        hkConstraints,
+        fairness,
+        maxIterations: hkConstraints.shortenRoutes ? hkConstraints.phase5Iterations : 0,
+        maxFairnessIterations: hkConstraints.rebalanceLoads ? hkConstraints.fairnessIterations : 0,
+      },
       timelineContext: result.phase0?.timelineContext
     });
     if (result.phase5.status === 'failed') {
@@ -673,7 +708,7 @@ export async function runAllPhases(
 
     // Persist plan only for full runs without pre-existing timeline.
     // This is the "single solve" baseline used by wave applies.
-    if (!hasExistingTimeline) {
+    if (recordPlan && !hasExistingTimeline) {
       await setPlanRunIdForDate(workDate, runId);
       console.log(`[runAllPhases] Plan run updated for ${workDate}: ${runId}`);
     }

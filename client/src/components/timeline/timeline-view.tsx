@@ -67,6 +67,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { openTimelineMapPanel } from "@/lib/timeline-map-panel";
 import { getPersonnelHexColor } from "@/lib/cleaner-colors";
+import { CleanerTriadMark, parseCleanerTriade, type CleanerTriadeLevel } from "@/components/triad-mark";
+import { DayCleanerTriadLevel } from "@/components/day-cleaner-triad-level";
 import { useSyncedTimelineScroll } from "@/hooks/use-synced-timeline-scroll";
 import {
   AlertDialog,
@@ -133,6 +135,7 @@ interface Cleaner {
   start_time: string | null;
   end_time?: string | null;
   show_plus_one?: boolean;
+  triade?: CleanerTriadeLevel | null;
 }
 
 const DEFAULT_TIMELINE_START_MINUTES = 10 * 60;
@@ -261,6 +264,7 @@ type CleanerDirectoryEntry = {
   lastname?: string;
   alias?: string;
   role?: string;
+  triade?: ReturnType<typeof parseCleanerTriade>;
 };
 
 const PREASSIGNED_REASON_NORMAL = "preassigned_enable_wass";
@@ -605,6 +609,7 @@ export default function TimelineView({
     const fullName = `${resolvedName} ${lastname}`.trim();
     const role = normalizeCleanerRole(cleanerLike?.role || directoryEntry?.role);
     const primaryLabel = alias || fullName || `ID ${cleanerId}`;
+    const triade = parseCleanerTriade(cleanerLike?.triade) || directoryEntry?.triade || null;
 
     return {
       alias,
@@ -613,6 +618,7 @@ export default function TimelineView({
       fullName,
       role,
       primaryLabel,
+      triade,
     };
   };
 
@@ -1319,6 +1325,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             lastname: current.lastname || String(cleaner?.lastname ?? "").trim() || undefined,
             alias: current.alias || String(cleaner?.alias ?? "").trim() || undefined,
             role: current.role || String(cleaner?.role ?? "").trim() || undefined,
+            triade: current.triade || parseCleanerTriade(cleaner?.triade),
           };
         }
       }
@@ -2112,7 +2119,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
     // Mantiene la colonna dinamica sul nome più lungo, evitando spazio vuoto eccessivo.
     const baseWidth = 44; // padding e margini
     const charWidth = 7; // circa 7px per carattere con font bold 13px
-    const badgeSpace = 20; // spazio per il badge P/F
+    const badgeSpace = 36; // spazio per i rombi Triade (fino a 3)
 
     return Math.max(128, baseWidth + (maxLength * charWidth) + badgeSpace);
   };
@@ -2948,30 +2955,23 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                             <Lock className="w-3 h-3 text-gray-600 dark:text-gray-400" />
                           </div>
                         )}
-                        {/* Se straordinario, mostra SOLO badge S */}
-                        {!isRemoved && cleanerRole === "Straordinario" ? (
-                          <div className="bg-red-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
-                            S
+                        {!isRemoved && cleanerRole === "Ufficio" && (
+                          <div className="bg-sky-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
+                            U
                           </div>
-                        ) : (
-                          /* Altrimenti mostra badge role normale */
-                          <>
-                            {!isRemoved && cleanerRole === "Premium" && (
-                              <div className="bg-yellow-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
-                                P
-                              </div>
-                            )}
-                            {!isRemoved && cleanerRole === "Formatore" && (
-                              <div className="bg-orange-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
-                                F
-                              </div>
-                            )}
-                            {!isRemoved && cleanerRole === "Ufficio" && (
-                              <div className="bg-sky-500 text-white dark:text-black font-bold text-[10px] px-1 py-0.5 rounded flex-shrink-0">
-                                U
-                              </div>
-                            )}
-                          </>
+                        )}
+                        {!isRemoved && cleanerRole !== "Ufficio" && (
+                          isOfficeScope ? (
+                            <CleanerTriadMark triade={cleanerDisplay.triade} size="sm" />
+                          ) : (
+                            <DayCleanerTriadLevel
+                              workDate={workDate}
+                              cleanerId={cleaner.id}
+                              original={cleanerDisplay.triade}
+                              enabled
+                              size="sm"
+                            />
+                          )
                         )}
                       </div>
                     </div>
@@ -3971,30 +3971,20 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        {cleaner.role === "Formatore" && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-200 border-orange-300 dark:border-orange-700">
-                            Formatore
-                          </span>
-                        )}
-                        {cleaner.role === "Standard" && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-200 border-green-300 dark:border-green-700">
-                            Standard
-                          </span>
-                        )}
-                        {cleaner.role === "Straordinario" && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 border-red-300 dark:border-red-700">
-                            Straordinario
-                          </span>
-                        )}
-                        {cleaner.role === "Premium" && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
-                            Premium
-                          </span>
-                        )}
-                        {cleaner.role === "Ufficio" && (
+                        {cleaner.role === "Ufficio" ? (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
                             Ufficio
                           </span>
+                        ) : isOfficeScope ? (
+                          <CleanerTriadMark triade={cleaner.triade} />
+                        ) : (
+                          <DayCleanerTriadLevel
+                            workDate={workDate}
+                            cleanerId={cleaner.id}
+                            original={cleaner.triade}
+                            enabled
+                            size="md"
+                          />
                         )}
                       </div>
                     </div>
@@ -4109,30 +4099,20 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           Non disponibile
                         </span>
                       )}
-                      {cleaner.role === "Formatore" && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-200 border-orange-300 dark:border-orange-700">
-                          Formatore
-                        </span>
-                      )}
-                      {cleaner.role === "Standard" && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-200 border-green-300 dark:border-green-700">
-                          Standard
-                        </span>
-                      )}
-                      {cleaner.role === "Straordinario" && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200 border-red-300 dark:border-red-700">
-                          Straordinario
-                        </span>
-                      )}
-                      {cleaner.role === "Premium" && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700">
-                          Premium
-                        </span>
-                      )}
-                      {cleaner.role === "Ufficio" && (
+                      {cleaner.role === "Ufficio" ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
                           Ufficio
                         </span>
+                      ) : isOfficeScope ? (
+                        <CleanerTriadMark triade={cleaner.triade} />
+                      ) : (
+                        <DayCleanerTriadLevel
+                          workDate={workDate}
+                          cleanerId={cleaner.id}
+                          original={cleaner.triade}
+                          enabled
+                          size="md"
+                        />
                       )}
                     </div>
                   </div>
@@ -4280,41 +4260,25 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
             "dark:bg-background",
           )}
           onOpenAutoFocus={(e) => e.preventDefault()}
+          onPointerDownOutside={(event) => {
+            const originalEvent = (event as any)?.detail?.originalEvent;
+            const target = (originalEvent?.target ?? event.target) as HTMLElement | null;
+            if (target?.closest?.("[data-radix-popper-content-wrapper]")) event.preventDefault();
+          }}
+          onInteractOutside={(event) => {
+            const originalEvent = (event as any)?.detail?.originalEvent;
+            const target = (originalEvent?.target ?? event.target) as HTMLElement | null;
+            if (target?.closest?.("[data-radix-popper-content-wrapper]")) event.preventDefault();
+          }}
         >
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 Dettagli Cleaner #{selectedCleaner?.id}
-                {selectedCleaner && (
-                  <>
-                    {/* Se straordinario, mostra SOLO badge straordinario (priorità assoluta) */}
-                    {getCleanerDisplayData(selectedCleaner).role === "Straordinario" ? (
-                      <span className="px-2 py-0.5 rounded border font-medium text-sm bg-red-600/30 text-gray-900 dark:bg-red-500/40 dark:text-red-200 border-red-700 dark:border-red-400">
-                        Straordinario
-                      </span>
-                    ) : (
-                      /* Altrimenti mostra badge role normale */
-                      <>
-                        {getCleanerDisplayData(selectedCleaner).role === "Formatore" ? (
-                          <span className="px-2 py-0.5 rounded border font-medium text-sm bg-orange-600/30 text-gray-900 dark:bg-orange-500/40 dark:text-orange-200 border-orange-700 dark:border-orange-400">
-                            Formatore
-                          </span>
-                        ) : getCleanerDisplayData(selectedCleaner).role === "Premium" ? (
-                          <span className="px-2 py-0.5 rounded border font-medium text-sm bg-yellow-600/30 text-gray-900 dark:bg-yellow-500/40 dark:text-yellow-200 border-yellow-700 dark:border-yellow-400">
-                            Premium
-                          </span>
-                        ) : getCleanerDisplayData(selectedCleaner).role === "Ufficio" ? (
-                          <span className="px-2 py-0.5 rounded border font-medium text-sm bg-sky-600/30 text-gray-900 dark:bg-sky-500/40 dark:text-sky-200 border-sky-700 dark:border-sky-400">
-                            Ufficio
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded border font-medium text-sm bg-green-600/30 text-gray-900 dark:bg-green-500/40 dark:text-green-200 border-green-700 dark:border-green-400">
-                            Standard
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </>
+                {selectedCleaner && getCleanerDisplayData(selectedCleaner).role === "Ufficio" && (
+                  <span className="px-2 py-0.5 rounded border font-medium text-sm bg-sky-600/30 text-gray-900 dark:bg-sky-500/40 dark:text-sky-200 border-sky-700 dark:border-sky-400">
+                    Ufficio
+                  </span>
                 )}
               </div>
 
@@ -4425,6 +4389,27 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     className={displayInputClass}
                   />
                 </div>
+
+                {!isOfficeScope && getCleanerDisplayData(selectedCleaner).role !== "Ufficio" && (
+                  <div className="col-span-4">
+                    <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1 flex items-center gap-1">
+                      Livello Triade
+                      {!isReadOnly && <Pencil className="w-3 h-3 text-gray-700 dark:text-muted-foreground/60" />}
+                    </p>
+                    <div className="flex min-h-10 items-center">
+                      <DayCleanerTriadLevel
+                        workDate={workDate}
+                        cleanerId={selectedCleaner.id}
+                        original={getCleanerDisplayData(selectedCleaner).triade}
+                        enabled
+                        editable={!isReadOnly}
+                        size="lg"
+                        unknown="text"
+                        appearance="day"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Giorni lavorati (2/4) */}
                 <div className="col-span-2">

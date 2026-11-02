@@ -20,6 +20,7 @@ export interface Phase4RepairAllowedPair {
 export interface Phase4RepairTask {
   taskId: number;
   cleaningTimeMinutes: number;
+  triadeWeight?: number;
 }
 
 export interface Phase4RepairCleaner {
@@ -28,6 +29,7 @@ export interface Phase4RepairCleaner {
   currentTaskCount: number;
   maxLoad: number;
   maxTasks: number;
+  triadeWeight?: number;
 }
 
 export interface Phase4RepairBatchResult {
@@ -39,29 +41,39 @@ export interface RunPhase4RepairBatchOptions {
   timeoutMs?: number;
   pythonPath?: string;
   scriptPath?: string;
+  triadLevelBonus?: number;
+  triadOverqualPenalty?: number;
 }
 
 function buildPayload(
   allowed: Phase4RepairAllowedPair[],
   tasks: Phase4RepairTask[],
   cleaners: Phase4RepairCleaner[],
-  wT: number
+  wT: number,
+  weights?: { triadLevelBonus?: number; triadOverqualPenalty?: number }
 ): string {
   const taskIds = tasks.map((t) => t.taskId);
   const cleanerIds = cleaners.map((c) => c.cleanerId);
   const payload = {
     taskIds,
-    tasks: tasks.map((t) => ({ taskId: t.taskId, cleaningTimeMinutes: t.cleaningTimeMinutes })),
+    tasks: tasks.map((t) => ({
+      taskId: t.taskId,
+      cleaningTimeMinutes: t.cleaningTimeMinutes,
+      triadeWeight: t.triadeWeight ?? 1
+    })),
     cleanerIds,
     cleaners: cleaners.map((c) => ({
       cleanerId: c.cleanerId,
       currentLoadMin: c.currentLoadMin,
       currentTaskCount: c.currentTaskCount,
       maxLoad: c.maxLoad,
-      maxTasks: c.maxTasks
+      maxTasks: c.maxTasks,
+      triadeWeight: c.triadeWeight ?? 1
     })),
     allowed: allowed.map((a) => ({ taskId: a.taskId, cleanerId: a.cleanerId, deltaTravel: a.deltaTravel })),
-    wT
+    wT,
+    triadLevelBonus: weights?.triadLevelBonus ?? 10000,
+    triadOverqualPenalty: weights?.triadOverqualPenalty ?? 4000
   };
   return JSON.stringify(payload);
 }
@@ -151,7 +163,7 @@ export async function runPhase4RepairBatch(
   }
 
   try {
-    const stdinJson = buildPayload(allowed, tasks, cleaners, wT);
+    const stdinJson = buildPayload(allowed, tasks, cleaners, wT, options);
     const stdout = await runPythonScript(scriptPath, stdinJson, { timeoutMs, pythonPath });
     return parseOutput(stdout, taskIds);
   } catch (err) {

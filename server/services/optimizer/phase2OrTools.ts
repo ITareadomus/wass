@@ -6,7 +6,7 @@
  * - Task-cleaner compatibility → (g,c) allowed only if compatible
  * - Load cap → sum(workMin + wT*travelMin) + initialLoad_c <= maxTarget
  * - Max tasks per cleaner → dynamicMaxTasks+1 or 4
- * - Straordinaria: reserve, existing OT, long OT empty cleaner, short OT + 1 extra <=2h
+ * - Straordinaria: long OT empty cleaner, short OT + 1 extra <=2h
  * - Anchored group → only that cleaner (or unassigned)
  * - Each group at most one cleaner → sum_c x[g,c] <= 1
  */
@@ -98,7 +98,8 @@ function buildPayload(
     isOfficeTask: t.isOfficeTask === true,
     typeApt: t.typeApt,
     priority: t.priority,
-    cleaningTime: t.cleaningTime
+    cleaningTime: t.cleaningTime,
+    triadeWeight: t.triadeWeight ?? 1
   }));
 
   const cleanersPayload = cleaners.map(c => ({
@@ -107,7 +108,8 @@ function buildPayload(
     role: c.role,
     contractType: c.contractType,
     preferredCustomers: c.preferredCustomers,
-    counterHours: c.counterHours
+    counterHours: c.counterHours,
+    triadeWeight: c.triadeWeight ?? 1
   }));
 
   const maxTasksPerCleaner = params.dynamicMaxTasks != null ? params.dynamicMaxTasks + 1 : 4;
@@ -163,7 +165,10 @@ function buildPayload(
     straordinariaLongThresholdMin: STRAORDINARIA_LONG_THRESHOLD_MIN,
     straordinariaExtraTaskMaxMin: STRAORDINARIA_EXTRA_TASK_MAX_MIN,
     travelToFirstTaskMin,
-    travelWeight: params.travelWeight ?? 2
+    travelWeight: params.hkConstraints?.travel === "off" ? 0 : (params.hkConstraints?.travelWeight ?? params.travelWeight ?? 2),
+    triadLevelBonus: params.hkConstraints?.triadeMatch === "soft" ? params.hkConstraints.triadeMatchBonus : (params.triadLevelBonus ?? 8000),
+    triadOverqualPenalty: params.hkConstraints?.triadeMatch === "soft" ? params.hkConstraints.triadeOverqualPenalty : (params.triadOverqualPenalty ?? 3000),
+    constraints: params.hkConstraints ?? null
   };
 
   return JSON.stringify(payload);
