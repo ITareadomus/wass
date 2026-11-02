@@ -24,7 +24,7 @@ import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from 'wouter';
-import { getStoredUserRole, isViewerRole } from "@/lib/auth-role";
+import { getStoredUserRole, isReadOnlySession } from "@/lib/auth-role";
 import { isTaskLocked } from "@/lib/taskValidation";
 
 const OFFICE_SCOPE_ENABLED = false;
@@ -504,7 +504,7 @@ export default function Convocazioni() {
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; cleanerId: number | null }>({ open: false, cleanerId: null });
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
-  const viewer = isViewerRole(getStoredUserRole());
+  const viewer = isReadOnlySession(getStoredUserRole());
 
   // Aggiunto uno stato per i cleaners filtrati per evitare che vengano sovrascritti quando cambia la data
   const [filteredCleaners, setFilteredCleaners] = useState<Cleaner[]>([]);

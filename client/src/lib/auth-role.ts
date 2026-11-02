@@ -26,6 +26,32 @@ export function isViewerRole(role?: string | null): boolean {
   return String(role ?? "").toLowerCase() === "viewer";
 }
 
+/** Pagine housekeeping: l'account logistica qui è in sola lettura. */
+export function isHousekeepingSurface(pathname: string, search = ""): boolean {
+  const path = pathWithoutQuery(pathname);
+  if (path === "/generate-assignments" || path.startsWith("/generate-assignments/")) return true;
+  if (path === "/unconfirmed-tasks" || path.startsWith("/unconfirmed-tasks/")) return true;
+  if (path === "/convocazioni") {
+    const embedded = pathname.includes("?") ? pathname.slice(pathname.indexOf("?") + 1).split("#")[0] : "";
+    const extra = search.startsWith("?") ? search.slice(1) : search;
+    const params = new URLSearchParams(embedded || extra);
+    return params.get("kind") !== "drivers";
+  }
+  return false;
+}
+
+/**
+ * Sola lettura come un visualizzatore.
+ * Il ruolo viewer lo è ovunque; logistica solo sulle pagine housekeeping.
+ */
+export function isReadOnlySession(role?: string | null, pathname?: string, search?: string): boolean {
+  if (isViewerRole(role)) return true;
+  if (!isLogisticaRole(role)) return false;
+  const path = pathname ?? (typeof window !== "undefined" ? window.location.pathname : "");
+  const query = search ?? (typeof window !== "undefined" ? window.location.search : "");
+  return isHousekeepingSurface(path, query);
+}
+
 function pathWithoutQuery(pathname: string): string {
   const query = pathname.search(/[?#]/);
   return query >= 0 ? pathname.slice(0, query) : pathname;
@@ -50,11 +76,14 @@ export function isLogisticaPathAllowed(pathname: string, search = ""): boolean {
     return true;
   }
 
-  if (path === "/convocazioni") {
-    const embedded = pathname.includes("?") ? pathname.slice(pathname.indexOf("?") + 1).split("#")[0] : "";
-    const extra = search.startsWith("?") ? search.slice(1) : search;
-    const params = new URLSearchParams(embedded || extra);
-    return params.get("kind") === "drivers";
+  if (
+    path === "/generate-assignments" ||
+    path.startsWith("/generate-assignments/") ||
+    path === "/unconfirmed-tasks" ||
+    path.startsWith("/unconfirmed-tasks/") ||
+    path === "/convocazioni"
+  ) {
+    return true;
   }
 
   return false;

@@ -27,7 +27,7 @@ import {
   homePathForRole,
   isLogisticaPathAllowed,
   isLogisticaRole,
-  isViewerRole,
+  isReadOnlySession,
   LOGISTICS_HOME_PATH,
 } from "@/lib/auth-role";
 
@@ -110,7 +110,9 @@ function GlobalHeader() {
 }
 
 function ViewerBanner() {
-  if (!isViewerRole(getStoredUserRole())) return null;
+  const [location] = useLocation();
+  const search = typeof window !== "undefined" ? window.location.search : "";
+  if (!isReadOnlySession(getStoredUserRole(), location, search)) return null;
   return (
     <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
       Sola lettura: puoi consultare i task della giornata e aprire i dettagli. Le modifiche sono disattivate.

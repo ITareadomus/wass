@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
-import { getStoredUserRole, isViewerRole } from "@/lib/auth-role";
+import { getStoredUserRole, isReadOnlySession } from "@/lib/auth-role";
 
 const CONTROL_SELECTOR = [
   "button",
@@ -50,7 +50,7 @@ function blockViewerMutation(event: Event) {
 /** Tiene il ruolo viewer in sola lettura: i controlli di modifica non partono. */
 export function ViewerLock() {
   const [location] = useLocation();
-  const viewer = isViewerRole(getStoredUserRole());
+  const viewer = isReadOnlySession(getStoredUserRole(), location, typeof window !== "undefined" ? window.location.search : "");
 
   useEffect(() => {
     const root = document.documentElement;
