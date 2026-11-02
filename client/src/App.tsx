@@ -20,7 +20,7 @@ import { useEffect } from "react";
 import { WassSiteHeader } from "@/components/wass-site-header";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Home } from "lucide-react";
+import { Home, Settings as SettingsIcon } from "lucide-react";
 import { ViewerLock } from "@/components/viewer-lock";
 import {
   getStoredUserRole,
@@ -102,6 +102,19 @@ function GlobalHeader() {
               </Button>
             </Link>
           ) : null}
+          {role === "admin" && (
+            <Link href="/settings">
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-full"
+                title="Impostazioni"
+                data-testid="link-settings-global"
+              >
+                <SettingsIcon className="h-5 w-5" />
+              </Button>
+            </Link>
+          )}
           <ThemeToggle showHomeButton={false} gapClassName="gap-3" />
         </>
       }

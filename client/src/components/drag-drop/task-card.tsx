@@ -105,6 +105,7 @@ import { isContinuazioneStraordinariaTask, isTaskLocked } from "@/lib/taskValida
 import { useTaskTriade } from "@/lib/task-triade";
 import { parseCleanerTriade, TaskTriadMark } from "@/components/triad-mark";
 import { DayTriadLevel } from "@/components/day-triad-level";
+import { useTriadeEnabled } from "@/lib/triade-enabled";
 import {
   getHousekeepingTypeTier,
   type HousekeepingTypeTier,
@@ -584,6 +585,7 @@ export default function TaskCard({
 }: TaskCardProps) {
   const effectiveWorkDate = workDate || getSelectedWorkDateForScope(operationsScope);
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
+  const triadeEnabled = useTriadeEnabled();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [housekeepingNowMs, setHousekeepingNowMs] = useState(() => Date.now());
   const [showDissolveDialog, setShowDissolveDialog] = useState(false);
@@ -1160,7 +1162,7 @@ const displayClickableInputClass =
   }, [allTasks, task]);
 
   // Trova l'indice effettivo della task nel cleaner
-  const showTaskTriade = operationsScope !== "logistics";
+  const showTaskTriade = triadeEnabled && operationsScope !== "logistics";
   const cardTriade = useTaskTriade(task, showTaskTriade);
   const { currentIndex, effectiveCurrentId, currentTaskInNavigable, displayTask, canGoPrev, canGoNext } = React.useMemo(() => {
     const normalizedCurrentId = currentTaskId ? String(currentTaskId) : null;

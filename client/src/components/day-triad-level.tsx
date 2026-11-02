@@ -85,6 +85,43 @@ export function DayTriadLevel({
     void commit(next);
   };
 
+  const diamonds = (rowSize: "sm" | "lg") =>
+    catalog.map((level) => {
+      const weight = level.weight;
+      return (
+        <button
+          key={`${level.name}-${weight}`}
+          type="button"
+          disabled={saving}
+          className="rounded-sm p-0.5 hover:bg-muted/50 disabled:cursor-default"
+          aria-label={level.name}
+          onMouseEnter={() => setHoverWeight(weight)}
+          onFocus={() => setHoverWeight(weight)}
+          onClick={() => choose(weight)}
+        >
+          <TriadDiamondRow
+            level={preview > 0 && weight <= preview ? previewLevel : null}
+            filled={preview > 0 && weight <= preview ? 1 : 0}
+            total={1}
+            size={rowSize}
+          />
+        </button>
+      );
+    });
+
+  if (committed <= 0 && catalog.length > 0) {
+    return (
+      <div
+        className={cn("inline-flex items-center gap-0.5", className)}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
+        onMouseLeave={() => setHoverWeight(null)}
+      >
+        {diamonds(size === "lg" ? "lg" : "sm")}
+      </div>
+    );
+  }
+
   return (
     <Popover
       open={open}
@@ -109,32 +146,8 @@ export function DayTriadLevel({
         onClick={(event) => event.stopPropagation()}
       >
         <p className="mb-2 text-sm font-semibold text-foreground">Livello di questa giornata</p>
-        <div
-          className="flex items-center gap-1"
-          onMouseLeave={() => setHoverWeight(null)}
-        >
-          {catalog.map((level) => {
-            const weight = level.weight;
-            return (
-              <button
-                key={`${level.name}-${weight}`}
-                type="button"
-                disabled={saving}
-                className="rounded-sm p-0.5 hover:bg-muted/50 disabled:cursor-default"
-                aria-label={level.name}
-                onMouseEnter={() => setHoverWeight(weight)}
-                onFocus={() => setHoverWeight(weight)}
-                onClick={() => choose(weight)}
-              >
-                <TriadDiamondRow
-                  level={preview > 0 && weight <= preview ? previewLevel : null}
-                  filled={preview > 0 && weight <= preview ? 1 : 0}
-                  total={1}
-                  size="lg"
-                />
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-1" onMouseLeave={() => setHoverWeight(null)}>
+          {diamonds("lg")}
         </div>
         <p className={cn("mt-2 min-h-5 text-xs text-muted-foreground")}>
           {previewLevel?.name ?? "Scegli un livello"}
