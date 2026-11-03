@@ -160,7 +160,7 @@ export function TimelineActionHistoryButton({
       const response = await fetch(`${path}?${params.toString()}`);
       if (!response.ok) throw new Error("cronologia");
       const data = await response.json();
-      setRows(Array.isArray(data.revisions) ? data.revisions.slice(0, 5) : []);
+      setRows(Array.isArray(data.revisions) ? data.revisions.slice(0, 20) : []);
     } catch {
       setFailed(true);
       setRows([]);
@@ -197,7 +197,7 @@ export function TimelineActionHistoryButton({
           <DialogHeader>
             <DialogTitle>Cronologia</DialogTitle>
             <DialogDescription>
-              Ultime cinque azioni su questa giornata. Solo lettura.
+              Fino a venti azioni su questa giornata. Solo lettura.
             </DialogDescription>
           </DialogHeader>
           {loading ? (

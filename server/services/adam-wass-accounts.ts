@@ -173,6 +173,90 @@ export async function resolveAdamUpdatedBy(username: string | null | undefined):
   return name;
 }
 
+/** Username (email o account WASS) → nome e cognome ADAM, se presenti. */
+export async function resolvePersonNames(
+  actors: Array<string | null | undefined>
+): Promise<Map<string, string>> {
+  const unique = [...new Set(actors.map((value) => String(value ?? "").trim()).filter(Boolean))];
+  const names = new Map<string, string>();
+  if (unique.length === 0) return names;
+
+  const adamIdByUsername = new Map<string, number>();
+  try {
+    const pgRows = await query(
+      `SELECT username, adam_id
+       FROM users
+       WHERE LOWER(username) = ANY($1::text[])
+         AND adam_id IS NOT NULL`,
+      [unique.map((value) => value.toLowerCase())]
+    );
+    for (const row of pgRows.rows) {
+      const id = Number(row.adam_id);
+      const username = String(row.username ?? "").trim();
+      if (username && Number.isInteger(id) && id > 0) {
+        adamIdByUsername.set(username.toLowerCase(), id);
+      }
+    }
+  } catch (error) {
+    console.warn("resolvePersonNames: lookup utenti WASS fallito", error);
+  }
+
+  const emails = unique.filter((value) => value.includes("@"));
+  const ids = [...new Set(adamIdByUsername.values())];
+  if (emails.length === 0 && ids.length === 0) return names;
+
+  try {
+    const employees = await withMysql(async (connection) => {
+      const where: string[] = [];
+      const params: Array<string | number> = [];
+      if (emails.length > 0) {
+        where.push(`LOWER(e.email) IN (${emails.map(() => "?").join(", ")})`);
+        params.push(...emails.map((email) => email.toLowerCase()));
+      }
+      if (ids.length > 0) {
+        where.push(`e.id IN (${ids.map(() => "?").join(", ")})`);
+        params.push(...ids);
+      }
+      const [rows] = await connection.execute(
+        `SELECT e.id, e.email, e.name, e.lastname
+         FROM app_employees e
+         WHERE e.deleted_at IS NULL
+           AND (${where.join(" OR ")})`,
+        params
+      );
+      return Array.isArray(rows) ? rows : [];
+    });
+
+    const byEmail = new Map<string, string>();
+    const byId = new Map<number, string>();
+    for (const row of employees) {
+      const record = row as { id?: unknown; email?: unknown; name?: unknown; lastname?: unknown };
+      const label = displayName(record.name, record.lastname);
+      if (!label) continue;
+      const email = String(record.email ?? "").trim().toLowerCase();
+      const id = Number(record.id);
+      if (email) byEmail.set(email, label);
+      if (Number.isInteger(id) && id > 0) byId.set(id, label);
+    }
+
+    for (const actor of unique) {
+      const key = actor.toLowerCase();
+      const fromEmail = byEmail.get(key);
+      if (fromEmail) {
+        names.set(actor, fromEmail);
+        continue;
+      }
+      const adamId = adamIdByUsername.get(key);
+      const fromId = adamId != null ? byId.get(adamId) : undefined;
+      if (fromId) names.set(actor, fromId);
+    }
+  } catch (error) {
+    console.warn("resolvePersonNames: lookup dipendenti ADAM fallito", error);
+  }
+
+  return names;
+}
+
 export async function loginAdamWassAccount(
   email: string,
   password: string

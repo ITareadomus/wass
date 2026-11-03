@@ -5160,14 +5160,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
-      const revisions = await pgDailyAssignmentsService.getTimelineActionHistory(dateParam, resolveScopeFromReq(req), 5);
+      const revisions = await pgDailyAssignmentsService.getTimelineActionHistory(dateParam, resolveScopeFromReq(req), 20);
+      const { resolvePersonNames } = await import("./services/adam-wass-accounts");
+      const personNames = await resolvePersonNames(revisions.map((row) => row.created_by));
       res.json({
         success: true,
         date: dateParam,
         revisions: revisions.map((row) => ({
           revision: row.revision,
           created_at: row.created_at,
-          created_by: row.created_by,
+          created_by: personNames.get(String(row.created_by ?? "").trim()) || row.created_by,
           modification_type: row.modification_type,
           changes: row.changes,
           detail: row.detail,
@@ -5184,11 +5186,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
-      const revisions = await pgDailyAssignmentsService.getLogisticsTimelineActionHistory(dateParam, 5);
+      const revisions = await pgDailyAssignmentsService.getLogisticsTimelineActionHistory(dateParam, 20);
+      const { resolvePersonNames } = await import("./services/adam-wass-accounts");
+      const personNames = await resolvePersonNames(revisions.map((row) => row.created_by));
       res.json({
         success: true,
         date: dateParam,
-        revisions,
+        revisions: revisions.map((row) => ({
+          ...row,
+          created_by: personNames.get(String(row.created_by ?? "").trim()) || row.created_by,
+        })),
       });
     } catch (error: any) {
       console.error("Errore nel caricamento cronologia timeline logistica:", error);

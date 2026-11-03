@@ -1890,13 +1890,13 @@ export class PgDailyAssignmentsService {
     }
   }
 
-  async getTimelineActionHistory(workDate: string, scope: string | null = 'housekeeping', limit = 5) {
+  async getTimelineActionHistory(workDate: string, scope: string | null = 'housekeeping', limit = 20) {
     const revisions = await this.getHistoryRevisions(workDate, scope, 120);
     const withChanges = await this.attachAssignmentChanges(workDate, scope, revisions, false);
     return withChanges.filter(isVisibleHistoryRow).slice(0, limit);
   }
 
-  async getLogisticsTimelineActionHistory(workDate: string, limit = 5) {
+  async getLogisticsTimelineActionHistory(workDate: string, limit = 20) {
     const revisions = await this.getLogisticsTimelineRevisions(workDate, 120);
     const withChanges = await this.attachAssignmentChanges(workDate, null, revisions, true);
     return withChanges.filter(isVisibleHistoryRow).slice(0, limit);

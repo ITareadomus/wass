@@ -2123,6 +2123,7 @@ export default function GenerateLogisticsAssignments() {
                 <div className="mt-[17px] flex justify-end">
                   <button
                     type="button"
+                    data-viewer-allow=""
                     onClick={() => {
                       setContainersManuallyCollapsed(true);
                       setContainersForcedOpen(false);
@@ -2200,6 +2201,7 @@ export default function GenerateLogisticsAssignments() {
                 <div className="mt-[17px] flex justify-end">
                   <button
                     type="button"
+                    data-viewer-allow=""
                     onClick={() => {
                       setContainersManuallyCollapsed(false);
                       setContainersForcedOpen(true);
