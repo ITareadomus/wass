@@ -30,6 +30,11 @@ import {
   type ManualCleaningTimeOverride,
 } from "../shared/wass-cleaning-time";
 import {
+  minutesToScheduleClock,
+  shiftedRouteStarts,
+  taskBlockMinutes,
+} from "../shared/housekeeping-start-shift";
+import {
   normalizeScheduleClock,
   scheduleClockToMinutes,
   withManualScheduleReason,
@@ -8509,12 +8514,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           try {
             if (!clearManualSchedule) {
-              cleanerEntry.tasks.sort((a: any, b: any) => {
-                const startA = scheduleClockToMinutes(a?.start_time ?? a?.startTime) ?? 24 * 60;
-                const startB = scheduleClockToMinutes(b?.start_time ?? b?.startTime) ?? 24 * 60;
-                if (startA !== startB) return startA - startB;
-                return Number(a?.task_id ?? a?.id) - Number(b?.task_id ?? b?.id);
-              });
+              const movedIndex = cleanerEntry.tasks.findIndex((task: any) => matchesScheduleTarget(task));
+              if (movedIndex >= 0) {
+                const starts = cleanerEntry.tasks.map((task: any) =>
+                  scheduleClockToMinutes(task?.start_time ?? task?.startTime)
+                );
+                const movedStart = starts[movedIndex];
+                if (movedStart != null) {
+                  const nextStarts = shiftedRouteStarts({
+                    startMinutes: starts,
+                    travelMinutes: cleanerEntry.tasks.map((task: any) => {
+                      const travel = Number(task?.travel_time ?? task?.travelTime ?? 0);
+                      return Number.isFinite(travel) ? travel : 0;
+                    }),
+                    blockMinutes: cleanerEntry.tasks.map((task: any) =>
+                      taskBlockMinutes(
+                        scheduleClockToMinutes(task?.start_time ?? task?.startTime),
+                        scheduleClockToMinutes(task?.end_time ?? task?.endTime),
+                        Number(task?.cleaning_time ?? task?.cleaningTime),
+                      )
+                    ),
+                    movedIndex,
+                    movedStartMinutes: movedStart,
+                    cascade: false,
+                  });
+                  for (let index = 0; index < cleanerEntry.tasks.length; index += 1) {
+                    const nextStart = nextStarts[index];
+                    const previousStart = starts[index];
+                    if (nextStart == null || previousStart == null || nextStart === previousStart) continue;
+                    const block = taskBlockMinutes(
+                      previousStart,
+                      scheduleClockToMinutes(cleanerEntry.tasks[index]?.end_time ?? cleanerEntry.tasks[index]?.endTime),
+                      Number(cleanerEntry.tasks[index]?.cleaning_time ?? cleanerEntry.tasks[index]?.cleaningTime),
+                    );
+                    cleanerEntry.tasks[index].start_time = minutesToScheduleClock(nextStart);
+                    cleanerEntry.tasks[index].end_time = minutesToScheduleClock(nextStart + block);
+                  }
+                }
+              }
               cleanerEntry.keep_existing_schedule = true;
             }
             await hydrateTasksFromContainers(cleanerEntry, workDate);

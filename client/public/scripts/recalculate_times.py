@@ -337,21 +337,25 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
             # Non feasible, ma salviamo comunque i tempi calcolati
             pass
 
-        # Aggiorna task. L'orario corretto a mano resta quello di WASS e non sposta le task successive:
-        # serve solo a disegnare la barra e a ricalcolare il viaggio.
+        # Aggiorna task. Un orario fissato a mano resta quello di WASS, ma non può
+        # coprire la task precedente: se la catena lo raggiunge, scorre in avanti.
+        # La task successiva parte dopo la fine davvero disegnata.
         pinned = pinned_manual_schedule(task)
         task["travel_time"] = travel_time
         if pinned is not None:
-            task["start_time"] = minutes_to_time(pinned[0])
-            task["end_time"] = minutes_to_time(pinned[1])
+            pinned_start, pinned_end = pinned
+            if pinned_start < start_time_min:
+                pinned_end += start_time_min - pinned_start
+                pinned_start = start_time_min
+            task["start_time"] = minutes_to_time(pinned_start)
+            task["end_time"] = minutes_to_time(pinned_end)
+            current_time_min = pinned_end
         else:
             task["start_time"] = minutes_to_time(start_time_min)
             task["end_time"] = minutes_to_time(end_time_min)
+            current_time_min = end_time_min
         task["sequence"] = i + 1
         task["followup"] = i > 0
-
-        # Aggiorna per prossima iterazione
-        current_time_min = end_time_min
         prev_lat = lat
         prev_lng = lng
         prev_addr = addr

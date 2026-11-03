@@ -24,6 +24,8 @@ type FirstApartmentTimeShiftProps = {
   tone?: "blue" | "orange";
   /** Minutes between start and end. When set, the drag moves both. */
   spanMinutes?: number;
+  /** Lo start non può entrare nella task precedente. */
+  minStartMinutes?: number;
   children: ReactNode;
   onPreview: (startMinutes: number) => void;
   onCommit: (startTime: string) => void | Promise<void>;
@@ -44,6 +46,7 @@ export function FirstApartmentTimeShift({
   leftSpacePx = 0,
   tone = "blue",
   spanMinutes,
+  minStartMinutes,
   children,
   onPreview,
   onCommit,
@@ -107,10 +110,11 @@ export function FirstApartmentTimeShift({
     const deltaPx = clientX - originX;
     const deltaMinutes = pxPerMinute > 0 ? deltaPx / pxPerMinute : 0;
     const raw = baseMinutes + deltaMinutes;
-    if (blockSpan > 0) {
-      return clampShiftedBlockStart(raw, cleanerStartMin, cleanerEndMin, blockSpan);
-    }
-    return clampFirstApartmentStart(raw, cleanerStartMin, cleanerEndMin);
+    const clamped = blockSpan > 0
+      ? clampShiftedBlockStart(raw, cleanerStartMin, cleanerEndMin, blockSpan)
+      : clampFirstApartmentStart(raw, cleanerStartMin, cleanerEndMin);
+    if (minStartMinutes == null) return clamped;
+    return Math.max(clamped, minStartMinutes);
   };
 
   const previewText = (startClock: string) => {
