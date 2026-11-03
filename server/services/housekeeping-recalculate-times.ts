@@ -2,6 +2,7 @@ import path from "path";
 import { spawn } from "child_process";
 import * as workspaceFiles from "./workspace-files";
 import { pgSettingsService } from "./pg-settings-service";
+import { attachScheduleBlockMinutes } from "../../shared/operation-base-duration";
 import {
   buildSchedulingWindows,
   parsePrioritySettings,
@@ -110,9 +111,10 @@ export async function recalculateCleanerTimes(
   if (endTime) cleanerData.cleaner.end_time = endTime;
 
   let priorityWindows: Record<string, { start_min: number }> | undefined;
+  let appSettings: any = null;
   try {
     await pgSettingsService.ensureTables();
-    const appSettings = await pgSettingsService.getSettings("app_settings");
+    appSettings = await pgSettingsService.getSettings("app_settings");
     const parsedPrioritySettings = parsePrioritySettings(appSettings ?? {});
     const windows = buildSchedulingWindows(parsedPrioritySettings);
     priorityWindows = {
@@ -129,10 +131,10 @@ export async function recalculateCleanerTimes(
 
   return new Promise((resolve, reject) => {
     const scriptPath = path.join(process.cwd(), "client/public/scripts/recalculate_times.py");
-    const cleanerDataJson = JSON.stringify({
+    const cleanerDataJson = JSON.stringify(attachScheduleBlockMinutes({
       ...cleanerData,
       ...(priorityWindows ? { priority_windows: priorityWindows } : {}),
-    });
+    }, appSettings));
 
     const pythonProcess = spawn("python3", [scriptPath], {
       stdio: ["pipe", "pipe", "pipe"],

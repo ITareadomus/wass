@@ -35,6 +35,11 @@ import {
   taskBlockMinutes,
 } from "../shared/housekeeping-start-shift";
 import {
+  attachScheduleBlockMinutes,
+  parseOperationBaseMinutes,
+  usesFictionalOperationDuration,
+} from "../shared/operation-base-duration";
+import {
   normalizeScheduleClock,
   scheduleClockToMinutes,
   withManualScheduleReason,
@@ -1133,9 +1138,10 @@ async function recalculateCleanerTimes(cleanerData: any, workDate?: string): Pro
     }
 
     let priorityWindows: Record<string, { start_min: number }> | undefined;
+    let appSettings: any = null;
     try {
       await pgSettingsService.ensureTables();
-      const appSettings = await pgSettingsService.getSettings("app_settings");
+      appSettings = await pgSettingsService.getSettings("app_settings");
       const parsedPrioritySettings = parsePrioritySettings(appSettings ?? {});
       const windows = buildSchedulingWindows(parsedPrioritySettings);
       priorityWindows = {
@@ -1149,10 +1155,10 @@ async function recalculateCleanerTimes(cleanerData: any, workDate?: string): Pro
 
     return new Promise((resolve, reject) => {
       const scriptPath = path.join(process.cwd(), 'client/public/scripts/recalculate_times.py');
-      const cleanerDataJson = JSON.stringify({
+      const cleanerDataJson = JSON.stringify(attachScheduleBlockMinutes({
         ...cleanerData,
         ...(priorityWindows ? { priority_windows: priorityWindows } : {}),
-      });
+      }, appSettings));
 
       // Usa spawn con stdin per evitare ARG_MAX limit e command injection
       const pythonProcess = spawn('python3', [scriptPath], {
@@ -2750,9 +2756,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         rows = Array.isArray(officeRows) ? officeRows : [];
       } else {
+        const includeAllActive = String(req.query.for || "").toLowerCase() === "all-active";
         const enableClause = forLogistics
           ? "o.enable_wass_route = 1"
-          : "(o.enable_wass = 1 OR o.enable_wass_readonly = 1)";
+          : includeAllActive
+            ? "1 = 1"
+            : "(o.enable_wass = 1 OR o.enable_wass_readonly = 1)";
         const [defaultRows]: any = await connection.execute(
           `SELECT o.id, l.name, o.enable_wass, o.enable_wass_readonly
            FROM app_structure_operation o
@@ -9303,6 +9312,14 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
     try {
       const workDateFormatted = formatDateForMySQL(workDate);
+      let operationBaseMinutes = new Map<number, number>();
+      try {
+        const { pgSettingsService } = await import("./services/pg-settings-service");
+        const appSettings = await pgSettingsService.getSettings("app_settings");
+        operationBaseMinutes = parseOperationBaseMinutes(appSettings);
+      } catch (settingsError) {
+        console.warn("⚠️ Orari base tipologia non disponibili:", settingsError);
+      }
 
       for (const cleanerEntry of timelineData.cleaners_assignments) {
         const cleanerId = Number(cleanerEntry.cleaner?.id);
@@ -9360,7 +9377,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
             
             // Le task non gestite da WASS tengono l'orario solo in WASS:
             // il trasferimento non scrive start_time/end_time su ADAM.
-            const keepAdamSchedule = isReadonlyPreassignedTask(task);
+            const fictionalSchedule = usesFictionalOperationDuration(task, operationBaseMinutes);
+            const keepAdamSchedule = isReadonlyPreassignedTask(task) || fictionalSchedule;
             const scheduleColumns = keepAdamSchedule
               ? "travel_time = ?,"
               : `travel_time = ?,
@@ -9431,7 +9449,11 @@ app.post("/api/transfer-to-adam", async (req, res) => {
               taskId
             ];
             if (keepAdamSchedule) {
-              console.log(`ℹ️ Task ${taskLabel}: start/end non inviati ad ADAM (tipologia non gestita da WASS)`);
+              console.log(
+                fictionalSchedule
+                  ? `ℹ️ Task ${taskLabel}: orario fittizio non inviato ad ADAM`
+                  : `ℹ️ Task ${taskLabel}: start/end non inviati ad ADAM (tipologia non gestita da WASS)`
+              );
             }
 
             await connection.execute(updateQuery, updateValues);

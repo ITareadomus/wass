@@ -35,6 +35,7 @@ import {
   manualScheduleSpanMinutes,
   normalizeScheduleClock,
 } from "@shared/wass-manual-schedule";
+import { timelineBarDurationLabel } from "@shared/operation-base-duration";
 import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
 import { StructureAccessKeyTypeField } from "@/components/structure-access-key-type";
 import {
@@ -2678,7 +2679,7 @@ const displayClickableInputClass =
 
   // Calcola la larghezza in base alla durata
   const calculateWidth = (duration: string | undefined, forTimeline: boolean) => {
-    const safeDuration = duration || "0.0";
+    const safeDuration = (forTimeline ? timelineBarDurationLabel(task) : null) || duration || "0.0";
     const parts = safeDuration.split(".");
     const hours = parseInt(parts[0] || "0");
     const minutes = parts[1] ? parseInt(parts[1]) : 0;
@@ -2736,7 +2737,7 @@ const displayClickableInputClass =
   })();
   const effectiveDurationForUi = showCompactAdamTimelineUi
     ? "0.15"
-    : (pinnedScheduleLabel || task.duration || "0.0");
+    : (pinnedScheduleLabel || timelineBarDurationLabel(task) || task.duration || "0.0");
 
   const effectiveDurationMinutesForUi = (() => {
     const durationStr = String(effectiveDurationForUi ?? "0.0");
@@ -3280,11 +3281,6 @@ const displayClickableInputClass =
                     if (canEditDuration) handleOpenDurationDialog();
                   }}
                 />
-                {canEditZeroDurationOnReadonly && (
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Durata a zero: puoi impostarla anche su questo task in sola lettura.
-                  </p>
-                )}
               </div>
             </div>
 
@@ -3540,11 +3536,6 @@ const displayClickableInputClass =
                   />
                 </div>
               </div>
-              {canEditReadonlySchedule && (
-                <p className="col-span-2 text-[11px] text-muted-foreground">
-                  Sposta solo la barra in timeline e ricalcola i tempi di spostamento, così non si sovrappone. L'orario resta su WASS e non viene inviato ad ADAM.
-                </p>
-              )}
             </div>
     </>
   );

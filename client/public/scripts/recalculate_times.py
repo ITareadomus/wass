@@ -220,11 +220,21 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
 
         addr = task.get("address", "")
 
-        # Converti cleaning_time, usa 60 se null/invalid
+        # Converti cleaning_time, usa 60 se null/invalid.
+        # schedule_block_minutes è solo WASS: riempie uno 0 di ADAM per start/end
+        # e non deve restare sul task né arrivare ad ADAM.
+        schedule_block = task.pop("schedule_block_minutes", None)
         try:
             cleaning_time = int(task.get("cleaning_time", 60))
         except (ValueError, TypeError):
             cleaning_time = 60
+        if cleaning_time <= 0 and schedule_block is not None:
+            try:
+                block = int(schedule_block)
+            except (ValueError, TypeError):
+                block = 0
+            if block > 0:
+                cleaning_time = block
 
         # Calcola travel_time (sempre ricalcolato per la rotta corrente del cleaner)
         if i == 0:

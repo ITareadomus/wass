@@ -13,6 +13,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HkAlgorithmSettings } from "@/components/settings/hk-algorithm-settings";
+import { OperationBaseDurationSettings } from "@/components/settings/operation-base-duration-settings";
+import { normalizeOperationBaseMinutes } from "@shared/operation-base-duration";
 import { parseHkConstraintSettings, parseHkProfileLibrary, type HkConstraintSettings, type HkProfileLibrary } from "@shared/hk-constraint-settings";
 import { Switch } from "@/components/ui/switch";
 import { CleanerTriadMark, type CleanerTriadeLevel } from "@/components/triad-mark";
@@ -72,6 +74,7 @@ interface SettingsData {
   key_registry_exceptions: number[];
   triade_enabled: boolean;
   algorithm_assign_enabled: boolean;
+  operation_base_minutes: Record<string, number>;
 }
 
 function withSettingsDefaults(data: Partial<SettingsData>): SettingsData {
@@ -125,6 +128,7 @@ function withSettingsDefaults(data: Partial<SettingsData>): SettingsData {
     key_registry_exceptions: data.key_registry_exceptions ?? [],
     triade_enabled: data.triade_enabled !== false,
     algorithm_assign_enabled: data.algorithm_assign_enabled !== false,
+    operation_base_minutes: normalizeOperationBaseMinutes(data.operation_base_minutes),
   };
 }
 
@@ -380,6 +384,7 @@ export default function SystemSettings() {
             <TabsTrigger value="priorita">Priorità</TabsTrigger>
             <TabsTrigger value="ruoli">Ruoli</TabsTrigger>
             <TabsTrigger value="chiavi">Chiavi</TabsTrigger>
+            <TabsTrigger value="tipologie">Tipologie</TabsTrigger>
           </TabsList>
           <TabsContent value="algoritmo" className="space-y-4">
             <Card>
@@ -1111,6 +1116,14 @@ export default function SystemSettings() {
               </ScrollArea>
             </CardContent>
           </Card>
+          </TabsContent>
+          <TabsContent value="tipologie">
+            <OperationBaseDurationSettings
+              value={settings.operation_base_minutes}
+              onChange={(operation_base_minutes) =>
+                setSettings((prev) => (prev ? { ...prev, operation_base_minutes } : prev))
+              }
+            />
           </TabsContent>
         </Tabs>
       </div>

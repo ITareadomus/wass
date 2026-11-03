@@ -12,6 +12,7 @@ import {
 } from "@shared/wass-manual-schedule";
 import { clockToMinutes, minutesToClock } from "@/lib/first-apartment-time-shift";
 import { shiftedRouteStarts, taskBlockMinutes } from "@shared/housekeeping-start-shift";
+import { timelineBarDurationLabel } from "@shared/operation-base-duration";
 import {
   applyHkPreassignedSchedule,
   parseHkPreassignedSchedules,
@@ -3276,7 +3277,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           ? formatScheduleDurationLabel(unmanagedSpanMinutes)
                                           : pinnedScheduleSpan != null
                                             ? formatScheduleDurationLabel(pinnedScheduleSpan)
-                                            : (taskObj.duration || "0.0"),
+                                            : (timelineBarDurationLabel(taskObj) || taskObj.duration || "0.0"),
                                       timelinePxPerMinute,
                                       timelineMinCardPx,
                                     );
