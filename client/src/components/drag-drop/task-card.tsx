@@ -34,7 +34,9 @@ import {
   hasManualSchedule,
   manualScheduleSpanMinutes,
   normalizeScheduleClock,
+  scheduleClockToMinutes,
 } from "@shared/wass-manual-schedule";
+import { minutesToScheduleClock, taskScheduleFloor } from "@shared/housekeeping-start-shift";
 import { timelineBarDurationLabel } from "@shared/operation-base-duration";
 import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
 import { StructureAccessKeyTypeField } from "@/components/structure-access-key-type";
@@ -1241,12 +1243,34 @@ const displayClickableInputClass =
     !Boolean((displayTask as any).is_finished ?? (displayTask as any).isFinished);
   const canEditDuration =
     operationsScope !== "logistics" && (!displayTaskReadOnly || canEditZeroDurationOnReadonly);
-  const canEditReadonlySchedule =
+  const canEditSchedule =
     operationsScope !== "logistics" &&
     isInTimeline &&
-    resolvePreAssignedModeFromTask(displayTask) === "readonly" &&
     !isReadOnly &&
     !Boolean((displayTask as any).is_finished ?? (displayTask as any).isFinished);
+  const scheduleFloor = React.useMemo(() => {
+    if (!isInTimeline) return { minStartMinutes: null, minEndMinutes: null };
+    const taskId = String((displayTask as any).task_id ?? (displayTask as any).id ?? "");
+    const index = allTasks.findIndex((candidate) =>
+      String((candidate as any).task_id ?? (candidate as any).id ?? "") === taskId
+    );
+    const previous = index > 0 ? allTasks[index - 1] : null;
+    const cleaning = Number((displayTask as any).cleaning_time ?? (displayTask as any).cleaningTime);
+    const start = scheduleClockToMinutes((displayTask as any).start_time ?? (displayTask as any).startTime);
+    const end = scheduleClockToMinutes((displayTask as any).end_time ?? (displayTask as any).endTime);
+    const span = start != null && end != null && end > start ? end - start : 0;
+    const travel = Number((displayTask as any).travel_time ?? (displayTask as any).travelTime ?? 0);
+    return taskScheduleFloor({
+      checkoutMinutes: scheduleClockToMinutes(
+        (displayTask as any).checkout_time ?? (displayTask as any).checkoutTime
+      ),
+      previousEndMinutes: previous
+        ? scheduleClockToMinutes((previous as any).end_time ?? (previous as any).endTime)
+        : null,
+      travelMinutes: Number.isFinite(travel) ? travel : 0,
+      durationMinutes: Number.isFinite(cleaning) && cleaning > 0 ? cleaning : span > 0 ? span : 1,
+    });
+  }, [allTasks, displayTask, isInTimeline]);
   const shownDialogLocked =
     dialogLockTaskKey === dialogTaskKey ? dialogIsLocked : displayTaskLocked;
   const shownDialogLockedReason =
@@ -2291,6 +2315,34 @@ const displayClickableInputClass =
   };
 
   const saveReadonlySchedule = async (clearManualSchedule: boolean) => {
+    if (!clearManualSchedule) {
+      const startMinutes = scheduleClockToMinutes(editingScheduleStart);
+      const endMinutes = scheduleClockToMinutes(editingScheduleEnd);
+      if (startMinutes == null || endMinutes == null || endMinutes <= startMinutes) {
+        toast({
+          title: "Errore di validazione",
+          description: "Inserisci uno start time e un end time validi, con la fine dopo l'inizio",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (scheduleFloor.minStartMinutes != null && startMinutes < scheduleFloor.minStartMinutes) {
+        toast({
+          title: "Errore di validazione",
+          description: `Lo start time non può essere prima delle ${minutesToScheduleClock(scheduleFloor.minStartMinutes)}`,
+          variant: "destructive",
+        });
+        return;
+      }
+      if (scheduleFloor.minEndMinutes != null && endMinutes < scheduleFloor.minEndMinutes) {
+        toast({
+          title: "Errore di validazione",
+          description: `L'end time non può essere prima delle ${minutesToScheduleClock(scheduleFloor.minEndMinutes)}`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     setIsSavingSchedule(true);
     try {
       const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -3485,26 +3537,26 @@ const displayClickableInputClass =
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                     Start Time
-                    {canEditReadonlySchedule && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                    {canEditSchedule && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                   </p>
                   <Input
                     readOnly
                     value={housekeepingStartDisplayValue}
                     className={
-                      canEditReadonlySchedule
+                      canEditSchedule
                         ? cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
                         : displayInputClass
                     }
-                    tabIndex={canEditReadonlySchedule ? 0 : -1}
+                    tabIndex={canEditSchedule ? 0 : -1}
                     onFocus={(e) => {
-                      if (!canEditReadonlySchedule) e.currentTarget.blur();
+                      if (!canEditSchedule) e.currentTarget.blur();
                     }}
                     onMouseDown={(e) => {
                       e.preventDefault();
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (canEditReadonlySchedule) handleOpenScheduleDialog();
+                      if (canEditSchedule) handleOpenScheduleDialog();
                     }}
                   />
                 </div>
@@ -3512,26 +3564,26 @@ const displayClickableInputClass =
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                     End Time
-                    {canEditReadonlySchedule && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
+                    {canEditSchedule && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
                   </p>
                   <Input
                     readOnly
                     value={housekeepingEndDisplayValue}
                     className={
-                      canEditReadonlySchedule
+                      canEditSchedule
                         ? cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
                         : displayInputClass
                     }
-                    tabIndex={canEditReadonlySchedule ? 0 : -1}
+                    tabIndex={canEditSchedule ? 0 : -1}
                     onFocus={(e) => {
-                      if (!canEditReadonlySchedule) e.currentTarget.blur();
+                      if (!canEditSchedule) e.currentTarget.blur();
                     }}
                     onMouseDown={(e) => {
                       e.preventDefault();
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (canEditReadonlySchedule) handleOpenScheduleDialog();
+                      if (canEditSchedule) handleOpenScheduleDialog();
                     }}
                   />
                 </div>
@@ -4597,7 +4649,7 @@ const displayClickableInputClass =
               Modifica orario
             </DialogTitle>
             <DialogDescription>
-              Task <strong>#{getTaskKey(displayTask)}</strong> — L'orario resta solo su WASS e non viene inviato ad ADAM.
+              Task <strong>#{getTaskKey(displayTask)}</strong> — Puoi spostare l'orario in avanti. Non può iniziare prima del checkout o dell'arrivo dal task precedente. Resta su WASS e non viene inviato ad ADAM.
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 mt-4">
@@ -4606,19 +4658,31 @@ const displayClickableInputClass =
               <Input
                 type="time"
                 value={editingScheduleStart}
+                min={scheduleFloor.minStartMinutes == null ? undefined : minutesToScheduleClock(scheduleFloor.minStartMinutes)}
                 onChange={(e) => setEditingScheduleStart(e.target.value)}
                 className="w-full"
                 autoFocus
               />
+              {scheduleFloor.minStartMinutes != null && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Minimo {minutesToScheduleClock(scheduleFloor.minStartMinutes)}
+                </p>
+              )}
             </div>
             <div>
               <label className="text-sm font-semibold text-muted-foreground mb-2 block">End Time</label>
               <Input
                 type="time"
                 value={editingScheduleEnd}
+                min={scheduleFloor.minEndMinutes == null ? undefined : minutesToScheduleClock(scheduleFloor.minEndMinutes)}
                 onChange={(e) => setEditingScheduleEnd(e.target.value)}
                 className="w-full"
               />
+              {scheduleFloor.minEndMinutes != null && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Minimo {minutesToScheduleClock(scheduleFloor.minEndMinutes)}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-6">
@@ -4630,7 +4694,7 @@ const displayClickableInputClass =
                 disabled={isSavingSchedule}
                 className="mr-auto border-2 border-custom-blue"
               >
-                Ripristina orario ADAM
+                Ripristina orario calcolato
               </Button>
             )}
             <Button

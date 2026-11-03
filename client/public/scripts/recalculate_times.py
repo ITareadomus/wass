@@ -253,8 +253,12 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
             prev_addr = addr
             continue
 
-        # Aggiungi travel time al tempo corrente
+        # Aggiungi travel time al tempo corrente.
+        # chain_floor_min è la fine della task precedente più lo spostamento
+        # (per la prima, l'inizio turno). Un orario fissato a mano non torna
+        # indietro al proprio checkout: scorre solo se coprirebbe la precedente.
         current_time_min += travel_time
+        chain_floor_min = current_time_min
 
         # Calcola start_time e end_time
         # Verifica vincoli di checkout/checkin
@@ -347,16 +351,17 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
             # Non feasible, ma salviamo comunque i tempi calcolati
             pass
 
-        # Aggiorna task. Un orario fissato a mano resta quello di WASS, ma non può
-        # coprire la task precedente: se la catena lo raggiunge, scorre in avanti.
-        # La task successiva parte dopo la fine davvero disegnata.
+        # Aggiorna task. Un orario fissato a mano resta quello di WASS, anche se
+        # è prima del checkout di quella task. Non può coprire la precedente:
+        # se la catena lo raggiunge, scorre in avanti. La successiva parte dopo
+        # la fine davvero disegnata e poi si ricalcola sul proprio checkout.
         pinned = pinned_manual_schedule(task)
         task["travel_time"] = travel_time
         if pinned is not None:
             pinned_start, pinned_end = pinned
-            if pinned_start < start_time_min:
-                pinned_end += start_time_min - pinned_start
-                pinned_start = start_time_min
+            if pinned_start < chain_floor_min:
+                pinned_end += chain_floor_min - pinned_start
+                pinned_start = chain_floor_min
             task["start_time"] = minutes_to_time(pinned_start)
             task["end_time"] = minutes_to_time(pinned_end)
             current_time_min = pinned_end

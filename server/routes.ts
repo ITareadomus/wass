@@ -33,6 +33,7 @@ import {
   minutesToScheduleClock,
   shiftedRouteStarts,
   taskBlockMinutes,
+  taskScheduleFloor,
 } from "../shared/housekeeping-start-shift";
 import {
   attachScheduleBlockMinutes,
@@ -40,6 +41,7 @@ import {
   usesFictionalOperationDuration,
 } from "../shared/operation-base-duration";
 import {
+  hasManualSchedule,
   normalizeScheduleClock,
   scheduleClockToMinutes,
   withManualScheduleReason,
@@ -8493,15 +8495,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
 
         let updated = 0;
-        let sawOtherTask = false;
         const touchedCleanerIds = new Set<number>();
+        const readTravelMinutes = (task: any): number => {
+          const travel = Number(task?.travel_time ?? task?.travelTime ?? 0);
+          return Number.isFinite(travel) ? Math.max(0, travel) : 0;
+        };
+        const scheduleDurationMinutes = (task: any): number => {
+          const cleaning = Number(task?.cleaning_time ?? task?.cleaningTime);
+          if (Number.isFinite(cleaning) && cleaning > 0) return cleaning;
+          const span = taskBlockMinutes(
+            scheduleClockToMinutes(task?.start_time ?? task?.startTime),
+            scheduleClockToMinutes(task?.end_time ?? task?.endTime),
+            cleaning,
+          );
+          return span > 0 ? span : 1;
+        };
+        if (!clearManualSchedule && scheduleStart != null && scheduleEnd != null) {
+          const startMinutes = scheduleClockToMinutes(scheduleStart);
+          const endMinutes = scheduleClockToMinutes(scheduleEnd);
+          for (const cleanerEntry of timelineData.cleaners_assignments || []) {
+            const tasks = cleanerEntry.tasks || [];
+            for (let index = 0; index < tasks.length; index += 1) {
+              if (!matchesScheduleTarget(tasks[index])) continue;
+              const previous = index > 0 ? tasks[index - 1] : null;
+              const floor = taskScheduleFloor({
+                checkoutMinutes: scheduleClockToMinutes(
+                  tasks[index]?.checkout_time ?? tasks[index]?.checkoutTime
+                ),
+                previousEndMinutes: previous
+                  ? scheduleClockToMinutes(previous.end_time ?? previous.endTime)
+                  : null,
+                travelMinutes: readTravelMinutes(tasks[index]),
+                durationMinutes: scheduleDurationMinutes(tasks[index]),
+              });
+              if (
+                startMinutes != null &&
+                floor.minStartMinutes != null &&
+                startMinutes < floor.minStartMinutes
+              ) {
+                return res.status(400).json({
+                  success: false,
+                  error: `Lo start time non può essere prima delle ${minutesToScheduleClock(floor.minStartMinutes)}`,
+                });
+              }
+              if (
+                endMinutes != null &&
+                floor.minEndMinutes != null &&
+                endMinutes < floor.minEndMinutes
+              ) {
+                return res.status(400).json({
+                  success: false,
+                  error: `L'end time non può essere prima delle ${minutesToScheduleClock(floor.minEndMinutes)}`,
+                });
+              }
+            }
+          }
+        }
         for (const cleanerEntry of timelineData.cleaners_assignments || []) {
           for (const task of cleanerEntry.tasks || []) {
             if (!matchesScheduleTarget(task)) continue;
-            if (!isReadonlyPreassignedTask(task)) {
-              sawOtherTask = true;
-              continue;
-            }
             if (clearManualSchedule) {
               task.reasons = withoutManualScheduleReason(task.reasons);
             } else {
@@ -8515,11 +8567,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         if (updated === 0) {
-          return res.status(sawOtherTask ? 423 : 404).json({
+          return res.status(404).json({
             success: false,
-            error: sawOtherTask
-              ? "L'orario si può correggere solo sulle task con tipologia non gestita da WASS"
-              : "Task non trovata in timeline",
+            error: "Task non trovata in timeline",
           });
         }
 
@@ -8558,6 +8608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     const nextStart = nextStarts[index];
                     const previousStart = starts[index];
                     if (nextStart == null || previousStart == null || nextStart === previousStart) continue;
+                    if (index !== movedIndex && !hasManualSchedule(cleanerEntry.tasks[index])) continue;
                     const block = taskBlockMinutes(
                       previousStart,
                       scheduleClockToMinutes(cleanerEntry.tasks[index]?.end_time ?? cleanerEntry.tasks[index]?.endTime),
@@ -8568,7 +8619,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   }
                 }
               }
-              cleanerEntry.keep_existing_schedule = true;
             }
             await hydrateTasksFromContainers(cleanerEntry, workDate);
             const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate);
@@ -9385,7 +9435,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
             // Le task non gestite da WASS tengono l'orario solo in WASS:
             // il trasferimento non scrive start_time/end_time su ADAM.
             const fictionalSchedule = usesFictionalOperationDuration(task, operationBaseMinutes);
-            const keepAdamSchedule = isReadonlyPreassignedTask(task) || fictionalSchedule;
+            const manualSchedule = hasManualSchedule(task);
+            const keepAdamSchedule = isReadonlyPreassignedTask(task) || fictionalSchedule || manualSchedule;
             const scheduleColumns = keepAdamSchedule
               ? "travel_time = ?,"
               : `travel_time = ?,
@@ -9459,7 +9510,9 @@ app.post("/api/transfer-to-adam", async (req, res) => {
               console.log(
                 fictionalSchedule
                   ? `ℹ️ Task ${taskLabel}: orario fittizio non inviato ad ADAM`
-                  : `ℹ️ Task ${taskLabel}: start/end non inviati ad ADAM (tipologia non gestita da WASS)`
+                  : manualSchedule && !isReadonlyPreassignedTask(task)
+                    ? `ℹ️ Task ${taskLabel}: orario impostato a mano non inviato ad ADAM`
+                    : `ℹ️ Task ${taskLabel}: start/end non inviati ad ADAM (tipologia non gestita da WASS)`
               );
             }
 

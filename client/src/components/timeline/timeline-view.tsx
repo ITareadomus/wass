@@ -11,7 +11,7 @@ import {
   scheduleClockToMinutes,
 } from "@shared/wass-manual-schedule";
 import { clockToMinutes, minutesToClock } from "@/lib/first-apartment-time-shift";
-import { shiftedRouteStarts, taskBlockMinutes } from "@shared/housekeeping-start-shift";
+import { reflowStartsAfterManualMove, shiftedRouteStarts, taskBlockMinutes, taskScheduleFloor } from "@shared/housekeeping-start-shift";
 import { timelineBarDurationLabel } from "@shared/operation-base-duration";
 import {
   applyHkPreassignedSchedule,
@@ -3167,24 +3167,58 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                     (candidate as any).startTime
                                   )
                                 );
+                                const blockMinutes = cleanerTasks.map((candidate, index) => {
+                                  const start = scheduleClockToMinutes((candidate as any).start_time || (candidate as any).startTime);
+                                  const end = scheduleClockToMinutes((candidate as any).end_time || (candidate as any).endTime);
+                                  const cleaning = Number((candidate as any).cleaning_time ?? (candidate as any).cleaningTime);
+                                  if (index === movedIndex && isReadonlyPreassignedTask(candidate)) {
+                                    const positive = start != null && end != null && end > start ? end - start : null;
+                                    return manualScheduleSpanMinutes(candidate)
+                                      ?? positive
+                                      ?? (Number.isFinite(cleaning) && cleaning > 0 ? cleaning : 60);
+                                  }
+                                  return taskBlockMinutes(start, end, cleaning);
+                                });
+                                const travelMinutes = cleanerTasks.map((candidate) => readTravel(candidate));
+                                if (isReadonlyPreassignedTask(cleanerTasks[movedIndex])) {
+                                  const hpStart = priorityWindows
+                                    ? scheduleClockToMinutes(priorityWindows.hpStart)
+                                    : null;
+                                  return reflowStartsAfterManualMove({
+                                    startMinutes: starts,
+                                    travelMinutes,
+                                    blockMinutes,
+                                    earliestMinutes: cleanerTasks.map((candidate) => {
+                                      const checkout = scheduleClockToMinutes(
+                                        (candidate as any).checkout_time ?? (candidate as any).checkoutTime
+                                      );
+                                      const priority = String((candidate as any).priority ?? "").trim().toLowerCase();
+                                      const priorityFloor =
+                                        hpStart != null &&
+                                        (priority === "high" ||
+                                          priority === "high_priority" ||
+                                          priority === "hp" ||
+                                          priority === "low" ||
+                                          priority === "low_priority" ||
+                                          priority === "lp")
+                                          ? hpStart
+                                          : null;
+                                      if (checkout == null) return priorityFloor;
+                                      if (priorityFloor == null) return checkout;
+                                      return Math.max(checkout, priorityFloor);
+                                    }),
+                                    pinned: cleanerTasks.map((candidate) => hasManualSchedule(candidate)),
+                                    movedIndex,
+                                    movedStartMinutes: routePreview.startMinutes,
+                                  });
+                                }
                                 return shiftedRouteStarts({
                                   startMinutes: starts,
-                                  travelMinutes: cleanerTasks.map((candidate) => readTravel(candidate)),
-                                  blockMinutes: cleanerTasks.map((candidate, index) => {
-                                    const start = scheduleClockToMinutes((candidate as any).start_time || (candidate as any).startTime);
-                                    const end = scheduleClockToMinutes((candidate as any).end_time || (candidate as any).endTime);
-                                    const cleaning = Number((candidate as any).cleaning_time ?? (candidate as any).cleaningTime);
-                                    if (index === movedIndex && isReadonlyPreassignedTask(candidate)) {
-                                      const positive = start != null && end != null && end > start ? end - start : null;
-                                      return manualScheduleSpanMinutes(candidate)
-                                        ?? positive
-                                        ?? (Number.isFinite(cleaning) && cleaning > 0 ? cleaning : 60);
-                                    }
-                                    return taskBlockMinutes(start, end, cleaning);
-                                  }),
+                                  travelMinutes,
+                                  blockMinutes,
                                   movedIndex,
                                   movedStartMinutes: routePreview.startMinutes,
-                                  cascade: !isReadonlyPreassignedTask(cleanerTasks[movedIndex]),
+                                  cascade: true,
                                 });
                               })();
 
@@ -3257,18 +3291,19 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                       taskObj.start_time || taskObj.fw_start_time || taskObj.startTime
                                     );
                                     const previousTask = idx > 0 ? cleanerTasks[idx - 1] as any : null;
-                                    const previousStartMinutes = previousTask
-                                      ? scheduleClockToMinutes(previousTask.start_time || previousTask.fw_start_time || previousTask.startTime)
+                                    const scheduleFloor = unmanagedTask
+                                      ? taskScheduleFloor({
+                                          checkoutMinutes: scheduleClockToMinutes(
+                                            taskObj.checkout_time ?? taskObj.checkoutTime
+                                          ),
+                                          previousEndMinutes: previousTask
+                                            ? scheduleClockToMinutes(previousTask.end_time || previousTask.endTime)
+                                            : null,
+                                          travelMinutes: travelTime,
+                                          durationMinutes: unmanagedSpanMinutes > 0 ? unmanagedSpanMinutes : 1,
+                                        })
                                       : null;
-                                    const minStartMinutes = unmanagedTask && previousStartMinutes != null
-                                      ? previousStartMinutes +
-                                        taskBlockMinutes(
-                                          previousStartMinutes,
-                                          scheduleClockToMinutes(previousTask.end_time || previousTask.endTime),
-                                          Number(previousTask.cleaning_time ?? previousTask.cleaningTime),
-                                        ) +
-                                        travelTime
-                                      : undefined;
+                                    const minStartMinutes = scheduleFloor?.minStartMinutes ?? undefined;
                                     const pinnedScheduleSpan = manualScheduleSpanMinutes(taskObj);
                                     const cardMinutes = renderedHousekeepingCardMinutes(
                                       hideRouteSpacers
