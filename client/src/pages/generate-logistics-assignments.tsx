@@ -681,7 +681,6 @@ export default function GenerateLogisticsAssignments() {
   const [containersManuallyCollapsed, setContainersManuallyCollapsed] = useState(false);
   /** Riapre i containers a mano anche se vuoti o con soli task locked. */
   const [containersForcedOpen, setContainersForcedOpen] = useState(false);
-  const prevHasUnlockedContainerTasksRef = useRef(false);
   const [activeDragDriverId, setActiveDragDriverId] = useState<number | null>(null);
   /** Estrazione / refresh da ADAM al cambio data (come checkAndAutoLoadSavedAssignments + extractData su HK) */
   const [isExtractingLogistics, setIsExtractingLogistics] = useState(false);
@@ -1510,15 +1509,35 @@ export default function GenerateLogisticsAssignments() {
     setTimelineSelectedTasks([]);
   }, [selectedDate]);
 
-  useEffect(() => {
-    if (!hasUnlockedContainerTasks) {
-      setContainersManuallyCollapsed(false);
+  const containerTaskCount =
+    earlyOutTasks.length + highPriorityTasks.length + lowPriorityTasks.length;
+  const [trackedContainerVisibility, setTrackedContainerVisibility] = useState({
+    unlocked: hasUnlockedContainerTasks,
+    count: containerTaskCount,
+  });
+  if (
+    trackedContainerVisibility.unlocked !== hasUnlockedContainerTasks ||
+    trackedContainerVisibility.count !== containerTaskCount ||
+    (containerTaskCount === 0 && (containersForcedOpen || containersManuallyCollapsed))
+  ) {
+    setTrackedContainerVisibility({
+      unlocked: hasUnlockedContainerTasks,
+      count: containerTaskCount,
+    });
+    if (
+      trackedContainerVisibility.unlocked &&
+      !hasUnlockedContainerTasks &&
+      trackedContainerVisibility.count === containerTaskCount &&
+      containerTaskCount > 0 &&
+      !containersManuallyCollapsed
+    ) {
+      setContainersForcedOpen(true);
     }
-    if (prevHasUnlockedContainerTasksRef.current && !hasUnlockedContainerTasks) {
-      setContainersForcedOpen(false);
+    if (containerTaskCount === 0) {
+      if (containersForcedOpen) setContainersForcedOpen(false);
+      if (containersManuallyCollapsed) setContainersManuallyCollapsed(false);
     }
-    prevHasUnlockedContainerTasksRef.current = hasUnlockedContainerTasks;
-  }, [hasUnlockedContainerTasks]);
+  }
 
   const showContainers =
     containersForcedOpen || (hasUnlockedContainerTasks && !containersManuallyCollapsed);

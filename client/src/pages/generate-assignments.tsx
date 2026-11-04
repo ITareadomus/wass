@@ -410,7 +410,6 @@ export default function GenerateAssignments() {
   const [containersManuallyCollapsed, setContainersManuallyCollapsed] = useState(false);
   /** Riapre i containers a mano anche se vuoti o con soli task locked. */
   const [containersForcedOpen, setContainersForcedOpen] = useState(false);
-  const prevHasUnlockedContainerTasksRef = useRef(false);
 
   // Selezione multipla condivisa: accenderla su un container la attiva su tutti.
   const [multiSelectModes, setMultiSelectModes] = useState<{
@@ -2752,15 +2751,35 @@ export default function GenerateAssignments() {
     setContainersForcedOpen(false);
   }, [selectedDate]);
 
-  useEffect(() => {
-    if (!hasUnlockedContainerTasks) {
-      setContainersManuallyCollapsed(false);
+  const containerTaskCount =
+    earlyOutTasks.length + highPriorityTasks.length + lowPriorityTasks.length;
+  const [trackedContainerVisibility, setTrackedContainerVisibility] = useState({
+    unlocked: hasUnlockedContainerTasks,
+    count: containerTaskCount,
+  });
+  if (
+    trackedContainerVisibility.unlocked !== hasUnlockedContainerTasks ||
+    trackedContainerVisibility.count !== containerTaskCount ||
+    (containerTaskCount === 0 && (containersForcedOpen || containersManuallyCollapsed))
+  ) {
+    setTrackedContainerVisibility({
+      unlocked: hasUnlockedContainerTasks,
+      count: containerTaskCount,
+    });
+    if (
+      trackedContainerVisibility.unlocked &&
+      !hasUnlockedContainerTasks &&
+      trackedContainerVisibility.count === containerTaskCount &&
+      containerTaskCount > 0 &&
+      !containersManuallyCollapsed
+    ) {
+      setContainersForcedOpen(true);
     }
-    if (prevHasUnlockedContainerTasksRef.current && !hasUnlockedContainerTasks) {
-      setContainersForcedOpen(false);
+    if (containerTaskCount === 0) {
+      if (containersForcedOpen) setContainersForcedOpen(false);
+      if (containersManuallyCollapsed) setContainersManuallyCollapsed(false);
     }
-    prevHasUnlockedContainerTasksRef.current = hasUnlockedContainerTasks;
-  }, [hasUnlockedContainerTasks]);
+  }
 
   const showContainers =
     containersForcedOpen || (hasUnlockedContainerTasks && !containersManuallyCollapsed);

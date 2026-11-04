@@ -556,6 +556,9 @@ function LogisticsAdamCodeLabel({
   );
 }
 
+/** Sopravvive al rimontaggio della card dopo un blocco, così il dialog resta aperto. */
+let openTaskDialogId: string | null = null;
+
 export default function TaskCard({
   task,
   index,
@@ -589,7 +592,21 @@ export default function TaskCard({
   const effectiveWorkDate = workDate || getSelectedWorkDateForScope(operationsScope);
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const triadeEnabled = useTriadeEnabled();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const taskDialogTaskKey = String((task as any).task_id ?? task.id ?? "");
+  const taskDialogId = `${isInTimeline ? "timeline" : "container"}:${currentContainer}:${cleanerId ?? ""}:${taskDialogTaskKey}`;
+  const looseTaskDialogId = `task:${taskDialogTaskKey}`;
+  const [isModalOpen, setIsModalOpen] = useState(
+    () => openTaskDialogId === taskDialogId || openTaskDialogId === looseTaskDialogId
+  );
+  useEffect(() => {
+    if (isModalOpen) {
+      openTaskDialogId = taskDialogId;
+      return;
+    }
+    if (openTaskDialogId === taskDialogId || openTaskDialogId === looseTaskDialogId) {
+      openTaskDialogId = null;
+    }
+  }, [isModalOpen, taskDialogId, looseTaskDialogId]);
   const [housekeepingNowMs, setHousekeepingNowMs] = useState(() => Date.now());
   const [showDissolveDialog, setShowDissolveDialog] = useState(false);
   const [isCollaborationDetailsOpen, setIsCollaborationDetailsOpen] = useState(false);
@@ -1024,9 +1041,7 @@ const displayClickableInputClass =
         description: `${selectedCleanerIds.length} cleaner(s) aggiunti alla task`,
       });
       
-      // Chiudi dialog e modale
       setIsCleanerSelectorOpen(false);
-      setIsModalOpen(false);
       
       // IMPORTANTE: Prima ricarica i selected_cleaners (per includere auto-convocati)
       if ((window as any).loadSelectedCleaners) {
@@ -2173,7 +2188,6 @@ const displayClickableInputClass =
       });
 
       setEditingFields(new Set());
-      setIsModalOpen(false);
       if ((window as any).reloadAllTasks) {
         await (window as any).reloadAllTasks();
       }
@@ -5307,7 +5321,7 @@ const displayClickableInputClass =
                       description: `Task ${result.logisticCode} riportata in ${result.priority} con durata ${result.originalDuration} min`,
                     });
                     setShowDissolveDialog(false);
-                    setIsModalOpen(false);
+                    openTaskDialogId = `task:${String(taskId)}`;
                     window.dispatchEvent(new CustomEvent('refresh-assignments'));
                   } else {
                     toast({
