@@ -178,7 +178,7 @@ export function KeyInternalNote({
         </>
       ) : (
         <>
-          <p className={cn("whitespace-pre-wrap text-sm", text ? "text-foreground" : "text-muted-foreground")}>
+          <p className={cn("whitespace-pre-wrap text-sm", text ? "font-medium text-yellow-700 dark:text-yellow-300" : "text-muted-foreground")}>
             {text || "Nessuna nota"}
           </p>
           {readOnly ? null : (

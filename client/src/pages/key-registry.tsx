@@ -2,7 +2,8 @@ import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDays, format, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
-import { Calendar, ChevronLeft, ChevronRight, KeyRound, Loader2, RefreshCw, Search, TriangleAlert, Truck, Undo2 } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, KeyRound, Loader2, RefreshCw, Search, TriangleAlert, Undo2 } from "lucide-react";
+import { DriverMark } from "@/components/key-driver-mark";
 import { Link } from "wouter";
 import { StructureAccessKeyButtons } from "@/components/structure-access-key-type";
 import { Button } from "@/components/ui/button";
@@ -99,27 +100,6 @@ const ROW_TONE: Record<KeyHandoverStatus, string> = {
 
 const MARKS_REVEAL = 148;
 const BIG_MARK_REVEAL = 96;
-
-function DriverMark({ className }: { className?: string }) {
-  return (
-    <span className={cn("relative inline-flex", className)}>
-      <Truck className="h-full w-full" strokeWidth={1.5} aria-hidden />
-      <svg viewBox="0 0 24 24" className="absolute inset-0 h-full w-full" aria-hidden>
-        <text
-          x="8"
-          y="12"
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fill="currentColor"
-          fontSize="7.5"
-          fontWeight="700"
-        >
-          A
-        </text>
-      </svg>
-    </span>
-  );
-}
 
 function BigMark({ className }: { className?: string }) {
   return (
@@ -1016,7 +996,7 @@ export default function KeyRegistry() {
                                   <span className="block truncate text-sm text-muted-foreground">{apartment.interventionType}</span>
                                 ) : null}
                                 {apartment.internalNote ? (
-                                  <span className="block truncate text-sm text-amber-700 dark:text-amber-300">{apartment.internalNote}</span>
+                                  <span className="block truncate text-sm font-medium text-yellow-700 dark:text-yellow-300">{apartment.internalNote}</span>
                                 ) : null}
                               </span>
                             </div>
@@ -1120,7 +1100,14 @@ export default function KeyRegistry() {
                                 <span className={cn("block truncate text-sm", quiet)}>{apartment.interventionType}</span>
                               ) : null}
                               {apartment.internalNote && status !== "returned" ? (
-                                <span className={cn("block truncate text-sm", quiet)}>{apartment.internalNote}</span>
+                                <span
+                                  className={cn(
+                                    "block truncate text-sm font-medium",
+                                    lostToday ? "text-yellow-200" : "text-yellow-700"
+                                  )}
+                                >
+                                  {apartment.internalNote}
+                                </span>
                               ) : null}
                             </span>
                             <span className="inline-flex shrink-0 items-center text-sm font-semibold">

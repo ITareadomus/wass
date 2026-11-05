@@ -42,6 +42,7 @@ export type LostKeyRow = {
   customerName: string | null;
   daysMissing: number;
   internalNote: string | null;
+  driverKey: boolean;
 };
 
 export type LostKeysPayload = {
@@ -802,7 +803,7 @@ async function loadOutstandingKeys(
   const dateFilter = "work_date <= $1::date";
   const result = await query(
     `
-      SELECT to_char(work_date, 'YYYY-MM-DD') AS work_date, task_id, cleaner_id, logistic_code, cleaner_name, matricola, apt_code, customer_name, internal_note
+      SELECT to_char(work_date, 'YYYY-MM-DD') AS work_date, task_id, cleaner_id, logistic_code, cleaner_name, matricola, apt_code, customer_name, internal_note, driver_key
       FROM hk_key_handovers
       WHERE ${filter}
         AND ${dateFilter}
@@ -829,6 +830,7 @@ async function loadOutstandingKeys(
       customerName: asText(row.customer_name),
       daysMissing: daysSinceWorkDate(workDate, today),
       internalNote: asText(row.internal_note),
+      driverKey: row.driver_key === true,
     });
   }
   return { today, keys };

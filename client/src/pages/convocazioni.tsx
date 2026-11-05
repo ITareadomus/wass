@@ -29,6 +29,7 @@ import { isTaskLocked } from "@/lib/taskValidation";
 import { type CleanerTriadeLevel } from "@/components/triad-mark";
 import { DayCleanerTriadLevel } from "@/components/day-cleaner-triad-level";
 import { CleanerRoleBadge } from "@/components/cleaner-role-mark";
+import { DriverKeyBadge, DriverMark } from "@/components/key-driver-mark";
 import { useTriadeEnabled } from "@/lib/triade-enabled";
 
 const OFFICE_SCOPE_ENABLED = false;
@@ -47,6 +48,7 @@ interface HeldKey {
   aptCode: string | null;
   customerName: string | null;
   internalNote: string | null;
+  driverKey: boolean;
 }
 
 interface Cleaner {
@@ -443,6 +445,7 @@ export default function Convocazioni() {
             aptCode: key.aptCode ?? null,
             customerName: key.customerName ?? null,
             internalNote: typeof key.internalNote === "string" && key.internalNote.trim() ? key.internalNote : null,
+            driverKey: key.driverKey === true,
           });
           grouped.set(cleanerId, list);
         }
@@ -1669,9 +1672,14 @@ export default function Convocazioni() {
                           event.stopPropagation();
                           setHeldKeysCleanerId(cleaner.id);
                         }}
-                        className="animate-held-key inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-red-600 bg-red-500/30 text-red-800 transition-colors hover:bg-red-500/40 dark:border-red-400 dark:bg-red-500/40 dark:text-red-200 dark:hover:bg-red-500/50"
+                        className="animate-held-key relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-red-600 bg-red-500/30 text-red-800 transition-colors hover:bg-red-500/40 dark:border-red-400 dark:bg-red-500/40 dark:text-red-200 dark:hover:bg-red-500/50"
                       >
                         <KeyRound className="h-4 w-4" aria-hidden />
+                        {(heldKeysByCleaner.get(cleaner.id) ?? []).some((key) => key.driverKey) ? (
+                          <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded bg-violet-700 text-white">
+                            <DriverMark className="h-3.5 w-3.5" />
+                          </span>
+                        ) : null}
                       </button>
                     ) : null}
                     {isDrivers && selectedCleaners.has(cleaner.id) && (
@@ -1828,7 +1836,10 @@ export default function Convocazioni() {
               <ul className="space-y-2">
                 {(heldKeysByCleaner.get(heldKeysCleanerId ?? -1) ?? []).map((key) => (
                   <li key={`${key.workDate}-${key.taskId}`} className="rounded-xl border px-4 py-3">
-                    <p className="text-lg font-semibold tabular-nums">{key.logisticCode}</p>
+                    <p className="flex items-center gap-2 text-lg font-semibold tabular-nums">
+                      {key.logisticCode}
+                      {key.driverKey ? <DriverKeyBadge /> : null}
+                    </p>
                     <p className="text-sm">{key.aptCode || "—"}</p>
                     <p className="text-sm text-muted-foreground">{key.customerName || "—"}</p>
                     <p className="mt-1 text-sm text-muted-foreground">

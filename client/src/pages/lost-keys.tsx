@@ -6,6 +6,7 @@ import { Check, ChevronLeft, Loader2, RefreshCw, Undo2 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DriverKeyBadge } from "@/components/key-driver-mark";
 import { KeyInternalNote } from "@/components/structure-access-key-type";
 import { useToast } from "@/hooks/use-toast";
 import { getStoredUserRole, isViewerRole } from "@/lib/auth-role";
@@ -22,6 +23,7 @@ type LostKey = {
   customerName: string | null;
   daysMissing: number;
   internalNote?: string | null;
+  driverKey?: boolean;
 };
 
 type LostKeysPayload = {
@@ -230,7 +232,10 @@ function KeyListPage({ kind }: { kind: ListKind }) {
                           className="min-w-0 flex-1 text-left"
                           onClick={() => setOpenKey(key)}
                         >
-                          <p className="text-2xl font-semibold tabular-nums">{key.logisticCode}</p>
+                          <p className="flex items-center gap-2 text-2xl font-semibold tabular-nums">
+                            {key.logisticCode}
+                            {key.driverKey ? <DriverKeyBadge /> : null}
+                          </p>
                           <p className="mt-1 text-sm font-medium">{key.aptCode || "—"}</p>
                           <p className="truncate text-sm text-muted-foreground">{key.customerName || "—"}</p>
                           {key.internalNote ? (
@@ -283,7 +288,10 @@ function KeyListPage({ kind }: { kind: ListKind }) {
       <Dialog open={openKey != null} onOpenChange={(open) => { if (!open) setOpenKey(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Chiave {openKey?.logisticCode}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              Chiave {openKey?.logisticCode}
+              {openKey?.driverKey ? <DriverKeyBadge /> : null}
+            </DialogTitle>
           </DialogHeader>
           {openKey ? (
             <div className="space-y-1">
