@@ -585,7 +585,6 @@ export async function setKeyBig(
   if (!found) {
     throw new Error("Appartamento non presente nel registro di questa giornata");
   }
-  assertKeyStatesEnabled(found.apartment);
   const cleanerName = [found.cleaner.name, found.cleaner.lastname].filter(Boolean).join(" ").trim();
   await query(
     `

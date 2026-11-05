@@ -269,6 +269,13 @@ function SwipeKeyRow({
       });
       return;
     }
+    if (marks === "big" && openMarks) {
+      park(0);
+      void onToggleBig().finally(() => {
+        suppressClick.current = false;
+      });
+      return;
+    }
     if (openMarks || (wasRevealed && offset > threshold * 0.45)) {
       park(revealWidth);
       window.setTimeout(() => {
@@ -328,8 +335,8 @@ function SwipeKeyRow({
     >
       <div className={cn("absolute inset-0 flex", offset > 0 ? "" : "invisible")}>
         {marks === "big" ? (
-          <div className="h-full shrink-0 bg-emerald-600" style={{ width: offset }}>
-            {markButton("big")}
+          <div className="flex h-full shrink-0 items-center justify-center bg-emerald-600 text-white" style={{ width: offset }}>
+            <BigMark className="h-14 w-16" />
           </div>
         ) : (
           <>
@@ -576,7 +583,7 @@ export default function KeyRegistry() {
   };
 
   const markBig = async (apartment: Apartment, taken: boolean) => {
-    if (viewer || apartment.keyStatesLocked || pendingIds.has(apartment.taskId) || Boolean(apartment.bigKey) === taken) return;
+    if (viewer || pendingIds.has(apartment.taskId) || Boolean(apartment.bigKey) === taken) return;
     const previous = queryClient.getQueryData<RegistryPayload>(queryKey);
     setPendingIds((current) => new Set(current).add(apartment.taskId));
     if (previous) {
@@ -987,13 +994,13 @@ export default function KeyRegistry() {
                                   onToggleBag={() => markBag(apartment, !apartment.bagReady)}
                                   onCycleStatus={() => cycleStatus(apartment)}
                                 />
-                                {apartment.bigKey && !apartment.keyStatesLocked ? (
+                                {apartment.bigKey ? (
                                   <button
                                     type="button"
                                     data-testid="button-big-key"
                                     data-mark-key=""
                                     disabled={pending || viewer}
-                                    title="Togli Big. Puoi anche scorrere a destra e toccare il borsone."
+                                    title="Togli Big. Puoi anche scorrere di nuovo a destra."
                                     aria-label={`Togli chiave Big, ${apartment.logisticCode}`}
                                     onClick={() => markBig(apartment, false)}
                                     className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white bg-emerald-600 text-white disabled:opacity-100"
@@ -1025,16 +1032,6 @@ export default function KeyRegistry() {
                             />
                           </>
                         );
-                        if (apartment.keyStatesLocked) {
-                          return (
-                            <li
-                              key={apartment.taskId}
-                              className="flex min-h-[4.75rem] items-center gap-3 rounded-xl border-2 border-border bg-card px-3 py-3"
-                            >
-                              {rowBody}
-                            </li>
-                          );
-                        }
                         return (
                           <SwipeKeyRow
                             key={apartment.taskId}
