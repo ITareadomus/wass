@@ -80,6 +80,8 @@ export async function ensureHkKeyHandoverTable(): Promise<void> {
   await query(`ALTER TABLE hk_key_handovers ADD COLUMN IF NOT EXISTS prepared BOOLEAN NOT NULL DEFAULT FALSE`);
   await query(`ALTER TABLE hk_key_handovers ADD COLUMN IF NOT EXISTS prepared_at TIMESTAMPTZ`);
   await query(`ALTER TABLE hk_key_handovers ADD COLUMN IF NOT EXISTS internal_note TEXT`);
+  await query(`ALTER TABLE hk_key_handovers ADD COLUMN IF NOT EXISTS bag_ready BOOLEAN NOT NULL DEFAULT FALSE`);
+  await query(`ALTER TABLE hk_key_handovers ADD COLUMN IF NOT EXISTS bag_ready_at TIMESTAMPTZ`);
   tableReady = true;
   console.log("✅ PG: Tabella hk_key_handovers verificata");
 }
@@ -229,10 +231,11 @@ async function loadHandoverFlags(workDate: string): Promise<{
   lostTaskIds: Set<number>;
   driverTaskIds: Set<number>;
   bigTaskIds: Set<number>;
+  bagTaskIds: Set<number>;
   noteByTaskId: Map<number, string>;
 }> {
   const result = await query(
-    `SELECT task_id, prepared, delivered, returned, lost, driver_key, big_key, internal_note FROM hk_key_handovers WHERE work_date = $1`,
+    `SELECT task_id, prepared, delivered, returned, lost, driver_key, big_key, bag_ready, internal_note FROM hk_key_handovers WHERE work_date = $1`,
     [workDate]
   );
   const preparedTaskIds = new Set<number>();
@@ -241,6 +244,7 @@ async function loadHandoverFlags(workDate: string): Promise<{
   const lostTaskIds = new Set<number>();
   const driverTaskIds = new Set<number>();
   const bigTaskIds = new Set<number>();
+  const bagTaskIds = new Set<number>();
   const noteByTaskId = new Map<number, string>();
   for (const row of result.rows) {
     const taskId = Number(row.task_id);
@@ -251,10 +255,11 @@ async function loadHandoverFlags(workDate: string): Promise<{
     if (row.lost === true) lostTaskIds.add(taskId);
     if (row.driver_key === true) driverTaskIds.add(taskId);
     if (row.big_key === true) bigTaskIds.add(taskId);
+    if (row.bag_ready === true) bagTaskIds.add(taskId);
     const note = asText(row.internal_note);
     if (note) noteByTaskId.set(taskId, note);
   }
-  return { preparedTaskIds, deliveredTaskIds, returnedTaskIds, lostTaskIds, driverTaskIds, bigTaskIds, noteByTaskId };
+  return { preparedTaskIds, deliveredTaskIds, returnedTaskIds, lostTaskIds, driverTaskIds, bigTaskIds, bagTaskIds, noteByTaskId };
 }
 
 async function loadOperationNames(operationIds: number[]): Promise<Map<number, string>> {
@@ -359,6 +364,7 @@ export async function loadKeyRegistry(workDate: string): Promise<KeyRegistryPayl
     lostTaskIds: handover.lostTaskIds,
     driverTaskIds: handover.driverTaskIds,
     bigTaskIds: handover.bigTaskIds,
+    bagTaskIds: handover.bagTaskIds,
     exceptionClientIds: await loadExceptionClientIds(),
   });
   for (const cleaner of rows) {
@@ -619,6 +625,57 @@ export async function setKeyBig(
     ]
   );
   return { taskId, bigKey: taken };
+}
+
+export async function setKeyBag(
+  workDate: string,
+  taskId: number,
+  ready: boolean
+): Promise<{ taskId: number; bagReady: boolean }> {
+  const registry = await loadKeyRegistry(workDate);
+  const found = findRegistryApartment(registry, taskId);
+  if (!found) {
+    throw new Error("Appartamento non presente nel registro di questa giornata");
+  }
+  const cleanerName = [found.cleaner.name, found.cleaner.lastname].filter(Boolean).join(" ").trim();
+  await query(
+    `
+      INSERT INTO hk_key_handovers (
+        work_date, task_id, cleaner_id, logistic_code, prepared, prepared_at,
+        delivered, delivered_at, returned, returned_at,
+        bag_ready, bag_ready_at, cleaner_name, matricola, apt_code, customer_name, updated_at
+      ) VALUES (
+        $1, $2, $3, $4, FALSE, NULL,
+        FALSE, NULL, FALSE, NULL,
+        $5, CASE WHEN $5 THEN NOW() ELSE NULL END, $6, $7, $8, $9, NOW()
+      )
+      ON CONFLICT (work_date, task_id) DO UPDATE SET
+        cleaner_id = EXCLUDED.cleaner_id,
+        logistic_code = EXCLUDED.logistic_code,
+        bag_ready = EXCLUDED.bag_ready,
+        bag_ready_at = CASE
+          WHEN EXCLUDED.bag_ready THEN COALESCE(hk_key_handovers.bag_ready_at, NOW())
+          ELSE NULL
+        END,
+        cleaner_name = EXCLUDED.cleaner_name,
+        matricola = EXCLUDED.matricola,
+        apt_code = EXCLUDED.apt_code,
+        customer_name = EXCLUDED.customer_name,
+        updated_at = NOW()
+    `,
+    [
+      workDate,
+      taskId,
+      found.cleaner.cleanerId,
+      found.apartment.logisticCode,
+      ready,
+      cleanerName || null,
+      found.cleaner.matricola,
+      found.apartment.aptCode,
+      found.apartment.customerName,
+    ]
+  );
+  return { taskId, bagReady: ready };
 }
 
 const KEY_NOTE_MAX = 1000;

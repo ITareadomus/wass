@@ -8,6 +8,8 @@ import {
   isLostKeyVisible,
   isLostKeyListed,
   registryKeyIcon,
+  bagCheckApplies,
+  bagCheckTotals,
   keyHandoverStatus,
   nextKeyHandoverStatus,
   priorAlertTone,
@@ -73,6 +75,31 @@ describe("stato consegna", () => {
       { kind: "unreturned", workDate: "2026-09-28", logisticCode: "1", cleanerName: "A", matricola: null, aptCode: null, customerName: null },
       { kind: "lost", workDate: "2026-09-20", logisticCode: "1", cleanerName: "A", matricola: null, aptCode: null, customerName: null },
     ])).toBe("lost");
+  });
+});
+
+describe("check borsone", () => {
+  it("resta sul codice finché la chiave è in magazzino", () => {
+    expect(bagCheckApplies({ physicalKey: true, delivered: false })).toBe(true);
+    expect(bagCheckApplies({ physicalKey: true, prepared: true, delivered: false })).toBe(false);
+    expect(bagCheckApplies({ physicalKey: true, prepared: true, delivered: true })).toBe(false);
+    expect(bagCheckApplies({ physicalKey: true, prepared: true, delivered: true, returned: true })).toBe(false);
+    expect(bagCheckApplies({ physicalKey: false, delivered: false })).toBe(true);
+    expect(bagCheckApplies({ keyStatesLocked: true, physicalKey: false, delivered: false })).toBe(true);
+    expect(bagCheckApplies({ physicalKey: true, lost: true, delivered: false })).toBe(false);
+  });
+
+  it("conta i borsoni pronti e quelli ancora da segnare", () => {
+    expect(
+      bagCheckTotals([
+        { physicalKey: true, delivered: false, bagReady: true },
+        { physicalKey: true, delivered: false, bagReady: false },
+        { physicalKey: false, delivered: false },
+        { physicalKey: true, prepared: true, delivered: false, bagReady: true },
+        { physicalKey: true, prepared: true, delivered: true, bagReady: false },
+        { physicalKey: true, lost: true, delivered: false, bagReady: false },
+      ])
+    ).toEqual({ ready: 2, missing: 2 });
   });
 });
 
@@ -157,6 +184,7 @@ describe("buildKeyRegistry", () => {
       deliveredTaskIds: new Set([10]),
       driverTaskIds: new Set([10]),
       bigTaskIds: new Set([11]),
+      bagTaskIds: new Set([11]),
     });
 
     expect(rows.map((row) => row.lastname)).toEqual(["Rossi", "Bianchi"]);
@@ -167,6 +195,8 @@ describe("buildKeyRegistry", () => {
     expect(rows[0].apartments[1].bigKey).toBe(false);
     expect(rows[0].apartments[0].driverKey).toBe(false);
     expect(rows[0].apartments[0].bigKey).toBe(true);
+    expect(rows[0].apartments[0].bagReady).toBe(true);
+    expect(rows[0].apartments[1].bagReady).toBe(false);
     expect(rows[0].apartments[1].aptCode).toBe("A2");
     expect(rows[0].apartments[1].customerName).toBe("Mario Rossi");
     expect(rows[0].apartments[1].interventionType).toBe("Partenza");

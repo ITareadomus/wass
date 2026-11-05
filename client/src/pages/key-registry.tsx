@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { StructureAccessBundle } from "@shared/structure-access-keys";
 import {
+  bagCheckApplies,
+  bagCheckTotals,
   calendarDateInRome,
   cleanersWithPhysicalKeys,
   keyHandoverStatus,
@@ -41,6 +43,7 @@ type Apartment = {
   lost?: boolean;
   driverKey?: boolean;
   bigKey?: boolean;
+  bagReady?: boolean;
   internalNote?: string | null;
   priorAlerts?: KeyPriorAlert[];
 };
@@ -95,6 +98,7 @@ const ROW_TONE: Record<KeyHandoverStatus, string> = {
 };
 
 const MARKS_REVEAL = 148;
+const BIG_MARK_REVEAL = 96;
 
 function DriverMark({ className }: { className?: string }) {
   return (
@@ -157,6 +161,7 @@ function BigMark({ className }: { className?: string }) {
 function SwipeKeyRow({
   disabled,
   lostBlocked,
+  marks = "both",
   driverMarked,
   bigMarked,
   onCommitLost,
@@ -167,10 +172,12 @@ function SwipeKeyRow({
 }: {
   disabled: boolean;
   lostBlocked: boolean;
+  /** «big»: solo la B, per i task senza chiave fisica. */
+  marks?: "both" | "big";
   driverMarked: boolean;
   bigMarked: boolean;
-  onCommitLost: () => Promise<void>;
-  onToggleDriver: () => Promise<void>;
+  onCommitLost?: () => Promise<void>;
+  onToggleDriver?: () => Promise<void>;
   onToggleBig: () => Promise<void>;
   className?: string;
   children: ReactNode;
@@ -200,13 +207,16 @@ function SwipeKeyRow({
     setOffset(next);
   };
 
+  const revealWidth = marks === "big" ? BIG_MARK_REVEAL : MARKS_REVEAL;
+
   const onPointerDown = (event: ReactPointerEvent<HTMLLIElement>) => {
     if (disabled) return;
     const interactive = (event.target as HTMLElement).closest("button, a");
-    if (interactive && interactive.getAttribute("data-testid") !== "button-key-status") return;
+    const swipeTestId = interactive?.getAttribute("data-testid");
+    if (interactive && swipeTestId !== "button-key-status" && swipeTestId !== "button-bag-check") return;
     tracking.current = true;
     draggingRef.current = false;
-    origin.current = revealedRef.current ? MARKS_REVEAL : 0;
+    origin.current = revealedRef.current ? revealWidth : 0;
     startX.current = event.clientX;
     startY.current = event.clientY;
   };
@@ -231,7 +241,7 @@ function SwipeKeyRow({
       }
     }
     const width = rowRef.current?.offsetWidth ?? 320;
-    const next = Math.max(-width, Math.min(width, origin.current + dx));
+    const next = Math.max(lostBlocked ? 0 : -width, Math.min(width, origin.current + dx));
     setOffset(next);
   };
 
@@ -252,7 +262,7 @@ function SwipeKeyRow({
       }, 0);
       return;
     }
-    if (commitLost) {
+    if (commitLost && onCommitLost) {
       park(0);
       void onCommitLost().finally(() => {
         suppressClick.current = false;
@@ -260,7 +270,7 @@ function SwipeKeyRow({
       return;
     }
     if (openMarks || (wasRevealed && offset > threshold * 0.45)) {
-      park(MARKS_REVEAL);
+      park(revealWidth);
       window.setTimeout(() => {
         suppressClick.current = false;
       }, 0);
@@ -285,7 +295,7 @@ function SwipeKeyRow({
         title={active ? `Togli ${label}` : label}
         onClick={() => {
           park(0);
-          void (kind === "driver" ? onToggleDriver() : onToggleBig());
+          void (kind === "driver" ? onToggleDriver?.() : onToggleBig());
         }}
         className="flex h-full w-full items-center justify-center text-white"
       >
@@ -317,14 +327,22 @@ function SwipeKeyRow({
       }}
     >
       <div className={cn("absolute inset-0 flex", offset > 0 ? "" : "invisible")}>
-        <div className="h-full shrink-0 bg-violet-700" style={{ width: offset / 2 }}>
-          {markButton("driver")}
-        </div>
-        <div className="flex h-full min-w-0 flex-1 bg-emerald-600">
-          <div className="h-full shrink-0" style={{ width: offset / 2 }}>
+        {marks === "big" ? (
+          <div className="h-full shrink-0 bg-emerald-600" style={{ width: offset }}>
             {markButton("big")}
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="h-full shrink-0 bg-violet-700" style={{ width: offset / 2 }}>
+              {markButton("driver")}
+            </div>
+            <div className="flex h-full min-w-0 flex-1 bg-emerald-600">
+              <div className="h-full shrink-0" style={{ width: offset / 2 }}>
+                {markButton("big")}
+              </div>
+            </div>
+          </>
+        )}
       </div>
       <div
         className={cn(
@@ -348,6 +366,49 @@ function SwipeKeyRow({
         {children}
       </div>
     </li>
+  );
+}
+
+function AdamCodeButton({
+  apartment,
+  pending,
+  viewer,
+  onToggleBag,
+  onCycleStatus,
+}: {
+  apartment: Apartment;
+  pending: boolean;
+  viewer: boolean;
+  onToggleBag: () => void;
+  onCycleStatus: () => void;
+}) {
+  const check = bagCheckApplies(apartment);
+  const ready = check && Boolean(apartment.bagReady);
+  const lostToday = Boolean(apartment.lost);
+  const statusLabel = lostToday ? "Smarrita" : STATUS_LABEL[keyHandoverStatus(apartment)];
+  return (
+    <button
+      type="button"
+      data-testid={check ? "button-bag-check" : "button-key-status"}
+      aria-pressed={check ? ready : undefined}
+      aria-label={
+        check
+          ? `${ready ? "Borsone pronto" : "Segna borsone pronto"}, ${apartment.logisticCode}`
+          : `${statusLabel}, chiave ${apartment.logisticCode}`
+      }
+      title={check ? (ready ? "Borsone pronto. Tocca per togliere." : "Tocca per segnare il borsone pronto") : statusLabel}
+      disabled={pending || viewer || (!check && lostToday)}
+      onClick={() => {
+        if (check) onToggleBag();
+        else onCycleStatus();
+      }}
+      className={cn(
+        "inline-flex h-14 min-w-14 shrink-0 items-center justify-center rounded-lg px-1.5 text-2xl font-semibold tabular-nums select-none touch-manipulation disabled:opacity-100",
+        ready && "bg-emerald-600 text-white"
+      )}
+    >
+      {apartment.logisticCode}
+    </button>
   );
 }
 
@@ -515,7 +576,7 @@ export default function KeyRegistry() {
   };
 
   const markBig = async (apartment: Apartment, taken: boolean) => {
-    if (viewer || apartment.physicalKey === false || apartment.keyStatesLocked || pendingIds.has(apartment.taskId) || Boolean(apartment.bigKey) === taken) return;
+    if (viewer || apartment.keyStatesLocked || pendingIds.has(apartment.taskId) || Boolean(apartment.bigKey) === taken) return;
     const previous = queryClient.getQueryData<RegistryPayload>(queryKey);
     setPendingIds((current) => new Set(current).add(apartment.taskId));
     if (previous) {
@@ -538,6 +599,43 @@ export default function KeyRegistry() {
       if (previous) queryClient.setQueryData(queryKey, previous);
       toast({
         title: taken ? "Chiave Big non segnata" : "Chiave Big non tolta",
+        description: error instanceof Error ? error.message : "Riprova",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setPendingIds((current) => {
+        const nextIds = new Set(current);
+        nextIds.delete(apartment.taskId);
+        return nextIds;
+      });
+    }
+  };
+
+  const markBag = async (apartment: Apartment, ready: boolean) => {
+    if (viewer || !bagCheckApplies(apartment) || pendingIds.has(apartment.taskId) || Boolean(apartment.bagReady) === ready) return;
+    const previous = queryClient.getQueryData<RegistryPayload>(queryKey);
+    setPendingIds((current) => new Set(current).add(apartment.taskId));
+    if (previous) {
+      queryClient.setQueryData(queryKey, {
+        ...previous,
+        cleaners: previous.cleaners.map((cleaner) => ({
+          ...cleaner,
+          apartments: cleaner.apartments.map((item) =>
+            item.taskId === apartment.taskId ? { ...item, bagReady: ready } : item
+          ),
+        })),
+      });
+    }
+    try {
+      await apiRequest("POST", "/api/key-registry/bag", { date, taskId: apartment.taskId, ready });
+      await queryClient.invalidateQueries({
+        predicate: (query) => String(query.queryKey[0] ?? "").startsWith("/api/key-registry"),
+      });
+    } catch (error) {
+      if (previous) queryClient.setQueryData(queryKey, previous);
+      toast({
+        title: ready ? "Borsone non segnato" : "Borsone non tolto",
         description: error instanceof Error ? error.message : "Riprova",
         variant: "destructive",
       });
@@ -629,6 +727,10 @@ export default function KeyRegistry() {
       returned: apartments.filter((apartment) => keyHandoverStatus(apartment) === "returned").length,
     };
   }, [roster]);
+  const bagTotals = useMemo(
+    () => bagCheckTotals(roster.flatMap((cleaner) => cleaner.apartments)),
+    [roster]
+  );
   const visibleCleaners = useMemo(() => {
     const cleaners = searchQuery
       ? roster
@@ -760,37 +862,38 @@ export default function KeyRegistry() {
             </Button>
           </div>
 
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-muted-foreground">Ordine</span>
-            <select
-              value={sortOrder}
-              data-viewer-allow=""
-              data-testid="select-key-order"
-              aria-label="Ordine del registro"
-              className="h-12 w-full rounded-md border-2 border-custom-blue bg-background px-3 text-lg text-foreground"
-              onChange={(event) => setSortOrder(event.target.value as KeyRegistryOrder)}
-            >
-              <option value="matricola">Matricola</option>
-              <option value="arrival">Orario di arrivo</option>
-            </select>
-          </label>
-
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" aria-hidden />
-            <input
-              type="search"
-              value={search}
-              data-viewer-allow=""
-              data-testid="input-key-search"
-              placeholder="Cerca codice, cleaner o appartamento"
-              aria-label="Cerca nel registro"
-              className="h-12 w-full rounded-md border-2 border-border bg-background pl-10 pr-3 text-lg text-foreground"
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </label>
+          <div className="flex items-end gap-2">
+            <label className="w-40 shrink-0 sm:w-48">
+              <span className="mb-1 block text-sm font-medium text-muted-foreground">Ordine</span>
+              <select
+                value={sortOrder}
+                data-viewer-allow=""
+                data-testid="select-key-order"
+                aria-label="Ordine del registro"
+                className="h-12 w-full rounded-md border-2 border-custom-blue bg-background px-2 text-base text-foreground"
+                onChange={(event) => setSortOrder(event.target.value as KeyRegistryOrder)}
+              >
+                <option value="matricola">Matricola</option>
+                <option value="arrival">Orario di arrivo</option>
+              </select>
+            </label>
+            <label className="relative block min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <input
+                type="search"
+                value={search}
+                data-viewer-allow=""
+                data-testid="input-key-search"
+                placeholder="Cerca codice, cleaner o appartamento"
+                aria-label="Cerca nel registro"
+                className="h-12 w-full rounded-md border-2 border-border bg-background pl-10 pr-3 text-base text-foreground"
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+          </div>
 
           {payload && (
-            <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="grid grid-cols-5 gap-2 text-center">
               <div className="rounded-xl border-2 border-slate-300 bg-slate-100 px-1 py-3 dark:border-slate-600 dark:bg-slate-800">
                 <p className="text-2xl font-semibold tabular-nums text-slate-800 dark:text-slate-100">
                   {displayTotals.warehouse}
@@ -808,6 +911,13 @@ export default function KeyRegistry() {
               <div className="rounded-xl border-2 border-emerald-700 bg-emerald-600 px-1 py-3">
                 <p className="text-2xl font-semibold tabular-nums text-white">{displayTotals.returned}</p>
                 <p className="text-xs font-medium text-white">Restituite</p>
+              </div>
+              <div className="rounded-xl border-2 border-slate-300 bg-white px-1 py-3 dark:border-slate-600 dark:bg-slate-950">
+                <p className="text-xl font-semibold tabular-nums text-slate-800 dark:text-slate-100 sm:text-2xl">
+                  <span className="text-emerald-600">{bagTotals.ready}</span>
+                  <span>/{bagTotals.ready + bagTotals.missing}</span>
+                </p>
+                <p className="text-xs font-medium text-slate-700 dark:text-slate-200">Borsoni</p>
               </div>
             </div>
           )}
@@ -866,22 +976,43 @@ export default function KeyRegistry() {
                       const pending = pendingIds.has(apartment.taskId);
                       const handover = apartment.physicalKey !== false && !apartment.keyStatesLocked;
                       if (!handover) {
-                        return (
-                          <li
-                            key={apartment.taskId}
-                            className="flex min-h-[4.75rem] items-center gap-3 rounded-xl border-2 border-border bg-card px-3 py-3"
-                          >
-                            <span className="shrink-0 text-2xl font-semibold tabular-nums">{apartment.logisticCode}</span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-medium">{apartment.aptCode || "—"}</span>
-                              <span className="block truncate text-sm text-muted-foreground">{apartment.customerName || "—"}</span>
-                              {apartment.interventionType ? (
-                                <span className="block truncate text-sm text-muted-foreground">{apartment.interventionType}</span>
-                              ) : null}
-                              {apartment.internalNote ? (
-                                <span className="block truncate text-sm text-amber-700 dark:text-amber-300">{apartment.internalNote}</span>
-                              ) : null}
-                            </span>
+                        const rowBody = (
+                          <>
+                            <div className="flex min-w-0 flex-1 items-center gap-3">
+                              <span className="inline-flex shrink-0 items-center gap-1.5">
+                                <AdamCodeButton
+                                  apartment={apartment}
+                                  pending={pending}
+                                  viewer={viewer}
+                                  onToggleBag={() => markBag(apartment, !apartment.bagReady)}
+                                  onCycleStatus={() => cycleStatus(apartment)}
+                                />
+                                {apartment.bigKey && !apartment.keyStatesLocked ? (
+                                  <button
+                                    type="button"
+                                    data-testid="button-big-key"
+                                    data-mark-key=""
+                                    disabled={pending || viewer}
+                                    title="Togli Big. Puoi anche scorrere a destra e toccare il borsone."
+                                    aria-label={`Togli chiave Big, ${apartment.logisticCode}`}
+                                    onClick={() => markBig(apartment, false)}
+                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white bg-emerald-600 text-white disabled:opacity-100"
+                                  >
+                                    <BigMark className="h-8 w-8" />
+                                  </button>
+                                ) : null}
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-medium">{apartment.aptCode || "—"}</span>
+                                <span className="block truncate text-sm text-muted-foreground">{apartment.customerName || "—"}</span>
+                                {apartment.interventionType ? (
+                                  <span className="block truncate text-sm text-muted-foreground">{apartment.interventionType}</span>
+                                ) : null}
+                                {apartment.internalNote ? (
+                                  <span className="block truncate text-sm text-amber-700 dark:text-amber-300">{apartment.internalNote}</span>
+                                ) : null}
+                              </span>
+                            </div>
                             <StructureAccessKeyButtons
                               bundles={apartment.keyBundles ?? []}
                               size="md"
@@ -892,7 +1023,31 @@ export default function KeyRegistry() {
                               internalNoteReadOnly={viewer}
                               onSaveInternalNote={(note) => saveNote(apartment, note)}
                             />
-                          </li>
+                          </>
+                        );
+                        if (apartment.keyStatesLocked) {
+                          return (
+                            <li
+                              key={apartment.taskId}
+                              className="flex min-h-[4.75rem] items-center gap-3 rounded-xl border-2 border-border bg-card px-3 py-3"
+                            >
+                              {rowBody}
+                            </li>
+                          );
+                        }
+                        return (
+                          <SwipeKeyRow
+                            key={apartment.taskId}
+                            disabled={viewer || pending}
+                            lostBlocked
+                            marks="big"
+                            driverMarked={false}
+                            bigMarked={Boolean(apartment.bigKey)}
+                            onToggleBig={() => markBig(apartment, !apartment.bigKey)}
+                            className="rounded-xl border-2 border-border bg-card"
+                          >
+                            {rowBody}
+                          </SwipeKeyRow>
                         );
                       }
                       const lostToday = Boolean(apartment.lost);
@@ -917,16 +1072,13 @@ export default function KeyRegistry() {
                         >
                           <div className="flex min-w-0 flex-1 items-center gap-3">
                           <span className="inline-flex shrink-0 items-center gap-1.5">
-                            <button
-                              type="button"
-                              data-testid="button-key-status"
-                              aria-label={`${statusLabel}, chiave ${apartment.logisticCode}`}
-                              disabled={pending || viewer || lostToday}
-                              onClick={() => cycleStatus(apartment)}
-                              className="text-left text-2xl font-semibold tabular-nums select-none touch-manipulation disabled:opacity-100"
-                            >
-                              {apartment.logisticCode}
-                            </button>
+                            <AdamCodeButton
+                              apartment={apartment}
+                              pending={pending}
+                              viewer={viewer}
+                              onToggleBag={() => markBag(apartment, !apartment.bagReady)}
+                              onCycleStatus={() => cycleStatus(apartment)}
+                            />
                             {apartment.driverKey ? (
                               <button
                                 type="button"

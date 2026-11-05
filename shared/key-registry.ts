@@ -48,6 +48,8 @@ export type KeyRegistryApartment = {
   driverKey: boolean;
   /** Chiave Big presa per questa task. Non cambia lo stato di consegna. */
   bigKey: boolean;
+  /** Borsone pronto. Vale solo finché la chiave non è preparata. */
+  bagReady: boolean;
   /** Nota interna di questa chiave, visibile a chi usa il registro. */
   internalNote: string | null;
   priorAlerts: KeyPriorAlert[];
@@ -89,6 +91,40 @@ export function nextKeyHandoverStatus(status: KeyHandoverStatus): KeyHandoverSta
   if (status === "prepared") return "with_cleaner";
   if (status === "with_cleaner") return "returned";
   return "warehouse";
+}
+
+/** Il check del borsone sta sul codice ADAM finché la chiave è in magazzino. Da preparata in poi non serve. */
+export function bagCheckApplies(flags: {
+  physicalKey?: boolean;
+  keyStatesLocked?: boolean;
+  lost?: boolean;
+  prepared?: boolean;
+  delivered?: boolean;
+  returned?: boolean;
+}): boolean {
+  if (flags.lost) return false;
+  const tracksHandover = flags.physicalKey !== false && !flags.keyStatesLocked;
+  if (!tracksHandover) return true;
+  return (
+    keyHandoverStatus({
+      prepared: flags.prepared,
+      delivered: Boolean(flags.delivered),
+      returned: flags.returned,
+    }) === "warehouse"
+  );
+}
+
+/** Pronti: borsone segnato. Mancano: il check è ancora da fare. */
+export function bagCheckTotals(
+  apartments: Array<Parameters<typeof bagCheckApplies>[0] & { bagReady?: boolean }>
+): { ready: number; missing: number } {
+  let ready = 0;
+  let missing = 0;
+  for (const apartment of apartments) {
+    if (apartment.bagReady) ready += 1;
+    else if (bagCheckApplies(apartment)) missing += 1;
+  }
+  return { ready, missing };
 }
 
 export type KeyRegistryCleaner = {
@@ -312,6 +348,7 @@ export function buildKeyRegistry(input: {
   lostTaskIds?: Set<number>;
   driverTaskIds?: Set<number>;
   bigTaskIds?: Set<number>;
+  bagTaskIds?: Set<number>;
   exceptionClientIds?: Set<number>;
 }): KeyRegistryCleaner[] {
   const cleanerById = new Map(input.cleaners.map((cleaner) => [cleaner.id, cleaner]));
@@ -345,6 +382,7 @@ export function buildKeyRegistry(input: {
       lost: input.lostTaskIds?.has(task.taskId) ?? false,
       driverKey: input.driverTaskIds?.has(task.taskId) ?? false,
       bigKey: input.bigTaskIds?.has(task.taskId) ?? false,
+      bagReady: input.bagTaskIds?.has(task.taskId) ?? false,
       internalNote: null,
       priorAlerts: [],
     });

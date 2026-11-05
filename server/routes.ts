@@ -2319,6 +2319,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/key-registry/bag", async (req, res) => {
+    try {
+      const workDate = String(req.body?.date ?? "");
+      const taskId = Number(req.body?.taskId);
+      const ready = req.body?.ready;
+      if (!isValidWorkDate(workDate) || !Number.isInteger(taskId) || taskId <= 0 || typeof ready !== "boolean") {
+        return res.status(400).json({ success: false, error: "Dati non validi" });
+      }
+      const { setKeyBag } = await import("./services/hk-key-registry");
+      const result = await setKeyBag(workDate, taskId, ready);
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      const message = error?.message || "Salvataggio non riuscito";
+      const status = message.includes("non presente") ? 404 : 500;
+      console.error("POST /api/key-registry/bag:", error);
+      res.status(status).json({ success: false, error: message });
+    }
+  });
+
   app.post("/api/key-registry/recovered", async (req, res) => {
     try {
       const workDate = String(req.body?.date ?? "");
