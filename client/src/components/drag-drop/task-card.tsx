@@ -175,6 +175,12 @@ const getDisplayedCleaningMinutes = (taskObj: any): number => {
   return countedCleaningMinutes(taskObj);
 };
 
+/** Orario di base delle impostazioni, mostrato solo perché ADAM ha mandato 0 ore. */
+const usesPresetBaseDuration = (taskObj: any): boolean => {
+  if (hasManualCleaningTime(taskObj)) return false;
+  return getStoredCleaningMinutes(taskObj) <= 0 && getDisplayedCleaningMinutes(taskObj) > 0;
+};
+
 const getCollaboratorCount = (taskObj: any): number => {
   const count = Number(taskObj?.collaborator_count);
   return Number.isFinite(count) && count > 1 ? Math.round(count) : 1;
@@ -3363,7 +3369,10 @@ const valueFieldClass = (editable: boolean, manual: boolean) =>
                 <Input
                   readOnly
                   value={`${formatCleaningHours(getDisplayedCleaningMinutes(displayTask))} ore`}
-                  className={valueFieldClass(canEditDuration, hasManualCleaningTime(displayTask))}
+                  className={valueFieldClass(
+                    canEditDuration,
+                    hasManualCleaningTime(displayTask) || usesPresetBaseDuration(displayTask)
+                  )}
                   tabIndex={canEditDuration ? 0 : -1}
                   onFocus={(e) => {
                     if (!canEditDuration) e.currentTarget.blur();
@@ -3584,7 +3593,8 @@ const valueFieldClass = (editable: boolean, manual: boolean) =>
                     className={valueFieldClass(
                       canEditSchedule,
                       hasManualSchedule(displayTask) ||
-                        String((displayTask as any).manual_start_time ?? "").trim() !== ""
+                        String((displayTask as any).manual_start_time ?? "").trim() !== "" ||
+                        usesPresetBaseDuration(displayTask)
                     )}
                     tabIndex={canEditSchedule ? 0 : -1}
                     onFocus={(e) => {
@@ -3608,7 +3618,10 @@ const valueFieldClass = (editable: boolean, manual: boolean) =>
                   <Input
                     readOnly
                     value={housekeepingEndDisplayValue}
-                    className={valueFieldClass(canEditSchedule, hasManualSchedule(displayTask))}
+                    className={valueFieldClass(
+                      canEditSchedule,
+                      hasManualSchedule(displayTask) || usesPresetBaseDuration(displayTask)
+                    )}
                     tabIndex={canEditSchedule ? 0 : -1}
                     onFocus={(e) => {
                       if (!canEditSchedule) e.currentTarget.blur();
