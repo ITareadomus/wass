@@ -116,6 +116,21 @@ describe("reflowStartsAfterManualMove", () => {
     expect(starts[1]).toBe(11 * 60 + 30);
   });
 
+  it("leaves a later task on its checkout when the previous block moves but does not reach it", () => {
+    const starts = reflowStartsAfterManualMove({
+      startMinutes: [10 * 60, 15 * 60],
+      travelMinutes: [0, 20],
+      blockMinutes: [120, 60],
+      earliestMinutes: [null, 15 * 60],
+      pinned: [true, false],
+      movedIndex: 0,
+      movedStartMinutes: 11 * 60,
+    });
+
+    expect(starts[0]).toBe(11 * 60);
+    expect(starts[1]).toBe(15 * 60);
+  });
+
   it("does not pull a later manual schedule earlier", () => {
     const starts = reflowStartsAfterManualMove({
       startMinutes: [11 * 60, 15 * 60],

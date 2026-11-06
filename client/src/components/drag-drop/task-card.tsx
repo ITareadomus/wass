@@ -2328,10 +2328,15 @@ const displayClickableInputClass =
     setScheduleDialogOpen(true);
   };
 
-  const saveReadonlySchedule = async (clearManualSchedule: boolean) => {
+  const saveReadonlySchedule = async (
+    clearManualSchedule: boolean,
+    override?: { start: string; end: string }
+  ) => {
+    const scheduleStart = override?.start ?? editingScheduleStart;
+    const scheduleEnd = override?.end ?? editingScheduleEnd;
     if (!clearManualSchedule) {
-      const startMinutes = scheduleClockToMinutes(editingScheduleStart);
-      const endMinutes = scheduleClockToMinutes(editingScheduleEnd);
+      const startMinutes = scheduleClockToMinutes(scheduleStart);
+      const endMinutes = scheduleClockToMinutes(scheduleEnd);
       if (startMinutes == null || endMinutes == null || endMinutes <= startMinutes) {
         toast({
           title: "Errore di validazione",
@@ -2370,7 +2375,7 @@ const displayClickableInputClass =
           modified_by: currentUser.username || "unknown",
           ...(clearManualSchedule
             ? { clearManualSchedule: true }
-            : { scheduleStart: editingScheduleStart, scheduleEnd: editingScheduleEnd }),
+            : { scheduleStart, scheduleEnd }),
         }, operationsScope)),
       });
       if (!response.ok) {
@@ -4700,17 +4705,19 @@ const displayClickableInputClass =
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-6">
-            {hasManualSchedule(displayTask) && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => saveReadonlySchedule(true)}
-                disabled={isSavingSchedule}
-                className="mr-auto border-2 border-custom-blue"
-              >
-                Ripristina orario calcolato
-              </Button>
-            )}
+            <div className="mr-auto flex flex-wrap gap-2">
+              {hasManualSchedule(displayTask) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => saveReadonlySchedule(true)}
+                  disabled={isSavingSchedule}
+                  className="border-2 border-custom-blue"
+                >
+                  Ripristina orario calcolato
+                </Button>
+              )}
+            </div>
             <Button
               variant="outline"
               size="sm"

@@ -67,8 +67,9 @@ export type ShiftedRouteInput = {
   movedIndex: number;
   movedStartMinutes: number;
   /**
-   * Primo appartamento gestito: tutta la coda scorre dello stesso scarto.
-   * Poi si chiude comunque ogni buco negativo.
+   * true: tutta la coda scorre dello stesso scarto, poi si chiudono i buchi.
+   * Il giro housekeeping non lo usa: i task senza orario manuale tornano
+   * al proprio minimo, non seguono lo scarto.
    */
   cascade: boolean;
 };
@@ -76,7 +77,7 @@ export type ShiftedRouteInput = {
 /**
  * Sposta lo start di una task senza far finire la sua barra sopra un'altra.
  * La task non può entrare in quella precedente. Quelle dopo scorrono in avanti
- * se resterebbero coperte.
+ * solo se resterebbero coperte.
  */
 export function shiftedRouteStarts(input: ShiftedRouteInput): Array<number | null> {
   const starts = input.startMinutes.map((value) => value);

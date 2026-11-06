@@ -255,8 +255,10 @@ def recalculate_cleaner_times(cleaner_data: Dict[str, Any]) -> Dict[str, Any]:
 
         # Aggiungi travel time al tempo corrente.
         # chain_floor_min è la fine della task precedente più lo spostamento
-        # (per la prima, l'inizio turno). Un orario fissato a mano non torna
-        # indietro al proprio checkout: scorre solo se coprirebbe la precedente.
+        # (per la prima, l'inizio turno). Solo il task fissato a mano tiene
+        # il suo orario: gli altri tornano al minimo, e non scorrono col delta
+        # di un task precedente. L'orario manuale non torna indietro al
+        # checkout: scorre solo se coprirebbe la precedente.
         current_time_min += travel_time
         chain_floor_min = current_time_min
 
