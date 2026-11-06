@@ -3533,6 +3533,9 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           compactAdamTimelineUi={hideRouteSpacers}
                                           isHighlighted={highlightedTaskIds.has(String(task.id))}
                                           cleanerId={cleaner.id}
+                                          timelineRowStaffDisplayLabel={
+                                            getCleanerDisplayDataByRaw(cleaner, Number(cleaner.id)).primaryLabel
+                                          }
                                           multiSelectContext={timelineCardMultiSelect}
                                           showExecutionStatusColors={showExecutionStatusColors}
                                         />

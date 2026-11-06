@@ -3196,10 +3196,6 @@ const displayClickableInputClass =
   const isContainerDetails = !isInTimeline && !isOfficeScope;
   const effectiveHousekeepingLabelText = String(effectiveHousekeepingLabel ?? "").trim();
   const logisticsHousekeepingAliasText = String(logisticsHousekeepingAlias || "").trim();
-  const logisticsAssignedTo =
-    logisticsHousekeepingAliasText ||
-    effectiveHousekeepingLabelText ||
-    "non assegnato";
   // Su timeline housekeeping `timelineRowStaffDisplayLabel` è il cleaner: non va mai come "Autista - Veicolo".
   const logisticsDriverDisplayValue =
     String(effectiveDriverBadge ?? "").trim() ||
@@ -3240,12 +3236,14 @@ const displayClickableInputClass =
     .filter((label: string) => label.length > 0);
   const allCollaboratorsLabel = collaboratorLabels.join(", ");
   const isLogisticsScope = operationsScope === "logistics";
+  const wassTimelineSequence = Number((displayTask as any).sequence ?? (task as any).sequence);
   const cleanerDetailsAssignedTo = (() => {
     if (isLogisticsScope) {
       if (allCollaboratorsLabel) return allCollaboratorsLabel;
       return effectiveHousekeepingLabelText || logisticsHousekeepingAliasText || "non assegnato";
     }
-    return primaryCollaboratorLabel ? primaryCollaboratorLabel : logisticsAssignedTo;
+    if (hasCollaboration && primaryCollaboratorLabel) return primaryCollaboratorLabel;
+    return syncTimelineRowStaffLabel || primaryCollaboratorLabel || "non assegnato";
   })();
   const cleanerDetailsSequenceValue = (() => {
     if (isLogisticsScope) {
@@ -3253,7 +3251,9 @@ const displayClickableInputClass =
         ? String(effectiveHousekeepingSequence)
         : "non assegnato";
     }
-    return String(effectiveHousekeepingSequence ?? fallbackTimelineSequence ?? "non assegnato");
+    return Number.isFinite(wassTimelineSequence) && wassTimelineSequence > 0
+      ? String(wassTimelineSequence)
+      : "non assegnato";
   })();
   const housekeepingTravelDisplayValue =
     isLogisticsScope
