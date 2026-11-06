@@ -274,6 +274,9 @@ def get_tasks_from_db(selected_date, assigned_task_ids=None, workflow="housekeep
             FROM app_structures preferred
             WHERE preferred.logistic_code = linked.logistic_code
               AND preferred.active = 1
+              AND preferred.lat IS NOT NULL AND preferred.lng IS NOT NULL
+              AND preferred.lat != '' AND preferred.lng != ''
+              AND preferred.lat != '0' AND preferred.lng != '0'
             ORDER BY (preferred.id = linked.id) DESC, preferred.id DESC
             LIMIT 1
           ),
@@ -792,6 +795,9 @@ def extract_tasks_from_db(work_date=None, assigned_task_ids=None, workflow="hous
             FROM app_structures preferred
             WHERE preferred.logistic_code = linked.logistic_code
               AND preferred.active = 1
+              AND preferred.lat IS NOT NULL AND preferred.lng IS NOT NULL
+              AND preferred.lat != '' AND preferred.lng != ''
+              AND preferred.lat != '0' AND preferred.lng != '0'
             ORDER BY (preferred.id = linked.id) DESC, preferred.id DESC
             LIMIT 1
           ),

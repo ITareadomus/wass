@@ -7,6 +7,7 @@ import {
   type ManualCleaningTimeOverride,
 } from '../../shared/wass-cleaning-time';
 import {
+  refreshTimelineApartmentFieldsFromAdam,
   syncTimelineAssignmentsFromAdam,
   type AssignmentSyncResult,
   type RefreshSyncMode,
@@ -774,14 +775,27 @@ async function runRefreshContainersFromAdam(
       };
     }
 
-    if (containersError) {
+    const apartmentFields = await refreshTimelineApartmentFieldsFromAdam(
+      workDate,
+      modifiedBy,
+      workflow
+    );
+    if (!apartmentFields.success) {
       return {
         success: false,
         containersData,
         removedCount,
         mode,
-        error: containersError,
+        error:
+          apartmentFields.error ||
+          containersError ||
+          "Errore aggiornamento specifiche da ADAM",
       };
+    }
+    if (containersError) {
+      console.error(
+        "⚠️ Containers non rigenerati, le specifiche dei task in timeline sono state aggiornate da ADAM"
+      );
     }
 
     return {

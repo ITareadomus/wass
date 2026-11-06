@@ -142,7 +142,8 @@ function sameIdSet(a: number[], b: number[]): boolean {
  */
 async function fetchAdamAssignmentsForDate(
   workDate: string,
-  scope: "housekeeping" | "office"
+  scope: "housekeeping" | "office",
+  extraTaskIds: number[] = []
 ): Promise<AdamAssignmentRow[]> {
   let connection: mysql.Connection | null = null;
   try {
@@ -158,6 +159,16 @@ async function fetchAdamAssignmentsForDate(
       scope === "office"
         ? "AND h.operation_id IN (15, 38)"
         : `AND (COALESCE(o.enable_wass, 0) = 1 OR COALESCE(o.enable_wass_readonly, 0) = 1)`;
+
+    const includedTaskIds = Array.from(
+      new Set(
+        extraTaskIds.filter((id) => Number.isFinite(id) && id > 0)
+      )
+    );
+    const extraIdClause =
+      includedTaskIds.length > 0
+        ? `OR h.id IN (${includedTaskIds.map(() => "?").join(",")})`
+        : "";
 
     const [rows]: any = await connection.execute(
       `
@@ -201,16 +212,21 @@ async function fetchAdamAssignmentsForDate(
         ${ADAM_ACTIVE_STRUCTURE_JOIN_FROM_HOUSEKEEPING}
         LEFT JOIN app_customers c ON s.customer_id = c.id
         LEFT JOIN app_structure_operation o ON o.id = h.operation_id
-        WHERE h.checkout = ?
-          AND h.deleted_at IS NULL
+        WHERE h.deleted_at IS NULL
           AND h.deleted_at_client IS NULL
-          AND s.lat IS NOT NULL AND s.lng IS NOT NULL
-          AND s.lat != '' AND s.lng != ''
-          AND s.lat != '0' AND s.lng != '0'
-          ${officeFilter}
+          AND (
+            (
+              h.checkout = ?
+              AND s.lat IS NOT NULL AND s.lng IS NOT NULL
+              AND s.lat != '' AND s.lng != ''
+              AND s.lat != '0' AND s.lng != '0'
+              ${officeFilter}
+            )
+            ${extraIdClause}
+          )
         ORDER BY h.cleaned_by_us ASC, h.sequence ASC, h.id ASC
       `,
-      [workDate]
+      [workDate, ...includedTaskIds]
     );
 
     const list = Array.isArray(rows) ? rows : [];
@@ -413,6 +429,64 @@ function countAssignedTasks(entry: any): number {
   return Array.isArray(entry?.tasks) ? entry.tasks.length : 0;
 }
 
+function collectTimelineTaskIds(timelineData: any): number[] {
+  const ids = new Set<number>();
+  for (const entry of timelineData?.cleaners_assignments || []) {
+    for (const task of entry?.tasks || []) {
+      const taskId = Number(task?.task_id);
+      if (Number.isFinite(taskId) && taskId > 0) ids.add(taskId);
+    }
+  }
+  return Array.from(ids);
+}
+
+const ADAM_APARTMENT_FIELDS = [
+  "logistic_code",
+  "client_id",
+  "premium",
+  "address",
+  "lat",
+  "lng",
+  "checkin_date",
+  "checkout_date",
+  "checkin_time",
+  "checkout_time",
+  "pax_in",
+  "pax_out",
+  "small_equipment",
+  "operation_id",
+  "confirmed_operation",
+  "straordinaria",
+  "type_apt",
+  "alias",
+  "customer_name",
+  "customer_reference",
+] as const;
+
+function applyAdamApartmentFields(task: any, row: AdamAssignmentRow): boolean {
+  const fresh = buildTaskFromAdam(row, task);
+  let changed = false;
+  for (const field of ADAM_APARTMENT_FIELDS) {
+    const next = fresh[field];
+    if (next === undefined) continue;
+    if (task[field] !== next) {
+      task[field] = next;
+      changed = true;
+    }
+  }
+  if (!hasManualCleaningTime(task)) {
+    if (task.cleaning_time !== fresh.cleaning_time) {
+      task.cleaning_time = fresh.cleaning_time;
+      changed = true;
+    }
+    if (task.base_cleaning_time !== fresh.base_cleaning_time) {
+      task.base_cleaning_time = fresh.base_cleaning_time;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 /**
  * Rimuove da timeline e convocati i cleaner senza task.
  * Usato a inizio giornata operativa e dopo ogni sync ADAM con giornata ON.
@@ -490,6 +564,66 @@ export async function pruneEmptyTimelineCleaners(
 }
 
 /**
+ * Rilegge su ADAM ogni task già in timeline e riscrive le specifiche appartamento
+ * (check-in/out, pax, indirizzo, operazione, cliente, …).
+ * Cleaner, sequenza e orari restano quelli WASS: li allinea solo lo specchio assegnazioni.
+ */
+export async function refreshTimelineApartmentFieldsFromAdam(
+  workDate: string,
+  modifiedBy: string = "system",
+  scope: "housekeeping" | "office" = "housekeeping"
+): Promise<{ success: boolean; updated: number; error?: string }> {
+  try {
+    const timelineData = await workspaceFiles.loadTimeline(workDate, scope);
+    if (!timelineData?.cleaners_assignments?.length) {
+      return { success: true, updated: 0 };
+    }
+
+    const timelineTaskIds = collectTimelineTaskIds(timelineData);
+    const adamRows = await fetchAdamAssignmentsForDate(
+      workDate,
+      scope,
+      timelineTaskIds
+    );
+    const adamById = new Map(adamRows.map((row) => [row.task_id, row]));
+
+    let updated = 0;
+    for (const entry of timelineData.cleaners_assignments) {
+      for (const task of entry?.tasks || []) {
+        const taskId = Number(task?.task_id);
+        const row = adamById.get(taskId);
+        if (!row) continue;
+        if (applyAdamApartmentFields(task, row)) updated += 1;
+      }
+    }
+
+    if (updated > 0) {
+      await workspaceFiles.saveTimeline(
+        workDate,
+        timelineData,
+        false,
+        modifiedBy,
+        "timeline_specs_synced_from_adam",
+        undefined,
+        scope
+      );
+    }
+
+    console.log(
+      `✅ Specifiche ADAM→WASS ${workDate}: ${updated} task aggiornate su ${timelineTaskIds.length}`
+    );
+    return { success: true, updated };
+  } catch (error: any) {
+    console.error("❌ refreshTimelineApartmentFieldsFromAdam:", error);
+    return {
+      success: false,
+      updated: 0,
+      error: error?.message || String(error),
+    };
+  }
+}
+
+/**
  * Porta la timeline WASS allo stato corrente di ADAM (cleaner, sequenza, collaborazioni).
  *
  * - task con cleaner in ADAM → assegnata a quel cleaner, che viene auto-convocato;
@@ -499,7 +633,10 @@ export async function pruneEmptyTimelineCleaners(
  *   se in ADAM non ha cleaner esce dalla timeline senza tornare nei containers
  *   (i containers coprono solo le operazioni enable_wass, vedi create_containers.py).
  *
- * Fuori dal perimetro ADAM della giornata la timeline non viene toccata.
+ * I task già in timeline vengono riletti su ADAM per id, anche se la query
+ * del giorno li esclude (coordinate mancanti sulla struttura attiva, ecc.):
+ * le specifiche appartamento vengono riscritte. Se il task non è più su ADAM,
+ * la riga WASS resta com'è.
  * ADAM wins: locked WASS tasks that would move are unlocked automatically.
  */
 export async function syncTimelineAssignmentsFromAdam(
@@ -508,8 +645,6 @@ export async function syncTimelineAssignmentsFromAdam(
   scope: "housekeeping" | "office" = "housekeeping"
 ): Promise<AssignmentSyncResult> {
   try {
-    const allAdamRows = await fetchAdamAssignmentsForDate(workDate, scope);
-
     const timelineData =
       (await workspaceFiles.loadTimeline(workDate, scope)) ||
       {
@@ -520,6 +655,13 @@ export async function syncTimelineAssignmentsFromAdam(
     timelineData.cleaners_assignments = Array.isArray(timelineData.cleaners_assignments)
       ? timelineData.cleaners_assignments
       : [];
+
+    const timelineTaskIds = collectTimelineTaskIds(timelineData);
+    const allAdamRows = await fetchAdamAssignmentsForDate(
+      workDate,
+      scope,
+      timelineTaskIds
+    );
 
     const selectedCleanersData =
       (await workspaceFiles.loadSelectedCleaners(workDate, scope)) || { cleaners: [] };
@@ -773,7 +915,9 @@ export async function syncTimelineAssignmentsFromAdam(
         removedUnhandled += 1;
         continue;
       }
-      const unassignedPayload = cloneTaskPayload(current.task, {
+      const unassignedSource = { ...current.task };
+      applyAdamApartmentFields(unassignedSource, desired);
+      const unassignedPayload = cloneTaskPayload(unassignedSource, {
           start_time: undefined,
           end_time: undefined,
           travel_time: undefined,
@@ -798,12 +942,18 @@ export async function syncTimelineAssignmentsFromAdam(
       unassigned += 1;
     }
 
-    // Fuori perimetro ADAM: la timeline WASS non si tocca
+    // Task ancora in timeline ma esclusi dallo specchio cleaner (readonly senza
+    // convocazione, oppure assenti da ADAM): le specifiche si aggiornano se la
+    // riga ADAM esiste, cleaner e orari WASS restano.
+    const adamSpecById = new Map(allAdamRows.map((row) => [row.task_id, row]));
     for (const [taskId, current] of currentByTask.entries()) {
       if (adamById.has(taskId)) continue;
+      const adamRow = adamSpecById.get(taskId);
+      const source = adamRow ? { ...current.task } : current.task;
+      if (adamRow) applyAdamApartmentFields(source, adamRow);
       for (const cleanerId of current.cleanerIds) {
         const entry = ensureCleanerEntry(cleanerId);
-        const copy = cloneTaskPayload(current.task, {
+        const copy = cloneTaskPayload(source, {
           start_time: current.task?.start_time ?? null,
           end_time: current.task?.end_time ?? null,
           travel_time: Number(current.task?.travel_time ?? 0) || 0,
