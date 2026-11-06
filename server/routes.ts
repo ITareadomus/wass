@@ -44,6 +44,11 @@ import {
   hasManualSchedule,
   normalizeScheduleClock,
   scheduleClockToMinutes,
+  withManualCheckinReason,
+  withManualCheckoutReason,
+  withManualCustomerNoteReason,
+  withManualOperationReason,
+  withManualPaxReason,
   withManualScheduleReason,
   withoutManualScheduleReason,
 } from "../shared/wass-manual-schedule";
@@ -8884,6 +8889,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             newValues.push(String(checkinTime));
             task.checkin_time = checkinTime;
           }
+          if (editedFields.includes("checkout_date") || editedFields.includes("checkout_time")) {
+            task.reasons = withManualCheckoutReason(task.reasons);
+          }
+          if (editedFields.includes("checkin_date") || editedFields.includes("checkin_time")) {
+            task.reasons = withManualCheckinReason(task.reasons);
+          }
           if (wassCleaningTotalMinutes != null) {
             editedFields.push('cleaning_time');
             oldValues.push(String(task.base_cleaning_time ?? task.cleaning_time ?? 'null'));
@@ -8899,6 +8910,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             oldValues.push(String(task.pax_in ?? 'null'));
             newValues.push(String(paxIn));
             task.pax_in = paxIn;
+            task.reasons = withManualPaxReason(task.reasons);
           }
           if (paxOut !== undefined && task.pax_out !== paxOut) {
             editedFields.push('pax_out');
@@ -8913,6 +8925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               newValues.push(String(operationId));
               task.operation_id = operationId;
               task.straordinaria = operationId === CONTINUAZIONE_PS_OPERATION_ID || Boolean(task.straordinaria);
+              task.reasons = withManualOperationReason(task.reasons);
             }
             const operationConfirmed = operationId != null && operationId !== "";
             if (Boolean(task.confirmed_operation) !== operationConfirmed) {
@@ -8933,6 +8946,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               previousTaskNote || previousAdamCustomerNote || null
             );
             task.customer_note = normalizedCustomerNote;
+            task.reasons = withManualCustomerNoteReason(task.reasons);
             customerNoteChanged = true;
           }
           taskUpdated = true;
@@ -10196,16 +10210,33 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         req.body.started,
         getCurrentUsername(req)
       );
-      let prunedEmptyCleaners = 0;
+      let assignmentSync = null;
       if (day.started) {
-        const { pruneEmptyTimelineCleaners } = await import(
-          "./services/adam-timeline-assignment-sync"
-        );
-        prunedEmptyCleaners = await pruneEmptyTimelineCleaners(
-          date,
-          scope,
-          getCurrentUsername(req)
-        );
+        try {
+          const { syncTimelineAssignmentsFromAdam } = await import(
+            "./services/adam-timeline-assignment-sync"
+          );
+          assignmentSync = await syncTimelineAssignmentsFromAdam(
+            date,
+            getCurrentUsername(req),
+            scope
+          );
+          if (!assignmentSync.success) {
+            throw new Error(assignmentSync.error || "Errore sync assegnazioni da ADAM");
+          }
+        } catch (syncError: any) {
+          await pgDailyAssignmentsService.setOperationalDayStarted(
+            date,
+            scope,
+            false,
+            getCurrentUsername(req)
+          );
+          return res.status(500).json({
+            success: false,
+            error: syncError?.message || "Errore sync assegnazioni da ADAM",
+            assignmentSync,
+          });
+        }
       }
       res.json({
         success: true,
@@ -10214,7 +10245,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         started: day.started,
         started_at: day.startedAt,
         started_by: day.startedBy,
-        pruned_empty_cleaners: prunedEmptyCleaners,
+        pruned_empty_cleaners: assignmentSync?.prunedEmptyCleaners ?? 0,
+        assignmentSync,
       });
     } catch (error: any) {
       console.error("PUT /api/operational-day:", error);

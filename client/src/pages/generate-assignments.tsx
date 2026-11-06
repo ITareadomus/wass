@@ -40,8 +40,6 @@ import { it } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -743,8 +741,8 @@ export default function GenerateAssignments() {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
   const isRefreshingContainersRef = useRef(false);
+  const tasksLoadSeqRef = useRef(0);
   const [showAdamRefreshDialog, setShowAdamRefreshDialog] = useState(false);
-  const [adamRefreshMode, setAdamRefreshMode] = useState<AdamRefreshMode>("assignments");
   const [showUnlockConfirmDialog, setShowUnlockConfirmDialog] = useState(false);
   const [pendingLockedTasks, setPendingLockedTasks] = useState<LockedConflictTask[]>([]);
   const [pendingRefreshMode, setPendingRefreshMode] = useState<AdamRefreshMode>("assignments");
@@ -843,6 +841,12 @@ export default function GenerateAssignments() {
         setIsOperationalDayStarted(confirmed);
         if (confirmed) {
           pendingForcedAdamSyncRef.current = true;
+          if (typeof (window as any).reloadAllTasks === "function") {
+            await (window as any).reloadAllTasks();
+          }
+          if (typeof (window as any).reloadTimelineRoster === "function") {
+            await (window as any).reloadTimelineRoster();
+          }
           await runAdamContainersRefreshRef.current({
             source: "manual",
             mode: "assignments",
@@ -1467,6 +1471,7 @@ export default function GenerateAssignments() {
   // Carica i task dai file JSON (SENZA rieseguire extract-data)
   // silent=true per evitare loader durante DnD background refresh
   const loadTasks = async (skipExtraction: boolean = false, silent: boolean = false) => {
+    const loadSeq = ++tasksLoadSeqRef.current;
     try {
       const { invalidateTaskTriade } = await import("@/lib/task-triade");
       invalidateTaskTriade();
@@ -1642,6 +1647,8 @@ export default function GenerateAssignments() {
       });
 
       dlog("Task dopo filtro - Early:", filteredEarlyOut.length, "High:", filteredHigh.length, "Low:", filteredLow.length);
+
+      if (loadSeq !== tasksLoadSeqRef.current) return;
 
       // AGGIORNA GLI STATI IN MODO SINCRONIZZATO
       setEarlyOutTasks(filteredEarlyOut);
@@ -3383,41 +3390,15 @@ export default function GenerateAssignments() {
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-sm text-muted-foreground">
                 <p>
-                  I containers vengono sempre rigenerati da ADAM e i nuovi task aggiunti nei containers (oltre che aggiornare i dati dei task esistenti come check-in/out, pax,
-                  indirizzo, operazione, nuove task, task sparite). Le modifiche WASS
-                  non ancora trasferite su ADAM verranno sovrascritte.
+                  La giornata viene riletta da ADAM e riscritta su WASS: cleaner,
+                  sequenza, collaborazioni, pax, indirizzo, operazione, cliente, note.
+                  Sulla timeline i task si spostano e travel, inizio e fine vengono
+                  ricalcolati.
                 </p>
-                <div className="space-y-2 pt-1">
-                  <Label className="text-foreground">Cosa sincronizzare</Label>
-                  <RadioGroup
-                    value={adamRefreshMode}
-                    onValueChange={(value) =>
-                      setAdamRefreshMode(value as AdamRefreshMode)
-                    }
-                    className="gap-3"
-                  >
-                    <div className="flex items-start space-x-2">
-                      <RadioGroupItem value="apt" id="refresh-mode-apt" className="mt-1" />
-                      <Label htmlFor="refresh-mode-apt" className="font-normal leading-snug">
-                        Solo containers e dati appartamento
-                      </Label>
-                    </div>
-                    <div className="flex items-start space-x-2">
-                      <RadioGroupItem
-                        value="assignments"
-                        id="refresh-mode-assignments"
-                        className="mt-1"
-                      />
-                      <Label
-                        htmlFor="refresh-mode-assignments"
-                        className="font-normal leading-snug"
-                      >
-                        Anche assegnazioni (cleaner, sequenza, collaborazioni) e ricalcolo
-                        orari / travel time
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </div>
+                <p>
+                  Restano solo il cleaning time e il check-in o check-out che hai
+                  cambiato a mano.
+                </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -3433,7 +3414,7 @@ export default function GenerateAssignments() {
               onClick={(e) => {
                 e.preventDefault();
                 setShowAdamRefreshDialog(false);
-                void runAdamContainersRefresh({ mode: adamRefreshMode });
+                void runAdamContainersRefresh({ mode: "assignments" });
               }}
               className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
             >

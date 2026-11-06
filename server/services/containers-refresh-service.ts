@@ -626,9 +626,10 @@ async function runRefreshContainersFromAdam(
       const createContainersPath = path.join(process.cwd(), 'client/public/scripts/create_containers.py');
 
       const workflowArg = workflow === 'office' ? ' --workflow office' : '';
+      const skipTimelineArg = mode === 'assignments' ? ' --skip-timeline-update' : '';
       await new Promise<string>((resolve, reject) => {
         exec(
-          `python3 "${createContainersPath}" --date "${workDate}" --skip-extract --use-api${workflowArg}`,
+          `python3 "${createContainersPath}" --date "${workDate}" --skip-extract --use-api${workflowArg}${skipTimelineArg}`,
           { timeout: CREATE_CONTAINERS_TIMEOUT_MS, maxBuffer: 5 * 1024 * 1024 },
           (error, stdout, stderr) => {
             if (error) {

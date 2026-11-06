@@ -4,20 +4,29 @@ import { databaseConfig } from "../../config/database";
 import { ADAM_ACTIVE_STRUCTURE_JOIN_FROM_HOUSEKEEPING } from "./adam-active-structure-join";
 import * as workspaceFiles from "./workspace-files";
 import { pgDailyAssignmentsService } from "./pg-daily-assignments-service";
-import {
-  hydrateTasksFromContainers,
-  recalculateCleanerTimes,
-} from "./housekeeping-recalculate-times";
+import { recalculateCleanerTimes } from "./housekeeping-recalculate-times";
 import {
   hasManualCleaningSplit,
   hasManualCleaningTime,
+  WASS_CLEANING_SPLIT_MANUAL_REASON,
+  WASS_CLEANING_TIME_MANUAL_REASON,
   withManualCleaningSplitReason,
   withManualCleaningTimeReason,
 } from "../../shared/wass-cleaning-time";
 import {
+  hasManualCheckin,
+  hasManualCheckout,
   hasManualSchedule,
-  withManualScheduleReason,
+  WASS_CHECKIN_CHECKOUT_MANUAL_REASON,
+  WASS_CHECKIN_MANUAL_REASON,
+  WASS_CHECKOUT_MANUAL_REASON,
+  withoutManualScheduleReason,
 } from "../../shared/wass-manual-schedule";
+import {
+  classifyTaskPriority,
+  parsePrioritySettings,
+  priorityToContainerFormat,
+} from "../../shared/taskPriorityClassification";
 
 export type RefreshSyncMode = "apt" | "assignments";
 
@@ -70,6 +79,7 @@ interface AdamAssignmentRow {
   alias: string | null;
   customer_name: string | null;
   customer_reference: string | null;
+  customer_note: string | null;
   primaryCleanerId: number | null;
   sequence: number;
   secondaryCleanerIds: number[];
@@ -205,6 +215,7 @@ async function fetchAdamAssignmentsForDate(
           c.alias AS alias,
           c.name AS customer_name,
           s.customer_structure_reference AS customer_reference,
+          h.notes AS customer_note,
           h.cleaned_by_us AS primary_cleaner_id,
           h.sequence AS adam_sequence,
           COALESCE(o.enable_wass_readonly, 0) AS enable_wass_readonly
@@ -308,6 +319,8 @@ async function fetchAdamAssignmentsForDate(
             clientId === 3 && r?.customer_reference != null
               ? String(r.customer_reference).trim() || null
               : null,
+          customer_note:
+            r?.customer_note != null ? String(r.customer_note).trim() || null : null,
           primaryCleanerId,
           sequence,
           secondaryCleanerIds: secondaries,
@@ -366,36 +379,62 @@ function cloneTaskPayload(source: any, overrides: Record<string, any> = {}): any
     sequence: 0,
     travel_time: 0,
     manually_moved: false,
-    manual_start_time: source.manual_start_time ?? null,
+    manual_start_time: null,
     ...overrides,
   };
 }
 
+function keptManualReasons(existing: any): string[] {
+  const reasons = Array.isArray(existing?.reasons) ? existing.reasons : [];
+  const keep = new Set<string>([
+    WASS_CLEANING_TIME_MANUAL_REASON,
+    WASS_CLEANING_SPLIT_MANUAL_REASON,
+    WASS_CHECKIN_CHECKOUT_MANUAL_REASON,
+    WASS_CHECKOUT_MANUAL_REASON,
+    WASS_CHECKIN_MANUAL_REASON,
+  ]);
+  const next: string[] = [];
+  for (const entry of reasons) {
+    const reason = String(entry ?? "").trim();
+    if (!reason || !keep.has(reason) || next.includes(reason)) continue;
+    next.push(reason);
+  }
+  return next;
+}
+
 function buildTaskFromAdam(row: AdamAssignmentRow, existing?: any): any {
   const keepWassDuration = hasManualCleaningTime(existing);
-  const source = existing
-    ? {
-        ...existing,
-        ...row,
-        cleaning_time: keepWassDuration
-          ? (existing.cleaning_time ?? existing.base_cleaning_time ?? row.cleaning_time)
-          : (row.cleaning_time || existing.cleaning_time),
-        base_cleaning_time: keepWassDuration
-          ? (existing.base_cleaning_time ?? existing.cleaning_time)
-          : existing.base_cleaning_time,
-        customer_note: existing.customer_note,
-        customer_note_history: existing.customer_note_history,
-        reasons: existing.reasons,
-        preAssignedMode: existing.preAssignedMode,
-        priority: existing.priority || "low_priority",
-      }
-    : row;
+  const keepWassCheckin = hasManualCheckin(existing);
+  const keepWassCheckout = hasManualCheckout(existing);
+  const source = {
+    ...row,
+    cleaning_time: keepWassDuration
+      ? (existing?.cleaning_time ?? existing?.base_cleaning_time ?? row.cleaning_time)
+      : row.cleaning_time,
+    base_cleaning_time: keepWassDuration
+      ? (existing?.base_cleaning_time ?? existing?.cleaning_time ?? row.cleaning_time)
+      : row.cleaning_time,
+    checkin_date: keepWassCheckin
+      ? (existing?.checkin_date ?? row.checkin_date)
+      : row.checkin_date,
+    checkin_time: keepWassCheckin
+      ? (existing?.checkin_time ?? row.checkin_time)
+      : row.checkin_time,
+    checkout_date: keepWassCheckout
+      ? (existing?.checkout_date ?? row.checkout_date)
+      : row.checkout_date,
+    checkout_time: keepWassCheckout
+      ? (existing?.checkout_time ?? row.checkout_time)
+      : row.checkout_time,
+    customer_note_history: existing?.customer_note_history ?? null,
+    reasons: keptManualReasons(existing),
+    priority: existing?.priority || "low_priority",
+  };
   const payload = cloneTaskPayload(source);
-  if (hasManualSchedule(existing)) {
-    payload.start_time = existing?.start_time ?? existing?.startTime ?? null;
-    payload.end_time = existing?.end_time ?? existing?.endTime ?? null;
-    payload.reasons = withManualScheduleReason(payload.reasons);
-  }
+  payload.manual_start_time = null;
+  payload.start_time = null;
+  payload.end_time = null;
+  payload.reasons = withoutManualScheduleReason(payload.reasons);
   return applyPreassignedMode(payload, row.enableWassReadonly ? "readonly" : "normal");
 }
 
@@ -461,7 +500,22 @@ const ADAM_APARTMENT_FIELDS = [
   "alias",
   "customer_name",
   "customer_reference",
+  "customer_note",
 ] as const;
+
+function releasePinnedSchedule(task: any): boolean {
+  const hadSchedule = hasManualSchedule(task);
+  const hadManualStart =
+    task?.manual_start_time != null && String(task.manual_start_time).trim() !== "";
+  if (!hadSchedule && !hadManualStart) return false;
+  if (hadSchedule) {
+    task.reasons = withoutManualScheduleReason(task.reasons);
+    task.start_time = null;
+    task.end_time = null;
+  }
+  if (hadManualStart) task.manual_start_time = null;
+  return true;
+}
 
 function applyAdamApartmentFields(task: any, row: AdamAssignmentRow): boolean {
   const fresh = buildTaskFromAdam(row, task);
@@ -484,6 +538,7 @@ function applyAdamApartmentFields(task: any, row: AdamAssignmentRow): boolean {
       changed = true;
     }
   }
+  if (releasePinnedSchedule(task)) changed = true;
   return changed;
 }
 
@@ -563,10 +618,95 @@ export async function pruneEmptyTimelineCleaners(
   return removed;
 }
 
+async function reclassifyTaskPriorities(entries: any[]): Promise<void> {
+  try {
+    const { pgSettingsService } = await import("./pg-settings-service");
+    const settings = parsePrioritySettings(
+      (await pgSettingsService.getSettings("app_settings")) ?? {}
+    );
+    for (const entry of entries) {
+      for (const task of entry?.tasks || []) {
+        task.priority = priorityToContainerFormat(
+          classifyTaskPriority(task, settings)
+        );
+      }
+    }
+  } catch (error: any) {
+    console.warn(
+      `⚠️ Reclassify priorità dopo sync ADAM: ${error?.message || error}`
+    );
+  }
+}
+
+function snapshotTaskTimes(entries: any[]): Map<number, any> {
+  const previous = new Map<number, any>();
+  for (const entry of entries || []) {
+    for (const task of entry?.tasks || []) {
+      const taskId = Number(task?.task_id);
+      if (!Number.isFinite(taskId) || previous.has(taskId)) continue;
+      previous.set(taskId, {
+        start_time: task?.start_time ?? null,
+        end_time: task?.end_time ?? null,
+        travel_time: task?.travel_time ?? 0,
+      });
+    }
+  }
+  return previous;
+}
+
+function restoreTaskTimes(entry: any, previous: Map<number, any>): void {
+  for (const task of entry?.tasks || []) {
+    const prev = previous.get(Number(task?.task_id));
+    if (!prev) continue;
+    task.start_time = prev.start_time;
+    task.end_time = prev.end_time;
+    task.travel_time = prev.travel_time;
+    task.sequence = Number(task.sequence) || 0;
+  }
+}
+
 /**
- * Rilegge su ADAM ogni task già in timeline e riscrive le specifiche appartamento
- * (check-in/out, pax, indirizzo, operazione, cliente, …).
- * Cleaner, sequenza e orari restano quelli WASS: li allinea solo lo specchio assegnazioni.
+ * Priorità dalla finestra ADAM (o dal check-in/out tenuto a mano), poi
+ * travel_time, start e end sulla rotta corrente di ogni cleaner.
+ */
+async function recalculateTimelineFromAdam(
+  timelineData: any,
+  workDate: string,
+  scope: "housekeeping" | "office",
+  previousTimes: Map<number, any>
+): Promise<number> {
+  const assignments = Array.isArray(timelineData?.cleaners_assignments)
+    ? timelineData.cleaners_assignments
+    : [];
+  await reclassifyTaskPriorities(assignments);
+  let recalculatedCleaners = 0;
+  for (let i = 0; i < assignments.length; i++) {
+    let entry = assignments[i];
+    if (!entry?.tasks?.length) continue;
+    try {
+      entry = await recalculateCleanerTimes(entry, workDate, scope);
+      assignments[i] = entry;
+      recalculatedCleaners += 1;
+    } catch (error: any) {
+      console.warn(
+        `⚠️ Recalc dopo sync ADAM fallito per cleaner ${entry?.cleaner?.id}: ${error?.message || error}`
+      );
+      restoreTaskTimes(entry, previousTimes);
+      entry.tasks.forEach((task: any, index: number) => {
+        task.sequence = index + 1;
+        task.followup = index > 0;
+      });
+      assignments[i] = entry;
+    }
+  }
+  timelineData.cleaners_assignments = assignments;
+  return recalculatedCleaners;
+}
+
+/**
+ * Rilegge su ADAM ogni task già in timeline e riscrive le specifiche appartamento.
+ * Cleaning time e check-in/out messi a mano restano. Travel e orari vengono ricalcolati.
+ * Cleaner e sequenza li allinea lo specchio assegnazioni.
  */
 export async function refreshTimelineApartmentFieldsFromAdam(
   workDate: string,
@@ -586,6 +726,7 @@ export async function refreshTimelineApartmentFieldsFromAdam(
       timelineTaskIds
     );
     const adamById = new Map(adamRows.map((row) => [row.task_id, row]));
+    const previousTimes = snapshotTaskTimes(timelineData.cleaners_assignments);
 
     let updated = 0;
     for (const entry of timelineData.cleaners_assignments) {
@@ -598,6 +739,12 @@ export async function refreshTimelineApartmentFieldsFromAdam(
     }
 
     if (updated > 0) {
+      await recalculateTimelineFromAdam(
+        timelineData,
+        workDate,
+        scope,
+        previousTimes
+      );
       await workspaceFiles.saveTimeline(
         workDate,
         timelineData,
@@ -634,9 +781,11 @@ export async function refreshTimelineApartmentFieldsFromAdam(
  *   (i containers coprono solo le operazioni enable_wass, vedi create_containers.py).
  *
  * I task già in timeline vengono riletti su ADAM per id, anche se la query
- * del giorno li esclude (coordinate mancanti sulla struttura attiva, ecc.):
- * le specifiche appartamento vengono riscritte. Se il task non è più su ADAM,
- * la riga WASS resta com'è.
+ * del giorno li esclude (coordinate mancanti sulla struttura attiva, ecc.).
+ * Da ADAM arrivano cleaner, sequenza, collaborazioni e tutte le specifiche.
+ * Restano solo il cleaning time e il check-in/out segnati a mano su WASS.
+ * Lo start fissato col drag viene sciolto: travel, inizio e fine si ricalcolano.
+ * Se il task non è più su ADAM, la riga WASS resta com'è.
  * ADAM wins: locked WASS tasks that would move are unlocked automatically.
  */
 export async function syncTimelineAssignmentsFromAdam(
@@ -672,23 +821,12 @@ export async function syncTimelineAssignmentsFromAdam(
     );
     const initiallySelected = new Set(selectedById.keys());
 
-    // Tipologia non gestita da WASS: passa solo se il cleaner ADAM che la possiede è
-    // già convocato. Senza cleaner in ADAM la riga resta nel perimetro perché la task
-    // va comunque rimossa dalla timeline.
+    // Ogni riga ADAM entra nello specchio, anche se la tipologia non è gestita da WASS
+    // e il cleaner non è ancora convocato: accendere la giornata deve riportare il task
+    // sul cleaner di ADAM, non lasciarlo dove è stato spostato in WASS.
     const skippedReadonlyTaskIds: number[] = [];
-    const adamRows = allAdamRows.filter((row) => {
-      if (!row.enableWassReadonly) return true;
-      if (!row.primaryCleanerId) return true;
-      if (initiallySelected.has(row.primaryCleanerId)) return true;
-      skippedReadonlyTaskIds.push(row.task_id);
-      return false;
-    });
+    const adamRows = allAdamRows;
     const adamById = new Map(adamRows.map((row) => [row.task_id, row]));
-    if (skippedReadonlyTaskIds.length > 0) {
-      console.log(
-        `ℹ️ Sync ADAM ${workDate}: ${skippedReadonlyTaskIds.length} task con tipologia non gestita da WASS ignorate (cleaner non convocato)`
-      );
-    }
 
     const locksMap = await pgDailyAssignmentsService.getLocksMap(workDate);
 
@@ -796,13 +934,11 @@ export async function syncTimelineAssignmentsFromAdam(
 
     // Auto-convocazione solo dai pre-assegnati non readonly.
     const neededCleanerIds = normalizeIdSet(
-      adamRows
-        .filter((row) => !row.enableWassReadonly)
-        .flatMap((row) =>
-          row.primaryCleanerId
-            ? [row.primaryCleanerId, ...row.secondaryCleanerIds]
-            : []
-        )
+      adamRows.flatMap((row) =>
+        row.primaryCleanerId
+          ? [row.primaryCleanerId, ...row.secondaryCleanerIds]
+          : []
+      )
     );
     const missingCleanerIds = neededCleanerIds.filter((id) => !selectedById.has(id));
     if (missingCleanerIds.length > 0) {
@@ -1012,7 +1148,10 @@ export async function syncTimelineAssignmentsFromAdam(
       // duration_minutes from ADAM again. Collab split still uses the frozen base.
       const keepWassDuration = hasManualCleaningTime(existingTask);
       // Quote sbilanciate a mano: ogni cleaner tiene la sua, niente divisione equa.
-      const keepWassSplit = hasManualCleaningSplit(existingTask);
+      // Se ADAM cambia i collaboratori, il totale resta e le quote si ridividono.
+      const keepWassSplit =
+        hasManualCleaningSplit(existingTask) &&
+        sameIdSet(current?.cleanerIds || [], collaboratorIds);
       const adamBase = Number(row.cleaning_time ?? 0) || 0;
       const storedBase = Number(existingTask?.base_cleaning_time ?? 0) || 0;
       const storedCleaning = Number(existingTask?.cleaning_time ?? 0) || 0;
@@ -1046,12 +1185,9 @@ export async function syncTimelineAssignmentsFromAdam(
           is_primary: isPrimary,
           collaborator_ids: collaboratorIds,
           collaborator_count: collabCount,
-          ...(hasManualSchedule(taskPayload)
-            ? {
-                start_time: taskPayload.start_time ?? null,
-                end_time: taskPayload.end_time ?? null,
-              }
-            : {}),
+          manual_start_time: null,
+          start_time: null,
+          end_time: null,
           ...(keepWassDuration || keepWassSplit
             ? {
                 reasons: keepWassSplit
@@ -1131,27 +1267,22 @@ export async function syncTimelineAssignmentsFromAdam(
     };
     timelineData.meta.total_tasks = timelineData.meta.assigned_tasks;
 
-    // Recalculate times for cleaners with tasks
-    let recalculatedCleaners = 0;
-    for (let i = 0; i < timelineData.cleaners_assignments.length; i++) {
-      let entry = timelineData.cleaners_assignments[i];
-      if (!entry?.tasks?.length) continue;
-      try {
-        entry = await hydrateTasksFromContainers(entry, workDate);
-        entry = await recalculateCleanerTimes(entry, workDate, scope);
-        timelineData.cleaners_assignments[i] = entry;
-        recalculatedCleaners += 1;
-      } catch (error: any) {
-        console.warn(
-          `⚠️ Recalc dopo sync ADAM fallito per cleaner ${entry?.cleaner?.id}: ${error?.message || error}`
-        );
-        entry.tasks.forEach((task: any, index: number) => {
-          task.sequence = index + 1;
-          task.followup = index > 0;
-        });
-        timelineData.cleaners_assignments[i] = entry;
-      }
+    const previousTimes = new Map<number, any>();
+    for (const current of currentByTask.values()) {
+      const taskId = Number(current?.task?.task_id);
+      if (!Number.isFinite(taskId)) continue;
+      previousTimes.set(taskId, {
+        start_time: current.task?.start_time ?? null,
+        end_time: current.task?.end_time ?? null,
+        travel_time: current.task?.travel_time ?? 0,
+      });
     }
+    const recalculatedCleaners = await recalculateTimelineFromAdam(
+      timelineData,
+      workDate,
+      scope,
+      previousTimes
+    );
 
     await workspaceFiles.saveTimeline(
       workDate,

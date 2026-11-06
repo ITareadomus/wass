@@ -65,8 +65,25 @@ def _collaborator_count_in_timeline(task, counts_per_task_id):
     return max(count, meta, len(ids), 1)
 
 
+MANUAL_CLEANING_REASON = "wass_cleaning_time_manual"
+MANUAL_WINDOW_REASON = "wass_checkin_checkout_manual"
+MANUAL_CHECKOUT_REASON = "wass_checkout_manual"
+MANUAL_CHECKIN_REASON = "wass_checkin_manual"
+CHECKOUT_FIELDS = {"checkout_date", "checkout_time"}
+CHECKIN_FIELDS = {"checkin_date", "checkin_time"}
+
+
+def _has_reason(task, marker):
+    reasons = task.get("reasons") or []
+    if not isinstance(reasons, list):
+        return False
+    return any(str(entry or "").strip() == marker for entry in reasons)
+
+
 def _apply_adam_cleaning_time(task, fresh_data, counts_per_task_id):
     """ADAM duration is the apartment total (base). Split it when the task is collaborative."""
+    if _has_reason(task, MANUAL_CLEANING_REASON):
+        return
     adam_duration = _int_or_none(fresh_data.get("cleaning_time"))
     if adam_duration is None:
         return
@@ -538,6 +555,11 @@ def main():
     parser = argparse.ArgumentParser(description='Crea containers.json per una data specifica.')
     parser.add_argument('--date', type=str, help='Data nel formato YYYY-MM-DD (es. 2025-11-17)')
     parser.add_argument('--skip-extract', action='store_true', help='Salta estrazione cleaners (usa quelli già presenti)')
+    parser.add_argument(
+        '--skip-timeline-update',
+        action='store_true',
+        help='Non riscrivere la timeline: cleaner e specifiche li allinea lo specchio assegnazioni',
+    )
     parser.add_argument('--use-api', action='store_true', help='Usa API per salvare i dati (OBBLIGATORIO)')
     parser.add_argument(
         '--workflow',
@@ -603,7 +625,12 @@ def main():
     )  # Non filtrare
 
     # CRITICAL: Preserva timeline aggiornando SOLO i dati modificati dal DB
-    if workflow != "logistics" and timeline_data and assigned_task_ids:
+    if (
+        not args.skip_timeline_update
+        and workflow != "logistics"
+        and timeline_data
+        and assigned_task_ids
+    ):
         db_tasks_map = {}
         for task in all_tasks_from_db:
             tid = task.get("task_id")
@@ -637,7 +664,14 @@ def main():
                         "type_apt", "alias", "customer_name", "customer_reference"
                     ]
 
+                    keep_both = _has_reason(task, MANUAL_WINDOW_REASON)
+                    keep_checkout = keep_both or _has_reason(task, MANUAL_CHECKOUT_REASON)
+                    keep_checkin = keep_both or _has_reason(task, MANUAL_CHECKIN_REASON)
                     for field in fields_to_update:
+                        if keep_checkout and field in CHECKOUT_FIELDS:
+                            continue
+                        if keep_checkin and field in CHECKIN_FIELDS:
+                            continue
                         if field in fresh_data:
                             task[field] = fresh_data[field]
 

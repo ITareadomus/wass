@@ -1,6 +1,18 @@
 /** Marker WASS: start/end impostati a mano. ADAM non li sovrascrive e non li riceve. */
 export const WASS_MANUAL_SCHEDULE_REASON = "wass_manual_schedule";
 
+/**
+ * Check-in e check-out modificati a mano su WASS.
+ * Lo specchio ADAM non li sostituisce. Il resto dei campi sì.
+ * Il marker unico copre entrambi; quelli separati accendono solo il campo toccato.
+ */
+export const WASS_CHECKIN_CHECKOUT_MANUAL_REASON = "wass_checkin_checkout_manual";
+export const WASS_CHECKOUT_MANUAL_REASON = "wass_checkout_manual";
+export const WASS_CHECKIN_MANUAL_REASON = "wass_checkin_manual";
+export const WASS_PAX_MANUAL_REASON = "wass_pax_manual";
+export const WASS_OPERATION_MANUAL_REASON = "wass_operation_manual";
+export const WASS_CUSTOMER_NOTE_MANUAL_REASON = "wass_customer_note_manual";
+
 function reasonsOf(value: unknown): unknown {
   if (Array.isArray(value)) return value;
   if (value && typeof value === "object") return (value as { reasons?: unknown }).reasons;
@@ -30,6 +42,60 @@ function withReason(reasons: unknown, marker: string): string[] {
 
 export function hasManualSchedule(taskOrReasons: unknown): boolean {
   return hasReason(taskOrReasons, WASS_MANUAL_SCHEDULE_REASON);
+}
+
+export function hasManualCheckinCheckout(taskOrReasons: unknown): boolean {
+  return hasReason(taskOrReasons, WASS_CHECKIN_CHECKOUT_MANUAL_REASON);
+}
+
+export function hasManualCheckout(taskOrReasons: unknown): boolean {
+  return (
+    hasManualCheckinCheckout(taskOrReasons) ||
+    hasReason(taskOrReasons, WASS_CHECKOUT_MANUAL_REASON)
+  );
+}
+
+export function hasManualCheckin(taskOrReasons: unknown): boolean {
+  return (
+    hasManualCheckinCheckout(taskOrReasons) ||
+    hasReason(taskOrReasons, WASS_CHECKIN_MANUAL_REASON)
+  );
+}
+
+export function withManualCheckinCheckoutReason(reasons: unknown): string[] {
+  return withReason(reasons, WASS_CHECKIN_CHECKOUT_MANUAL_REASON);
+}
+
+export function withManualCheckoutReason(reasons: unknown): string[] {
+  return withReason(reasons, WASS_CHECKOUT_MANUAL_REASON);
+}
+
+export function withManualCheckinReason(reasons: unknown): string[] {
+  return withReason(reasons, WASS_CHECKIN_MANUAL_REASON);
+}
+
+export function hasManualPax(taskOrReasons: unknown): boolean {
+  return hasReason(taskOrReasons, WASS_PAX_MANUAL_REASON);
+}
+
+export function withManualPaxReason(reasons: unknown): string[] {
+  return withReason(reasons, WASS_PAX_MANUAL_REASON);
+}
+
+export function hasManualOperation(taskOrReasons: unknown): boolean {
+  return hasReason(taskOrReasons, WASS_OPERATION_MANUAL_REASON);
+}
+
+export function withManualOperationReason(reasons: unknown): string[] {
+  return withReason(reasons, WASS_OPERATION_MANUAL_REASON);
+}
+
+export function hasManualCustomerNote(taskOrReasons: unknown): boolean {
+  return hasReason(taskOrReasons, WASS_CUSTOMER_NOTE_MANUAL_REASON);
+}
+
+export function withManualCustomerNoteReason(reasons: unknown): string[] {
+  return withReason(reasons, WASS_CUSTOMER_NOTE_MANUAL_REASON);
 }
 
 export function withManualScheduleReason(reasons: unknown): string[] {

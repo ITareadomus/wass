@@ -26,11 +26,17 @@ import {
   type HousekeepingTaskExecutionStatus,
 } from "@shared/housekeeping-task-execution-status";
 import {
+  hasManualCleaningSplit,
   hasManualCleaningTime,
   splitCleaningTimeAcrossCollaborators,
 } from "@shared/wass-cleaning-time";
 import {
   formatScheduleDurationLabel,
+  hasManualCheckin,
+  hasManualCheckout,
+  hasManualCustomerNote,
+  hasManualOperation,
+  hasManualPax,
   hasManualSchedule,
   manualScheduleSpanMinutes,
   normalizeScheduleClock,
@@ -630,6 +636,17 @@ export default function TaskCard({
 
 const displayClickableInputClass =
   "h-9 border-transparent bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus:border-transparent px-0";
+
+const manualValueClass =
+  "bg-yellow-100 px-1.5 hover:bg-yellow-100 dark:bg-yellow-300/25 dark:hover:bg-yellow-300/25";
+
+const valueFieldClass = (editable: boolean, manual: boolean) =>
+  cn(
+    editable
+      ? cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
+      : displayInputClass,
+    manual && manualValueClass
+  );
 
   const isOfficeScope = (() => {
     if (operationsScope === "office") return true;
@@ -3346,11 +3363,7 @@ const displayClickableInputClass =
                 <Input
                   readOnly
                   value={`${formatCleaningHours(getDisplayedCleaningMinutes(displayTask))} ore`}
-                  className={
-                    canEditDuration
-                      ? cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
-                      : displayInputClass
-                  }
+                  className={valueFieldClass(canEditDuration, hasManualCleaningTime(displayTask))}
                   tabIndex={canEditDuration ? 0 : -1}
                   onFocus={(e) => {
                     if (!canEditDuration) e.currentTarget.blur();
@@ -3395,11 +3408,10 @@ const displayClickableInputClass =
                         }`
                       : "non migrato"
                   }
-                  className={
-                    isHousekeepingFieldsReadOnly
-                      ? displayInputClass
-                      : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
-                  }
+                  className={valueFieldClass(
+                    !isHousekeepingFieldsReadOnly,
+                    hasManualCheckout(displayTask)
+                  )}
                   tabIndex={isHousekeepingFieldsReadOnly ? -1 : 0}
                   onFocus={(e) => {
                     if (isHousekeepingFieldsReadOnly) e.currentTarget.blur();
@@ -3434,11 +3446,10 @@ const displayClickableInputClass =
                         }`
                       : "non migrato"
                   }
-                  className={
-                    isHousekeepingFieldsReadOnly
-                      ? displayInputClass
-                      : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
-                  }
+                  className={valueFieldClass(
+                    !isHousekeepingFieldsReadOnly,
+                    hasManualCheckin(displayTask)
+                  )}
                   tabIndex={isHousekeepingFieldsReadOnly ? -1 : 0}
                   onFocus={(e) => {
                     if (isHousekeepingFieldsReadOnly) e.currentTarget.blur();
@@ -3473,11 +3484,10 @@ const displayClickableInputClass =
                     if ((displayTask as any).operation_id) return getInterventionLabel(displayTask);
                     return "-";
                   })()}
-                  className={
-                    isHousekeepingFieldsReadOnly
-                      ? displayInputClass
-                      : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
-                  }
+                  className={valueFieldClass(
+                    !isHousekeepingFieldsReadOnly,
+                    hasManualOperation(displayTask)
+                  )}
                   tabIndex={isHousekeepingFieldsReadOnly ? -1 : 0}
                   onFocus={(e) => {
                     if (isHousekeepingFieldsReadOnly) e.currentTarget.blur();
@@ -3525,11 +3535,10 @@ const displayClickableInputClass =
                 <Input
                   readOnly
                   value={String((displayTask as any).pax_in ?? "non migrato")}
-                  className={
-                    isHousekeepingFieldsReadOnly
-                      ? displayInputClass
-                      : cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
-                  }
+                  className={valueFieldClass(
+                    !isHousekeepingFieldsReadOnly,
+                    hasManualPax(displayTask)
+                  )}
                   tabIndex={isHousekeepingFieldsReadOnly ? -1 : 0}
                   onFocus={(e) => {
                     if (isHousekeepingFieldsReadOnly) e.currentTarget.blur();
@@ -3572,11 +3581,11 @@ const displayClickableInputClass =
                   <Input
                     readOnly
                     value={housekeepingStartDisplayValue}
-                    className={
-                      canEditSchedule
-                        ? cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
-                        : displayInputClass
-                    }
+                    className={valueFieldClass(
+                      canEditSchedule,
+                      hasManualSchedule(displayTask) ||
+                        String((displayTask as any).manual_start_time ?? "").trim() !== ""
+                    )}
                     tabIndex={canEditSchedule ? 0 : -1}
                     onFocus={(e) => {
                       if (!canEditSchedule) e.currentTarget.blur();
@@ -3599,11 +3608,7 @@ const displayClickableInputClass =
                   <Input
                     readOnly
                     value={housekeepingEndDisplayValue}
-                    className={
-                      canEditSchedule
-                        ? cn(displayClickableInputClass, "cursor-pointer hover:bg-muted/50")
-                        : displayInputClass
-                    }
+                    className={valueFieldClass(canEditSchedule, hasManualSchedule(displayTask))}
                     tabIndex={canEditSchedule ? 0 : -1}
                     onFocus={(e) => {
                       if (!canEditSchedule) e.currentTarget.blur();
@@ -3695,11 +3700,13 @@ const displayClickableInputClass =
             {canEditCustomerNote && <Pencil className="w-3 h-3 text-muted-foreground/60" />}
           </p>
           <div
-            className={
-              !canEditCustomerNote
-                ? "min-h-9 w-full rounded-md border-transparent bg-transparent px-0 py-1 text-sm text-foreground shadow-none select-none whitespace-pre-wrap break-words"
-                : "min-h-9 w-full rounded-md border-transparent bg-transparent px-0 py-1 text-sm text-foreground shadow-none whitespace-pre-wrap break-words cursor-pointer hover:bg-muted/50"
-            }
+            className={cn(
+              "min-h-9 w-full rounded-md border-transparent px-0 py-1 text-sm text-foreground shadow-none whitespace-pre-wrap break-words",
+              canEditCustomerNote
+                ? "cursor-pointer hover:bg-muted/50"
+                : "select-none",
+              hasManualCustomerNote(displayTask) && manualValueClass
+            )}
             tabIndex={canEditCustomerNote ? 0 : -1}
             onFocus={(e) => {
               if (!canEditCustomerNote) e.currentTarget.blur();
@@ -4569,10 +4576,11 @@ const displayClickableInputClass =
                         disabled={isHousekeepingFieldsReadOnly}
                         onClick={() => handleOpenShareDialog(collab)}
                         className={cn(
-                          "flex items-center gap-1 font-semibold",
+                          "flex items-center gap-1 rounded px-1 font-semibold",
                           isHousekeepingFieldsReadOnly
                             ? "cursor-default"
-                            : "cursor-pointer hover:underline"
+                            : "cursor-pointer hover:underline",
+                          hasManualCleaningSplit(displayTask) && manualValueClass
                         )}
                       >
                         {formatCleaningHours(collab.cleaningTime)} ore
