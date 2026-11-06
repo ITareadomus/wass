@@ -38,7 +38,10 @@ export interface RefreshContainersResult {
   assignedChanges?: LogisticsAssignedSyncNotice;
 }
 
-const inflightAdamRefresh = new Map<string, Promise<RefreshContainersResult>>();
+const inflightAdamRefresh = new Map<
+  string,
+  { promise: Promise<RefreshContainersResult>; mode: RefreshSyncMode }
+>();
 const inflightLogisticsRefresh = new Map<string, Promise<RefreshContainersResult>>();
 
 const CREATE_CONTAINERS_TIMEOUT_MS = 120000;
@@ -530,10 +533,48 @@ export async function refreshContainersFromAdam(
   } = {}
 ): Promise<RefreshContainersResult> {
   const lockKey = `${workflow}:${workDate}`;
+  const requestedMode: RefreshSyncMode =
+    options.mode === "assignments" ? "assignments" : "apt";
   const existing = inflightAdamRefresh.get(lockKey);
   if (existing) {
-    console.log(`⏳ refreshContainersFromAdam: attendo refresh già in corso (${lockKey})`);
-    return existing;
+    if (requestedMode !== "assignments" || existing.mode === "assignments") {
+      console.log(`⏳ refreshContainersFromAdam: attendo refresh già in corso (${lockKey})`);
+      return existing.promise;
+    }
+    console.log(
+      `⏳ refreshContainersFromAdam: refresh apt in corso, accodo lo specchio assegnazioni (${lockKey})`
+    );
+    const chained = existing.promise.then(async (prior) => {
+      const assignmentSync = await syncTimelineAssignmentsFromAdam(
+        workDate,
+        modifiedBy,
+        workflow
+      );
+      if (!assignmentSync.success) {
+        return {
+          ...prior,
+          success: false,
+          mode: "assignments" as const,
+          assignmentSync,
+          error: assignmentSync.error || "Errore sync assegnazioni da ADAM",
+        };
+      }
+      const containersData = await workspaceFiles.loadContainers(workDate, workflow);
+      return {
+        success: true,
+        containersData,
+        removedCount: prior.removedCount ?? 0,
+        mode: "assignments" as const,
+        assignmentSync,
+      };
+    });
+    const tracked = chained.finally(() => {
+      if (inflightAdamRefresh.get(lockKey)?.promise === tracked) {
+        inflightAdamRefresh.delete(lockKey);
+      }
+    });
+    inflightAdamRefresh.set(lockKey, { promise: tracked, mode: "assignments" });
+    return tracked;
   }
 
   const pending = runRefreshContainersFromAdam(
@@ -542,11 +583,11 @@ export async function refreshContainersFromAdam(
     workflow,
     options
   ).finally(() => {
-    if (inflightAdamRefresh.get(lockKey) === pending) {
+    if (inflightAdamRefresh.get(lockKey)?.promise === pending) {
       inflightAdamRefresh.delete(lockKey);
     }
   });
-  inflightAdamRefresh.set(lockKey, pending);
+  inflightAdamRefresh.set(lockKey, { promise: pending, mode: requestedMode });
   return pending;
 }
 
@@ -563,10 +604,11 @@ async function runRefreshContainersFromAdam(
   const mode: RefreshSyncMode = options.mode === 'assignments' ? 'assignments' : 'apt';
   console.log(`🔄 refreshContainersFromAdam: ${workDate} mode=${mode}`);
 
-  try {
-    let containersData: any = null;
-    let removedCount = 0;
+  let containersData: any = null;
+  let removedCount = 0;
+  let containersError: string | null = null;
 
+  try {
     if (!options.skipContainersRefresh) {
       const previousContainers = await workspaceFiles.loadContainers(workDate, workflow);
       const previousTimeline = await workspaceFiles.loadTimeline(workDate, workflow);
@@ -684,7 +726,24 @@ async function runRefreshContainersFromAdam(
     } else {
       containersData = await workspaceFiles.loadContainers(workDate, workflow);
     }
+  } catch (error: any) {
+    containersError = error?.message || String(error);
+    console.error('❌ Errore nella rigenerazione containers:', error);
+    if (mode !== 'assignments') {
+      return {
+        success: false,
+        containersData: null,
+        removedCount: 0,
+        mode,
+        error: containersError,
+      };
+    }
+    console.error(
+      '⚠️ Continuo con lo specchio delle assegnazioni ADAM anche se i containers non sono stati rigenerati'
+    );
+  }
 
+  try {
     if (mode === 'assignments') {
       const assignmentSync = await syncTimelineAssignmentsFromAdam(
         workDate,
@@ -715,6 +774,16 @@ async function runRefreshContainersFromAdam(
       };
     }
 
+    if (containersError) {
+      return {
+        success: false,
+        containersData,
+        removedCount,
+        mode,
+        error: containersError,
+      };
+    }
+
     return {
       success: true,
       containersData,
@@ -722,13 +791,13 @@ async function runRefreshContainersFromAdam(
       mode,
     };
   } catch (error: any) {
-    console.error('❌ Errore nella rigenerazione containers:', error);
+    console.error('❌ Errore nello specchio assegnazioni ADAM:', error);
     return {
       success: false,
-      containersData: null,
-      removedCount: 0,
+      containersData,
+      removedCount,
       mode,
-      error: error.message,
+      error: error?.message || String(error),
     };
   }
 }

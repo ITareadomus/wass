@@ -744,7 +744,7 @@ export default function GenerateAssignments() {
   const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
   const isRefreshingContainersRef = useRef(false);
   const [showAdamRefreshDialog, setShowAdamRefreshDialog] = useState(false);
-  const [adamRefreshMode, setAdamRefreshMode] = useState<AdamRefreshMode>("apt");
+  const [adamRefreshMode, setAdamRefreshMode] = useState<AdamRefreshMode>("assignments");
   const [showUnlockConfirmDialog, setShowUnlockConfirmDialog] = useState(false);
   const [pendingLockedTasks, setPendingLockedTasks] = useState<LockedConflictTask[]>([]);
   const [pendingRefreshMode, setPendingRefreshMode] = useState<AdamRefreshMode>("assignments");
@@ -757,6 +757,8 @@ export default function GenerateAssignments() {
   const runAdamContainersRefreshRef = useRef<(opts?: AdamRefreshOpts) => Promise<void>>(
     async () => {}
   );
+  const adamRefreshTailRef = useRef<Promise<void>>(Promise.resolve());
+  const assignmentsFollowUpRef = useRef(false);
 
   autoAdamSyncBlockedRef.current =
     isAssigning ||
@@ -841,7 +843,11 @@ export default function GenerateAssignments() {
         setIsOperationalDayStarted(confirmed);
         if (confirmed) {
           pendingForcedAdamSyncRef.current = true;
-          tryAutoAdamSync();
+          await runAdamContainersRefreshRef.current({
+            source: "manual",
+            mode: "assignments",
+          });
+          pendingForcedAdamSyncRef.current = false;
         } else {
           pendingForcedAdamSyncRef.current = false;
         }
@@ -1941,10 +1947,23 @@ export default function GenerateAssignments() {
     }
   };
 
-  const runAdamContainersRefresh = async (opts?: AdamRefreshOpts) => {
-    if (isRefreshingContainersRef.current) return;
-    const source = opts?.source ?? "manual";
+  const runAdamContainersRefresh = (opts?: AdamRefreshOpts): Promise<void> => {
     const mode: AdamRefreshMode = opts?.mode ?? "assignments";
+    if (isRefreshingContainersRef.current) {
+      if (mode === "assignments") assignmentsFollowUpRef.current = true;
+      return adamRefreshTailRef.current;
+    }
+    const run = runAdamContainersRefreshNow(opts);
+    adamRefreshTailRef.current = run.then(
+      () => undefined,
+      () => undefined
+    );
+    return run;
+  };
+
+  const runAdamContainersRefreshNow = async (opts?: AdamRefreshOpts) => {
+    const mode: AdamRefreshMode = opts?.mode ?? "assignments";
+    const source = opts?.source ?? "manual";
     const year = selectedDate.getFullYear();
     const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
     const day = String(selectedDate.getDate()).padStart(2, "0");
@@ -1959,6 +1978,7 @@ export default function GenerateAssignments() {
       setIsRefreshingContainers(true);
     }
     let keepFrozenForUnlockDialog = false;
+    let mirroredAssignments = false;
     try {
       const response = await fetch("/api/containers/refresh", {
         method: "POST",
@@ -1976,6 +1996,8 @@ export default function GenerateAssignments() {
       if (!response.ok) {
         throw new Error(result?.error || "Errore durante il refresh");
       }
+
+      mirroredAssignments = mode === "assignments";
 
       if (result.needsUnlockConfirm) {
         keepFrozenForUnlockDialog = true;
@@ -2044,6 +2066,16 @@ export default function GenerateAssignments() {
       isRefreshingContainersRef.current = false;
       if (!keepFrozenForUnlockDialog) {
         setIsRefreshingContainers(false);
+      }
+      if (assignmentsFollowUpRef.current && !mirroredAssignments) {
+        assignmentsFollowUpRef.current = false;
+        await runAdamContainersRefresh({
+          source,
+          mode: "assignments",
+          skipContainersRefresh: true,
+        });
+      } else {
+        assignmentsFollowUpRef.current = false;
       }
     }
   };
