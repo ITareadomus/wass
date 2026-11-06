@@ -145,6 +145,56 @@ function sameIdSet(a: number[], b: number[]): boolean {
   return true;
 }
 
+/** Stessi ruoli di extract_cleaners_optimized.py: solo personale cleaner. */
+const HOUSEKEEPING_CLEANER_ROLE_IDS = [7, 13, 15, 20];
+const OFFICE_CLEANER_ROLE_IDS = [17];
+
+/**
+ * Ricontrolla su ADAM il ruolo degli utenti indicati sulle task.
+ * Restituisce solo gli id con ruolo cleaner dello scope.
+ */
+async function fetchCleanerRoleUserIds(
+  userIds: number[],
+  scope: "housekeeping" | "office"
+): Promise<Set<number>> {
+  const ids = normalizeIdSet(userIds);
+  if (ids.length === 0) return new Set();
+  const roleIds =
+    scope === "office" ? OFFICE_CLEANER_ROLE_IDS : HOUSEKEEPING_CLEANER_ROLE_IDS;
+  let connection: mysql.Connection | null = null;
+  try {
+    connection = await mysql.createConnection({
+      host: databaseConfig.mysql.host,
+      port: databaseConfig.mysql.port,
+      user: databaseConfig.mysql.user,
+      password: databaseConfig.mysql.password,
+      database: databaseConfig.mysql.database,
+    });
+    const [rows]: any = await connection.execute(
+      `
+        SELECT id
+        FROM app_users
+        WHERE id IN (${ids.map(() => "?").join(",")})
+          AND user_role_id IN (${roleIds.map(() => "?").join(",")})
+      `,
+      [...ids, ...roleIds]
+    );
+    return new Set(
+      (Array.isArray(rows) ? rows : [])
+        .map((row: any) => Number(row?.id))
+        .filter((id: number) => Number.isFinite(id) && id > 0)
+    );
+  } finally {
+    if (connection) {
+      try {
+        await connection.end();
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+
 /**
  * Stato ADAM della giornata sulle operazioni di interesse WASS, incluse le task
  * senza cleaner: la sync è uno specchio, quindi anche l'assenza di assegnazione
@@ -826,6 +876,26 @@ export async function syncTimelineAssignmentsFromAdam(
     // sul cleaner di ADAM, non lasciarlo dove è stato spostato in WASS.
     const skippedReadonlyTaskIds: number[] = [];
     const adamRows = allAdamRows;
+    const referencedUserIds = adamRows.flatMap((row) => [
+      ...(row.primaryCleanerId ? [row.primaryCleanerId] : []),
+      ...row.secondaryCleanerIds,
+    ]);
+    const cleanerRoleUserIds = await fetchCleanerRoleUserIds(referencedUserIds, scope);
+    let skippedNonCleanerTasks = 0;
+    for (const row of adamRows) {
+      row.secondaryCleanerIds = row.secondaryCleanerIds.filter((id) =>
+        cleanerRoleUserIds.has(id)
+      );
+      if (row.primaryCleanerId && !cleanerRoleUserIds.has(row.primaryCleanerId)) {
+        row.primaryCleanerId = null;
+        skippedNonCleanerTasks += 1;
+      }
+    }
+    if (skippedNonCleanerTasks > 0) {
+      console.log(
+        `⏭️ Sync ADAM ${workDate}: ${skippedNonCleanerTasks} task non prese, assegnate in ADAM a personale senza ruolo cleaner`
+      );
+    }
     const adamById = new Map(adamRows.map((row) => [row.task_id, row]));
 
     const locksMap = await pgDailyAssignmentsService.getLocksMap(workDate);
@@ -932,12 +1002,12 @@ export async function syncTimelineAssignmentsFromAdam(
       }
     }
 
-    // Auto-convocazione solo dai pre-assegnati non readonly.
+    // Auto-convocazione solo del personale con ruolo cleaner.
     const neededCleanerIds = normalizeIdSet(
       adamRows.flatMap((row) =>
-        row.primaryCleanerId
+        row.primaryCleanerId && cleanerRoleUserIds.has(row.primaryCleanerId)
           ? [row.primaryCleanerId, ...row.secondaryCleanerIds]
-          : []
+          : row.secondaryCleanerIds.filter((id) => cleanerRoleUserIds.has(id))
       )
     );
     const missingCleanerIds = neededCleanerIds.filter((id) => !selectedById.has(id));
