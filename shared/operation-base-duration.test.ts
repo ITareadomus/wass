@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   attachScheduleBlockMinutes,
+  countedCleaningMinutes,
   fictionalScheduleMinutes,
   parseOperationBaseMinutes,
   usesFictionalOperationDuration,
@@ -37,5 +38,19 @@ describe("operation base duration", () => {
     expect(cleaner.tasks[0].schedule_block_minutes).toBe(90);
     expect(cleaner.tasks[0].cleaning_time).toBe(0);
     expect(cleaner.tasks[1].schedule_block_minutes).toBeUndefined();
+  });
+
+  it("counts the drawn block when ADAM sent 0 hours", () => {
+    expect(countedCleaningMinutes({ cleaning_time: 45 })).toBe(45);
+    expect(
+      countedCleaningMinutes({
+        cleaning_time: 0,
+        duration: "0.0",
+        start_time: "11:00",
+        end_time: "15:00",
+      }),
+    ).toBe(240);
+    expect(countedCleaningMinutes({ cleaning_time: 0, schedule_block_minutes: 90 })).toBe(90);
+    expect(countedCleaningMinutes({ cleaning_time: 0, start_time: "11:00", end_time: "11:00" })).toBe(0);
   });
 });

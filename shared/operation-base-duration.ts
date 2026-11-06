@@ -72,7 +72,6 @@ export function attachScheduleBlockMinutes<T extends { tasks?: any[] }>(
 
 /**
  * Se la durata ADAM è 0 ma start/end occupano già un blocco, la barra usa quello.
- * La durata mostrata nel dialog resta quella di ADAM.
  */
 export function timelineBarDurationLabel(task: {
   duration?: unknown;
@@ -88,4 +87,33 @@ export function timelineBarDurationLabel(task: {
   const end = scheduleClockToMinutes(task.end_time ?? task.endTime);
   if (start == null || end == null || end <= start) return null;
   return formatScheduleDurationLabel(end - start);
+}
+
+/**
+ * Minuti da mostrare nel dialog e da sommare nel conteggio ore.
+ * Con durata ADAM a 0 usa il blocco già disegnato fra start e end
+ * (la durata di base impostata per quella tipologia).
+ */
+export function countedCleaningMinutes(task: {
+  cleaning_time?: unknown;
+  cleaningTime?: unknown;
+  duration?: unknown;
+  schedule_block_minutes?: unknown;
+  start_time?: unknown;
+  startTime?: unknown;
+  end_time?: unknown;
+  endTime?: unknown;
+} | null | undefined): number {
+  const direct = Number(task?.cleaning_time ?? task?.cleaningTime);
+  if (Number.isFinite(direct) && direct > 0) return Math.round(direct);
+  const labeled = parseHousekeepingDurationLabel(
+    task?.duration as string | number | null | undefined,
+  );
+  if (labeled > 0) return labeled;
+  const block = Number(task?.schedule_block_minutes);
+  if (Number.isFinite(block) && block > 0) return Math.round(block);
+  const start = scheduleClockToMinutes(task?.start_time ?? task?.startTime);
+  const end = scheduleClockToMinutes(task?.end_time ?? task?.endTime);
+  if (start != null && end != null && end > start) return end - start;
+  return 0;
 }

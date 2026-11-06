@@ -12,7 +12,7 @@ import {
 } from "@shared/wass-manual-schedule";
 import { clockToMinutes, minutesToClock } from "@/lib/first-apartment-time-shift";
 import { reflowStartsAfterManualMove, taskBlockMinutes, taskScheduleFloor } from "@shared/housekeeping-start-shift";
-import { timelineBarDurationLabel } from "@shared/operation-base-duration";
+import { countedCleaningMinutes, timelineBarDurationLabel } from "@shared/operation-base-duration";
 import {
   applyHkPreassignedSchedule,
   parseHkPreassignedSchedules,
@@ -3557,10 +3557,10 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                         const cleanerTasks = tasks.filter(task =>
                           (task as any).assignedCleaner === cleaner.id
                         );
-                        const totalMinutes = cleanerTasks.reduce((sum, task) => {
-                          const ct = (task as any).cleaning_time || (task as any).cleaningTime || 0;
-                          return sum + (typeof ct === 'number' ? ct : parseInt(ct, 10) || 0);
-                        }, 0);
+                        const totalMinutes = cleanerTasks.reduce(
+                          (sum, task) => sum + countedCleaningMinutes(task),
+                          0,
+                        );
                         const hours = Math.floor(totalMinutes / 60);
                         const minutes = totalMinutes % 60;
                         return (

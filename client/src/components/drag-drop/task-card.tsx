@@ -37,7 +37,7 @@ import {
   scheduleClockToMinutes,
 } from "@shared/wass-manual-schedule";
 import { minutesToScheduleClock, taskScheduleFloor } from "@shared/housekeeping-start-shift";
-import { timelineBarDurationLabel } from "@shared/operation-base-duration";
+import { countedCleaningMinutes, timelineBarDurationLabel } from "@shared/operation-base-duration";
 import { SequenceSummaryViolationIndicator } from "@/components/sequence-summary-violation-indicator";
 import { StructureAccessKeyTypeField } from "@/components/structure-access-key-type";
 import {
@@ -152,13 +152,21 @@ function withMutationScope<T extends Record<string, unknown>>(
 const getTaskNavigationKey = (t: any, listIndex?: number) =>
   `${getTaskKey(t)}::${String((t as any)?.sequence ?? "")}::${String(listIndex ?? "")}`;
 
-// Minuti del singolo cleaner: in collaborazione è già la quota divisa.
-const getDisplayedCleaningMinutes = (taskObj: any): number => {
+// Minuti salvati su ADAM/WASS. Non include la durata di base usata solo per disegnare la barra.
+const getStoredCleaningMinutes = (taskObj: any): number => {
   const direct = Number(taskObj?.cleaning_time ?? taskObj?.cleaningTime);
   if (Number.isFinite(direct) && direct > 0) return Math.round(direct);
   const duration = String(taskObj?.duration || "0.0");
   const [hours, mins] = duration.split(".").map(Number);
   return (hours || 0) * 60 + (mins || 0);
+};
+
+// Minuti del singolo cleaner: in collaborazione è già la quota divisa.
+// Se ADAM ha mandato 0, mostra il blocco già disegnato in timeline.
+const getDisplayedCleaningMinutes = (taskObj: any): number => {
+  const stored = getStoredCleaningMinutes(taskObj);
+  if (stored > 0) return stored;
+  return countedCleaningMinutes(taskObj);
 };
 
 const getCollaboratorCount = (taskObj: any): number => {
@@ -170,7 +178,10 @@ const getCollaboratorCount = (taskObj: any): number => {
 const getTotalCleaningMinutes = (taskObj: any): number => {
   const base = Number(taskObj?.base_cleaning_time);
   if (Number.isFinite(base) && base > 0) return Math.round(base);
-  return getDisplayedCleaningMinutes(taskObj) * getCollaboratorCount(taskObj);
+  const stored = getStoredCleaningMinutes(taskObj);
+  const displayed = getDisplayedCleaningMinutes(taskObj);
+  if (stored <= 0) return displayed;
+  return displayed * getCollaboratorCount(taskObj);
 };
 
 const formatCleaningHours = (minutes: unknown): string => {
@@ -1252,7 +1263,7 @@ const displayClickableInputClass =
   // Resta chiuso se la giornata è bloccata o la task è già finita.
   const canEditZeroDurationOnReadonly =
     operationsScope !== "logistics" &&
-    getDisplayedCleaningMinutes(displayTask) <= 0 &&
+    getStoredCleaningMinutes(displayTask) <= 0 &&
     !isReadOnly &&
     resolvePreAssignedModeFromTask(displayTask) === "readonly" &&
     !Boolean((displayTask as any).is_finished ?? (displayTask as any).isFinished);
