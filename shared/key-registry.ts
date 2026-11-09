@@ -48,7 +48,7 @@ export type KeyRegistryApartment = {
   driverKey: boolean;
   /** Chiave Big presa per questa task. Non cambia lo stato di consegna. */
   bigKey: boolean;
-  /** Borsone pronto. Vale solo finché la chiave non è preparata. */
+  /** Borsone pronto. Resta segnato per ogni stato della chiave. */
   bagReady: boolean;
   /** Nota interna di questa chiave, visibile a chi usa il registro. */
   internalNote: string | null;
@@ -93,7 +93,7 @@ export function nextKeyHandoverStatus(status: KeyHandoverStatus): KeyHandoverSta
   return "warehouse";
 }
 
-/** Il check del borsone sta sul codice ADAM finché la chiave è in magazzino. Da preparata in poi non serve. */
+/** Il check del borsone resta sul codice ADAM per ogni stato della chiave. Scompare solo se è smarrita. */
 export function bagCheckApplies(flags: {
   physicalKey?: boolean;
   keyStatesLocked?: boolean;
@@ -102,16 +102,7 @@ export function bagCheckApplies(flags: {
   delivered?: boolean;
   returned?: boolean;
 }): boolean {
-  if (flags.lost) return false;
-  const tracksHandover = flags.physicalKey !== false && !flags.keyStatesLocked;
-  if (!tracksHandover) return true;
-  return (
-    keyHandoverStatus({
-      prepared: flags.prepared,
-      delivered: Boolean(flags.delivered),
-      returned: flags.returned,
-    }) === "warehouse"
-  );
+  return !flags.lost;
 }
 
 /** Pronti: borsone segnato. Mancano: il check è ancora da fare. */

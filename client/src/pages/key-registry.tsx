@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDays, format, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
-import { Calendar, ChevronLeft, ChevronRight, KeyRound, Loader2, RefreshCw, Search, TriangleAlert, Undo2 } from "lucide-react";
+import { Calendar, Check, ChevronLeft, ChevronRight, KeyRound, Loader2, RefreshCw, Search, TriangleAlert, Undo2 } from "lucide-react";
 import { DriverMark } from "@/components/key-driver-mark";
 import { Link } from "wouter";
 import { StructureAccessKeyButtons } from "@/components/structure-access-key-type";
@@ -193,7 +193,7 @@ function SwipeKeyRow({
     if (disabled) return;
     const interactive = (event.target as HTMLElement).closest("button, a");
     const swipeTestId = interactive?.getAttribute("data-testid");
-    if (interactive && swipeTestId !== "button-key-status" && swipeTestId !== "button-bag-check") return;
+    if (interactive && swipeTestId !== "button-key-status") return;
     tracking.current = true;
     draggingRef.current = false;
     origin.current = revealedRef.current ? revealWidth : 0;
@@ -356,43 +356,65 @@ function SwipeKeyRow({
   );
 }
 
+function BagCheckBox({
+  apartment,
+  pending,
+  viewer,
+  onToggle,
+}: {
+  apartment: Apartment;
+  pending: boolean;
+  viewer: boolean;
+  onToggle: () => void;
+}) {
+  const applies = bagCheckApplies(apartment);
+  const ready = Boolean(apartment.bagReady);
+  return (
+    <button
+      type="button"
+      data-testid="button-bag-check"
+      aria-pressed={ready}
+      aria-label={`${ready ? "Borsone pronto" : "Segna borsone pronto"}, ${apartment.logisticCode}`}
+      title={ready ? "Borsone pronto. Tocca per togliere." : "Tocca per segnare il borsone pronto"}
+      disabled={pending || viewer || !applies}
+      onClick={onToggle}
+      className={cn(
+        "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border-2 bg-white touch-manipulation disabled:opacity-40",
+        ready ? "border-emerald-700 text-emerald-700" : "border-slate-400 text-transparent"
+      )}
+    >
+      <Check className="h-7 w-7" strokeWidth={3} aria-hidden />
+    </button>
+  );
+}
+
 function AdamCodeButton({
   apartment,
   pending,
   viewer,
-  onToggleBag,
   onCycleStatus,
 }: {
   apartment: Apartment;
   pending: boolean;
   viewer: boolean;
-  onToggleBag: () => void;
   onCycleStatus: () => void;
 }) {
-  const check = bagCheckApplies(apartment);
-  const ready = check && Boolean(apartment.bagReady);
+  const handover = apartment.physicalKey !== false && !apartment.keyStatesLocked;
   const lostToday = Boolean(apartment.lost);
   const statusLabel = lostToday ? "Smarrita" : STATUS_LABEL[keyHandoverStatus(apartment)];
+  const className = "inline-flex h-14 min-w-14 shrink-0 items-center justify-center rounded-lg px-1.5 text-2xl font-semibold tabular-nums select-none";
+  if (!handover) {
+    return <span className={className}>{apartment.logisticCode}</span>;
+  }
   return (
     <button
       type="button"
-      data-testid={check ? "button-bag-check" : "button-key-status"}
-      aria-pressed={check ? ready : undefined}
-      aria-label={
-        check
-          ? `${ready ? "Borsone pronto" : "Segna borsone pronto"}, ${apartment.logisticCode}`
-          : `${statusLabel}, chiave ${apartment.logisticCode}`
-      }
-      title={check ? (ready ? "Borsone pronto. Tocca per togliere." : "Tocca per segnare il borsone pronto") : statusLabel}
-      disabled={pending || viewer || (!check && lostToday)}
-      onClick={() => {
-        if (check) onToggleBag();
-        else onCycleStatus();
-      }}
-      className={cn(
-        "inline-flex h-14 min-w-14 shrink-0 items-center justify-center rounded-lg px-1.5 text-2xl font-semibold tabular-nums select-none touch-manipulation disabled:opacity-100",
-        ready && "bg-emerald-600 text-white"
-      )}
+      data-testid="button-key-status"
+      aria-label={`${statusLabel}, chiave ${apartment.logisticCode}`}
+      title={statusLabel}
+      disabled={pending || viewer || lostToday}
+      onClick={onCycleStatus}
+      className={cn(className, "touch-manipulation disabled:opacity-100")}
     >
       {apartment.logisticCode}
     </button>
@@ -965,13 +987,18 @@ export default function KeyRegistry() {
                       if (!handover) {
                         const rowBody = (
                           <>
+                            <BagCheckBox
+                              apartment={apartment}
+                              pending={pending}
+                              viewer={viewer}
+                              onToggle={() => markBag(apartment, !apartment.bagReady)}
+                            />
                             <div className="flex min-w-0 flex-1 items-center gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5">
                                 <AdamCodeButton
                                   apartment={apartment}
                                   pending={pending}
                                   viewer={viewer}
-                                  onToggleBag={() => markBag(apartment, !apartment.bagReady)}
                                   onCycleStatus={() => cycleStatus(apartment)}
                                 />
                                 {apartment.bigKey ? (
@@ -1047,13 +1074,18 @@ export default function KeyRegistry() {
                             lostToday ? "border-red-600 bg-red-600 text-white" : ROW_TONE[status]
                           )}
                         >
+                          <BagCheckBox
+                            apartment={apartment}
+                            pending={pending}
+                            viewer={viewer}
+                            onToggle={() => markBag(apartment, !apartment.bagReady)}
+                          />
                           <div className="flex min-w-0 flex-1 items-center gap-3">
                           <span className="inline-flex shrink-0 items-center gap-1.5">
                             <AdamCodeButton
                               apartment={apartment}
                               pending={pending}
                               viewer={viewer}
-                              onToggleBag={() => markBag(apartment, !apartment.bagReady)}
                               onCycleStatus={() => cycleStatus(apartment)}
                             />
                             {apartment.driverKey ? (

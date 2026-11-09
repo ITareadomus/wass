@@ -79,14 +79,15 @@ describe("stato consegna", () => {
 });
 
 describe("check borsone", () => {
-  it("resta sul codice finché la chiave è in magazzino", () => {
+  it("resta sul codice per ogni stato della chiave, tranne se è smarrita", () => {
     expect(bagCheckApplies({ physicalKey: true, delivered: false })).toBe(true);
-    expect(bagCheckApplies({ physicalKey: true, prepared: true, delivered: false })).toBe(false);
-    expect(bagCheckApplies({ physicalKey: true, prepared: true, delivered: true })).toBe(false);
-    expect(bagCheckApplies({ physicalKey: true, prepared: true, delivered: true, returned: true })).toBe(false);
+    expect(bagCheckApplies({ physicalKey: true, prepared: true, delivered: false })).toBe(true);
+    expect(bagCheckApplies({ physicalKey: true, prepared: true, delivered: true })).toBe(true);
+    expect(bagCheckApplies({ physicalKey: true, prepared: true, delivered: true, returned: true })).toBe(true);
     expect(bagCheckApplies({ physicalKey: false, delivered: false })).toBe(true);
     expect(bagCheckApplies({ keyStatesLocked: true, physicalKey: false, delivered: false })).toBe(true);
     expect(bagCheckApplies({ physicalKey: true, lost: true, delivered: false })).toBe(false);
+    expect(bagCheckApplies({ physicalKey: true, lost: true, prepared: true, delivered: true })).toBe(false);
   });
 
   it("conta i borsoni pronti e quelli ancora da segnare", () => {
@@ -99,7 +100,7 @@ describe("check borsone", () => {
         { physicalKey: true, prepared: true, delivered: true, bagReady: false },
         { physicalKey: true, lost: true, delivered: false, bagReady: false },
       ])
-    ).toEqual({ ready: 2, missing: 2 });
+    ).toEqual({ ready: 2, missing: 3 });
   });
 });
 
