@@ -7,6 +7,10 @@ import {
   type ManualCleaningTimeOverride,
 } from '../../shared/wass-cleaning-time';
 import {
+  collectManualDetailOverrides,
+  restoreManualDetailOverrides,
+} from '../../shared/wass-manual-schedule';
+import {
   refreshTimelineApartmentFieldsFromAdam,
   syncTimelineAssignmentsFromAdam,
   type AssignmentSyncResult,
@@ -617,6 +621,10 @@ async function runRefreshContainersFromAdam(
         previousContainers,
         previousTimeline
       );
+      const manualDetails = collectManualDetailOverrides(
+        previousContainers,
+        previousTimeline
+      );
       if (options.extraManualOverrides) {
         for (const [taskId, override] of options.extraManualOverrides.entries()) {
           manualOverrides.set(taskId, override);
@@ -701,9 +709,13 @@ async function runRefreshContainersFromAdam(
         containersData,
         manualOverrides
       );
-      if (restoredManual > 0) {
+      const restoredDetails = restoreManualDetailOverrides(
+        containersData,
+        manualDetails
+      );
+      if (restoredManual > 0 || restoredDetails > 0) {
         console.log(
-          `🔒 Restore durata WASS manuale su ${restoredManual} task nei containers dopo refresh ADAM`
+          `🔒 Restore dettagli WASS manuali dopo refresh ADAM: durata=${restoredManual}, altri=${restoredDetails}`
         );
       }
 

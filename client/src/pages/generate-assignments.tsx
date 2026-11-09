@@ -40,6 +40,8 @@ import { it } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -745,8 +747,10 @@ export default function GenerateAssignments() {
   const [showAdamRefreshDialog, setShowAdamRefreshDialog] = useState(false);
   const [showUnlockConfirmDialog, setShowUnlockConfirmDialog] = useState(false);
   const [pendingLockedTasks, setPendingLockedTasks] = useState<LockedConflictTask[]>([]);
+  const [adamRefreshMode, setAdamRefreshMode] = useState<AdamRefreshMode>("apt");
   const [pendingRefreshMode, setPendingRefreshMode] = useState<AdamRefreshMode>("assignments");
-  // Polling ADAM: fingerprint (apt + assegnazioni). Auto-sync solo con giornata operativa ON.
+  // Polling fingerprint ADAM. Giornata spenta: auto-sync solo containers.
+  // Giornata accesa: auto-sync delle assegnazioni.
   const adamBaselineRef = useRef<AdamFingerprint | null>(null);
   const [hasAdamUpdates, setHasAdamUpdates] = useState(false);
   const hasAdamUpdatesRef = useRef(false);
@@ -809,12 +813,15 @@ export default function GenerateAssignments() {
 
   const tryAutoAdamSync = useCallback(() => {
     const forced = pendingForcedAdamSyncRef.current;
-    if (!forced && !isOperationalDayStartedRef.current) return;
+    const dayOn = isOperationalDayStartedRef.current;
     if (!forced && !hasAdamUpdatesRef.current) return;
     if (isRefreshingContainersRef.current || isDraggingRef.current) return;
     if (autoAdamSyncBlockedRef.current) return;
     pendingForcedAdamSyncRef.current = false;
-    void runAdamContainersRefreshRef.current({ source: "auto", mode: "assignments" });
+    // Pianificazione: solo containers, così i task già in timeline restano.
+    // Giornata accesa: specchio completo delle assegnazioni ADAM.
+    const mode = dayOn || forced ? "assignments" : "apt";
+    void runAdamContainersRefreshRef.current({ source: "auto", mode });
   }, []);
 
   const handleOperationalDayToggle = useCallback(
@@ -2932,7 +2939,10 @@ export default function GenerateAssignments() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowAdamRefreshDialog(true)}
+                onClick={() => {
+                  setAdamRefreshMode(isOperationalDayStarted ? "assignments" : "apt");
+                  setShowAdamRefreshDialog(true);
+                }}
                 disabled={isRefreshingContainers || isTimelineReadOnly}
                 className="flex items-center gap-2 rounded-none text-black dark:text-white hover:bg-custom-blue/80 px-3"
                 title={
@@ -3390,15 +3400,37 @@ export default function GenerateAssignments() {
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-sm text-muted-foreground">
                 <p>
-                  La giornata viene riletta da ADAM e riscritta su WASS: cleaner,
-                  sequenza, collaborazioni, pax, indirizzo, operazione, cliente, note.
-                  Sulla timeline i task si spostano e travel, inizio e fine vengono
-                  ricalcolati.
+                  I containers vengono rigenerati da ADAM. I task già messi in timeline
+                  restano sul cleaner dove li hai pianificati, se aggiorni solo i containers.
                 </p>
-                <p>
-                  Restano solo il cleaning time e il check-in o check-out che hai
-                  cambiato a mano.
-                </p>
+                <div className="space-y-2 pt-1">
+                  <Label className="text-foreground">Cosa sincronizzare</Label>
+                  <RadioGroup
+                    value={adamRefreshMode}
+                    onValueChange={(value) => setAdamRefreshMode(value as AdamRefreshMode)}
+                    className="gap-3"
+                  >
+                    <div className="flex items-start space-x-2">
+                      <RadioGroupItem value="apt" id="refresh-mode-apt" className="mt-1" />
+                      <Label htmlFor="refresh-mode-apt" className="font-normal leading-snug">
+                        Solo containers e dati appartamento. Cleaner, sequenza e task in timeline restano.
+                      </Label>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <RadioGroupItem
+                        value="assignments"
+                        id="refresh-mode-assignments"
+                        className="mt-1"
+                      />
+                      <Label
+                        htmlFor="refresh-mode-assignments"
+                        className="font-normal leading-snug"
+                      >
+                        Anche assegnazioni: cleaner, sequenza e collaborazioni da ADAM, con ricalcolo di travel e orari.
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -3414,7 +3446,7 @@ export default function GenerateAssignments() {
               onClick={(e) => {
                 e.preventDefault();
                 setShowAdamRefreshDialog(false);
-                void runAdamContainersRefresh({ mode: "assignments" });
+                void runAdamContainersRefresh({ mode: adamRefreshMode });
               }}
               className="border-2 border-custom-blue bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
             >

@@ -69,8 +69,12 @@ MANUAL_CLEANING_REASON = "wass_cleaning_time_manual"
 MANUAL_WINDOW_REASON = "wass_checkin_checkout_manual"
 MANUAL_CHECKOUT_REASON = "wass_checkout_manual"
 MANUAL_CHECKIN_REASON = "wass_checkin_manual"
+MANUAL_PAX_REASON = "wass_pax_manual"
+MANUAL_OPERATION_REASON = "wass_operation_manual"
 CHECKOUT_FIELDS = {"checkout_date", "checkout_time"}
 CHECKIN_FIELDS = {"checkin_date", "checkin_time"}
+PAX_FIELDS = {"pax_in"}
+OPERATION_FIELDS = {"operation_id", "confirmed_operation", "straordinaria"}
 
 
 def _has_reason(task, marker):
@@ -667,10 +671,16 @@ def main():
                     keep_both = _has_reason(task, MANUAL_WINDOW_REASON)
                     keep_checkout = keep_both or _has_reason(task, MANUAL_CHECKOUT_REASON)
                     keep_checkin = keep_both or _has_reason(task, MANUAL_CHECKIN_REASON)
+                    keep_pax = _has_reason(task, MANUAL_PAX_REASON)
+                    keep_operation = _has_reason(task, MANUAL_OPERATION_REASON)
                     for field in fields_to_update:
                         if keep_checkout and field in CHECKOUT_FIELDS:
                             continue
                         if keep_checkin and field in CHECKIN_FIELDS:
+                            continue
+                        if keep_pax and field in PAX_FIELDS:
+                            continue
+                        if keep_operation and field in OPERATION_FIELDS:
                             continue
                         if field in fresh_data:
                             task[field] = fresh_data[field]

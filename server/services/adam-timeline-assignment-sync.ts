@@ -16,10 +16,15 @@ import {
 import {
   hasManualCheckin,
   hasManualCheckout,
-  hasManualSchedule,
+  hasManualCustomerNote,
+  hasManualOperation,
+  hasManualPax,
   WASS_CHECKIN_CHECKOUT_MANUAL_REASON,
   WASS_CHECKIN_MANUAL_REASON,
   WASS_CHECKOUT_MANUAL_REASON,
+  WASS_CUSTOMER_NOTE_MANUAL_REASON,
+  WASS_OPERATION_MANUAL_REASON,
+  WASS_PAX_MANUAL_REASON,
   withoutManualScheduleReason,
 } from "../../shared/wass-manual-schedule";
 import {
@@ -442,6 +447,9 @@ function keptManualReasons(existing: any): string[] {
     WASS_CHECKIN_CHECKOUT_MANUAL_REASON,
     WASS_CHECKOUT_MANUAL_REASON,
     WASS_CHECKIN_MANUAL_REASON,
+    WASS_PAX_MANUAL_REASON,
+    WASS_OPERATION_MANUAL_REASON,
+    WASS_CUSTOMER_NOTE_MANUAL_REASON,
   ]);
   const next: string[] = [];
   for (const entry of reasons) {
@@ -456,6 +464,9 @@ function buildTaskFromAdam(row: AdamAssignmentRow, existing?: any): any {
   const keepWassDuration = hasManualCleaningTime(existing);
   const keepWassCheckin = hasManualCheckin(existing);
   const keepWassCheckout = hasManualCheckout(existing);
+  const keepWassPax = hasManualPax(existing);
+  const keepWassOperation = hasManualOperation(existing);
+  const keepWassNote = hasManualCustomerNote(existing);
   const source = {
     ...row,
     cleaning_time: keepWassDuration
@@ -476,6 +487,17 @@ function buildTaskFromAdam(row: AdamAssignmentRow, existing?: any): any {
     checkout_time: keepWassCheckout
       ? (existing?.checkout_time ?? row.checkout_time)
       : row.checkout_time,
+    pax_in: keepWassPax ? (existing?.pax_in ?? row.pax_in) : row.pax_in,
+    operation_id: keepWassOperation
+      ? (existing?.operation_id ?? row.operation_id)
+      : row.operation_id,
+    confirmed_operation: keepWassOperation
+      ? existing?.confirmed_operation
+      : row.confirmed_operation,
+    straordinaria: keepWassOperation ? Boolean(existing?.straordinaria) : row.straordinaria,
+    customer_note: keepWassNote
+      ? (existing?.customer_note ?? row.customer_note)
+      : row.customer_note,
     customer_note_history: existing?.customer_note_history ?? null,
     reasons: keptManualReasons(existing),
     priority: existing?.priority || "low_priority",
@@ -553,20 +575,6 @@ const ADAM_APARTMENT_FIELDS = [
   "customer_note",
 ] as const;
 
-function releasePinnedSchedule(task: any): boolean {
-  const hadSchedule = hasManualSchedule(task);
-  const hadManualStart =
-    task?.manual_start_time != null && String(task.manual_start_time).trim() !== "";
-  if (!hadSchedule && !hadManualStart) return false;
-  if (hadSchedule) {
-    task.reasons = withoutManualScheduleReason(task.reasons);
-    task.start_time = null;
-    task.end_time = null;
-  }
-  if (hadManualStart) task.manual_start_time = null;
-  return true;
-}
-
 function applyAdamApartmentFields(task: any, row: AdamAssignmentRow): boolean {
   const fresh = buildTaskFromAdam(row, task);
   let changed = false;
@@ -588,7 +596,6 @@ function applyAdamApartmentFields(task: any, row: AdamAssignmentRow): boolean {
       changed = true;
     }
   }
-  if (releasePinnedSchedule(task)) changed = true;
   return changed;
 }
 
@@ -755,8 +762,8 @@ async function recalculateTimelineFromAdam(
 
 /**
  * Rilegge su ADAM ogni task già in timeline e riscrive le specifiche appartamento.
- * Cleaning time e check-in/out messi a mano restano. Travel e orari vengono ricalcolati.
- * Cleaner e sequenza li allinea lo specchio assegnazioni.
+ * I dettagli impostati a mano restano. Cleaner, sequenza e orari restano:
+ * li riallinea solo lo specchio assegnazioni.
  */
 export async function refreshTimelineApartmentFieldsFromAdam(
   workDate: string,
@@ -776,7 +783,6 @@ export async function refreshTimelineApartmentFieldsFromAdam(
       timelineTaskIds
     );
     const adamById = new Map(adamRows.map((row) => [row.task_id, row]));
-    const previousTimes = snapshotTaskTimes(timelineData.cleaners_assignments);
 
     let updated = 0;
     for (const entry of timelineData.cleaners_assignments) {
@@ -789,12 +795,6 @@ export async function refreshTimelineApartmentFieldsFromAdam(
     }
 
     if (updated > 0) {
-      await recalculateTimelineFromAdam(
-        timelineData,
-        workDate,
-        scope,
-        previousTimes
-      );
       await workspaceFiles.saveTimeline(
         workDate,
         timelineData,

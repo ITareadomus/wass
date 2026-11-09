@@ -98,6 +98,140 @@ export function withManualCustomerNoteReason(reasons: unknown): string[] {
   return withReason(reasons, WASS_CUSTOMER_NOTE_MANUAL_REASON);
 }
 
+export type ManualDetailOverride = {
+  checkin_date?: unknown;
+  checkin_time?: unknown;
+  checkout_date?: unknown;
+  checkout_time?: unknown;
+  pax_in?: unknown;
+  operation_id?: unknown;
+  confirmed_operation?: unknown;
+  straordinaria?: unknown;
+  customer_note?: unknown;
+  customer_note_history?: unknown;
+  reasons: string[];
+};
+
+function taskIdOf(task: any): number | null {
+  const id = Number(task?.task_id ?? task?.id);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
+function snapshotManualDetails(task: any): ManualDetailOverride | null {
+  const keepCheckin = hasManualCheckin(task);
+  const keepCheckout = hasManualCheckout(task);
+  const keepPax = hasManualPax(task);
+  const keepOperation = hasManualOperation(task);
+  const keepNote = hasManualCustomerNote(task);
+  if (!keepCheckin && !keepCheckout && !keepPax && !keepOperation && !keepNote) {
+    return null;
+  }
+  const snapshot: ManualDetailOverride = {
+    reasons: Array.isArray(task?.reasons)
+      ? task.reasons.map((entry: unknown) => String(entry ?? "").trim()).filter(Boolean)
+      : [],
+  };
+  if (keepCheckin) {
+    snapshot.checkin_date = task?.checkin_date ?? null;
+    snapshot.checkin_time = task?.checkin_time ?? null;
+  }
+  if (keepCheckout) {
+    snapshot.checkout_date = task?.checkout_date ?? null;
+    snapshot.checkout_time = task?.checkout_time ?? null;
+  }
+  if (keepPax) snapshot.pax_in = task?.pax_in ?? null;
+  if (keepOperation) {
+    snapshot.operation_id = task?.operation_id ?? null;
+    snapshot.confirmed_operation = task?.confirmed_operation;
+    snapshot.straordinaria = task?.straordinaria;
+  }
+  if (keepNote) {
+    snapshot.customer_note = task?.customer_note ?? null;
+    snapshot.customer_note_history = task?.customer_note_history ?? null;
+  }
+  return snapshot;
+}
+
+function walkTaskDocuments(doc: any, visit: (task: any) => void): void {
+  if (!doc || typeof doc !== "object") return;
+  const containers = doc.containers;
+  if (containers && typeof containers === "object") {
+    for (const key of Object.keys(containers)) {
+      const bucket = containers[key];
+      const tasks = Array.isArray(bucket)
+        ? bucket
+        : Array.isArray(bucket?.tasks)
+          ? bucket.tasks
+          : [];
+      for (const task of tasks) visit(task);
+    }
+  }
+  const assignments = doc.cleaners_assignments;
+  if (Array.isArray(assignments)) {
+    for (const entry of assignments) {
+      for (const task of entry?.tasks || []) visit(task);
+    }
+  }
+}
+
+/** Valori dei dettagli task impostati a mano, da rimettere dopo un refresh ADAM. */
+export function collectManualDetailOverrides(
+  ...documents: any[]
+): Map<number, ManualDetailOverride> {
+  const map = new Map<number, ManualDetailOverride>();
+  for (const doc of documents) {
+    walkTaskDocuments(doc, (task) => {
+      const id = taskIdOf(task);
+      const snapshot = snapshotManualDetails(task);
+      if (id == null || !snapshot) return;
+      const previous = map.get(id);
+      map.set(id, previous ? { ...previous, ...snapshot, reasons: snapshot.reasons } : snapshot);
+    });
+  }
+  return map;
+}
+
+export function restoreManualDetailOverrides(
+  containersData: any,
+  overrides: Map<number, ManualDetailOverride>
+): number {
+  if (!containersData?.containers || !overrides || overrides.size === 0) return 0;
+  let restored = 0;
+  for (const key of Object.keys(containersData.containers)) {
+    const tasks = containersData.containers[key]?.tasks;
+    if (!Array.isArray(tasks)) continue;
+    for (const task of tasks) {
+      const id = taskIdOf(task);
+      if (id == null) continue;
+      const snapshot = overrides.get(id);
+      if (!snapshot) continue;
+      if ("checkin_date" in snapshot) task.checkin_date = snapshot.checkin_date ?? null;
+      if ("checkin_time" in snapshot) task.checkin_time = snapshot.checkin_time ?? null;
+      if ("checkout_date" in snapshot) task.checkout_date = snapshot.checkout_date ?? null;
+      if ("checkout_time" in snapshot) task.checkout_time = snapshot.checkout_time ?? null;
+      if ("pax_in" in snapshot) task.pax_in = snapshot.pax_in ?? null;
+      if ("operation_id" in snapshot) {
+        task.operation_id = snapshot.operation_id ?? null;
+        task.confirmed_operation = snapshot.confirmed_operation;
+        task.straordinaria = snapshot.straordinaria;
+      }
+      if ("customer_note" in snapshot) {
+        task.customer_note = snapshot.customer_note ?? null;
+        task.customer_note_history = snapshot.customer_note_history ?? null;
+      }
+      const reasons = new Set<string>(
+        Array.isArray(task.reasons)
+          ? task.reasons.map((entry: unknown) => String(entry ?? "").trim()).filter(Boolean)
+          : []
+      );
+      for (const reason of snapshot.reasons) reasons.add(reason);
+      task.reasons = Array.from(reasons);
+      restored += 1;
+    }
+  }
+  return restored;
+}
+
 export function withManualScheduleReason(reasons: unknown): string[] {
   return withReason(reasons, WASS_MANUAL_SCHEDULE_REASON);
 }
