@@ -14,7 +14,7 @@ import type {
 const MILAN_CENTER = { lat: 45.464, lng: 9.19 };
 const MILAN_ZOOM = 12;
 const GOOGLE_MAPS_SRC =
-  "https://maps.googleapis.com/maps/api/js?key=AIzaSyBRKGlNnryWd0psedJholmVPlaxQUmSlY0&v=weekly";
+  "https://maps.googleapis.com/maps/api/js?key=AIzaSyAZ43KN01rau6_DxWZ__fPcWSsLsn9j2bs&v=weekly";
 
 declare global {
   interface Window {

@@ -217,7 +217,7 @@ export default function MapSection({
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyBRKGlNnryWd0psedJholmVPlaxQUmSlY0&v=weekly`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyAZ43KN01rau6_DxWZ__fPcWSsLsn9j2bs&v=weekly`;
     script.async = true;
     script.defer = true;
     script.onload = () => setIsMapLoaded(true);
