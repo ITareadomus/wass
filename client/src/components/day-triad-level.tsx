@@ -133,11 +133,7 @@ export function DayTriadLevel({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={cn(
-            "inline-flex cursor-pointer items-center rounded-md px-1 py-0.5 hover:bg-muted/60",
-            overrideWeight != null &&
-              "bg-yellow-100 hover:bg-yellow-100 dark:bg-yellow-300/25 dark:hover:bg-yellow-300/25"
-          )}
+          className="inline-flex cursor-pointer items-center rounded-md px-1 py-0.5 hover:bg-muted/60"
           aria-label="Modifica il livello Triade di questa giornata"
           onClick={(event) => event.stopPropagation()}
         >

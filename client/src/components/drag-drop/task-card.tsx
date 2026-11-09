@@ -644,7 +644,7 @@ const displayClickableInputClass =
   "h-9 border-transparent bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none focus:border-transparent px-0";
 
 const manualValueClass =
-  "bg-yellow-100 px-1.5 hover:bg-yellow-100 dark:bg-yellow-300/25 dark:hover:bg-yellow-300/25";
+  "text-yellow-500 dark:text-yellow-400 no-underline hover:no-underline";
 
 const valueFieldClass = (editable: boolean, manual: boolean) =>
   cn(

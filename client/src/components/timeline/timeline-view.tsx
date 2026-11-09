@@ -191,6 +191,21 @@ const getTimelineTravelMinutes = (task: any) => {
   return Number.isFinite(travel) && travel > 0 ? travel : 0;
 };
 
+/** Fine visibile della barra, anche se la durata salvata è 0. */
+const getTimelineTaskVisibleEndMinutes = (task: any): number | null => {
+  const start = parseTimelineClockToMinutes(
+    task?.start_time || task?.fw_start_time || task?.startTime
+  );
+  const end = parseTimelineClockToMinutes(task?.end_time || task?.endTime);
+  if (end != null && (start == null || end > start)) return end;
+
+  const fromBar = parseTimelineDurationToMinutes(timelineBarDurationLabel(task) || undefined);
+  const stored = getTimelineTaskDurationMinutes(task);
+  const span = fromBar > 0 ? fromBar : stored > 0 ? stored : 60;
+  if (start != null) return start + span;
+  return null;
+};
+
 const roundDownToHour = (minutes: number) => Math.floor(minutes / 60) * 60;
 const roundUpToHour = (minutes: number) => Math.ceil(minutes / 60) * 60;
 
@@ -1045,19 +1060,8 @@ export default function TimelineView({
 
     for (const task of timelineAssignedTasks) {
       const taskObj = task as any;
-      const duration = getTimelineTaskDurationMinutes(taskObj);
-      if (!Number.isFinite(duration) || duration <= 0) continue;
-
-      const startMinutes = parseTimelineClockToMinutes(
-        taskObj.start_time || taskObj.fw_start_time || taskObj.startTime
-      );
-      const endMinutes = parseTimelineClockToMinutes(taskObj.end_time || taskObj.endTime);
-
-      if (endMinutes !== null) {
-        endCandidates.push(endMinutes);
-      } else if (startMinutes !== null) {
-        endCandidates.push(startMinutes + duration);
-      }
+      const visibleEnd = getTimelineTaskVisibleEndMinutes(taskObj);
+      if (visibleEnd != null) endCandidates.push(visibleEnd);
     }
 
     const tasksByCleaner = new Map<number, any[]>();
@@ -1083,12 +1087,16 @@ export default function TimelineView({
       });
 
       sortedTasks.forEach((taskObj, index) => {
-        const duration = getTimelineTaskDurationMinutes(taskObj);
-        if (!Number.isFinite(duration) || duration <= 0) return;
-
         const explicitStart = parseTimelineClockToMinutes(
           taskObj.start_time || taskObj.fw_start_time || taskObj.startTime
         );
+        const visibleEnd = getTimelineTaskVisibleEndMinutes(taskObj);
+        const duration = getTimelineTaskDurationMinutes(taskObj);
+        const span = visibleEnd != null && explicitStart != null && visibleEnd > explicitStart
+          ? visibleEnd - explicitStart
+          : Number.isFinite(duration) && duration > 0
+            ? duration
+            : 60;
 
         if (explicitStart !== null) {
           cursor = Math.max(cursor, explicitStart);
@@ -1096,8 +1104,9 @@ export default function TimelineView({
           cursor += getTimelineTravelMinutes(taskObj);
         }
 
-        cursor += duration;
+        cursor += span;
         endCandidates.push(cursor);
+        if (visibleEnd != null) endCandidates.push(visibleEnd);
       });
     }
 
