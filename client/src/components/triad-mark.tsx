@@ -174,45 +174,19 @@ export function TriadDiamondRow({
   );
 }
 
-const UNKNOWN_LABEL = "Livello Triade non determinato";
-
-function UnknownTriadMark({ size }: { size: "sm" | "md" | "lg" }) {
-  return (
-    <span
-      className={cn(
-        "font-bold leading-none text-foreground",
-        size === "sm" ? "text-[15px]" : size === "lg" ? "text-3xl" : "text-lg"
-      )}
-      aria-hidden
-    >
-      ?
-    </span>
-  );
-}
-
 export function TaskTriadMark({
   triade,
   size = "md",
   className,
 }: {
-  /** undefined = ancora in caricamento; null = livello non determinabile. */
+  /** undefined = ancora in caricamento; null = nessun livello impostato. */
   triade?: CleanerTriadeLevel | null;
   size?: "sm" | "md" | "lg";
   className?: string;
 }) {
   if (triade === undefined) return null;
   const level = parseCleanerTriade(triade);
-  if (!level) {
-    return (
-      <span
-        className={cn("inline-flex shrink-0 items-center", className)}
-        title={UNKNOWN_LABEL}
-        aria-label={UNKNOWN_LABEL}
-      >
-        <UnknownTriadMark size={size} />
-      </span>
-    );
-  }
+  if (!level) return null;
   return <CleanerTriadMark triade={triade} size={size} className={className} />;
 }
 
@@ -301,6 +275,7 @@ export function DayTriadMark({
   overrideWeight: number | null;
   levels: CleanerTriadeLevel[];
   size?: "sm" | "md" | "lg";
+  /** "text" resta solo nel dialog, dove si può impostare il livello. Altrove non si disegna nulla. */
   unknown?: "question" | "text";
   appearance?: "day" | "real";
   className?: string;
@@ -311,16 +286,14 @@ export function DayTriadMark({
   const originalWeight = base?.weight ?? 0;
   const currentWeight = overrideWeight ?? originalWeight;
   if (appearance === "real") {
-    if (currentWeight <= 0) {
-      return <TaskTriadMark triade={null} size={size} className={className} />;
-    }
+    if (currentWeight <= 0) return null;
     const current = levelForWeight(levels, currentWeight) ?? (currentWeight === originalWeight ? base : null);
     const shown = current
       ? { ...current, weight: currentWeight, color_bg: current.colorBg }
       : base
         ? { name: base.name, weight: currentWeight, color: base.color, color_bg: base.colorBg }
         : null;
-    if (!shown) return <TaskTriadMark triade={null} size={size} className={className} />;
+    if (!shown) return null;
     return <CleanerTriadMark triade={shown} size={size} className={className} />;
   }
   const marks = dayMarks(originalWeight, overrideWeight);
@@ -328,7 +301,7 @@ export function DayTriadMark({
     if (unknown === "text") {
       return <span className={cn("text-sm text-foreground", className)}>Livello non impostato</span>;
     }
-    return <TaskTriadMark triade={null} size={size} className={className} />;
+    return null;
   }
 
   const dim =
