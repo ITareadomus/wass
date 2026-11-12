@@ -2970,7 +2970,11 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                           "ring-2 ring-inset ring-blue-500 border-blue-500",
                         hasIncompatibleTasks &&
                           !isRemoved &&
-                          "ring-2 ring-inset ring-yellow-500 border-yellow-500 animate-pulse"
+                          "ring-2 ring-inset ring-yellow-500 border-yellow-500",
+                        hasIncompatibleTasks &&
+                          !isRemoved &&
+                          cleanerRole !== "Formatore" &&
+                          "animate-pulse"
                       )}
                       style={{
                         width: `${cleanerColumnWidth}px`,
