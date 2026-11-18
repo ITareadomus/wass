@@ -20,6 +20,7 @@ import {
 } from "@shared/hk-preassigned-schedules";
 import { Calendar as CalendarIcon, RotateCcw, Users, RefreshCw, UserPlus, UserMinus, Maximize2, Minimize2, Check, CheckCircle, Save, Pencil, ChevronLeft, ChevronRight, Loader2, Zap, Lock, Unlock, AlertCircle, BarChart3, Map as MapIcon, CheckSquare, SlidersHorizontal } from "lucide-react";
 import { TimelineActionHistoryButton } from "@/components/timeline/timeline-action-history-button";
+import { TimelineDayExportButton } from "@/components/timeline/timeline-day-export-button";
 import {
   readTimelineHourScale,
   TIMELINE_HOUR_SCALE_KEY,
@@ -2659,6 +2660,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 {!isResetting && <RotateCcw className="w-4 h-4" />}
                 Reset
               </Button>
+              <TimelineDayExportButton workDate={workDate} />
             </div>
           </div>
         </div>

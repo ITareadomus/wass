@@ -2072,6 +2072,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // SQL della giornata corrente, per importarla nel database di sviluppo. Solo admin.
+  app.get("/api/day-export.sql", async (req, res) => {
+    try {
+      const workDate = String(req.query.date || "");
+      if (!isValidWorkDate(workDate)) {
+        return res.status(400).json({ error: "Data non valida" });
+      }
+      const { buildDayExportSql, isDayExportAdmin } = await import("./services/day-sql-export");
+      const username = String(req.get("x-wass-username") || "");
+      if (!(await isDayExportAdmin(username))) {
+        return res.status(403).json({ error: "Solo gli admin possono scaricare la giornata" });
+      }
+      const sql = await buildDayExportSql(workDate);
+      res.setHeader("Content-Type", "application/sql; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="wass-giornata-${workDate}.sql"`);
+      res.send(sql);
+    } catch (error: any) {
+      console.error("Errore nell'export SQL della giornata:", error);
+      res.status(500).json({ error: error?.message || "Export non riuscito" });
+    }
+  });
+
   // GET /api/timeline/execution-status?date=YYYY-MM-DD
   // Polling UI: solo startwork / cleaned da ADAM, senza ricalcolo timeline.
   app.get("/api/timeline/execution-status", async (req, res) => {

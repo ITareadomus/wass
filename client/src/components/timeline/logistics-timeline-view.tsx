@@ -18,6 +18,7 @@ import {
   CheckSquare,
 } from "lucide-react";
 import { TimelineActionHistoryButton } from "@/components/timeline/timeline-action-history-button";
+import { TimelineDayExportButton } from "@/components/timeline/timeline-day-export-button";
 import {
   useCallback,
   useEffect,
@@ -1864,6 +1865,7 @@ export default function LogisticsTimelineView({
                 {isResetting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
                 Reset Assegnazioni
               </Button>
+              <TimelineDayExportButton workDate={workDate} />
             </div>
           </div>
         </div>
