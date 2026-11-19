@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { assignmentScopeFromWindow } from "@shared/assignment-scope";
 import {
   Dialog,
   DialogContent,
@@ -64,18 +65,7 @@ export function CleanerSelectorDialog({
   isLoading = false,
 }: CleanerSelectorDialogProps) {
   const triadeEnabled = useTriadeEnabled();
-  const scopeValue: "housekeeping" | "office" =
-    typeof window !== "undefined" &&
-    (() => {
-      const params = new URLSearchParams(window.location.search);
-      return (
-        params.get("scope") === "office" ||
-        params.get("kind") === "office" ||
-        localStorage.getItem("assignments_scope") === "office"
-      );
-    })()
-      ? "office"
-      : "housekeeping";
+  const scopeValue = assignmentScopeFromWindow();
   const withScope = (url: string) =>
     `${url}${url.includes("?") ? "&" : "?"}scope=${scopeValue}`;
 
@@ -322,7 +312,7 @@ export function CleanerSelectorDialog({
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
                                 Ufficio
                               </span>
-                            ) : triadeEnabled && scopeValue === "housekeeping" ? (
+                            ) : triadeEnabled && scopeValue !== "office" ? (
                               <DayCleanerTriadLevel
                                 workDate={workDate}
                                 cleanerId={cleaner.id}
@@ -398,7 +388,7 @@ export function CleanerSelectorDialog({
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200 border-sky-300 dark:border-sky-700">
                                 Ufficio
                               </span>
-                            ) : triadeEnabled && scopeValue === "housekeeping" ? (
+                            ) : triadeEnabled && scopeValue !== "office" ? (
                               <DayCleanerTriadLevel
                                 workDate={workDate}
                                 cleanerId={cleaner.id}

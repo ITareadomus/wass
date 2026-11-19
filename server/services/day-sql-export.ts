@@ -224,6 +224,11 @@ async function aliasStatements(ids: number[]): Promise<{ statements: string[]; r
   };
 }
 
+export async function canReadDayExport(username: string): Promise<boolean> {
+  const { hasBetaAccess, lookupAccountAccess } = await import("./account-access");
+  return hasBetaAccess(await lookupAccountAccess(username));
+}
+
 export async function isDayExportAdmin(username: string): Promise<boolean> {
   const name = username.trim();
   if (!name) return false;
@@ -242,10 +247,73 @@ export async function isDayExportAdmin(username: string): Promise<boolean> {
   }
 }
 
-export async function buildDayExportSql(workDate: string): Promise<string> {
+const ALG_TEST_TABLES = [
+  "cleaners",
+  "alg_test_selected_cleaners",
+  "alg_test_containers",
+  "alg_test_assignments",
+] as const;
+
+async function algTestCleanerIds(present: Set<string>, workDate: string): Promise<number[]> {
+  const parts: string[] = [];
+  if (present.has("cleaners")) {
+    parts.push(`SELECT cleaner_id FROM public.cleaners WHERE work_date = $1::date`);
+  }
+  if (present.has("alg_test_selected_cleaners")) {
+    parts.push(`SELECT unnest(cleaners) AS cleaner_id FROM public.alg_test_selected_cleaners WHERE work_date = $1::date`);
+  }
+  if (present.has("alg_test_assignments")) {
+    parts.push(`SELECT cleaner_id FROM public.alg_test_assignments WHERE work_date = $1::date`);
+  }
+  if (parts.length === 0 || !present.has("aliases")) return [];
+  const result = await query(
+    `SELECT DISTINCT cleaner_id
+     FROM (${parts.join(" UNION ")}) ids
+     WHERE cleaner_id IS NOT NULL
+     ORDER BY cleaner_id`,
+    [workDate]
+  );
+  return result.rows.map((row) => Number(row.cleaner_id)).filter((id) => Number.isInteger(id));
+}
+
+async function buildAlgTestDayExportSql(workDate: string): Promise<string> {
+  const present = await existingTables([...ALG_TEST_TABLES, "aliases"]);
+  const lines: string[] = ["BEGIN;", ""];
+  const exported: string[] = [];
+  for (const table of ALG_TEST_TABLES) {
+    if (!present.has(table)) continue;
+    const columns = (await tableColumns(table)).filter((column) => !isSerial(column));
+    if (!columns.some((column) => column.column_name === "work_date")) continue;
+    const rows = await literalRows(table, columns, workDate);
+    lines.push(...insertStatements(table, columns, rows));
+    lines.push("");
+    exported.push(`${table} (${rows.length})`);
+  }
+  const aliases = await aliasStatements(await algTestCleanerIds(present, workDate));
+  if (aliases.statements.length > 0) {
+    lines.push(...aliases.statements);
+    lines.push("");
+    exported.push(`aliases (${aliases.rows})`);
+  }
+  lines.push("COMMIT;");
+  lines.push("");
+  return [
+    `-- Prova algoritmo WASS ${workDate}`,
+    `-- Solo lettura per il confronto: assegnazioni, contenitori e convocazioni della prova.`,
+    `-- Tabelle: ${exported.join(", ") || "nessuna"}.`,
+    "",
+    lines.join("\n"),
+  ].join("\n");
+}
+
+export async function buildDayExportSql(
+  workDate: string,
+  scope: "housekeeping" | "alg-test" = "housekeeping",
+): Promise<string> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(workDate)) {
     throw new Error("Data non valida");
   }
+  if (scope === "alg-test") return buildAlgTestDayExportSql(workDate);
   const present = await existingTables([...CURRENT_TABLES, "aliases"]);
   const lines: string[] = [
     "BEGIN;",

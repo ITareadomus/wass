@@ -21,7 +21,10 @@ export interface HkConstraintSettings {
   formatorePriority: ConstraintMode;
   formatoreStandard: ConstraintMode;
   priorityWindow: ConstraintMode;
+  checkout: ConstraintMode;
   checkin: ConstraintMode;
+  /** Preferire un carico di minuti simile tra i cleaner. */
+  workloadBalance: ConstraintMode;
   shiftEnd: ConstraintMode;
   shortenRoutes: boolean;
   rebalanceLoads: boolean;
@@ -66,7 +69,9 @@ export const HK_CONSTRAINT_PRESETS = {
     formatorePriority: "hard",
     formatoreStandard: "hard",
     priorityWindow: "soft",
+    checkout: "hard",
     checkin: "hard",
+    workloadBalance: "soft",
     shiftEnd: "hard",
     shortenRoutes: true,
     rebalanceLoads: true,
@@ -81,7 +86,7 @@ export const HK_CONSTRAINT_PRESETS = {
     triadeOverqualPenalty: 8000,
     phase4LevelBonus: 80000,
     phase4OverqualPenalty: 20000,
-    travel: "soft",
+    travel: "off",
     travelWeight: 0.5,
     travelHardMaxMin: 45,
     loadCap: "hard",
@@ -94,7 +99,9 @@ export const HK_CONSTRAINT_PRESETS = {
     formatorePriority: "hard",
     formatoreStandard: "hard",
     priorityWindow: "soft",
+    checkout: "hard",
     checkin: "hard",
+    workloadBalance: "soft",
     shiftEnd: "hard",
     shortenRoutes: false,
     rebalanceLoads: false,
@@ -103,13 +110,13 @@ export const HK_CONSTRAINT_PRESETS = {
     triadSwap: true,
   },
   distance: {
-    triadeCeiling: "hard",
+    triadeCeiling: "off",
     triadeMatch: "off",
     triadeMatchBonus: 0,
     triadeOverqualPenalty: 0,
     phase4LevelBonus: 0,
     phase4OverqualPenalty: 0,
-    travel: "soft",
+    travel: "hard",
     travelWeight: 8,
     travelHardMaxMin: 45,
     loadCap: "hard",
@@ -122,7 +129,9 @@ export const HK_CONSTRAINT_PRESETS = {
     formatorePriority: "hard",
     formatoreStandard: "hard",
     priorityWindow: "soft",
+    checkout: "hard",
     checkin: "hard",
+    workloadBalance: "soft",
     shiftEnd: "hard",
     shortenRoutes: true,
     rebalanceLoads: true,
@@ -141,46 +150,34 @@ export const HK_CONSTRAINT_FIELDS: Array<{
   group: string;
 }> = [
   {
-    id: "triadeCeiling",
-    group: "Livello",
-    title: "Non superare la triade",
-    detail: "Un cleaner prende solo appartamenti del suo livello o più bassi.",
-  },
-  {
-    id: "triadeMatch",
-    group: "Livello",
-    title: "Preferire lo stesso livello",
-    detail: "A parità di copertura, un cleaner alto prende gli appartamenti del suo livello.",
-  },
-  {
-    id: "travel",
-    group: "Giornata",
-    title: "Giri corti",
-    detail: "Tiene vicini gli appartamenti dello stesso cleaner.",
-  },
-  {
-    id: "loadCap",
-    group: "Giornata",
-    title: "Tetto di carico",
-    detail: "Il cleaner non supera la percentuale scelta dei minuti medi della giornata.",
-  },
-  {
-    id: "priorityWindow",
-    group: "Orari",
-    title: "Finestre Early Out, High e Low",
-    detail: "Rispetta l'orario di partenza e la finestra della priorità.",
-  },
-  {
     id: "checkin",
-    group: "Orari",
+    group: "Vincoli",
     title: "Finire prima del check-in",
     detail: "La pulizia deve chiudersi prima dell'arrivo dell'ospite.",
   },
   {
-    id: "shiftEnd",
-    group: "Orari",
-    title: "Finire dentro il turno",
-    detail: "Nessun task può terminare dopo l'orario di fine del cleaner.",
+    id: "checkout",
+    group: "Vincoli",
+    title: "Partire dopo il checkout",
+    detail: "La pulizia non inizia prima che l'ospite sia uscito.",
+  },
+  {
+    id: "triadeCeiling",
+    group: "Vincoli",
+    title: "Livelli triade",
+    detail: "Un cleaner prende solo appartamenti del suo livello o più bassi.",
+  },
+  {
+    id: "travel",
+    group: "Vincoli",
+    title: "Distanza tra appartamenti",
+    detail: "Il viaggio fra una tappa e l'altra resta entro il massimo di minuti.",
+  },
+  {
+    id: "workloadBalance",
+    group: "Vincoli",
+    title: "Stesso carico di lavoro",
+    detail: "I cleaner ricevono più o meno gli stessi minuti di lavoro.",
   },
 ];
 
@@ -230,21 +227,23 @@ export function parseHkConstraintSettings(raw: unknown): HkConstraintSettings {
     travelHardMaxMin: asNumber(source.travelHardMaxMin, base.travelHardMaxMin, 5, 180),
     loadCap: asMode(source.loadCap, base.loadCap),
     loadCapPercent: asNumber(source.loadCapPercent, base.loadCapPercent, 100, 200),
-    taskCount: "hard",
-    longOt: "hard",
-    shortOt: "hard",
-    officeRole: "hard",
-    apartmentType: "hard",
-    formatorePriority: "hard",
-    formatoreStandard: "hard",
     priorityWindow: asMode(source.priorityWindow, base.priorityWindow),
+    checkout: asMode(source.checkout, base.checkout),
     checkin: asMode(source.checkin, base.checkin),
+    workloadBalance: asMode(source.workloadBalance, base.workloadBalance),
     shiftEnd: asMode(source.shiftEnd, base.shiftEnd),
     shortenRoutes: asBool(source.shortenRoutes, base.shortenRoutes),
     rebalanceLoads: asBool(source.rebalanceLoads, base.rebalanceLoads),
     phase5Iterations: asNumber(source.phase5Iterations, base.phase5Iterations, 0, 200),
     fairnessIterations: asNumber(source.fairnessIterations, base.fairnessIterations, 0, 100),
     triadSwap: asBool(source.triadSwap, base.triadSwap),
+    taskCount: asMode(source.taskCount, base.taskCount),
+    longOt: asMode(source.longOt, base.longOt),
+    shortOt: asMode(source.shortOt, base.shortOt),
+    officeRole: asMode(source.officeRole, base.officeRole),
+    apartmentType: asMode(source.apartmentType, base.apartmentType),
+    formatorePriority: asMode(source.formatorePriority, base.formatorePriority),
+    formatoreStandard: asMode(source.formatoreStandard, base.formatoreStandard),
   };
 }
 
@@ -262,10 +261,10 @@ export function sameHkConstraintSettings(a: HkConstraintSettings, b: HkConstrain
 }
 
 export const HK_BUILTIN_PROFILES: Array<{ id: HkConstraintPresetId; name: string; detail: string }> = [
-  { id: "balanced", name: "Bilanciato", detail: "Prima assegna, poi il livello, poi la distanza." },
-  { id: "triade", name: "Triade", detail: "Il livello pesa molto. I giri non vengono accorciati dopo." },
-  { id: "distance", name: "Distanza", detail: "I giri restano compatti. Il match di livello è spento." },
+  { id: "balanced", name: "Bilanciato", detail: "Check-in, checkout e livello prima. Distanza e carico restano preferibili." },
 ];
+
+const RETIRED_BUILTIN_IDS = new Set(["triade", "distance"]);
 
 export interface HkNamedProfile {
   id: string;
@@ -326,9 +325,11 @@ export function parseHkProfileLibrary(raw: unknown, activeSettings?: unknown): H
   for (const item of source.profiles) {
     if (!item || typeof item !== "object") continue;
     const row = item as Partial<HkNamedProfile>;
-    const builtin =
-      row.builtin === "balanced" || row.builtin === "triade" || row.builtin === "distance" ? row.builtin : null;
-    const id = cleanProfileId(row.id) || builtin || "";
+    const rawBuiltin = row.builtin === "balanced" || row.builtin === "triade" || row.builtin === "distance" ? row.builtin : null;
+    const rawId = cleanProfileId(row.id) || rawBuiltin || "";
+    if (RETIRED_BUILTIN_IDS.has(rawId) || (rawBuiltin != null && RETIRED_BUILTIN_IDS.has(rawBuiltin))) continue;
+    const builtin = rawBuiltin === "balanced" ? rawBuiltin : null;
+    const id = rawId;
     if (!id || seen.has(id)) continue;
     seen.add(id);
     const fallbackName = HK_BUILTIN_PROFILES.find((preset) => preset.id === builtin)?.name ?? "Profilo";

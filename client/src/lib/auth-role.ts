@@ -3,14 +3,47 @@ export type AppUserRole = "admin" | "user" | "viewer" | "logistica";
 
 export const LOGISTICS_HOME_PATH = "/generate-logistics-assignments";
 
-export function getStoredUser(): { username?: string; role?: string } | null {
+export interface StoredUser {
+  username?: string;
+  role?: string;
+  betaTester?: boolean;
+}
+
+export function getStoredUser(): StoredUser | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem("user");
     if (!raw) return null;
-    return JSON.parse(raw) as { username?: string; role?: string };
+    return JSON.parse(raw) as StoredUser;
   } catch {
     return null;
+  }
+}
+
+export function isBetaTesterAccess(user?: StoredUser | null): boolean {
+  const current = user === undefined ? getStoredUser() : user;
+  if (!current) return false;
+  return current.betaTester === true;
+}
+
+export async function refreshStoredSession(): Promise<StoredUser | null> {
+  const current = getStoredUser();
+  if (!current?.username) return current;
+  try {
+    const response = await fetch("/api/session", {
+      headers: { "x-wass-username": current.username },
+    });
+    if (!response.ok) return current;
+    const data = await response.json();
+    const next: StoredUser = {
+      ...current,
+      role: typeof data?.role === "string" ? data.role : current.role,
+      betaTester: data?.betaTester === true,
+    };
+    localStorage.setItem("user", JSON.stringify(next));
+    return next;
+  } catch {
+    return current;
   }
 }
 

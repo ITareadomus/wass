@@ -13,9 +13,15 @@ export interface AdamWassAccount {
   id: number;
   username: string;
   role: AdamWassRole;
+  betaTester: boolean;
   source: "adam";
   displayName: string;
   adam_id: number;
+}
+
+interface StoredAdamAccess {
+  role: AdamWassRole;
+  betaTester: boolean;
 }
 
 function isWassRole(role: string): role is AdamWassRole {
@@ -58,21 +64,31 @@ export async function ensureAdamWassRoleTable(): Promise<void> {
     CREATE TABLE IF NOT EXISTS adam_wass_account_roles (
       employee_id INTEGER PRIMARY KEY,
       role TEXT NOT NULL DEFAULT 'user',
+      beta_tester BOOLEAN NOT NULL DEFAULT false,
       updated_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  await query(`ALTER TABLE adam_wass_account_roles ADD COLUMN IF NOT EXISTS beta_tester BOOLEAN NOT NULL DEFAULT false`);
 }
 
-async function loadStoredRoles(): Promise<Map<number, AdamWassRole>> {
+async function loadStoredAccess(): Promise<Map<number, StoredAdamAccess>> {
   await ensureAdamWassRoleTable();
-  const result = await query("SELECT employee_id, role FROM adam_wass_account_roles");
-  const roles = new Map<number, AdamWassRole>();
+  const result = await query("SELECT employee_id, role, beta_tester FROM adam_wass_account_roles");
+  const access = new Map<number, StoredAdamAccess>();
   for (const row of result.rows) {
     const id = Number(row.employee_id);
     const role = String(row.role ?? "");
-    if (Number.isInteger(id) && isWassRole(role)) roles.set(id, role);
+    if (Number.isInteger(id) && isWassRole(role)) {
+      access.set(id, { role, betaTester: row.beta_tester === true });
+    }
   }
-  return roles;
+  return access;
+}
+
+export async function readAdamWassAccess(employeeId: number): Promise<StoredAdamAccess | null> {
+  if (!Number.isInteger(employeeId) || employeeId <= 0) return null;
+  const access = await loadStoredAccess();
+  return access.get(employeeId) ?? { role: "user", betaTester: false };
 }
 
 const EMPLOYEE_JOIN = `
@@ -90,7 +106,7 @@ const EMPLOYEE_JOIN = `
 `;
 
 export async function listAdamWassAccounts(): Promise<AdamWassAccount[]> {
-  const roles = await loadStoredRoles();
+  const access = await loadStoredAccess();
   const employees = await withMysql(async (connection) => {
     const [rows] = await connection.execute(
       `SELECT e.id, e.email, e.name, e.lastname ${EMPLOYEE_JOIN} ORDER BY e.email`,
@@ -106,7 +122,8 @@ export async function listAdamWassAccounts(): Promise<AdamWassAccount[]> {
     return {
       id,
       username: email,
-      role: roles.get(id) ?? "user",
+      role: access.get(id)?.role ?? "user",
+      betaTester: access.get(id)?.betaTester === true,
       source: "adam" as const,
       displayName: displayName(record.name, record.lastname),
       adam_id: id,
@@ -116,17 +133,21 @@ export async function listAdamWassAccounts(): Promise<AdamWassAccount[]> {
 
 export async function setAdamWassAccountRole(
   employeeId: number,
-  role: string
+  role: string,
+  betaTester?: boolean
 ): Promise<"ok" | "invalid" | "missing"> {
   if (!Number.isInteger(employeeId) || employeeId <= 0 || !isWassRole(role)) return "invalid";
   const accounts = await listAdamWassAccounts();
   if (!accounts.some((account) => account.id === employeeId)) return "missing";
   await ensureAdamWassRoleTable();
   await query(
-    `INSERT INTO adam_wass_account_roles (employee_id, role, updated_at)
-     VALUES ($1, $2, NOW())
-     ON CONFLICT (employee_id) DO UPDATE SET role = EXCLUDED.role, updated_at = NOW()`,
-    [employeeId, role]
+    `INSERT INTO adam_wass_account_roles (employee_id, role, beta_tester, updated_at)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (employee_id) DO UPDATE SET
+       role = EXCLUDED.role,
+       beta_tester = EXCLUDED.beta_tester,
+       updated_at = NOW()`,
+    [employeeId, role, betaTester === true]
   );
   return "ok";
 }
@@ -280,11 +301,12 @@ export async function loginAdamWassAccount(
   if (!matches) return null;
 
   const id = Number(row.id);
-  const roles = await loadStoredRoles();
+  const access = await loadStoredAccess();
   return {
     id,
     username: String(row.email ?? "").trim(),
-    role: roles.get(id) ?? "user",
+    role: access.get(id)?.role ?? "user",
+    betaTester: access.get(id)?.betaTester === true,
     source: "adam",
     displayName: displayName(row.name, row.lastname),
     adam_id: id,

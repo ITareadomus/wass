@@ -24,6 +24,7 @@ import { buildSchedulingWindows, parsePrioritySettings } from '../../../shared/t
 import { type HkHypothesisId } from '../../../shared/hk-assignment-hypotheses';
 import { hkSettingsForHypothesis, parseHkConstraintSettings, type HkConstraintSettings } from '../../../shared/hk-constraint-settings';
 import { loadHkConstraintSettings } from './load-hk-constraints';
+import { assignmentScopeSql, assignmentsTableFor, containersTableFor, normalizeAssignmentScope, type AssignmentScope } from '../../../shared/assignment-scope';
 
 export type WavePriority = 'early_out' | 'high_priority' | 'low_priority';
 
@@ -131,7 +132,8 @@ async function recalculateAffectedCleaners(
   client: any,
   workDate: string,
   runId: string,
-  cleanerIds: number[]
+  cleanerIds: number[],
+  assignmentsTable: "daily_assignments_current" | "alg_test_assignments" = "daily_assignments_current",
 ): Promise<CheckinViolation[]> {
   const violations: CheckinViolation[] = [];
   const priorityWindows = await loadPythonPriorityWindowsFromAppSettings();
@@ -142,7 +144,7 @@ async function recalculateAffectedCleaners(
               dac.sequence, dac.cleaning_time, dac.address, dac.lat, dac.lng,
               dac.start_time, dac.end_time, dac.travel_time,
               dac.checkout_time, dac.checkin_time, dac.checkin_date, dac.priority
-       FROM daily_assignments_current dac
+       FROM ${assignmentsTable} dac
        LEFT JOIN optimizer.optimizer_assignment oa
          ON oa.task_id = dac.task_id
          AND oa.run_id = $3
@@ -227,7 +229,7 @@ async function recalculateAffectedCleaners(
       const newSeq = i + 1;
       const followup = newSeq > 1;
       await client.query(
-        `UPDATE daily_assignments_current
+        `UPDATE ${assignmentsTable}
          SET start_time = $1, end_time = $2, travel_time = $3, sequence = $4, followup = $5
          WHERE work_date = $6 AND cleaner_id = $7 AND task_id = $8`,
         [task.start_time, task.end_time, task.travel_time, newSeq, followup, workDate, cleanerId, task.task_id]
@@ -902,8 +904,12 @@ export interface ApplyToProductionResult {
 
 export async function applyOptimizerToProduction(
   runId: string,
-  workDate: string
+  workDate: string,
+  scope: AssignmentScope = "housekeeping",
 ): Promise<ApplyToProductionResult> {
+  const resolvedScope = normalizeAssignmentScope(scope);
+  const assignmentsTable = assignmentsTableFor(resolvedScope);
+  const containersTable = containersTableFor(resolvedScope);
   const result: ApplyToProductionResult = {
     runId,
     workDate,
@@ -917,17 +923,15 @@ export async function applyOptimizerToProduction(
   try {
     await client.query('BEGIN');
 
-    // Le righe inserite qui non valorizzano `scope`, quindi valgono housekeeping:
-    // il lock deve essere quello housekeeping o non escluderebbe saveTimeline.
-    await acquireTimelineWriteLock(client, workDate, 'housekeeping');
+    await acquireTimelineWriteLock(client, workDate, resolvedScope);
 
     // Ensure PK sequence is aligned. If the table was bulk-loaded with explicit IDs
     // (or restored), the underlying sequence can lag behind and generate duplicates.
     // This would break MERGE MODE inserts with "duplicate key ... daily_assignments_current_pkey".
     await client.query(`
       SELECT setval(
-        pg_get_serial_sequence('daily_assignments_current', 'id'),
-        (SELECT COALESCE(MAX(id), 0) FROM daily_assignments_current),
+        pg_get_serial_sequence('${assignmentsTable}', 'id'),
+        (SELECT COALESCE(MAX(id), 0) FROM ${assignmentsTable}),
         true
       )
     `);
@@ -935,8 +939,8 @@ export async function applyOptimizerToProduction(
     result.deletedCount = 0;
 
     const insertQuery = `
-      INSERT INTO daily_assignments_current (
-        work_date, cleaner_id, task_id, logistic_code, client_id,
+      INSERT INTO ${assignmentsTable} (
+        work_date, scope, cleaner_id, task_id, logistic_code, client_id,
         premium, address, lat, lng, cleaning_time,
         checkin_date, checkout_date, checkin_time, checkout_time,
         pax_in, pax_out, small_equipment, operation_id, confirmed_operation, straordinaria,
@@ -947,6 +951,7 @@ export async function applyOptimizerToProduction(
       )
       SELECT 
         $2 as work_date,
+        $3 as scope,
         oa.cleaner_id,
         oa.task_id,
         oa.logistic_code,
@@ -985,12 +990,14 @@ export async function applyOptimizerToProduction(
         dc.customer_reference,
         dc.cleaning_time as base_cleaning_time
       FROM optimizer.optimizer_assignment oa
-      JOIN daily_containers dc ON dc.task_id = oa.task_id AND dc.work_date = $2
+      JOIN ${containersTable} dc ON dc.task_id = oa.task_id AND dc.work_date = $2
+        AND ${assignmentScopeSql(resolvedScope, "dc.scope")}
       LEFT JOIN cleaners c ON c.cleaner_id = oa.cleaner_id AND c.work_date = $2
       LEFT JOIN LATERAL (
         SELECT COALESCE(MAX(sequence), 0) as base_seq
-        FROM daily_assignments_current dac
+        FROM ${assignmentsTable} dac
         WHERE dac.work_date = $2 AND dac.cleaner_id = oa.cleaner_id
+          AND ${assignmentScopeSql(resolvedScope, "dac.scope")}
       ) bs ON true
       WHERE oa.run_id = $1
         AND oa.task_id NOT IN (
@@ -998,13 +1005,14 @@ export async function applyOptimizerToProduction(
           WHERE work_date = $2 AND locked = true
         )
         AND oa.task_id NOT IN (
-          SELECT task_id FROM daily_assignments_current
+          SELECT task_id FROM ${assignmentsTable}
           WHERE work_date = $2
+            AND ${assignmentScopeSql(resolvedScope)}
         )
       ON CONFLICT DO NOTHING
     `;
 
-    const insertResult = await client.query(insertQuery, [runId, workDate]);
+    const insertResult = await client.query(insertQuery, [runId, workDate, resolvedScope]);
     result.insertedCount = insertResult.rowCount || 0;
     console.log(`[applyToProduction] MERGE MODE: Inserted ${result.insertedCount} new assignments (existing preserved)`);
 
@@ -1014,7 +1022,8 @@ export async function applyOptimizerToProduction(
         const affectedCleanersResult = await client.query(
           `SELECT DISTINCT oa.cleaner_id
            FROM optimizer.optimizer_assignment oa
-           JOIN daily_assignments_current dac ON dac.task_id = oa.task_id AND dac.work_date = $2
+           JOIN ${assignmentsTable} dac ON dac.task_id = oa.task_id AND dac.work_date = $2
+             AND ${assignmentScopeSql(resolvedScope, "dac.scope")}
            WHERE oa.run_id = $1`,
           [runId, workDate]
         );
@@ -1022,7 +1031,7 @@ export async function applyOptimizerToProduction(
           .map((r: any) => Number(r.cleaner_id))
           .filter((n: number) => Number.isFinite(n));
 
-        violations = await recalculateAffectedCleaners(client, workDate, runId, cleanerIds);
+        violations = await recalculateAffectedCleaners(client, workDate, runId, cleanerIds, assignmentsTable);
         console.log(`[applyToProduction] Recalculated travel/start/end times for ${cleanerIds.length} cleaners`);
       } catch (recalcError: any) {
         console.warn(`[applyToProduction] Warning: failed to recalculate travel times: ${recalcError.message}`);
@@ -1038,7 +1047,8 @@ export async function applyOptimizerToProduction(
       return result;
     }
 
-    // Get next revision number for history table
+    // La prova non scrive lo storico della giornata ufficiale.
+    if (resolvedScope !== "alg-test") {
     const historyRevisionResult = await client.query(
       `SELECT COALESCE(MAX(revision), 0) + 1 as next_revision FROM daily_assignments_history WHERE work_date = $1`,
       [workDate]
@@ -1078,6 +1088,7 @@ export async function applyOptimizerToProduction(
       INSERT INTO daily_assignments_revisions (work_date, revision, task_count, created_by, modification_type)
       VALUES ($1, $2, $3, $4, 'optimizer_auto_assign')
     `, [workDate, revisionsNextRevision, result.insertedCount, 'optimizer-' + runId]);
+    }
 
     await client.query('COMMIT');
     result.success = true;

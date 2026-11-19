@@ -7,6 +7,8 @@ type TimelineHorizontalScrollbarProps = {
   onScroll: UIEventHandler<HTMLDivElement>;
   /** Contenuto nella colonna sinistra (es. pulsante +), allineato alla scrollbar. */
   labelContent?: ReactNode;
+  /** Spazio a destra, come la colonna ore della timeline housekeeping. */
+  trailingWidth?: number;
 };
 
 /** Barra di scroll orizzontale allineata alla colonna timeline (sincronizzata via registerRef). */
@@ -16,6 +18,7 @@ export function TimelineHorizontalScrollbar({
   registerRef,
   onScroll,
   labelContent,
+  trailingWidth = 80,
 }: TimelineHorizontalScrollbarProps) {
   const scrollNodeRef = useRef<HTMLDivElement | null>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
@@ -80,7 +83,9 @@ export function TimelineHorizontalScrollbar({
           aria-hidden
         />
       </div>
-      <div className="h-full w-20 flex-shrink-0" aria-hidden />
+      {trailingWidth > 0 ? (
+        <div className="h-full flex-shrink-0" style={{ width: trailingWidth }} aria-hidden />
+      ) : null}
     </div>
   );
 }

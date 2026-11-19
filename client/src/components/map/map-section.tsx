@@ -1,6 +1,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { TaskType as Task } from "@shared/schema";
+import { assignmentScopeFromWindow } from "@shared/assignment-scope";
 import TaskCard from "@/components/drag-drop/task-card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -76,18 +77,7 @@ export default function MapSection({
   const [cleanerAliases, setCleanerAliases] = useState<Record<string, { id: number; name: string; lastname: string; alias: string }>>({});
   const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
   const [filteredTaskId, setFilteredTaskId] = useState<string | null>(null);
-  const scopeValue: "housekeeping" | "office" =
-    typeof window !== "undefined" &&
-    (() => {
-      const params = new URLSearchParams(window.location.search);
-      return (
-        params.get("scope") === "office" ||
-        params.get("kind") === "office" ||
-        localStorage.getItem("assignments_scope") === "office"
-      );
-    })()
-      ? "office"
-      : "housekeeping";
+  const scopeValue = assignmentScopeFromWindow();
   const withScope = (url: string) =>
     `${url}${url.includes("?") ? "&" : "?"}scope=${scopeValue}`;
 

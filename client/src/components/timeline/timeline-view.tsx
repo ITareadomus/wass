@@ -1,4 +1,5 @@
 import { Personnel, TaskType as Task } from "@shared/schema";
+import { assignmentScopeFromWindow } from "@shared/assignment-scope";
 import { formatClockFromMinutes } from "@shared/clock-display";
 import {
   layoutHousekeepingTimelineTask,
@@ -446,18 +447,8 @@ export default function TimelineView({
 
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const isOfficeScope =
-    (typeof window !== "undefined" &&
-      (() => {
-        const params = new URLSearchParams(window.location.search);
-        return (
-          params.get("scope") === "office" ||
-          params.get("kind") === "office" ||
-          localStorage.getItem("assignments_scope") === "office"
-        );
-      })()) ||
-    false;
-  const scopeValue = isOfficeScope ? "office" : "housekeeping";
+  const scopeValue = assignmentScopeFromWindow();
+  const isOfficeScope = scopeValue === "office";
   const withScope = (url: string) => `${url}${url.includes("?") ? "&" : "?"}scope=${scopeValue}`;
   const [editingAlias, setEditingAlias] = useState<string>("");
   const [isSavingAlias, setIsSavingAlias] = useState(false);
@@ -1472,12 +1463,14 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
   };
 
   useEffect(() => {
+    setCleaners([]);
+    setTimelineData(null);
     loadCleaners();
     loadAliases();
     loadTimelineCleaners();
     loadTimelineData();
     loadCleanerLocks();
-  }, []);
+  }, [scopeValue]);
 
   useEffect(() => {
     const reloadTimelineRoster = async () => {
@@ -2240,7 +2233,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: workDate,
-          modified_by: currentUser.username || 'unknown'
+          modified_by: currentUser.username || 'unknown',
+          scope: scopeValue,
         })
       });
 
@@ -2561,7 +2555,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
               )}
             </div>
             <div className="flex items-center gap-3 print:hidden">
-              {!isOfficeScope && (
+              {!isOfficeScope && scopeValue !== "alg-test" && (
                 <div className="flex items-center gap-2">
                   <Label
                     htmlFor="execution-status-colors-switch"
@@ -2637,7 +2631,15 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 Mappa
               </Button>
               <Button
-                onClick={() => setLocation(isOfficeScope ? '/convocazioni?kind=office' : '/convocazioni')}
+                onClick={() =>
+                  setLocation(
+                    scopeValue === "alg-test"
+                      ? "/convocazioni?scope=alg-test"
+                      : isOfficeScope
+                        ? "/convocazioni?kind=office"
+                        : "/convocazioni",
+                  )
+                }
                 variant="outline"
                 size="sm"
                 data-viewer-allow=""
@@ -3640,7 +3642,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                 />
                 <div className="grid h-full flex-1 grid-cols-[1fr_auto] items-center pl-2 pr-0">
                   <div className="col-start-2 flex items-center gap-3 justify-self-end print:hidden">
-                    {onOperationalDayToggle && (
+                    {onOperationalDayToggle && scopeValue !== "alg-test" && (
                       <div className="flex items-center gap-2">
                         <Label
                           htmlFor="operational-day-switch"
@@ -3658,6 +3660,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                         />
                       </div>
                     )}
+                  {scopeValue === "alg-test" ? null : (
                   <Button
                     onClick={() => setShowAdamTransferDialog(true)}
                     size="sm"
@@ -3682,6 +3685,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                     )}
                     {isTransferringToAdam ? "Trasferimento..." : "Trasferisci su ADAM"}
                   </Button>
+                  )}
                   </div>
                 </div>
                 <div

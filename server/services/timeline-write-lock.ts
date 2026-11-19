@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg';
 
-export type TimelineLockScope = 'housekeeping' | 'office' | 'logistics';
+export type TimelineLockScope = 'housekeeping' | 'office' | 'alg-test' | 'logistics';
 
 async function lockWithKey(client: PoolClient, key: string): Promise<void> {
   // Chi prende il lock deve chiudere la transazione entro questo timeout: oltre,
@@ -44,7 +44,7 @@ export async function acquireTimelineWriteLock(
 export async function acquireContainersWriteLock(
   client: PoolClient,
   workDate: string,
-  scope: 'housekeeping' | 'office'
+  scope: 'housekeeping' | 'office' | 'alg-test'
 ): Promise<void> {
   await lockWithKey(client, `daily_containers:${workDate}:${scope}`);
 }

@@ -32,6 +32,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Eye, EyeOff, Loader2, Lock, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { PageViewportCentered } from "@/components/page-viewport-centered";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +44,7 @@ interface Account {
   password?: string;
   plain_password?: string;
   role: AccountRole;
+  betaTester?: boolean;
   source?: "wass" | "adam";
   displayName?: string;
 }
@@ -111,8 +113,8 @@ function accountPassword(account: Pick<Account, "password" | "plain_password">):
   return account.password;
 }
 
-function isPrimaryAdmin(account: Pick<Account, "id" | "role" | "source">) {
-  return !isAdamAccount(account) && account.id === 1 && account.role === "admin";
+function isPrimaryAdmin(account: Pick<Account, "id" | "role" | "source"> | null | undefined) {
+  return !!account && !isAdamAccount(account) && account.id === 1 && account.role === "admin";
 }
 
 async function readError(response: Response, fallback: string) {
@@ -138,6 +140,7 @@ export default function Settings() {
   const [draftUsername, setDraftUsername] = useState("");
   const [draftPassword, setDraftPassword] = useState("");
   const [draftRole, setDraftRole] = useState<AccountRole>("user");
+  const [draftBetaTester, setDraftBetaTester] = useState(false);
   const [showDraftPassword, setShowDraftPassword] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -208,23 +211,25 @@ export default function Settings() {
     setDraftUsername("");
     setDraftPassword("");
     setDraftRole("user");
+    setDraftBetaTester(false);
     setShowDraftPassword(false);
     setEditorOpen(true);
   };
 
   const openEdit = (account: Account) => {
-    if (isPrimaryAdmin(account)) return;
     setEditingAccount(account);
     setDraftUsername(accountLabel(account));
     setDraftPassword(accountPassword(account));
     setDraftRole(account.role);
+    setDraftBetaTester(account.betaTester === true);
     setShowDraftPassword(false);
     setEditorOpen(true);
   };
 
   const handleSave = async () => {
     const isAdam = isAdamAccount(editingAccount);
-    if (!draftUsername.trim() || (!isAdam && !draftPassword)) {
+    const lockedAdmin = isPrimaryAdmin(editingAccount);
+    if (!draftUsername.trim() || (!isAdam && !lockedAdmin && !draftPassword)) {
       toast({
         title: "Campi mancanti",
         description: "Username e password sono obbligatori",
@@ -241,10 +246,10 @@ export default function Settings() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
           isEdit && isAdam
-            ? { source: "adam", id: editingAccount.id, role: draftRole }
+            ? { source: "adam", id: editingAccount.id, role: draftRole, betaTester: draftBetaTester }
             : isEdit
-              ? { id: editingAccount.id, username: draftUsername.trim(), password: draftPassword, role: draftRole }
-              : { username: draftUsername.trim(), password: draftPassword, role: draftRole }
+              ? { id: editingAccount.id, username: draftUsername.trim(), password: draftPassword, role: draftRole, betaTester: draftBetaTester }
+              : { username: draftUsername.trim(), password: draftPassword, role: draftRole, betaTester: draftBetaTester }
         ),
       });
 
@@ -389,6 +394,11 @@ export default function Settings() {
                           </span>
                         ) : null}
                         <Badge className={role.badgeClass}>{role.label}</Badge>
+                        {account.betaTester ? (
+                          <Badge className="border-transparent bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-100">
+                            Beta-Tester
+                          </Badge>
+                        ) : null}
                         {locked ? (
                           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                             <Lock className="h-3 w-3" />
@@ -428,8 +438,7 @@ export default function Settings() {
                         variant="ghost"
                         size="icon"
                         aria-label={`Modifica ${accountLabel(account)}`}
-                        title={locked ? "L'account admin principale non si può modificare" : "Modifica"}
-                        disabled={locked}
+                        title={locked ? "Puoi cambiare solo il flag Beta-Tester" : "Modifica"}
                         onClick={() => openEdit(account)}
                       >
                         <Pencil className="h-4 w-4" />
@@ -467,6 +476,8 @@ export default function Settings() {
             <DialogDescription>
               {isAdamAccount(editingAccount)
                 ? "Nome e password arrivano da ADAM. Qui puoi cambiare solo il ruolo WASS."
+                : isPrimaryAdmin(editingAccount)
+                  ? "L'account principale resta admin. Qui puoi solo accendere o spegnere Beta-Tester."
                 : editingAccount
                   ? `Aggiorna username, password o ruolo di ${editingAccount.username}.`
                   : "Username e password servono per entrare in WASS."}
@@ -481,14 +492,14 @@ export default function Settings() {
                 onChange={(event) => setDraftUsername(event.target.value)}
                 placeholder="Nome utente"
                 autoComplete="off"
-                readOnly={isAdamAccount(editingAccount)}
-                disabled={isAdamAccount(editingAccount)}
+                readOnly={isAdamAccount(editingAccount) || isPrimaryAdmin(editingAccount)}
+                disabled={isAdamAccount(editingAccount) || isPrimaryAdmin(editingAccount)}
               />
               {isAdamAccount(editingAccount) ? (
                 <p className="text-xs text-muted-foreground">Accesso con {editingAccount?.username}</p>
               ) : null}
             </div>
-            {isAdamAccount(editingAccount) ? null : (
+            {isAdamAccount(editingAccount) || isPrimaryAdmin(editingAccount) ? null : (
             <div className="space-y-2">
               <Label htmlFor="account-password">Password</Label>
               <div className="relative">
@@ -535,6 +546,19 @@ export default function Settings() {
                 </SelectContent>
               </Select>
             </div>
+            <label className="flex items-start gap-3 rounded-md border px-3 py-2">
+              <Checkbox
+                checked={draftBetaTester}
+                onCheckedChange={(checked) => setDraftBetaTester(checked === true)}
+                aria-label="Beta-Tester"
+              />
+              <span>
+                <span className="block text-sm font-medium">Beta-Tester</span>
+                <span className="block text-xs text-muted-foreground">
+                  Può aprire la prova algoritmo, confrontare le giornate, modificare le impostazioni dell&apos;algoritmo e scaricare la giornata.
+                </span>
+              </span>
+            </label>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setEditorOpen(false)} disabled={isSaving}>

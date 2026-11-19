@@ -17,6 +17,7 @@ import {
   type RefreshSyncMode,
 } from './adam-timeline-assignment-sync';
 import pool from '../../shared/pg-db';
+import type { AssignmentScope } from '../../shared/assignment-scope';
 import { formatHmTime } from '../../shared/logistics-task-windows';
 import {
   normalizeLogisticsTaskKind,
@@ -529,7 +530,7 @@ async function runRefreshLogisticsContainersFromAdam(
 export async function refreshContainersFromAdam(
   workDate: string,
   modifiedBy: string = 'system',
-  workflow: 'housekeeping' | 'office' = 'housekeeping',
+  workflow: AssignmentScope = 'housekeeping',
   options: {
     mode?: RefreshSyncMode;
     /** Skip create_containers (e.g. retry after apt already refreshed). */
@@ -542,7 +543,7 @@ export async function refreshContainersFromAdam(
     options.mode === "assignments" ? "assignments" : "apt";
   const existing = inflightAdamRefresh.get(lockKey);
   if (existing) {
-    if (requestedMode !== "assignments" || existing.mode === "assignments") {
+    if (workflow === "alg-test" || requestedMode !== "assignments" || existing.mode === "assignments") {
       console.log(`⏳ refreshContainersFromAdam: attendo refresh già in corso (${lockKey})`);
       return existing.promise;
     }
@@ -599,7 +600,7 @@ export async function refreshContainersFromAdam(
 async function runRefreshContainersFromAdam(
   workDate: string,
   modifiedBy: string,
-  workflow: 'housekeeping' | 'office',
+  workflow: AssignmentScope,
   options: {
     mode?: RefreshSyncMode;
     skipContainersRefresh?: boolean;
@@ -633,7 +634,11 @@ async function runRefreshContainersFromAdam(
 
       const createContainersPath = path.join(process.cwd(), 'client/public/scripts/create_containers.py');
 
-      const workflowArg = workflow === 'office' ? ' --workflow office' : '';
+      const workflowArg = workflow === 'office'
+        ? ' --workflow office'
+        : workflow === 'alg-test'
+          ? ' --workflow alg-test --skip-timeline-update'
+          : '';
       const skipTimelineArg = mode === 'assignments' ? ' --skip-timeline-update' : '';
       await new Promise<string>((resolve, reject) => {
         exec(
@@ -727,12 +732,14 @@ async function runRefreshContainersFromAdam(
         workflow
       );
 
-      const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
-      await pgDailyAssignmentsService.saveContainersToHistory(
-        workDate,
-        modifiedBy,
-        'containers_synced_from_adam'
-      );
+      if (workflow !== 'alg-test') {
+        const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
+        await pgDailyAssignmentsService.saveContainersToHistory(
+          workDate,
+          modifiedBy,
+          'containers_synced_from_adam'
+        );
+      }
 
       console.log(
         `✅ Containers sincronizzati: rimosse ${removedCount} task già assegnate, salvati su PostgreSQL`
@@ -749,12 +756,22 @@ async function runRefreshContainersFromAdam(
         containersData: null,
         removedCount: 0,
         mode,
-        error: containersError,
+        error: containersError || undefined,
       };
     }
     console.error(
       '⚠️ Continuo con lo specchio delle assegnazioni ADAM anche se i containers non sono stati rigenerati'
     );
+  }
+
+  if (workflow === 'alg-test') {
+    return {
+      success: containersError == null,
+      containersData,
+      removedCount,
+      mode,
+      error: containersError || undefined,
+    };
   }
 
   try {

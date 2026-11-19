@@ -150,7 +150,7 @@ export async function enrichHousekeepingTimelineExecutionStatus(
 /** Carica solo gli stati esecuzione Adam per i task già in timeline (niente ricalcolo). */
 export async function loadHousekeepingTimelineExecutionStatusByDate(
   workDate: string,
-  scope: "housekeeping" | "office" = "housekeeping"
+  scope: "housekeeping" | "office" | "alg-test" = "housekeeping"
 ): Promise<Record<string, AdamHousekeepingExecutionFields>> {
   const { loadTimeline } = await import("./workspace-files");
   const timeline = await loadTimeline(workDate, scope);

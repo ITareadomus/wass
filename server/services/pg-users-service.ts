@@ -6,6 +6,7 @@ export interface User {
   password: string;
   plain_password?: string;
   role: string;
+  beta_tester?: boolean;
   adam_id?: number;
   created_at?: Date;
   updated_at?: Date;
@@ -30,6 +31,7 @@ export class PgUsersService {
       // Ensure adam_id column exists (migration for existing tables)
       await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS adam_id INTEGER`);
       await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS plain_password TEXT`);
+      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS beta_tester BOOLEAN NOT NULL DEFAULT false`);
       // Le password restano in chiaro. Se `password` è ancora un hash bcrypt
       // e `plain_password` è leggibile, ripristina il valore in chiaro.
       await query(`
@@ -50,7 +52,7 @@ export class PgUsersService {
   async getAllUsers(): Promise<User[]> {
     try {
       // Include plain_password for admin settings page
-      const result = await query('SELECT id, username, password, plain_password, role, adam_id, created_at, updated_at FROM users ORDER BY id');
+      const result = await query('SELECT id, username, password, plain_password, role, beta_tester, adam_id, created_at, updated_at FROM users ORDER BY id');
       return result.rows;
     } catch (error) {
       console.error('❌ PG: Errore nel caricamento users:', error);
@@ -60,7 +62,7 @@ export class PgUsersService {
 
   async getUserById(id: number): Promise<User | null> {
     try {
-      const result = await query('SELECT id, username, password, role, adam_id, created_at, updated_at FROM users WHERE id = $1', [id]);
+      const result = await query('SELECT id, username, password, role, beta_tester, adam_id, created_at, updated_at FROM users WHERE id = $1', [id]);
       return result.rows[0] || null;
     } catch (error) {
       console.error(`❌ PG: Errore nel caricamento user ${id}:`, error);
@@ -70,7 +72,7 @@ export class PgUsersService {
 
   async getUserByUsername(username: string): Promise<User | null> {
     try {
-      const result = await query('SELECT id, username, password, role, adam_id, created_at, updated_at FROM users WHERE username = $1', [username]);
+      const result = await query('SELECT id, username, password, role, beta_tester, adam_id, created_at, updated_at FROM users WHERE username = $1', [username]);
       return result.rows[0] || null;
     } catch (error) {
       console.error(`❌ PG: Errore nel caricamento user ${username}:`, error);
@@ -78,11 +80,11 @@ export class PgUsersService {
     }
   }
 
-  async createUser(username: string, password: string, role: string = 'user'): Promise<User | null> {
+  async createUser(username: string, password: string, role: string = 'user', betaTester: boolean = false): Promise<User | null> {
     try {
       const result = await query(
-        'INSERT INTO users (username, password, plain_password, role) VALUES ($1, $2, $2, $3) RETURNING id, username, password, plain_password, role, created_at, updated_at',
-        [username, password, role]
+        'INSERT INTO users (username, password, plain_password, role, beta_tester) VALUES ($1, $2, $2, $3, $4) RETURNING id, username, password, plain_password, role, beta_tester, created_at, updated_at',
+        [username, password, role, betaTester]
       );
       console.log(`✅ PG: User ${username} creato`);
       return result.rows[0] || null;
@@ -92,7 +94,7 @@ export class PgUsersService {
     }
   }
 
-  async updateUser(id: number, updates: Partial<Pick<User, 'username' | 'password' | 'role'>>): Promise<User | null> {
+  async updateUser(id: number, updates: Partial<Pick<User, 'username' | 'password' | 'role' | 'beta_tester'>>): Promise<User | null> {
     try {
       const setClauses: string[] = [];
       const values: any[] = [];
@@ -112,6 +114,10 @@ export class PgUsersService {
         setClauses.push(`role = $${paramIndex++}`);
         values.push(updates.role);
       }
+      if (updates.beta_tester !== undefined) {
+        setClauses.push(`beta_tester = $${paramIndex++}`);
+        values.push(Boolean(updates.beta_tester));
+      }
 
       if (setClauses.length === 0) return null;
 
@@ -119,7 +125,7 @@ export class PgUsersService {
       values.push(id);
 
       const result = await query(
-        `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING id, username, password, role, created_at, updated_at`,
+        `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING id, username, password, role, beta_tester, created_at, updated_at`,
         values
       );
       console.log(`✅ PG: User ${id} aggiornato`);
@@ -147,7 +153,7 @@ export class PgUsersService {
   async validateLogin(username: string, password: string): Promise<User | null> {
     try {
       const result = await query(
-        'SELECT id, username, password, role, created_at, updated_at FROM users WHERE username = $1',
+        'SELECT id, username, password, role, beta_tester, created_at, updated_at FROM users WHERE username = $1',
         [username]
       );
       

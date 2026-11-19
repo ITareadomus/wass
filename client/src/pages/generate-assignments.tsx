@@ -1,5 +1,7 @@
 import { DndContext, MeasuringStrategy } from "@dnd-kit/core";
 import { TaskType as Task } from "@shared/schema";
+import { assignmentScopeFromWindow } from "@shared/assignment-scope";
+import { AlgTestAlgorithmSettingsButton } from "@/components/settings/alg-test-algorithm-settings-dialog";
 import {
   isWorkDateHistoricallyLocked,
   isWorkDateInPast,
@@ -665,18 +667,13 @@ export default function GenerateAssignments() {
   const [lastSavedTimestamp, setLastSavedTimestamp] = useState<string | null>(null); // Renamed from lastSavedAssignment
   const { toast } = useToast();
   const [location] = useLocation();
-  const isOfficeScope = useMemo(() => {
-    if (!OFFICE_SCOPE_ENABLED) return false;
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const scopeParam = params.get("scope");
-      const kindParam = params.get("kind");
-      const storedScope = localStorage.getItem("assignments_scope");
-      return scopeParam === "office" || kindParam === "office" || storedScope === "office";
-    }
-    return location.includes("scope=office") || location.includes("kind=office");
+  const scopeValue = useMemo(() => {
+    const detected = assignmentScopeFromWindow();
+    if (!OFFICE_SCOPE_ENABLED && detected === "office") return "housekeeping";
+    return detected;
   }, [location]);
-  const scopeValue = isOfficeScope ? "office" : "housekeeping";
+  const isOfficeScope = scopeValue === "office";
+  const isAlgTest = scopeValue === "alg-test";
   const withScope = useCallback((url: string) => {
     const separator = url.includes("?") ? "&" : "?";
     return `${url}${separator}scope=${scopeValue}`;
@@ -733,6 +730,7 @@ export default function GenerateAssignments() {
   }, [toast]);
 
   useEffect(() => {
+    if (scopeValue === "alg-test") return;
     localStorage.setItem("assignments_scope", scopeValue);
   }, [scopeValue]);
 
@@ -1255,6 +1253,30 @@ export default function GenerateAssignments() {
         // NON esistono assegnazioni salvate in Object Storage
         console.log("ℹ️ Nessuna assegnazione salvata in Object Storage per", dateStr);
 
+        // I contenitori già presenti in PostgreSQL vanno mostrati.
+        // L'estrazione da ADAM li sostituirebbe con i task del database esterno.
+        try {
+          const containersResponse = await fetch(withScope(`/api/containers?date=${dateStr}`), {
+            cache: "no-store",
+            headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+          });
+          if (containersResponse.ok) {
+            const containersData = await containersResponse.json();
+            const totalTasks = Number(containersData?.summary?.total_tasks ?? 0);
+            if (totalTasks > 0) {
+              console.log(`📦 ${totalTasks} task già nei contenitori per ${dateStr}`);
+              await loadTasks(true);
+              setIsTimelineReadOnly(isWorkDateHistoricallyLocked(date));
+              setHasUnsavedChanges(false);
+              setExtractionStep("Task caricati!");
+              setIsExtracting(false);
+              return;
+            }
+          }
+        } catch (err) {
+          console.log("Contenitori non disponibili, procedo con il flusso normale", err);
+        }
+
         // Verifica se esiste timeline locale (da DB)
         try {
           const timelineResponse = await fetch(withScope(`/api/timeline?date=${dateStr}`), {
@@ -1415,6 +1437,17 @@ export default function GenerateAssignments() {
       prevDateRef.current = currentDateStr;
     }
   }, [selectedDate, isInitialMount]);
+
+  const loadedScopeRef = useRef(scopeValue);
+  useEffect(() => {
+    if (loadedScopeRef.current === scopeValue) return;
+    loadedScopeRef.current = scopeValue;
+    setEarlyOutTasks([]);
+    setHighPriorityTasks([]);
+    setLowPriorityTasks([]);
+    setAllTasksWithAssignments([]);
+    refreshAssignments("initial", selectedDate);
+  }, [scopeValue]);
 
   // Funzione per convertire cleaning_time (minuti) in formato ore.minuti
   const formatDuration = (minutes: number): string => {
@@ -2751,7 +2784,7 @@ export default function GenerateAssignments() {
       const response = await fetch("/api/optimizer/apply-hypothesis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: dateStr, runId: hypothesis.runId }),
+        body: JSON.stringify({ date: dateStr, runId: hypothesis.runId, scope: scopeValue }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data?.success) {
@@ -2844,7 +2877,11 @@ export default function GenerateAssignments() {
           <div className="mx-auto mb-3 flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-4">
               <h1 className="flex items-center gap-2 text-[25px] leading-[44px] font-bold text-foreground">
-                {isOfficeScope ? "Assegnazioni Ufficio del" : "Assegnazioni Housekeeping del"}
+                {isAlgTest
+                  ? "Prova algoritmo del"
+                  : isOfficeScope
+                    ? "Assegnazioni Ufficio del"
+                    : "Assegnazioni Housekeeping del"}
               </h1>
               <Popover>
                 <PopoverTrigger asChild>
@@ -2871,12 +2908,22 @@ export default function GenerateAssignments() {
                 </PopoverContent>
               </Popover>
             </div>
-            <HousekeepingLogisticsSwitch
-              active={isOfficeScope ? "office" : "housekeeping"}
-              workDate={format(selectedDate, "yyyy-MM-dd")}
-            />
+            {isAlgTest ? null : (
+              <HousekeepingLogisticsSwitch
+                active={isOfficeScope ? "office" : "housekeeping"}
+                workDate={format(selectedDate, "yyyy-MM-dd")}
+              />
+            )}
           </div>
         )}
+        {isAlgTest && !(isExtracting || isLoadingTasks || isLoading) ? (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+            <p>
+              Questa è una prova. I task arrivano da ADAM senza le assegnazioni già fatte, i cleaner sono quelli selezionati per la data, e il pulsante Assegna scrive solo qui. La giornata vera resta com&apos;è. Poi confronta le due dalla pagina di comparison.
+            </p>
+            <AlgTestAlgorithmSettingsButton />
+          </div>
+        ) : null}
 
         {isExtracting || isLoadingTasks || isLoading ? (
           <PageViewportCentered layout="fill" className="py-4">
@@ -2936,6 +2983,7 @@ export default function GenerateAssignments() {
                 />
               </div>
               <div className="flex items-center flex-shrink-0 bg-custom-blue rounded-md overflow-hidden border-2 border-custom-blue">
+              {isAlgTest ? null : (
               <Button
                 variant="ghost"
                 size="sm"
@@ -2968,7 +3016,8 @@ export default function GenerateAssignments() {
                 )}
                 Sync from ADAM
               </Button>
-              <div className="w-px h-6 bg-black/20 dark:bg-white/20" />
+              )}
+              {isAlgTest ? null : <div className="w-px h-6 bg-black/20 dark:bg-white/20" />}
               <Button
                 variant="ghost"
                 size="sm"
@@ -3239,7 +3288,7 @@ export default function GenerateAssignments() {
                   }}
                   preassignedAnimatedTaskIds={preassignedAnimatedTaskIds}
                   isOperationalDayStarted={isOperationalDayStarted}
-                  onOperationalDayToggle={(started) => void handleOperationalDayToggle(started)}
+                  onOperationalDayToggle={isAlgTest ? undefined : (started) => void handleOperationalDayToggle(started)}
                   isOperationalDaySwitchDisabled={isTimelineReadOnly || isSavingOperationalDay}
                   className={!showContainers ? "rounded-tr-none" : undefined}
                   onOpenStatistics={toggleStatistics}

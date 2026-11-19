@@ -1,4 +1,5 @@
 import { formatInTimeZone } from 'date-fns-tz';
+import { normalizeAssignmentScope, type AssignmentScope } from '../../shared/assignment-scope';
 import { isPastWorkDateServerGuardBlocked } from '../../shared/work-date-access';
 
 /**
@@ -165,7 +166,7 @@ function getNormalizedLogisticsTimeline(data: any): any {
  */
 export async function loadTimeline(
   workDate: string,
-  scope: 'housekeeping' | 'office' = 'housekeeping'
+  scope: AssignmentScope = 'housekeeping'
 ): Promise<any | null> {
   try {
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
@@ -201,11 +202,10 @@ export async function saveTimeline(
     oldValues?: string[];
     newValues?: string[];
   },
-  scope?: 'housekeeping' | 'office'
+  scope?: AssignmentScope
 ): Promise<boolean> {
   try {
-    const resolvedScope: 'housekeeping' | 'office' =
-      scope ?? (data?.metadata?.scope === 'office' ? 'office' : 'housekeeping');
+    const resolvedScope = normalizeAssignmentScope(scope ?? data?.metadata?.scope);
     const normalizedData = getNormalizedTimeline(data);
 
     normalizedData.metadata = normalizedData.metadata || {};
@@ -218,16 +218,15 @@ export async function saveTimeline(
     await pgDailyAssignmentsService.saveTimeline(workDate, normalizedData, resolvedScope);
     console.log(`✅ Timeline saved to PostgreSQL for ${workDate}`);
 
-    // Keep task_collaborators in sync with daily_assignments_current.
-    // This prevents collaboration mismatches after any operation that saves the timeline
-    // (drag & drop, swap cleaners, batch operations, etc.).
-    try {
-      const { taskCollaborationService } = await import('./pg-task-collaboration-service');
-      await taskCollaborationService.reconcileForWorkDate(workDate);
-    } catch (reconcileErr) {
-      // Don't hide the original save errors, but do surface reconcile failures.
-      console.error(`❌ Error reconciling collaborations for ${workDate}:`, reconcileErr);
-      throw reconcileErr;
+    // La prova non riscrive i collaboratori della giornata ufficiale: quella tabella non ha scope.
+    if (resolvedScope !== "alg-test") {
+      try {
+        const { taskCollaborationService } = await import('./pg-task-collaboration-service');
+        await taskCollaborationService.reconcileForWorkDate(workDate);
+      } catch (reconcileErr) {
+        console.error(`❌ Error reconciling collaborations for ${workDate}:`, reconcileErr);
+        throw reconcileErr;
+      }
     }
     
     // Prepare change tracking arrays
@@ -247,8 +246,8 @@ export async function saveTimeline(
       }
     }
     
-    // Save to history for audit/rollback (PostgreSQL only)
-    if (!skipRevision) {
+    // La prova non scrive lo storico della giornata ufficiale.
+    if (!skipRevision && resolvedScope !== "alg-test") {
       await pgDailyAssignmentsService.saveToHistory(
         workDate, 
         normalizedData, 
@@ -274,7 +273,7 @@ export async function saveTimeline(
  */
 async function loadContainersInternal(
   workDate: string,
-  scope: 'housekeeping' | 'office' = 'housekeeping'
+  scope: AssignmentScope = 'housekeeping'
 ): Promise<any | null> {
   try {
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
@@ -290,7 +289,7 @@ async function loadContainersInternal(
  */
 export async function loadContainers(
   workDate: string,
-  scope: 'housekeeping' | 'office' = 'housekeeping'
+  scope: AssignmentScope = 'housekeeping'
 ): Promise<any | null> {
   try {
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
@@ -317,11 +316,10 @@ export async function saveContainers(
   data: any,
   createdBy: string = 'system',
   modificationType: string = 'manual',
-  scope?: 'housekeeping' | 'office'
+  scope?: AssignmentScope
 ): Promise<boolean> {
   try {
-    const resolvedScope: 'housekeeping' | 'office' =
-      scope ?? (data?.metadata?.scope === 'office' ? 'office' : 'housekeeping');
+    const resolvedScope = normalizeAssignmentScope(scope ?? data?.metadata?.scope);
     // Save to PostgreSQL (primary and only storage)
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
     await pgDailyAssignmentsService.saveContainers(workDate, data, resolvedScope);
@@ -372,7 +370,7 @@ export async function saveLogisticsContainers(
  */
 async function loadSelectedCleanersFromPg(
   workDate: string,
-  scope: 'housekeeping' | 'office' = 'housekeeping'
+  scope: AssignmentScope = 'housekeeping'
 ): Promise<any | null> {
   try {
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
@@ -400,7 +398,7 @@ async function loadSelectedCleanersFromPg(
  */
 export async function loadSelectedCleaners(
   workDate: string,
-  scope: 'housekeeping' | 'office' = 'housekeeping'
+  scope: AssignmentScope = 'housekeeping'
 ): Promise<any | null> {
   try {
     const { pgDailyAssignmentsService } = await import('./pg-daily-assignments-service');
@@ -489,11 +487,10 @@ export async function saveSelectedCleaners(
   skipRevision: boolean = false, 
   createdBy: string = 'system', 
   modificationType: string = 'MANUAL',
-  scope?: 'housekeeping' | 'office'
+  scope?: AssignmentScope
 ): Promise<boolean> {
   try {
-    const resolvedScope: 'housekeeping' | 'office' =
-      scope ?? (data?.metadata?.scope === 'office' ? 'office' : 'housekeeping');
+    const resolvedScope = normalizeAssignmentScope(scope ?? data?.metadata?.scope);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const targetDate = new Date(workDate);
@@ -777,7 +774,7 @@ export async function resetTimeline(
   workDate: string,
   createdBy: string = 'system',
   modificationType: string = 'reset',
-  scope: 'housekeeping' | 'office' = 'housekeeping'
+  scope: AssignmentScope = 'housekeeping'
 ): Promise<boolean> {
   try {
     if (isPastWorkDateServerGuardBlocked(workDate)) {

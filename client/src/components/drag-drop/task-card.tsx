@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import { useComparisonSelection } from "@/components/comparison/comparison-selection";
 import { useQuery } from "@tanstack/react-query";
 import { TaskType as Task } from "@shared/schema";
 import { formatClockLabel } from "@shared/clock-display";
@@ -779,6 +780,7 @@ const valueFieldClass = (editable: boolean, manual: boolean) =>
   };
 
   const [isMapFiltered, setIsMapFiltered] = useState(false);
+  const comparisonSelection = useComparisonSelection();
   
   // Estrai locked e locked_reason dal task per dependency stabili
   const taskLocked = (task as any).locked ?? false;
@@ -814,19 +816,19 @@ const valueFieldClass = (editable: boolean, manual: boolean) =>
 
   // Sincronizza con il filtro mappa per evidenziazione
   useEffect(() => {
+    const markerId = getTaskMapMarkerId(task);
+    if (comparisonSelection) {
+      setIsMapFiltered(comparisonSelection.taskId === markerId);
+      return;
+    }
     const checkMapFilter = setInterval(() => {
       const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-      // Per task collaborativi usa ID composto taskId:cleanerId.
-      const markerId = getTaskMapMarkerId(task);
-      
       const shouldBeFiltered = currentFilteredTaskId === markerId;
-      if (shouldBeFiltered !== isMapFiltered) {
-        setIsMapFiltered(shouldBeFiltered);
-      }
+      setIsMapFiltered((current) => (current === shouldBeFiltered ? current : shouldBeFiltered));
     }, 100);
 
     return () => clearInterval(checkMapFilter);
-  }, [task.id, isMapFiltered, task]);
+  }, [task, comparisonSelection, comparisonSelection?.taskId]);
 
   // Gestisce il click sulla card: se multi-select toggle selezione, altrimenti apri modale
   const handleCardClick = (e: React.MouseEvent) => {
@@ -850,7 +852,11 @@ const valueFieldClass = (editable: boolean, manual: boolean) =>
       // Toggle filtro mappa per questa task (attiva/disattiva animazione)
       // Per task collaborativi usa ID composto "taskId:cleanerId" per identificare il marker specifico
       const markerId = getTaskMapMarkerId(task);
-      
+      if (comparisonSelection) {
+        comparisonSelection.toggleTask(markerId);
+        return;
+      }
+
       const currentFilteredTaskId = (window as any).mapFilteredTaskId;
       if (currentFilteredTaskId === markerId) {
         // Spegni animazione

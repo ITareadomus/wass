@@ -17,6 +17,7 @@ const DEFAULT_PAN_IGNORE_SELECTOR = [
   "a",
   '[role="button"]',
   "[data-first-apt-time-shift]",
+  "[data-dnd-task-card-surface]",
 ].join(", ");
 
 type TimelineScrollDragState = {
@@ -42,6 +43,7 @@ export function useSyncedTimelineScroll() {
   const isSyncingRef = useRef(false);
   const dragRef = useRef<TimelineScrollDragState | null>(null);
   const applyScrollLeftRef = useRef<(left: number) => void>(() => {});
+  const scrollLeftRef = useRef(0);
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
 
   const applyScrollLeft = useCallback((left: number) => {
@@ -55,6 +57,7 @@ export function useSyncedTimelineScroll() {
     if (maxScroll <= 0) return;
 
     const next = Math.max(0, Math.min(maxScroll, left));
+    scrollLeftRef.current = next;
     isSyncingRef.current = true;
     for (const node of nodes) {
       if (node.scrollLeft !== next) node.scrollLeft = next;
@@ -70,6 +73,7 @@ export function useSyncedTimelineScroll() {
   const registerScrollRef = useCallback((node: HTMLDivElement | null) => {
     if (!node || nodesRef.current.includes(node)) return;
     nodesRef.current.push(node);
+    if (node.scrollLeft !== scrollLeftRef.current) node.scrollLeft = scrollLeftRef.current;
   }, []);
 
   const handleScroll = useCallback((event: ReactUIEvent<HTMLDivElement>) => {
@@ -146,5 +150,6 @@ export function useSyncedTimelineScroll() {
     handlePointerDown,
     handlePointerMove,
     stopPan,
+    applyScrollLeft,
   };
 }

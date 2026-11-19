@@ -10,7 +10,8 @@ import {
   type HkNamedProfile,
 } from "../../../shared/hk-constraint-settings";
 import { loadHkProfileLibrary } from "./load-hk-constraints";
-import { runAllPhases } from "./runAllPhases";
+import { runBalancedDay } from "./runBalancedDay";
+import type { AssignmentScope } from "../../../shared/assignment-scope";
 
 async function loadHypothesisAssignments(runId: string): Promise<{
   assignments: HkHypothesisAssignment[];
@@ -54,17 +55,15 @@ function descriptionFor(profile: HkNamedProfile): string {
   return "Profilo salvato nelle impostazioni.";
 }
 
-export async function runHkAssignmentHypotheses(workDate: string): Promise<HkHypothesisPickerItem[]> {
+export async function runHkAssignmentHypotheses(
+  workDate: string,
+  scope: AssignmentScope = "housekeeping",
+): Promise<HkHypothesisPickerItem[]> {
   const library = await loadHkProfileLibrary();
   const hypotheses: HkHypothesisPickerItem[] = [];
   for (const profile of library.profiles) {
-    console.log(`[hk-hypotheses] Calcolo ipotesi ${profile.name} per ${workDate}`);
-    const result = await runAllPhases(workDate, {
-      hkConstraints: profile.settings,
-      applyToProduction: false,
-      recordPlan: false,
-      skipPhase4: false,
-    });
+    console.log(`[hk-hypotheses] Calcolo ipotesi ${profile.name} per ${workDate} (${scope})`);
+    const result = await runBalancedDay(workDate, profile.settings, scope);
     if (result.status === "failed") {
       throw new Error(result.error || `Ipotesi ${profile.name} non calcolata`);
     }

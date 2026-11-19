@@ -1,13 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { getStoredUser, getStoredUserRole } from "@/lib/auth-role";
+import { getStoredUser, isBetaTesterAccess, refreshStoredSession } from "@/lib/auth-role";
 
 export function TimelineDayExportButton({ workDate }: { workDate: string }) {
   const { toast } = useToast();
   const [downloading, setDownloading] = useState(false);
-  if (getStoredUserRole() !== "admin") return null;
+  const [visible, setVisible] = useState(() => isBetaTesterAccess());
+  useEffect(() => {
+    void refreshStoredSession().then((user) => setVisible(isBetaTesterAccess(user)));
+  }, []);
+  if (!visible) return null;
 
   const download = async () => {
     if (downloading) return;

@@ -16,26 +16,36 @@ import PreassignedApartments from "@/pages/preassigned-apartments";
 import KeyRegistry from "@/pages/key-registry";
 import LostKeys, { UnreturnedKeys } from "@/pages/lost-keys";
 import NotFound from "@/pages/not-found";
-import { useEffect } from "react";
+import DayComparison from "@/pages/day-comparison";
+import { useEffect, useState } from "react";
 import { WassSiteHeader } from "@/components/wass-site-header";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Home, Settings as SettingsIcon } from "lucide-react";
+import { Columns2, Home, Settings as SettingsIcon } from "lucide-react";
 import { ViewerLock } from "@/components/viewer-lock";
 import {
+  getStoredUser,
   getStoredUserRole,
   homePathForRole,
+  isBetaTesterAccess,
   isLogisticaPathAllowed,
   isLogisticaRole,
   isReadOnlySession,
+  refreshStoredSession,
   LOGISTICS_HOME_PATH,
+  type StoredUser,
 } from "@/lib/auth-role";
 
 const OFFICE_SCOPE_ENABLED = false;
 
 function GlobalHeader() {
   const [location] = useLocation();
-  const role = getStoredUserRole();
+  const [sessionUser, setSessionUser] = useState<StoredUser | null>(getStoredUser());
+  useEffect(() => {
+    void refreshStoredSession().then(setSessionUser);
+  }, [location]);
+  const role = sessionUser?.role ?? getStoredUserRole();
+  const betaAccess = isBetaTesterAccess(sessionUser);
   const logisticsOnly = isLogisticaRole(role);
   const assignmentsHomeHref = homePathForRole(role);
   const isConvocazioniPage =
@@ -50,7 +60,9 @@ function GlobalHeader() {
     location === "/registro-chiavi" ||
     location.startsWith("/registro-chiavi?") ||
     location === "/chiavi-smarrite" ||
-    location === "/chiavi-non-restituite";
+    location === "/chiavi-non-restituite" ||
+    location === "/comparison" ||
+    location === "/alg-test";
 
   useEffect(() => {
     if (typeof window === "undefined" || OFFICE_SCOPE_ENABLED) return;
@@ -78,11 +90,15 @@ function GlobalHeader() {
 
   const homeHref =
     logisticsOnly ||
-    (isConvocazioniPage &&
+      (isConvocazioniPage &&
       typeof window !== "undefined" &&
       new URLSearchParams(window.location.search).get("kind") === "drivers")
       ? LOGISTICS_HOME_PATH
-      : assignmentsHomeHref;
+      : isConvocazioniPage &&
+          typeof window !== "undefined" &&
+          new URLSearchParams(window.location.search).get("scope") === "alg-test"
+        ? "/alg-test"
+        : assignmentsHomeHref;
 
   return (
     <WassSiteHeader
@@ -102,6 +118,32 @@ function GlobalHeader() {
               </Button>
             </Link>
           ) : null}
+          {betaAccess && location !== "/alg-test" && (
+            <Link href="/alg-test">
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                title="Prova l'algoritmo senza modificare la giornata vera"
+                data-testid="link-alg-test-global"
+              >
+                Prova algoritmo
+              </Button>
+            </Link>
+          )}
+          {betaAccess && (
+            <Link href="/comparison">
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-full"
+                title="Confronta giornate"
+                data-testid="link-comparison-global"
+              >
+                <Columns2 className="h-5 w-5" />
+              </Button>
+            </Link>
+          )}
           {role === "admin" && (
             <Link href="/settings">
               <Button
@@ -143,34 +185,50 @@ function LoginHeader() {
 
 function ProtectedRoute({ component: Component }: { component: () => JSX.Element }) {
   const [location, setLocation] = useLocation();
+  const searchNow = typeof window !== "undefined" ? window.location.search : "";
+  const betaPath =
+    location === "/alg-test" ||
+    location === "/comparison" ||
+    (location === "/convocazioni" && new URLSearchParams(searchNow).get("scope") === "alg-test");
+  const [allowed, setAllowed] = useState(!betaPath);
 
   useEffect(() => {
-    const user = localStorage.getItem("user");
-    if (!user) {
-      setLocation("/login");
-      return;
-    }
-
-    const role = getStoredUserRole();
-    if (!isLogisticaRole(role)) return;
-
-    const search = typeof window !== "undefined" ? window.location.search : "";
-    if (!isLogisticaPathAllowed(location, search)) {
-      setLocation(LOGISTICS_HOME_PATH);
-    }
+    let cancelled = false;
+    const run = async () => {
+      const raw = localStorage.getItem("user");
+      if (!raw) {
+        setLocation("/login");
+        return;
+      }
+      const session = await refreshStoredSession();
+      if (cancelled) return;
+      const role = session?.role ?? getStoredUserRole();
+      const search = typeof window !== "undefined" ? window.location.search : "";
+      const betaPage =
+        location === "/alg-test" ||
+        location === "/comparison" ||
+        (location === "/convocazioni" && new URLSearchParams(search).get("scope") === "alg-test");
+      if (betaPage && !isBetaTesterAccess(session)) {
+        setAllowed(false);
+        setLocation(homePathForRole(role));
+        return;
+      }
+      if (isLogisticaRole(role) && !isLogisticaPathAllowed(location, search)) {
+        setAllowed(false);
+        setLocation(LOGISTICS_HOME_PATH);
+        return;
+      }
+      setAllowed(true);
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
   }, [location, setLocation]);
 
   const user = localStorage.getItem("user");
-  if (!user) {
+  if (!user || !allowed) {
     return null;
-  }
-
-  const role = getStoredUserRole();
-  if (isLogisticaRole(role)) {
-    const search = typeof window !== "undefined" ? window.location.search : "";
-    if (!isLogisticaPathAllowed(location, search)) {
-      return null;
-    }
   }
 
   return (
@@ -199,8 +257,8 @@ function Router() {
       <Route path="/unconfirmed-tasks">
         {() => <ProtectedRoute component={UnconfirmedTasks} />}
       </Route>
-      <Route path="/generate-assignments">
-        {() => <ProtectedRoute component={GenerateAssignments} />}
+      <Route path="/generate-assignments" key="housekeeping-assignments">
+        {() => <ProtectedRoute key="housekeeping-assignments" component={GenerateAssignments} />}
       </Route>
       <Route path="/generate-logistics-assignments/driver/:driverId">
         {() => <ProtectedRoute component={LogisticsDriverSheet} />}
@@ -216,6 +274,12 @@ function Router() {
       </Route>
       <Route path="/settings">
         {() => <ProtectedRoute component={SystemSettings} />}
+      </Route>
+      <Route path="/comparison">
+        {() => <ProtectedRoute component={DayComparison} />}
+      </Route>
+      <Route path="/alg-test" key="alg-test-assignments">
+        {() => <ProtectedRoute key="alg-test-assignments" component={GenerateAssignments} />}
       </Route>
       <Route path="/appartamenti-preassegnati">
         {() => <ProtectedRoute component={PreassignedApartments} />}

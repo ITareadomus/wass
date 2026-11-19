@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { Check, Pencil, Plus, Trash2 } from "lucide-react";
 import {
@@ -252,30 +251,30 @@ export function HkAlgorithmSettings({
                     <p className="text-sm text-muted-foreground">{field.detail}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
-                    {field.id === "loadCap" && (
+                    {field.id === "travel" && (
                       <div className="flex items-center gap-2">
-                        <Label htmlFor="load-cap-percent" className="whitespace-nowrap text-sm">
-                          Percentuale
+                        <Label htmlFor="travel-hard-max" className="whitespace-nowrap text-sm">
+                          Massimo
                         </Label>
                         <Input
-                          id="load-cap-percent"
+                          id="travel-hard-max"
                           type="number"
-                          min={100}
-                          max={200}
+                          min={5}
+                          max={180}
                           step={5}
-                          disabled={value.loadCap === "off"}
-                          value={value.loadCapPercent}
+                          disabled={value.travel === "off"}
+                          value={value.travelHardMaxMin}
                           className="w-24"
                           onChange={(event) => {
                             const next = Number(event.target.value);
                             if (!Number.isFinite(next)) return;
                             writeActive({
                               ...value,
-                              loadCapPercent: Math.min(200, Math.max(100, Math.round(next))),
+                              travelHardMaxMin: Math.min(180, Math.max(5, Math.round(next))),
                             });
                           }}
                         />
-                        <span className="text-sm text-muted-foreground">%</span>
+                        <span className="text-sm text-muted-foreground">min</span>
                       </div>
                     )}
                     <ModeSwitch value={mode} onChange={(next) => setMode(field.id, next)} />
@@ -287,50 +286,8 @@ export function HkAlgorithmSettings({
         </section>
       ))}
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Dopo la prima assegnazione</h2>
-        <div className="divide-y rounded-xl border">
-          <label className="flex items-center justify-between gap-4 p-4">
-            <span>
-              <span className="block font-medium">Accorcia i giri</span>
-              <span className="text-sm text-muted-foreground">
-                Sposta task normali tra cleaner se il viaggio totale scende.
-              </span>
-            </span>
-            <Switch
-              checked={value.shortenRoutes}
-              onCheckedChange={(checked) => writeActive({ ...value, shortenRoutes: checked })}
-            />
-          </label>
-          <label className="flex items-center justify-between gap-4 p-4">
-            <span>
-              <span className="block font-medium">Ribilancia i carichi</span>
-              <span className="text-sm text-muted-foreground">
-                Sposta lavoro dai cleaner troppo pieni a quelli troppo vuoti.
-              </span>
-            </span>
-            <Switch
-              checked={value.rebalanceLoads}
-              onCheckedChange={(checked) => writeActive({ ...value, rebalanceLoads: checked })}
-            />
-          </label>
-          <label className="flex items-center justify-between gap-4 p-4">
-            <span>
-              <span className="block font-medium">Scambia per far entrare un livello più alto</span>
-              <span className="text-sm text-muted-foreground">
-                Un task di triade più alta può prendere il posto di uno più basso sullo stesso cleaner.
-              </span>
-            </span>
-            <Switch
-              checked={value.triadSwap}
-              onCheckedChange={(checked) => writeActive({ ...value, triadSwap: checked })}
-            />
-          </label>
-        </div>
-      </section>
-
       <p className="text-sm text-muted-foreground">
-        Obbligatorio blocca l'assegnazione. Preferibile la fa costare, ma il task viene comunque messo se altrimenti resterebbe fuori. Spento ignora la regola.
+        Obbligatorio evita quell'abbinamento finché c'è un'altra scelta. Preferibile lo fa pesare. Spento lo ignora. Ogni cleaner resta entro 4 task; un quinto entra solo se con 4 i task non ci stanno tutti. Se i posti bastano, ogni task viene assegnato.
         {active ? ` Il profilo aperto è ${active.name}.` : ""}
       </p>
     </div>

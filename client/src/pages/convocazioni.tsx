@@ -394,28 +394,35 @@ function buildHousekeepingStatsTasks(containers: any, timelineRows: any[]): Task
   return [...unassigned, ...assigned];
 }
 
-function convocationKindFromSearch(): "cleaners" | "drivers" | "office" {
-  if (typeof window === "undefined") return "cleaners";
-  const kind = new URLSearchParams(window.location.search).get("kind");
-  if (kind === "drivers") return "drivers";
-  if (kind === "office") return OFFICE_SCOPE_ENABLED ? "office" : "cleaners";
-  return "cleaners";
+function convocationSearch(): { kind: "cleaners" | "drivers" | "office"; algTest: boolean } {
+  if (typeof window === "undefined") return { kind: "cleaners", algTest: false };
+  const params = new URLSearchParams(window.location.search);
+  const kindParam = params.get("kind");
+  const kind =
+    kindParam === "drivers"
+      ? "drivers"
+      : kindParam === "office" && OFFICE_SCOPE_ENABLED
+        ? "office"
+        : "cleaners";
+  return { kind, algTest: kind === "cleaners" && params.get("scope") === "alg-test" };
 }
 
-function useConvocationKind(): "cleaners" | "drivers" | "office" {
-  const [kind, setKind] = useState<"cleaners" | "drivers" | "office">(convocationKindFromSearch);
+function useConvocationSearch() {
+  const [search, setSearch] = useState(convocationSearch);
   useEffect(() => {
-    const sync = () => setKind(convocationKindFromSearch());
+    const sync = () => setSearch(convocationSearch());
     sync();
     window.addEventListener("popstate", sync);
     return () => window.removeEventListener("popstate", sync);
   }, []);
-  return kind;
+  return search;
 }
 
 export default function Convocazioni() {
   const triadeEnabled = useTriadeEnabled();
-  const convKind = useConvocationKind();
+  const convocation = useConvocationSearch();
+  const convKind = convocation.kind;
+  const isAlgTest = convocation.algTest;
   const isDrivers = convKind === "drivers";
   const isOffice = convKind === "office";
   const isHousekeeping = !isDrivers && !isOffice;
@@ -458,7 +465,16 @@ export default function Convocazioni() {
       cancelled = true;
     };
   }, [isHousekeeping]);
-  const scopeValue: "housekeeping" | "office" = isOffice ? "office" : "housekeeping";
+  const scopeValue: "housekeeping" | "office" | "alg-test" = isAlgTest
+    ? "alg-test"
+    : isOffice
+      ? "office"
+      : "housekeeping";
+  const assignmentsPath = isAlgTest
+    ? "/alg-test"
+    : isOffice
+      ? "/generate-assignments?scope=office"
+      : "/generate-assignments";
   const withScope = (url: string) =>
     `${url}${url.includes("?") ? "&" : "?"}scope=${scopeValue}`;
 
@@ -535,8 +551,12 @@ export default function Convocazioni() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (!params.has("date")) return;
+    const next = new URLSearchParams();
     const kind = params.get("kind");
-    setLocation(kind ? `/convocazioni?kind=${kind}` : "/convocazioni", { replace: true });
+    if (kind) next.set("kind", kind);
+    if (params.get("scope") === "alg-test") next.set("scope", "alg-test");
+    const query = next.toString();
+    setLocation(query ? `/convocazioni?${query}` : "/convocazioni", { replace: true });
   }, [location, setLocation]);
 
   // Convocazioni logistica: indietro del browser → home logistica (come pulsante Home)
@@ -585,7 +605,9 @@ export default function Convocazioni() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
-            isDrivers ? { date: dateStr } : { date: dateStr, scope: scopeValue }
+            isDrivers
+              ? { date: dateStr }
+              : { date: dateStr, scope: isAlgTest ? "housekeeping" : scopeValue }
           ),
         });
 
@@ -761,7 +783,7 @@ export default function Convocazioni() {
     return () => {
       cancelled = true;
     };
-  }, [selectedDate, convKind]);
+  }, [selectedDate, convKind, isAlgTest]);
 
   const loadTaskStats = async (dateStr: string, driversMode: boolean, officeMode: boolean) => {
     try {
@@ -1297,7 +1319,7 @@ export default function Convocazioni() {
           });
         }
         sessionStorage.setItem("preserveAssignments", "true");
-        setLocation(isOffice ? "/generate-assignments?scope=office" : "/generate-assignments");
+        setLocation(assignmentsPath);
       }
     } catch (error) {
       console.error("Errore nell'aggiunta:", error);
@@ -1337,7 +1359,13 @@ export default function Convocazioni() {
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="flex flex-wrap items-center gap-2 text-3xl font-bold text-foreground">
                 <Users className="h-8 w-8 shrink-0 text-custom-blue" />
-                {isDrivers ? "CONVOCAZIONI DRIVER del" : isOffice ? "CONVOCAZIONI UFFICIO del" : "CONVOCAZIONI HOUSEKEEPING del" }
+                {isDrivers
+                  ? "CONVOCAZIONI DRIVER del"
+                  : isAlgTest
+                    ? "CONVOCAZIONI PROVA del"
+                    : isOffice
+                      ? "CONVOCAZIONI UFFICIO del"
+                      : "CONVOCAZIONI HOUSEKEEPING del"}
               </h1>
               <Popover>
                 <PopoverTrigger asChild>
@@ -1956,13 +1984,7 @@ export default function Convocazioni() {
                 data-viewer-allow=""
                 className="flex items-center gap-2 border-2 border-custom-blue"
                 onClick={() =>
-                  setLocation(
-                    isDrivers
-                      ? "/generate-logistics-assignments"
-                      : isOffice
-                        ? "/generate-assignments?scope=office"
-                        : "/generate-assignments",
-                  )
+                  setLocation(isDrivers ? "/generate-logistics-assignments" : assignmentsPath)
                 }
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -1973,7 +1995,7 @@ export default function Convocazioni() {
               onClick={async () => {
                 const ok = await handleSaveSelection();
                 if (ok) {
-                  setLocation(isDrivers ? "/generate-logistics-assignments" : isOffice ? "/generate-assignments?scope=office" : "/generate-assignments");
+                  setLocation(isDrivers ? "/generate-logistics-assignments" : assignmentsPath);
                 }
               }}
               size="lg"

@@ -38,7 +38,7 @@ class ApiClient:
         self.base_url = base_url.rstrip("/")
         self.timeout = 30  # secondi
         normalized_scope = (scope or "").strip().lower()
-        self.scope = normalized_scope if normalized_scope in ("housekeeping", "office") else None
+        self.scope = normalized_scope if normalized_scope in ("housekeeping", "office", "alg-test") else None
 
     def _params_with_scope(self, params: Optional[Dict] = None) -> Optional[Dict]:
         out = dict(params or {})

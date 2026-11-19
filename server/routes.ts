@@ -19,6 +19,7 @@ import {
   PrioritySettingsError,
 } from "../shared/taskPriorityClassification";
 import { parseHkPreassignedSchedules } from "../shared/hk-preassigned-schedules";
+import { assignmentsTableFor, containersTableFor } from "../shared/assignment-scope";
 import { ADAM_ACTIVE_STRUCTURE_JOIN_FROM_HOUSEKEEPING } from "./services/adam-active-structure-join";
 import {
   applyWassCleaningTimeOverride,
@@ -75,10 +76,21 @@ function isOfficeScope(scope: unknown): boolean {
   return String(scope || "").toLowerCase() === "office";
 }
 
-function resolveScopeFromReq(req: any): "housekeeping" | "office" {
+function resolveScopeFromReq(req: any): "housekeeping" | "office" | "alg-test" {
+  const raw = String(req?.query?.scope ?? req?.body?.scope ?? "").toLowerCase();
+  if (raw === "alg-test") return "alg-test";
   return isOfficeScope(req?.query?.scope) || isOfficeScope(req?.body?.scope)
     ? "office"
     : "housekeeping";
+}
+
+function rejectAlgTestOfficialWrite(req: any, res: any): boolean {
+  if (resolveScopeFromReq(req) !== "alg-test") return false;
+  res.status(400).json({
+    success: false,
+    error: "La prova algoritmo non modifica le collaborazioni della giornata ufficiale.",
+  });
+  return true;
 }
 
 function isLogisticsScopeRequest(req: any): boolean {
@@ -547,9 +559,12 @@ const rehydrateQueues = new Map<string, Promise<RehydrateResult>>();
 async function rehydratePreassignedAssignmentsFromAdam(
   workDate: string,
   currentUsername: string,
-  scope: "housekeeping" | "office",
+  scope: "housekeeping" | "office" | "alg-test",
   options: { cleanerIds?: number[] } = {}
 ): Promise<RehydrateResult> {
+  if (scope === "alg-test") {
+    return { rehydrated: 0, autoConvokedCleaners: 0 };
+  }
   const queueKey = `${scope}:${workDate}`;
   const previous = rehydrateQueues.get(queueKey);
   const current = (previous ? previous.catch(() => undefined) : Promise.resolve()).then(() =>
@@ -816,8 +831,8 @@ async function runRehydratePreassignedAssignmentsFromAdam(
       task.followup = index > 0;
     });
     try {
-      await hydrateTasksFromContainers(cleanerEntry, workDate);
-      const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate);
+      await hydrateTasksFromContainers(cleanerEntry, workDate, scope);
+      const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate, scope);
       cleanerEntry.tasks = updatedCleanerData.tasks || cleanerEntry.tasks;
     } catch (error: any) {
       console.warn(
@@ -913,7 +928,7 @@ function snapToHalfHourMinutes(totalMinutes: number): number {
 async function getCleanerStartTime(
   cleanerId: number,
   workDate: string,
-  scope: "housekeeping" | "office" = "housekeeping"
+  scope: "housekeeping" | "office" | "alg-test" = "housekeeping"
 ): Promise<string | null> {
   try {
     // Try PostgreSQL first
@@ -933,7 +948,7 @@ async function getCleanerStartTime(
 async function getCleanerEndTime(
   cleanerId: number,
   workDate: string,
-  scope: "housekeeping" | "office" = "housekeeping"
+  scope: "housekeeping" | "office" | "alg-test" = "housekeeping"
 ): Promise<string | null> {
   try {
     const selectedCleaners = await workspaceFiles.loadSelectedCleaners(workDate, scope);
@@ -1020,7 +1035,11 @@ async function isCleanerLocked(workDate: string, cleanerId: number): Promise<boo
  * Helper: Hydrate tasks with lat/lng/address from PostgreSQL
  * Searches both daily_assignments_current (assigned tasks) and daily_containers (unassigned tasks)
  */
-async function hydrateTasksFromContainers(cleanerData: any, workDate: string): Promise<any> {
+async function hydrateTasksFromContainers(
+  cleanerData: any,
+  workDate: string,
+  scope: "housekeeping" | "office" | "alg-test" = "housekeeping",
+): Promise<any> {
   if (!cleanerData?.tasks || cleanerData.tasks.length === 0) {
     return cleanerData;
   }
@@ -1041,12 +1060,14 @@ async function hydrateTasksFromContainers(cleanerData: any, workDate: string): P
 
     // Query both tables to find coordinates - assignments first (already assigned), then containers (unassigned)
     // CAST to numeric because daily_containers stores lat/lng as varchar while daily_assignments_current uses numeric
+    const assignmentsTable = assignmentsTableFor(scope);
+    const containersTable = containersTableFor(scope);
     const result = await query(`
       SELECT task_id, lat, lng, address FROM (
-        SELECT task_id, lat::numeric, lng::numeric, address FROM daily_assignments_current 
+        SELECT task_id, lat::numeric, lng::numeric, address FROM ${assignmentsTable}
         WHERE work_date = $1 AND task_id = ANY($2)
         UNION ALL
-        SELECT task_id, lat::numeric, lng::numeric, address FROM daily_containers 
+        SELECT task_id, lat::numeric, lng::numeric, address FROM ${containersTable}
         WHERE work_date = $1 AND task_id = ANY($2)
       ) combined
     `, [workDate, taskIds]);
@@ -1122,15 +1143,19 @@ const normalizeTaskSequence = (tasks: any[]) => {
  * Helper function to recalculate travel_time, start_time, end_time for a cleaner's tasks
  * CRITICAL: Ensures cleaner's start_time is loaded from PostgreSQL before recalculation
  */
-async function recalculateCleanerTimes(cleanerData: any, workDate?: string): Promise<any> {
+async function recalculateCleanerTimes(
+  cleanerData: any,
+  workDate?: string,
+  scope: "housekeeping" | "office" | "alg-test" = "housekeeping",
+): Promise<any> {
   try {
     const { spawn } = await import('child_process');
     const { pgSettingsService } = await import("./services/pg-settings-service");
 
     // CRITICAL: Load start_time from PostgreSQL to ensure it's up-to-date
     const dateToUse = workDate || format(new Date(), 'yyyy-MM-dd');
-    const startTime = await getCleanerStartTime(cleanerData.cleaner.id, dateToUse);
-    const endTime = await getCleanerEndTime(cleanerData.cleaner.id, dateToUse);
+    const startTime = await getCleanerStartTime(cleanerData.cleaner.id, dateToUse, scope);
+    const endTime = await getCleanerEndTime(cleanerData.cleaner.id, dateToUse, scope);
     if (startTime) {
       cleanerData.cleaner.start_time = startTime;
       console.log(`✅ Loaded start_time ${startTime} from PostgreSQL for cleaner ${cleanerData.cleaner.id}`);
@@ -1250,6 +1275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await pgDailyAssignmentsService.ensureDailyAssignmentsCurrentNoDuplicates();
     await pgDailyAssignmentsService.ensureDailyAssignmentsIdSequence();
     await pgDailyAssignmentsService.ensureSelectedCleanersScopeStructure();
+    await pgDailyAssignmentsService.ensureAlgTestTables();
     await pgDailyAssignmentsService.ensureLogisticsWorkspaceTables();
     // Dopo ensureLogisticsWorkspaceTables: su un database nuovo lg_timeline non
     // esiste ancora prima di quella chiamata.
@@ -1315,7 +1341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         success: true,
-        user: userWithoutPassword,
+        user: { ...userWithoutPassword, betaTester: user.beta_tester === true },
         message: "Login effettuato con successo"
       });
     } catch (error: any) {
@@ -1371,21 +1397,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername, 'timeline_reset', undefined, resolveScopeFromReq(req));
-      console.log(`✅ Timeline svuotata su PostgreSQL`);
+      const resolvedScope = resolveScopeFromReq(req);
+      await workspaceFiles.saveTimeline(workDate, emptyTimeline, false, currentUsername, 'timeline_reset', undefined, resolvedScope);
+      console.log(`✅ Timeline svuotata su PostgreSQL (${resolvedScope})`);
 
-      // 2. Cancella le collaborazioni dalla tabella task_collaborators
-      const { query } = await import("../shared/pg-db");
-      await query(`DELETE FROM task_collaborators WHERE work_date = $1`, [workDate]);
-      console.log(`✅ Collaborazioni cancellate da task_collaborators per ${workDate}`);
+      // Collaborazioni ed eccezioni triade non hanno scope: sulla prova non si toccano,
+      // altrimenti il reset cancellerebbe quelli della giornata vera.
+      if (resolvedScope !== "alg-test") {
+        const { query } = await import("../shared/pg-db");
+        await query(`DELETE FROM task_collaborators WHERE work_date = $1`, [workDate]);
+        console.log(`✅ Collaborazioni cancellate da task_collaborators per ${workDate}`);
 
-      await query(`DELETE FROM daily_task_triade_override WHERE work_date = $1`, [workDate]);
-      await query(`DELETE FROM daily_cleaner_triade_override WHERE work_date = $1`, [workDate]);
-      console.log(`✅ Eccezioni triade cancellate per ${workDate}`);
+        await query(`DELETE FROM daily_task_triade_override WHERE work_date = $1`, [workDate]);
+        await query(`DELETE FROM daily_cleaner_triade_override WHERE work_date = $1`, [workDate]);
+        console.log(`✅ Eccezioni triade cancellate per ${workDate}`);
+      }
 
-      // 3. Refresh containers direttamente da ADAM (fonte sorgente)
-      console.log(`🔄 Refresh containers da ADAM per ${workDate}...`);
-      const refreshResult = await refreshContainersFromAdam(workDate, currentUsername);
+      // La prova rilegge i task già nel database, senza cleaner e senza start/end.
+      if (resolvedScope === "alg-test") {
+        const { refillAlgTestContainersFromDb } = await import("./services/alg-test-containers");
+        const refilled = await refillAlgTestContainersFromDb(workDate);
+        console.log(`✅ Reset prova: ${refilled.taskCount} task rimessi nei contenitori per ${workDate}`);
+        return res.json({
+          success: true,
+          message: "Timeline di prova svuotata e task rimessi nei contenitori",
+          containersRefreshed: true,
+          taskCount: refilled.taskCount,
+          preassignedRehydrated: 0,
+        });
+      }
+
+      // 3. Refresh containers direttamente da ADAM (fonte sorgente), solo dello scope corrente
+      console.log(`🔄 Refresh containers da ADAM per ${workDate} (${resolvedScope})...`);
+      const refreshResult = await refreshContainersFromAdam(workDate, currentUsername, resolvedScope);
       
       if (!refreshResult.success) {
         console.warn(`⚠️ Refresh containers fallito: ${refreshResult.error}`);
@@ -1400,13 +1444,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isDev = isDevelopmentEnvironment();
 
       let rehydratedPreassigned = 0;
-      if (isDev) {
-        console.log(`🧪 [DEV] Reset totale: le task pre-assegnate NON vengono reidratate`);
+      if (isDev || resolvedScope === "alg-test") {
+        console.log(`🧪 Reset senza reidratare assegnazioni (${resolvedScope})`);
       } else {
         const rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
           workDate,
           currentUsername,
-          resolveScopeFromReq(req)
+          resolvedScope
         );
         rehydratedPreassigned = rehydrateResult.rehydrated;
       }
@@ -1488,7 +1532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const numSourceCleanerId = sourceCleanerId ? Number(sourceCleanerId) : null;
       const numDestCleanerId = destCleanerId ? Number(destCleanerId) : null;
       
-      if (numTaskId && numSourceCleanerId && numDestCleanerId) {
+      if (resolvedScope !== "alg-test" && numTaskId && numSourceCleanerId && numDestCleanerId) {
         const { query } = await import("../shared/pg-db");
         // Self-heal: if pivot is stale/missing, derive collaboration from assignments
         // so drag-&-drop can't silently desync task_collaborators.
@@ -1662,16 +1706,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         // Ricalcola cleaner di origine (se ha ancora task)
         if (sourceEntry && sourceEntry.tasks.length > 0) {
-          await hydrateTasksFromContainers(sourceEntry, workDate);
-          const updatedSourceData = await recalculateCleanerTimes(sourceEntry, workDate);
+          await hydrateTasksFromContainers(sourceEntry, workDate, resolveScopeFromReq(req));
+          const updatedSourceData = await recalculateCleanerTimes(sourceEntry, workDate, resolveScopeFromReq(req));
           sourceEntry.tasks = updatedSourceData.tasks;
           normalizeTaskSequence(sourceEntry.tasks);
           console.log(`✅ Tempi ricalcolati per cleaner sorgente ${sourceCleanerId}`);
         }
 
         // Ricalcola cleaner di destinazione
-        await hydrateTasksFromContainers(destEntry, workDate);
-        const updatedDestData = await recalculateCleanerTimes(destEntry, workDate);
+        await hydrateTasksFromContainers(destEntry, workDate, resolveScopeFromReq(req));
+        const updatedDestData = await recalculateCleanerTimes(destEntry, workDate, resolveScopeFromReq(req));
         destEntry.tasks = updatedDestData.tasks;
         normalizeTaskSequence(destEntry.tasks);
         console.log(`✅ Tempi ricalcolati per cleaner destinazione ${destCleanerId}`);
@@ -1918,15 +1962,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Ricalcola tempi per entrambi i cleaners
       try {
         if (sourceEntry.tasks.length > 0) {
-          await hydrateTasksFromContainers(sourceEntry, workDate);
-          const updatedSourceData = await recalculateCleanerTimes(sourceEntry, workDate);
+          await hydrateTasksFromContainers(sourceEntry, workDate, resolveScopeFromReq(req));
+          const updatedSourceData = await recalculateCleanerTimes(sourceEntry, workDate, resolveScopeFromReq(req));
           sourceEntry.tasks = updatedSourceData.tasks;
           console.log(`✅ Tempi ricalcolati per cleaner ${sourceCleanerId} (dopo swap)`);
         }
 
         if (destEntry.tasks.length > 0) {
-          await hydrateTasksFromContainers(destEntry, workDate);
-          const updatedDestData = await recalculateCleanerTimes(destEntry, workDate);
+          await hydrateTasksFromContainers(destEntry, workDate, resolveScopeFromReq(req));
+          const updatedDestData = await recalculateCleanerTimes(destEntry, workDate, resolveScopeFromReq(req));
           destEntry.tasks = updatedDestData.tasks;
           console.log(`✅ Tempi ricalcolati per cleaner ${destCleanerId} (dopo swap)`);
         }
@@ -2040,12 +2084,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
       const workDate = dateParam;
-      const officeScope = isOfficeScope(req.query.scope);
 
       console.log(`📖 GET /api/timeline - Caricamento timeline per ${workDate}`);
 
       // Carica la timeline da PostgreSQL
-      const timeline = await workspaceFiles.loadTimeline(workDate, officeScope ? "office" : "housekeeping");
+      const timeline = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
 
       if (!timeline) {
         // Restituisci struttura vuota invece di 404 per compatibilità frontend
@@ -2079,12 +2122,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!isValidWorkDate(workDate)) {
         return res.status(400).json({ error: "Data non valida" });
       }
-      const { buildDayExportSql, isDayExportAdmin } = await import("./services/day-sql-export");
+      const { buildDayExportSql, canReadDayExport } = await import("./services/day-sql-export");
       const username = String(req.get("x-wass-username") || "");
-      if (!(await isDayExportAdmin(username))) {
+      if (!(await canReadDayExport(username))) {
         return res.status(403).json({ error: "Solo gli admin possono scaricare la giornata" });
       }
-      const sql = await buildDayExportSql(workDate);
+      const scope = req.query.scope === "alg-test" ? "alg-test" : "housekeeping";
+      const sql = await buildDayExportSql(workDate, scope);
       res.setHeader("Content-Type", "application/sql; charset=utf-8");
       res.setHeader("Content-Disposition", `attachment; filename="wass-giornata-${workDate}.sql"`);
       res.send(sql);
@@ -2435,7 +2479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`📖 GET /api/containers - Caricamento containers per ${workDate}`);
 
-      const containers = await workspaceFiles.loadContainers(workDate, officeScope ? "office" : "housekeeping");
+      const containers = await workspaceFiles.loadContainers(workDate, resolveScopeFromReq(req));
 
       if (!containers) {
         return res.json({
@@ -2477,11 +2521,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
       const workDate = dateParam;
-      const officeScope = isOfficeScope(req.query.scope);
 
       console.log(`📖 GET /api/selected-cleaners - Caricamento cleaners selezionati per ${workDate}`);
 
-      const selectedCleaners = await workspaceFiles.loadSelectedCleaners(workDate, officeScope ? "office" : "housekeeping");
+      const selectedCleaners = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
 
       if (!selectedCleaners) {
         return res.json({
@@ -2497,13 +2540,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
         const lastTransfer = await pgDailyAssignmentsService.getLastTransferToAdamTimestamp(
           workDate,
-          officeScope ? "office" : "housekeeping"
+          resolveScopeFromReq(req)
         );
         let inProgramIds: Set<number>;
         if (!lastTransfer) {
           const selectedIds = await pgDailyAssignmentsService.loadSelectedCleaners(
             workDate,
-            officeScope ? "office" : "housekeeping"
+            resolveScopeFromReq(req)
           );
           inProgramIds = new Set(selectedIds ?? []);
         } else {
@@ -2623,14 +2666,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const dateParam = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
       const workDate = dateParam;
-      const officeScope = isOfficeScope(req.query.scope);
 
       console.log(`📖 GET /api/cleaners - Caricamento cleaners per ${workDate}`);
 
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       let cleaners = await pgDailyAssignmentsService.loadCleanersForDate(
         workDate,
-        officeScope ? "office" : "housekeeping"
+        resolveScopeFromReq(req)
       );
 
       if (!cleaners || cleaners.length === 0) {
@@ -2646,13 +2688,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // show_plus_one: in programma per la data ma senza report ancora. Fonte "in programma": prima invio = selected_cleaners, dopo invio = ADAM (titolari + collaboratori)
       const lastTransfer = await pgDailyAssignmentsService.getLastTransferToAdamTimestamp(
         workDate,
-        officeScope ? "office" : "housekeeping"
+        resolveScopeFromReq(req)
       );
       let inProgramIds: Set<number>;
       if (!lastTransfer) {
         const selectedIds = await pgDailyAssignmentsService.loadSelectedCleaners(
           workDate,
-          officeScope ? "office" : "housekeeping"
+          resolveScopeFromReq(req)
         );
         inProgramIds = new Set(selectedIds ?? []);
       } else {
@@ -2944,7 +2986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { date, timeline, scope, skipRecalculate } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
-      const resolvedScope = isOfficeScope(scope) ? "office" : "housekeeping";
+      const resolvedScope = resolveScopeFromReq(req);
       const shouldSkipRecalculate = skipRecalculate === true || skipRecalculate === "true" || skipRecalculate === 1;
 
       if (!timeline) {
@@ -2987,10 +3029,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // 3) Hydrate coords/address (fondamentale per travel_time realistico)
-          entry = await hydrateTasksFromContainers(entry, workDate);
+          entry = await hydrateTasksFromContainers(entry, workDate, resolveScopeFromReq(req));
 
           // 4) Ricalcolo reale start/end/travel via Python
-          entry = await recalculateCleanerTimes(entry, workDate);
+          entry = await recalculateCleanerTimes(entry, workDate, resolveScopeFromReq(req));
 
           // 5) Salva back
           timelineData.cleaners_assignments[idx] = entry;
@@ -3035,7 +3077,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { date, containers, scope } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
-      const resolvedScope = isOfficeScope(scope) ? "office" : "housekeeping";
+      const resolvedScope = resolveScopeFromReq(req);
 
       if (!containers) {
         return res.status(400).json({ success: false, error: "containers data required" });
@@ -3089,13 +3131,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const {
         date,
         modified_by,
-        scope,
         mode,
         skipContainersRefresh,
       } = req.body || {};
       const workDate = date || format(new Date(), "yyyy-MM-dd");
       const currentUsername = modified_by || getCurrentUsername(req);
-      const officeScope = isOfficeScope(scope);
       const refreshMode = mode === "assignments" ? "assignments" : "apt";
 
       console.log(
@@ -3106,7 +3146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const refreshResult = await refreshContainersFromAdam(
         workDate,
         currentUsername,
-        officeScope ? "office" : "housekeeping",
+        resolveScopeFromReq(req),
         {
           mode: refreshMode,
           skipContainersRefresh: Boolean(skipContainersRefresh),
@@ -5070,7 +5110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { date, cleaner_ids, cleaners, scope } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
-      const resolvedScope = isOfficeScope(scope) ? "office" : "housekeeping";
+      const resolvedScope = resolveScopeFromReq(req);
 
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
 
@@ -5120,7 +5160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { date, cleaners, snapshotReason, scope } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
-      const resolvedScope = isOfficeScope(scope) ? "office" : "housekeeping";
+      const resolvedScope = resolveScopeFromReq(req);
 
       if (!cleaners || !Array.isArray(cleaners)) {
         return res.status(400).json({ success: false, error: "cleaners array required" });
@@ -5618,8 +5658,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Ricalcola travel_time, start_time, end_time usando lo script Python
       try {
-        await hydrateTasksFromContainers(cleanerEntry, workDate);
-        const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate);
+        await hydrateTasksFromContainers(cleanerEntry, workDate, resolveScopeFromReq(req));
+        const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate, resolveScopeFromReq(req));
         cleanerEntry.tasks = updatedCleanerData.tasks;
         console.log(`✅ Tempi ricalcolati per cleaner ${normalizedCleanerId}`);
       } catch (pythonError: any) {
@@ -5819,8 +5859,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const cleanerEntry of assignmentsData.cleaners_assignments) {
         if (cleanerEntry._needsRecalculation) {
           try {
-            await hydrateTasksFromContainers(cleanerEntry, workDate);
-            const updatedData = await recalculateCleanerTimes(cleanerEntry, workDate);
+            await hydrateTasksFromContainers(cleanerEntry, workDate, resolveScopeFromReq(req));
+            const updatedData = await recalculateCleanerTimes(cleanerEntry, workDate, resolveScopeFromReq(req));
             Object.assign(cleanerEntry, updatedData);
             console.log(`✅ Ricalcolati travel_time e orari per cleaner ${cleanerEntry.cleaner?.id}`);
           } catch (recalcError: any) {
@@ -5983,9 +6023,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/load-saved-assignments", async (req, res) => {
     try {
       const workDate = req.body?.date || format(new Date(), "yyyy-MM-dd");
-      const officeScope = isOfficeScope(req.body?.scope);
       const resolvedScope = resolveScopeFromReq(req);
-      const currentUsername = req.body?.modified_by || req.body?.created_by || getCurrentUsername(req);
 
       console.log(`📥 Caricamento assegnazioni dal database per ${workDate}...`);
 
@@ -6004,72 +6042,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // SEMPRE rigenera containers dal DB ADAM (per avere le task aggiornate)
-      console.log(`🔄 Rigenerazione containers dal DB ADAM per ${workDate}...`);
-      const createContainersPath = path.join(process.cwd(), 'client/public/scripts/create_containers.py');
-      const workflowArg = officeScope ? ' --workflow office' : '';
-      try {
-        await new Promise<string>((resolve, reject) => {
-          exec(`python3 "${createContainersPath}" --date "${workDate}" --skip-extract --use-api${workflowArg}`, (error, stdout, stderr) => {
-            if (error) {
-              console.error(`❌ Errore create_containers: ${error.message}`);
-              reject(new Error(stderr || error.message));
-            } else {
-              console.log(`create_containers output: ${stdout}`);
-              resolve(stdout);
-            }
-          });
-        });
+      // I contenitori restano quelli già salvati in PostgreSQL.
+      // Il riallineamento con ADAM avviene solo dal refresh esplicito.
+      if (!containersData) {
+        containersData = {
+          containers: { early_out: { tasks: [], count: 0 }, high_priority: { tasks: [], count: 0 }, low_priority: { tasks: [], count: 0 } },
+          summary: { early_out: 0, high_priority: 0, low_priority: 0, total_tasks: 0 },
+          metadata: { date: workDate }
+        };
+      }
 
-        // Carica i containers appena rigenerati da PostgreSQL (salvati da Python via API)
-        containersData = await workspaceFiles.loadContainers(workDate, resolvedScope);
-        // Guard against null containersData
-        if (!containersData) {
-          containersData = {
-            containers: { early_out: { tasks: [], count: 0 }, high_priority: { tasks: [], count: 0 }, low_priority: { tasks: [], count: 0 } },
-            summary: { early_out: 0, high_priority: 0, low_priority: 0, total_tasks: 0 },
-            metadata: { date: workDate }
-          };
-        }
-        console.log(`✅ Containers rigenerati dal DB ADAM per ${workDate} (caricati da PostgreSQL)`);
-
-        const rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
-          workDate,
-          currentUsername,
-          resolvedScope
-        );
-        if (rehydrateResult.rehydrated > 0 || rehydrateResult.autoConvokedCleaners > 0) {
-          console.log(
-            `✅ Reidratazione pre-assegnati dopo load-saved-assignments: task=${rehydrateResult.rehydrated}, cleaners auto-convocati=${rehydrateResult.autoConvokedCleaners}`
-          );
-          timelineData = await workspaceFiles.loadTimeline(workDate, resolvedScope);
-          selectedCleanersData = await workspaceFiles.loadSelectedCleaners(workDate, resolvedScope);
-          containersData = await workspaceFiles.loadContainers(workDate, resolvedScope);
-        }
-
-        // Sincronizza: rimuovi task già assegnate dai containers
-        const assignedTaskIds = new Set<number>();
-        if (timelineData?.cleaners_assignments) {
-          for (const cleanerEntry of timelineData.cleaners_assignments) {
-            for (const task of cleanerEntry.tasks || []) {
-              assignedTaskIds.add(task.task_id);
-            }
+      const assignedTaskIds = new Set<number>();
+      if (timelineData?.cleaners_assignments) {
+        for (const cleanerEntry of timelineData.cleaners_assignments) {
+          for (const task of cleanerEntry.tasks || []) {
+            assignedTaskIds.add(task.task_id);
           }
         }
+      }
 
-        console.log(`🔍 Task assegnate trovate in timeline: ${assignedTaskIds.size}`);
+      console.log(`🔍 Task assegnate trovate in timeline: ${assignedTaskIds.size}`);
 
-        let removedCount = 0;
-        for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
-          const container = containersData.containers?.[containerType];
-          if (container?.tasks) {
-            const originalCount = container.tasks.length;
-            container.tasks = container.tasks.filter((t: any) => !assignedTaskIds.has(t.task_id));
-            container.count = container.tasks.length;
-            removedCount += (originalCount - container.tasks.length);
-          }
+      let removedCount = 0;
+      for (const containerType of ['early_out', 'high_priority', 'low_priority']) {
+        const container = containersData.containers?.[containerType];
+        if (container?.tasks) {
+          const originalCount = container.tasks.length;
+          container.tasks = container.tasks.filter((t: any) => !assignedTaskIds.has(t.task_id));
+          container.count = container.tasks.length;
+          removedCount += (originalCount - container.tasks.length);
         }
+      }
 
+      if (removedCount > 0) {
         if (containersData.summary) {
           containersData.summary.early_out = containersData.containers.early_out?.count || 0;
           containersData.summary.high_priority = containersData.containers.high_priority?.count || 0;
@@ -6080,14 +6085,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             containersData.summary.low_priority;
         }
 
-        // Salva containers sincronizzati su PostgreSQL (e filesystem come cache per Python scripts)
         await workspaceFiles.saveContainers(workDate, containersData, 'system', 'containers_synced_from_adam', resolvedScope);
         console.log(`✅ Containers sincronizzati: rimosse ${removedCount} task già assegnate, salvati su PostgreSQL`);
-      } catch (err) {
-        console.error('❌ Errore nella rigenerazione containers:', err);
-        if (!containersData) {
-          console.warn('⚠️ Impossibile rigenerare containers e nessun dato containers salvato disponibile');
-        }
       }
 
       // Selected cleaners già caricati da PostgreSQL - nessuna scrittura filesystem necessaria
@@ -6271,7 +6270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Usa la data fornita o la data corrente
       const workDate = date || format(new Date(), 'yyyy-MM-dd');
-      const resolvedScope = isOfficeScope(scope) ? "office" : "housekeeping";
+      const resolvedScope = resolveScopeFromReq(req);
 
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
 
@@ -6446,8 +6445,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Ricalcola i tempi per le task con il nuovo cleaner
         if (taskCount > 0) {
           try {
-            await hydrateTasksFromContainers(cleanerToReplace, workDate);
-            const updatedData = await recalculateCleanerTimes(cleanerToReplace, workDate);
+            await hydrateTasksFromContainers(cleanerToReplace, workDate, resolveScopeFromReq(req));
+            const updatedData = await recalculateCleanerTimes(cleanerToReplace, workDate, resolveScopeFromReq(req));
             cleanerToReplace.tasks = updatedData.tasks;
             console.log(`✅ Tempi ricalcolati per ${taskCount} task del nuovo cleaner ${cleanerId}`);
           } catch (err) {
@@ -7068,7 +7067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       // Sincronizza anche su daily_containers per backward compatibility
-      await pgDailyAssignmentsService.syncLockToContainers(task_id, workDate, locked, locked_reason);
+      await pgDailyAssignmentsService.syncLockToContainers(task_id, workDate, locked, locked_reason, resolveScopeFromReq(req));
 
       console.log(`✅ Task ${task_id} ${locked ? 'bloccata' : 'sbloccata'} in daily_task_locks`);
       res.json({ success: true, locked, locked_reason, locked_by: currentUser });
@@ -7104,7 +7103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Sincronizza su daily_containers
       for (const taskId of task_ids) {
-        await pgDailyAssignmentsService.syncLockToContainers(taskId, workDate, locked, locked_reason);
+        await pgDailyAssignmentsService.syncLockToContainers(taskId, workDate, locked, locked_reason, resolveScopeFromReq(req));
       }
 
       console.log(`✅ ${task_ids.length} tasks ${locked ? 'bloccate' : 'sbloccate'}`);
@@ -7283,6 +7282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/tasks/:taskId/collaborators/add - Caso A: aggiungi collaboratore a task esistente
   app.post("/api/tasks/:taskId/collaborators/add", async (req, res) => {
     try {
+      if (rejectAlgTestOfficialWrite(req, res)) return;
       const taskId = parseInt(req.params.taskId, 10);
       const { date, cleanerId } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
@@ -7488,7 +7488,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
 
           // Ricalcola usando il Python script (calcoli accurati)
-          const updatedCleanerData = await recalculateCleanerTimes(cleanerData, workDate);
+          const updatedCleanerData = await recalculateCleanerTimes(cleanerData, workDate, resolveScopeFromReq(req));
 
           // Valida overlap
           const recalculatedTasks = updatedCleanerData.tasks || [];
@@ -7553,6 +7553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/tasks/:taskId/collaborators/assign - Caso B: assegna N collaboratori da containers
   app.post("/api/tasks/:taskId/collaborators/assign", async (req, res) => {
     try {
+      if (rejectAlgTestOfficialWrite(req, res)) return;
       const taskId = parseInt(req.params.taskId, 10);
       const { date, cleanerIds } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
@@ -7737,7 +7738,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }))
           };
 
-          const updatedCleanerData = await recalculateCleanerTimes(cleanerData, workDate);
+          const updatedCleanerData = await recalculateCleanerTimes(cleanerData, workDate, resolveScopeFromReq(req));
           const recalculatedTasks = updatedCleanerData.tasks || [];
 
           const overlapCheck = validateOverlap(recalculatedTasks.map((t: any) => ({
@@ -7805,6 +7806,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/tasks/:taskId/collaborators/remove - Rimuovi collaboratore
   app.post("/api/tasks/:taskId/collaborators/remove", async (req, res) => {
     try {
+      if (rejectAlgTestOfficialWrite(req, res)) return;
       const taskId = parseInt(req.params.taskId, 10);
       const { date, cleanerId } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
@@ -7936,7 +7938,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }))
           };
 
-          const updatedCleanerData = await recalculateCleanerTimes(cleanerData, workDate);
+          const updatedCleanerData = await recalculateCleanerTimes(cleanerData, workDate, resolveScopeFromReq(req));
           const recalculatedTasks = updatedCleanerData.tasks || [];
 
           const overlapCheck = validateOverlap(recalculatedTasks.map((t: any) => ({
@@ -7998,6 +8000,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // singolo collaboratore. Resta solo su WASS: ADAM conosce solo il totale.
   app.post("/api/tasks/:taskId/collaborators/cleaning-time", async (req, res) => {
     try {
+      if (rejectAlgTestOfficialWrite(req, res)) return;
       const taskId = parseInt(req.params.taskId, 10);
       const { date, cleanerId, cleaningTime } = req.body ?? {};
       const workDate = date || format(new Date(), "yyyy-MM-dd");
@@ -8110,7 +8113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             })),
           };
 
-          const updatedCleanerData = await recalculateCleanerTimes(cleanerData, workDate);
+          const updatedCleanerData = await recalculateCleanerTimes(cleanerData, workDate, resolveScopeFromReq(req));
           for (const task of updatedCleanerData.tasks || []) {
             await client.query(
               `UPDATE daily_assignments_current
@@ -8149,6 +8152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/tasks/:taskId/collaborators/dissolve - Dissolvi TUTTA la collaborazione e riporta task nei containers
   app.post("/api/tasks/:taskId/collaborators/dissolve", async (req, res) => {
     try {
+      if (rejectAlgTestOfficialWrite(req, res)) return;
       const taskId = parseInt(req.params.taskId, 10);
       const { date } = req.body;
       const workDate = date || format(new Date(), "yyyy-MM-dd");
@@ -8285,7 +8289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }))
           };
 
-          const updatedCleanerData = await recalculateCleanerTimes(cleanerData, workDate);
+          const updatedCleanerData = await recalculateCleanerTimes(cleanerData, workDate, resolveScopeFromReq(req));
           const recalculatedTasks = updatedCleanerData.tasks || [];
 
           for (const task of recalculatedTasks) {
@@ -8666,8 +8670,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
               }
             }
-            await hydrateTasksFromContainers(cleanerEntry, workDate);
-            const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate);
+            await hydrateTasksFromContainers(cleanerEntry, workDate, resolveScopeFromReq(req));
+            const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate, resolveScopeFromReq(req));
             cleanerEntry.tasks = updatedCleanerData?.tasks || cleanerEntry.tasks;
             delete cleanerEntry.keep_existing_schedule;
           } catch (pythonError: any) {
@@ -9075,8 +9079,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!Array.isArray(tasks) || tasks.length === 0) continue;
           if (!tasks.some((task: any) => taskMatchesEditTarget(task))) continue;
           try {
-            await hydrateTasksFromContainers(cleanerEntry, workDate);
-            const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate);
+            await hydrateTasksFromContainers(cleanerEntry, workDate, resolveScopeFromReq(req));
+            const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate, resolveScopeFromReq(req));
             cleanerEntry.tasks = updatedCleanerData.tasks || cleanerEntry.tasks;
             normalizeTaskSequence(cleanerEntry.tasks);
             console.log(
@@ -9322,6 +9326,12 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     const { date, username: reqUsername } = req.body;
     const workDate = date || format(new Date(), "yyyy-MM-dd");
     const username = reqUsername || "system";
+    if (resolveScopeFromReq(req) === "alg-test") {
+      return res.status(400).json({
+        success: false,
+        message: "La prova algoritmo resta in WASS e non si trasferisce su ADAM.",
+      });
+    }
 
     if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
 
@@ -10233,7 +10243,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         getCurrentUsername(req)
       );
       let assignmentSync = null;
-      if (day.started) {
+      if (day.started && scope !== "alg-test") {
         try {
           const { syncTimelineAssignmentsFromAdam } = await import(
             "./services/adam-timeline-assignment-sync"
@@ -10461,7 +10471,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
   app.post("/api/extract-cleaners-optimized", async (req, res) => {
     try {
       const { date, scope } = req.body || {};
-      const resolvedScope = isOfficeScope(scope) ? "office" : "housekeeping";
+      const resolvedScope = resolveScopeFromReq(req);
       const scriptPath = path.join(process.cwd(), 'client', 'public', 'scripts', 'extract_cleaners_optimized.py');
 
       // Se la data è fornita, passala come argomento allo script
@@ -10729,10 +10739,10 @@ app.post("/api/transfer-to-adam", async (req, res) => {
   // Endpoint per estrarre i dati
   app.post("/api/extract-data", async (req, res) => {
     try {
-      const { date, created_by, scope } = req.body;
+      const { date, created_by } = req.body;
       const createdBy = created_by || 'unknown';
-      const officeScope = isOfficeScope(scope);
-      const resolvedScope = officeScope ? "office" : "housekeeping";
+      const resolvedScope = resolveScopeFromReq(req);
+      const cleanerExtractScope = resolvedScope === "alg-test" ? "housekeeping" : resolvedScope;
       const assignedDir = path.join(process.cwd(), 'client/public/data/assigned');
 
       // CRITICAL: Esegui extract_cleaners_optimized.py ma non bloccare se fallisce
@@ -10741,7 +10751,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       try {
         const extractResult = await new Promise<string>((resolve, reject) => {
           exec(
-            `python3 client/public/scripts/extract_cleaners_optimized.py ${date} ${resolvedScope}`,
+            `python3 client/public/scripts/extract_cleaners_optimized.py ${date} ${cleanerExtractScope}`,
             { timeout: 30000 },
             (error, stdout, stderr) => {
               if (error) {
@@ -10866,9 +10876,69 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         console.log(`✅ Stessa data (${date}) - mantieni selected_cleaners`);
       }
 
-      // Esegui SEMPRE create_containers.py per avere dati freschi dal database
+      const copyHousekeepingCleanersForAlgTest = async () => {
+        if (resolvedScope !== "alg-test") return;
+        const current = await workspaceFiles.loadSelectedCleaners(date, "alg-test");
+        const currentIds = Array.isArray(current?.cleaners) ? current.cleaners : [];
+        if (currentIds.length > 0) return;
+        const housekeeping = await workspaceFiles.loadSelectedCleaners(date, "housekeeping");
+        const housekeepingCleaners = Array.isArray(housekeeping?.cleaners) ? housekeeping.cleaners : [];
+        if (housekeepingCleaners.length === 0) return;
+        await workspaceFiles.saveSelectedCleaners(
+          date,
+          {
+            cleaners: housekeepingCleaners,
+            total_selected: housekeepingCleaners.length,
+            metadata: { date, scope: "alg-test" },
+          },
+          true,
+          "system",
+          "COPY_HOUSEKEEPING",
+          "alg-test",
+        );
+        console.log(`✅ Prova algoritmo: copiati ${housekeepingCleaners.length} cleaner selezionati da housekeeping per ${date}`);
+      };
+      await copyHousekeepingCleanersForAlgTest();
+
+      if (resolvedScope === "alg-test") {
+        const existingTestContainers = await workspaceFiles.loadContainers(date, "alg-test");
+        const existingTestCount = Number(existingTestContainers?.summary?.total_tasks ?? 0);
+        if (existingTestCount > 0) {
+          console.log(`📦 Prova algoritmo: ${existingTestCount} task già nei contenitori per ${date}`);
+          return res.json({
+            success: true,
+            message: "Contenitori di prova già presenti",
+            skippedAdamRefresh: true,
+          });
+        }
+        const { refillAlgTestContainersFromDb } = await import("./services/alg-test-containers");
+        const refilled = await refillAlgTestContainersFromDb(date, { copyCleaners: true });
+        console.log(`✅ Prova algoritmo: ${refilled.taskCount} task dal database, senza assegnazioni, per ${date}`);
+        return res.json({
+          success: true,
+          message: "Task caricati dal database senza assegnazioni",
+          taskCount: refilled.taskCount,
+        });
+      }
+
+      const existingContainers = await workspaceFiles.loadContainers(date, resolvedScope);
+      const existingContainerCount = Number(existingContainers?.summary?.total_tasks ?? 0);
+      if (existingContainerCount > 0) {
+        console.log(`📦 ${existingContainerCount} task già nei contenitori per ${date}, salto estrazione ADAM`);
+        return res.json({
+          success: true,
+          message: "Contenitori già presenti, estrazione ADAM saltata",
+          skippedAdamRefresh: true,
+        });
+      }
+
+      // Esegui create_containers.py solo se la giornata non ha ancora contenitori.
       console.log(`Eseguendo create_containers.py per data ${date}...`);
-      const workflowArg = officeScope ? " --workflow office" : "";
+      const workflowArg = resolvedScope === "office"
+        ? " --workflow office"
+        : resolvedScope === "alg-test"
+          ? " --workflow alg-test --skip-timeline-update --skip-extract"
+          : "";
       const containersResult = await new Promise<string>((resolve, reject) => {
         exec(
           `python3 client/public/scripts/create_containers.py --date ${date} --use-api${workflowArg}`,
@@ -10887,12 +10957,15 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       // Python ha già salvato containers via API - nessuna azione necessaria
       console.log(`✅ Containers già salvati via API da Python per ${date}`);
 
-      // Reidrata task pre-assegnate subito dopo creazione containers (caricamento iniziale pagina)
-      const rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
-        date,
-        createdBy,
-        resolvedScope
-      );
+      // La prova algoritmo parte senza assegnazioni, anche se ADAM ne ha già.
+      const rehydrateResult = resolvedScope === "alg-test"
+        ? { rehydrated: 0, autoConvokedCleaners: 0 }
+        : await rehydratePreassignedAssignmentsFromAdam(
+            date,
+            createdBy,
+            resolvedScope
+          );
+      await copyHousekeepingCleanersForAlgTest();
       if (rehydrateResult.rehydrated > 0 || rehydrateResult.autoConvokedCleaners > 0) {
         console.log(
           `✅ Reidratazione pre-assegnati dopo extract: task=${rehydrateResult.rehydrated}, cleaners auto-convocati=${rehydrateResult.autoConvokedCleaners}`
@@ -11051,6 +11124,64 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         return res.status(400).json({ success: false, error: error.message });
       }
       res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/session", async (req, res) => {
+    try {
+      const { lookupAccountAccess } = await import("./services/account-access");
+      const access = await lookupAccountAccess(String(req.get("x-wass-username") || ""));
+      if (!access) return res.status(401).json({ success: false });
+      res.json({ role: access.role, betaTester: access.betaTester });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error?.message || "Sessione non letta" });
+    }
+  });
+
+  app.get("/api/hk-algorithm-settings", async (req, res) => {
+    try {
+      const { hasBetaAccess, lookupAccountAccess } = await import("./services/account-access");
+      const access = await lookupAccountAccess(String(req.get("x-wass-username") || ""));
+      if (!hasBetaAccess(access)) {
+        return res.status(403).json({ success: false, error: "Solo i beta tester possono aprire queste impostazioni" });
+      }
+      const { pgSettingsService } = await import("./services/pg-settings-service");
+      const { parseHkConstraintSettings, parseHkProfileLibrary } = await import("../shared/hk-constraint-settings");
+      await pgSettingsService.ensureTables();
+      const data = (await pgSettingsService.getSettings("app_settings")) ?? {};
+      const profiles = parseHkProfileLibrary(data.hk_profiles, data.hk_constraints);
+      const active = profiles.profiles.find((profile) => profile.id === profiles.activeId) ?? profiles.profiles[0];
+      res.json({
+        hk_constraints: active ? { ...active.settings } : parseHkConstraintSettings(data.hk_constraints),
+        hk_profiles: profiles,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error?.message || "Impostazioni non lette" });
+    }
+  });
+
+  app.post("/api/hk-algorithm-settings", async (req, res) => {
+    try {
+      const { hasBetaAccess, lookupAccountAccess } = await import("./services/account-access");
+      const access = await lookupAccountAccess(String(req.get("x-wass-username") || ""));
+      if (!hasBetaAccess(access)) {
+        return res.status(403).json({ success: false, error: "Solo i beta tester possono modificare l'algoritmo" });
+      }
+      const { parseHkConstraintSettings, parseHkProfileLibrary } = await import("../shared/hk-constraint-settings");
+      const profiles = parseHkProfileLibrary(req.body?.hk_profiles, req.body?.hk_constraints);
+      const active = profiles.profiles.find((profile) => profile.id === profiles.activeId) ?? profiles.profiles[0];
+      const { pgSettingsService } = await import("./services/pg-settings-service");
+      await pgSettingsService.ensureTables();
+      const current = (await pgSettingsService.getSettings("app_settings")) ?? {};
+      const saved = await pgSettingsService.saveSettings("app_settings", {
+        ...current,
+        hk_constraints: active ? { ...active.settings } : parseHkConstraintSettings(req.body?.hk_constraints),
+        hk_profiles: profiles,
+      });
+      if (!saved) return res.status(500).json({ success: false, error: "Salvataggio non riuscito" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error?.message || "Salvataggio non riuscito" });
     }
   });
 
@@ -11407,8 +11538,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
       // Ricalcola tempi usando lo script Python per avere start_time/end_time coerenti con la sequenza
       try {
-        await hydrateTasksFromContainers(dstEntry, workDate);
-        const updatedDst = await recalculateCleanerTimes(dstEntry, workDate);
+        await hydrateTasksFromContainers(dstEntry, workDate, resolveScopeFromReq(req));
+        const updatedDst = await recalculateCleanerTimes(dstEntry, workDate, resolveScopeFromReq(req));
         dstEntry.tasks = updatedDst.tasks;
         console.log(`✅ Tempi ricalcolati per cleaner ${toCleanerId} dopo inserimento`);
 
@@ -11416,8 +11547,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         if (typeof fromCleanerId === 'number' && fromCleanerId !== toCleanerId) {
           const srcEntry = getCleanerEntry(fromCleanerId);
           if (srcEntry && srcEntry.tasks.length > 0) {
-            await hydrateTasksFromContainers(srcEntry, workDate);
-            const updatedSrc = await recalculateCleanerTimes(srcEntry, workDate);
+            await hydrateTasksFromContainers(srcEntry, workDate, resolveScopeFromReq(req));
+            const updatedSrc = await recalculateCleanerTimes(srcEntry, workDate, resolveScopeFromReq(req));
             srcEntry.tasks = updatedSrc.tasks;
             console.log(`✅ Tempi ricalcolati per cleaner ${fromCleanerId} dopo rimozione`);
           }
@@ -11531,8 +11662,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
       // Ricalcola travel_time, start_time, end_time usando lo script Python
       try {
-        await hydrateTasksFromContainers(cleanerEntry, workDate);
-        const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate);
+        await hydrateTasksFromContainers(cleanerEntry, workDate, resolveScopeFromReq(req));
+        const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate, resolveScopeFromReq(req));
         cleanerEntry.tasks = updatedCleanerData.tasks;
         normalizeTaskSequence(cleanerEntry.tasks);
         console.log(`✅ Tempi ricalcolati per cleaner ${cleanerId}`);
@@ -11661,8 +11792,8 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       }
 
       try {
-        await hydrateTasksFromContainers(cleanerEntry, workDate);
-        const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate);
+        await hydrateTasksFromContainers(cleanerEntry, workDate, resolveScopeFromReq(req));
+        const updatedCleanerData = await recalculateCleanerTimes(cleanerEntry, workDate, resolveScopeFromReq(req));
         cleanerEntry.tasks = updatedCleanerData.tasks || cleanerEntry.tasks;
         normalizeTaskSequence(cleanerEntry.tasks);
       } catch (pythonError: any) {
@@ -11828,7 +11959,11 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     try {
       const { pgUsersService } = await import("./services/pg-users-service");
       const { listAdamWassAccounts } = await import("./services/adam-wass-accounts");
-      const users = (await pgUsersService.getAllUsers()).map((user) => ({ ...user, source: "wass" as const }));
+      const users = (await pgUsersService.getAllUsers()).map((user) => ({
+        ...user,
+        source: "wass" as const,
+        betaTester: user.beta_tester === true,
+      }));
       let adamAccounts: Awaited<ReturnType<typeof listAdamWassAccounts>> = [];
       try {
         adamAccounts = await listAdamWassAccounts();
@@ -11844,13 +11979,13 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
   app.post("/api/accounts/add", async (req, res) => {
     try {
-      const { username, password, role } = req.body;
+      const { username, password, role, betaTester } = req.body;
       if (!username || !password) {
         return res.status(400).json({ success: false, message: "Username e password sono obbligatori." });
       }
 
       const { pgUsersService } = await import("./services/pg-users-service");
-      const newUser = await pgUsersService.createUser(username, password, role || 'user');
+      const newUser = await pgUsersService.createUser(username, password, role || 'user', betaTester === true);
 
       if (!newUser) {
         return res.status(400).json({ success: false, message: "Errore nella creazione dell'account (username già esistente?)." });
@@ -11865,14 +12000,14 @@ app.post("/api/transfer-to-adam", async (req, res) => {
 
   app.post("/api/accounts/update", async (req, res) => {
     try {
-      const { id, username, password, role, source } = req.body;
+      const { id, username, password, role, source, betaTester } = req.body;
       if (typeof id === 'undefined') {
         return res.status(400).json({ success: false, message: "ID account mancante." });
       }
 
       if (source === "adam") {
         const { setAdamWassAccountRole } = await import("./services/adam-wass-accounts");
-        const result = await setAdamWassAccountRole(Number(id), String(role ?? ""));
+        const result = await setAdamWassAccountRole(Number(id), String(role ?? ""), betaTester === true);
         if (result === "invalid") {
           return res.status(400).json({ success: false, message: "Ruolo non valido." });
         }
@@ -11901,6 +12036,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       if (username !== undefined) updates.username = username;
       if (password !== undefined) updates.password = password;
       if (role !== undefined) updates.role = role;
+      if (betaTester !== undefined) updates.beta_tester = betaTester === true;
 
       await pgUsersService.updateUser(id, updates);
       res.json({ success: true, message: "Account aggiornato con successo." });
@@ -12675,7 +12811,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
 
       const { runHkAssignmentHypotheses } = await import("./services/optimizer/hk-hypotheses");
-      const hypotheses = await runHkAssignmentHypotheses(workDate);
+      const hypotheses = await runHkAssignmentHypotheses(workDate, resolveScopeFromReq(req));
       res.json({ success: true, hypotheses });
     } catch (error: any) {
       console.error("❌ Errore optimizer hypotheses:", error);
@@ -12701,7 +12837,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
 
       const { applyOptimizerToProduction } = await import("./services/optimizer/runAllPhases");
-      const apply = await applyOptimizerToProduction(runId, workDate);
+      const apply = await applyOptimizerToProduction(runId, workDate, resolveScopeFromReq(req));
       if (!apply.success) {
         return res.status(409).json({
           success: false,
@@ -12726,6 +12862,12 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       const workDate = date || format(new Date(), "yyyy-MM-dd");
 
       if (await rejectIfAlgorithmAssignDisabled(res)) return;
+      if (resolveScopeFromReq(req) === "alg-test") {
+        return res.status(400).json({
+          success: false,
+          error: "La prova algoritmo non usa la pipeline che scrive la giornata ufficiale.",
+        });
+      }
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
       console.log(`   skipPhase4=${skipPhase4}, applyToProduction=${applyToProduction}`);
       
@@ -12762,7 +12904,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       console.log(`🚀 POST /api/optimizer/apply-to-production - Applying run ${runId} to production`);
       
       const { applyOptimizerToProduction } = await import('./services/optimizer/runAllPhases');
-      const result = await applyOptimizerToProduction(runId, date);
+      const result = await applyOptimizerToProduction(runId, date, resolveScopeFromReq(req));
       
       console.log(`✅ Apply to production: inserted=${result.insertedCount}, deleted=${result.deletedCount}`);
       

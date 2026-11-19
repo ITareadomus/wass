@@ -23,7 +23,7 @@ def init_api_client(workflow="housekeeping"):
     global api_client
     try:
         from api_client import ApiClient
-        scope = "office" if workflow == "office" else "housekeeping"
+        scope = workflow if workflow in ("housekeeping", "office", "alg-test") else "housekeeping"
         api_client = ApiClient(scope=scope)
         print(f"API client scope: {scope}")
         return api_client.test_connection()
@@ -568,9 +568,9 @@ def main():
     parser.add_argument(
         '--workflow',
         type=str,
-        choices=['housekeeping', 'office', 'logistics'],
+        choices=['housekeeping', 'office', 'logistics', 'alg-test'],
         default='housekeeping',
-        help='housekeeping: enable_wass (default). office: operation_id [15,38]. logistics: enable_wass_route → /api/logistics-containers',
+        help='housekeeping: enable_wass (default). office: operation_id [15,38]. logistics: enable_wass_route → /api/logistics-containers. alg-test: stessi task di housekeeping, senza togliere quelli già assegnati.',
     )
     args = parser.parse_args()
     workflow = getattr(args, 'workflow', 'housekeeping') or 'housekeeping'
@@ -699,6 +699,10 @@ def main():
             # NON cambiare la data - mantieni quella della timeline
             api_client.save_timeline(target_date, timeline_data, skip_recalculate=True)
             print(f"✅ Aggiornate {updated_count} task in timeline via API (preservati campi timeline: start_time, end_time, travel_time, sequence; skipRecalculate)")
+
+    # La prova algoritmo deve vedere anche i task già assegnati sulla giornata vera.
+    if workflow == "alg-test":
+        assigned_task_ids = set()
 
     # Filtra le task già assegnate per containers.json (solo housekeeping)
     if workflow != "logistics":
