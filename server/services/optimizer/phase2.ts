@@ -284,8 +284,7 @@ function canCleanerHandleApartment(
       allowedApts = apartmentTypes.straordinario_apt || [];
       break;
     case 'formatore_cleaner':
-      allowedApts = apartmentTypes.formatore_apt || [];
-      break;
+      return true;
     case 'ufficio_cleaner':
       allowedApts = apartmentTypes.ufficio_apt || [];
       break;
@@ -318,7 +317,7 @@ export function isCleanerCompatible(
     return { compatible: false, reason: 'UFFICIO_CLEANER_NON_OFFICE_TASK' };
   }
 
-  if (!cleanerCanTakeTriadeTask(cleaner.triadeWeight, task.triadeWeight)) {
+  if (normalizedRole !== 'formatore_cleaner' && !cleanerCanTakeTriadeTask(cleaner.triadeWeight, task.triadeWeight)) {
     return { compatible: false, reason: 'TRIADE_LEVEL' };
   }
 

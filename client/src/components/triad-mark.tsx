@@ -73,6 +73,7 @@ function Diamond({
   className,
   faded = false,
   sign,
+  icon,
   strokeColor,
   fillColor,
   signColor,
@@ -107,7 +108,18 @@ function Diamond({
         strokeLinejoin="round"
         strokeDasharray={faded ? "1.15 0.75" : undefined}
       />
-      {sign ? (
+      {icon === "clock" ? (
+        <g
+          transform="translate(5 6.15)"
+          fill="none"
+          stroke={mixHex(strokeColor ?? colors.stroke, "#000000", 0.35)}
+          strokeWidth="0.7"
+          strokeLinecap="round"
+        >
+          <circle r="1.9" />
+          <path d="M0 -0.9 V0.15 H0.9" />
+        </g>
+      ) : sign ? (
         <text
           x="5"
           y="8.15"
@@ -192,17 +204,25 @@ export function TaskTriadMark({
 
 export function CleanerTriadMark({
   triade,
+  clockLevel,
+  extraGreen = 0,
   size = "md",
   className,
 }: {
   triade?: CleanerTriadeLevel | null;
+  /** Rombo in più, con l'orologio, per il livello di prova. */
+  clockLevel?: CleanerTriadeLevel | null;
+  /** Rombi verdi aggiunti sopra il livello vero. L'orologio solo se non sono piccoli. */
+  extraGreen?: number;
   size?: "sm" | "md" | "lg";
   className?: string;
 }) {
   const level = parseCleanerTriade(triade);
+  const raised = parseCleanerTriade(clockLevel);
   const reactId = useId().replace(/[^a-zA-Z0-9]/g, "");
   if (!level) return null;
 
+  const extras = Math.max(0, Math.floor(extraGreen), raised ? 1 : 0);
   const dim =
     size === "sm" ? "h-[11px] w-[9px]" : size === "lg" ? "h-10 w-8" : "h-3.5 w-[11px]";
   const colors = {
@@ -210,6 +230,12 @@ export function CleanerTriadMark({
     mid: mixHex(level.colorBg, level.color, 0.45),
     dark: level.color,
     stroke: level.color,
+  };
+  const clockColors = {
+    light: "#DCFCE7",
+    mid: mixHex("#DCFCE7", "#15803D", 0.45),
+    dark: "#15803D",
+    stroke: "#15803D",
   };
 
   return (
@@ -219,8 +245,8 @@ export function CleanerTriadMark({
         size === "lg" ? "gap-1" : "gap-px",
         className
       )}
-      title={level.name}
-      aria-label={level.name}
+      title={extras > 0 ? `${level.name}, livello temporaneo` : level.name}
+      aria-label={extras > 0 ? `${level.name}, livello temporaneo` : level.name}
     >
       {Array.from({ length: shownDiamondCount(level.weight) }, (_, index) => (
         <Diamond
@@ -228,6 +254,15 @@ export function CleanerTriadMark({
           gradientId={`triad-${reactId}-${index}`}
           colors={colors}
           className={dim}
+        />
+      ))}
+      {Array.from({ length: extras }, (_, index) => (
+        <Diamond
+          key={`extra-${index}`}
+          gradientId={`triad-${reactId}-clock-${index}`}
+          colors={clockColors}
+          className={dim}
+          icon={size === "sm" ? undefined : "clock"}
         />
       ))}
     </span>
@@ -266,6 +301,8 @@ export function DayTriadMark({
   original,
   overrideWeight,
   levels,
+  trial = false,
+  cleanerTemporary = false,
   size = "md",
   unknown = "question",
   appearance = "day",
@@ -274,6 +311,9 @@ export function DayTriadMark({
   original?: CleanerTriadeLevel | null;
   overrideWeight: number | null;
   levels: CleanerTriadeLevel[];
+  trial?: boolean;
+  /** Sul cleaner, il livello aggiunto è un rombo verde. I task non lo usano. */
+  cleanerTemporary?: boolean;
   size?: "sm" | "md" | "lg";
   /** "text" resta solo nel dialog, dove si può impostare il livello. Altrove non si disegna nulla. */
   unknown?: "question" | "text";
@@ -285,6 +325,10 @@ export function DayTriadMark({
   const base = parseCleanerTriade(original);
   const originalWeight = base?.weight ?? 0;
   const currentWeight = overrideWeight ?? originalWeight;
+  const added = base ? shownDiamondCount(currentWeight) - shownDiamondCount(originalWeight) : 0;
+  if ((trial || cleanerTemporary) && base && added > 0) {
+    return <CleanerTriadMark triade={original} extraGreen={added} size={size} className={className} />;
+  }
   if (appearance === "real") {
     if (currentWeight <= 0) return null;
     const current = levelForWeight(levels, currentWeight) ?? (currentWeight === originalWeight ? base : null);

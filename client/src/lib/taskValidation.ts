@@ -2,7 +2,8 @@
  * Utility per validare la compatibilità tra cleaner e task basata su settings.json
  */
 
-import { HK_CONSTRAINT_PRESETS, parseHkConstraintSettings, type HkConstraintSettings } from "@shared/hk-constraint-settings";
+import { formatoreTriadeLevel, formatoreTriadeSelected, HK_CONSTRAINT_PRESETS, parseHkConstraintSettings, type HkConstraintSettings } from "@shared/hk-constraint-settings";
+import { cachedTaskTriadeWeight } from "@/lib/task-triade";
 
 interface CleanerTaskRules {
   standard_apt: boolean;
@@ -249,7 +250,7 @@ function canHandleApartment(cleanerRole: string, task: any): boolean {
     // Both premium and straordinario cleaners can handle premium apartments
     allowedApts = cachedApartmentTypes.premium_apt || [];
   } else if (roleKey === 'formatore_cleaner') {
-    allowedApts = cachedApartmentTypes.formatore_apt || [];
+    return true;
   } else {
     // For any other cleaner roles, check if there's a general fallback or no specific rules.
     // If we want to be strict, we could return false here. For now, assume if no rule, it's allowed.
@@ -323,6 +324,17 @@ export function explainCleanerTaskIncompatibility(
   }
   if (!officeTask && roleKey === "ufficio_cleaner" && cachedHkConstraints.officeRole === "hard") {
     reasons.push("Il cleaner Ufficio non può gestire task non-ufficio.");
+    return reasons;
+  }
+  if (roleKey === "formatore_cleaner") {
+    const weight = cachedTaskTriadeWeight(task);
+    if (
+      cachedHkConstraints.formatoreTriade === "hard" &&
+      weight != null &&
+      !formatoreTriadeSelected(cachedHkConstraints, formatoreTriadeLevel(weight))
+    ) {
+      reasons.push(`Livello triade ${formatoreTriadeLevel(weight)}: non è tra quelli preferiti per il formatore.`);
+    }
     return reasons;
   }
 
@@ -403,6 +415,11 @@ export function canCleanerHandleTaskSync(
     if (cachedHkConstraints.officeRole === "hard") return false;
   }
   if (officeTask && roleKey === "ufficio_cleaner") return true;
+  if (roleKey === "formatore_cleaner") {
+    const weight = cachedTaskTriadeWeight(task);
+    if (cachedHkConstraints.formatoreTriade !== "hard" || weight == null) return true;
+    return formatoreTriadeSelected(cachedHkConstraints, formatoreTriadeLevel(weight));
+  }
 
   const taskType = determineTaskType(task);
   // If the task type cannot be determined, assume it can be handled.

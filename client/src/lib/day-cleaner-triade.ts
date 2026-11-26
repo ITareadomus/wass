@@ -4,10 +4,11 @@ import type { CleanerTriadeLevel } from "@/components/triad-mark";
 export type DayCleanerTriadeSnapshot = {
   levels: CleanerTriadeLevel[];
   overrides: Record<number, number>;
+  trials: Record<number, boolean>;
   ready: boolean;
 };
 
-const EMPTY: DayCleanerTriadeSnapshot = { levels: [], overrides: {}, ready: false };
+const EMPTY: DayCleanerTriadeSnapshot = { levels: [], overrides: {}, trials: {}, ready: false };
 const snapshots = new Map<string, DayCleanerTriadeSnapshot>();
 const listeners = new Map<string, Set<() => void>>();
 const inflight = new Map<string, Promise<void>>();
@@ -33,16 +34,18 @@ async function load(workDate: string) {
       const payload = response.ok ? await response.json() : null;
       const levels = Array.isArray(payload?.levels) ? payload.levels : [];
       const overrides: Record<number, number> = {};
+      const trials: Record<number, boolean> = {};
       for (const row of Array.isArray(payload?.overrides) ? payload.overrides : []) {
         const cleanerId = Number(row?.cleaner_id);
         const weight = Number(row?.weight);
         if (!Number.isFinite(cleanerId) || cleanerId <= 0) continue;
         if (!Number.isInteger(weight) || weight < 1) continue;
         overrides[cleanerId] = weight;
+        if (row?.trial === true) trials[cleanerId] = true;
       }
-      write(workDate, { levels, overrides, ready: true });
+      write(workDate, { levels, overrides, trials, ready: true });
     } catch {
-      write(workDate, { levels: [], overrides: {}, ready: true });
+      write(workDate, { levels: [], overrides: {}, trials: {}, ready: true });
     } finally {
       inflight.delete(workDate);
     }
@@ -99,9 +102,11 @@ export async function saveDayCleanerTriadeOverride(
   if (!response.ok || payload?.success === false) {
     throw new Error(payload?.message || payload?.error || "Impossibile aggiornare il livello");
   }
-  const current = snapshots.get(workDate) ?? { levels: [], overrides: {}, ready: true };
+  const current = snapshots.get(workDate) ?? { levels: [], overrides: {}, trials: {}, ready: true };
   const overrides = { ...current.overrides };
+  const trials = { ...current.trials };
   if (weight == null) delete overrides[cleanerId];
   else overrides[cleanerId] = weight;
-  write(workDate, { ...current, overrides, ready: true });
+  delete trials[cleanerId];
+  write(workDate, { ...current, overrides, trials, ready: true });
 }

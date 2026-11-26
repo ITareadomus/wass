@@ -4,6 +4,7 @@ type ComparisonSelectionValue = {
   taskId: string | null;
   cleanerId: number | null;
   toggleTask: (taskId: string) => void;
+  setTask: (taskId: string | null) => void;
   toggleCleaner: (cleanerId: number) => void;
 };
 
@@ -35,6 +36,10 @@ export function ComparisonSelectionProvider({
     toggleTask: (next) => {
       setCleanerId(null);
       setTaskId((current) => (current === next ? null : next));
+    },
+    setTask: (next) => {
+      setCleanerId(null);
+      setTaskId(next);
     },
     toggleCleaner: (next) => {
       setTaskId(null);

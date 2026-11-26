@@ -187,26 +187,31 @@ try:
             pg_cur = pg_conn.cursor(cursor_factory=RealDictCursor)
             # Leggi TUTTI i cleaners esistenti da PostgreSQL per questa data
             # Li preserveremo se non sono in ADAM
-            if scope == "office":
-                pg_cur.execute("""
-                    SELECT cleaner_id, name, lastname, role, active, ranking,
-                           counter_hours, counter_days, available, contract_type,
-                           preferred_customers, telegram_id, start_time
-                    FROM cleaners
-                    WHERE work_date = %s
-                      AND LOWER(TRIM(COALESCE(role, ''))) = 'ufficio'
-                """, (target_date_str,))
-            else:
-                pg_cur.execute("""
-                    SELECT cleaner_id, name, lastname, role, active, ranking,
-                           counter_hours, counter_days, available, contract_type,
-                           preferred_customers, telegram_id, start_time
-                    FROM cleaners
-                    WHERE work_date = %s
-                      AND LOWER(TRIM(COALESCE(role, ''))) <> 'ufficio'
-                """, (target_date_str,))
+            roster_sql = """
+                SELECT c.cleaner_id, c.name, c.lastname, c.role, c.active, c.ranking,
+                       c.counter_hours, c.counter_days, c.available, c.contract_type,
+                       c.preferred_customers, c.telegram_id, c.start_time, c.end_time,
+                       COALESCE(c.start_time_manual, false) AS start_time_manual,
+                       COALESCE(c.end_time_manual, false) AS end_time_manual,
+                       a.default_start_time,
+                       a.default_end_time,
+                       a.preferred_customers AS anagrafica_preferred,
+                       COALESCE(a.preferred_customers_custom, false) AS preferred_customers_custom
+                FROM cleaners c
+                LEFT JOIN cleaner_anagrafica a ON a.cleaner_id = c.cleaner_id
+                WHERE c.work_date = %s
+                  AND {role_filter}
+            """
+            role_filter = (
+                "LOWER(TRIM(COALESCE(c.role, ''))) = 'ufficio'"
+                if scope == "office"
+                else "LOWER(TRIM(COALESCE(c.role, ''))) <> 'ufficio'"
+            )
+            pg_cur.execute(roster_sql.format(role_filter=role_filter), (target_date_str,))
             for row in pg_cur.fetchall():
                 cid = row["cleaner_id"]
+                manual_start = bool(row.get("start_time_manual"))
+                manual_end = bool(row.get("end_time_manual"))
                 existing_pg_cleaners[cid] = {
                     "id": cid,
                     "name": row["name"],
@@ -221,9 +226,15 @@ try:
                     "preferred_customers": row["preferred_customers"] or [],
                     "telegram_id": row["telegram_id"],
                     "start_time": row["start_time"],
+                    "end_time": row.get("end_time"),
+                    "start_time_manual": manual_start,
+                    "end_time_manual": manual_end,
+                    "default_start_time": row.get("default_start_time") or None,
+                    "default_end_time": row.get("default_end_time") or None,
+                    "anagrafica_preferred": row.get("anagrafica_preferred") or [],
+                    "preferred_customers_custom": bool(row.get("preferred_customers_custom")),
                 }
-                # Salva anche lo start_time custom per uso successivo
-                if row["start_time"]:
+                if manual_start and row["start_time"]:
                     custom_start_times[cid] = row["start_time"]
             if existing_pg_cleaners:
                 print(f"✅ Trovati {len(existing_pg_cleaners)} cleaners esistenti in PostgreSQL per {target_date_str}")
@@ -257,18 +268,30 @@ for u in cleaners:
         role = "Standard"
     available = 0 if cid in leave_set else 1
 
-    # Gerarchia start_time:
-    # 1. PostgreSQL custom (date-scoped) se disponibile
-    # 2. tw_start da ADAM se disponibile e non vuoto
-    # 3. None → il backend applicherà il default 10:00
-    if cid in custom_start_times:
-        # Custom start_time da PostgreSQL (ha priorità assoluta)
-        start_time = custom_start_times[cid]
+    # Gerarchia orari:
+    # 1. Orario già modificato per questa data
+    # 2. Orario predefinito salvato in anagrafica
+    # 3. tw_start da ADAM per l'inizio, altrimenti None
+    pg_row = existing_pg_cleaners.get(cid)
+    if pg_row and pg_row.get("start_time_manual") and pg_row.get("start_time"):
+        start_time = pg_row["start_time"]
+    elif pg_row and pg_row.get("default_start_time"):
+        start_time = pg_row["default_start_time"]
     else:
-        # Prova tw_start da ADAM
         adam_tw_start = u.get("tw_start")
-        # Gestisci il caso di stringa vuota o None
         start_time = adam_tw_start if adam_tw_start else None
+
+    if pg_row and pg_row.get("end_time_manual") and pg_row.get("end_time"):
+        end_time = pg_row["end_time"]
+    elif pg_row and pg_row.get("default_end_time"):
+        end_time = pg_row["default_end_time"]
+    else:
+        end_time = pg_row.get("end_time") if pg_row and pg_row.get("end_time") else None
+
+    if pg_row and pg_row.get("preferred_customers_custom"):
+        preferred_customers = pg_row.get("anagrafica_preferred") or []
+    else:
+        preferred_customers = prefs_map.get(cid, [])
 
     # counter_hours: ore lavorate nella settimana target da app_housekeeping_report (query #2)
     counter_hours = weekly_hours.get(cid, 0.0)
@@ -301,9 +324,10 @@ for u in cleaners:
         "counter_days": counter_days,
         "available": bool(available),
         "contract_type": contract_map.get(u.get("contract_type_id"), u.get("contract_type_id")),
-        "preferred_customers": prefs_map.get(cid, []),
+        "preferred_customers": preferred_customers,
         "telegram_id": u.get("telegram_id"),
         "start_time": start_time,
+        "end_time": end_time,
     }
     cleaners_data.append(cleaner)
 

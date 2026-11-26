@@ -6,7 +6,7 @@ import {
   PriorityViolation,
   Phase3TimelineConstraints
 } from './phase3';
-import { PriorityWindows, priorityPenalty, Priority } from './priorityWindows';
+import { PriorityWindows, priorityPenalty } from './priorityWindows';
 import { ApartmentTypes, DEFAULT_APARTMENT_TYPES, FairnessParams, DEFAULT_FAIRNESS_PARAMS, MinutesBasedTargets, FormatoreRules, TaskTypesByCleanerConfig } from './phase2';
 import { TravelPolicy, getWaveLevelConstraints } from './travelPolicy';
 import { runPhase4RepairBatch } from './phase4OrTools';
@@ -14,6 +14,7 @@ import { isTaskEquivalentToStraordinaria } from '../../utils/straordinaria-utils
 import { triadeWeightOrBase } from '../triade-assignment';
 import {
   constraintDecision,
+  formatoreTriadeViolated,
   HK_CONSTRAINT_PRESETS,
   HK_SOFT_PENALTY,
   type ConstraintMode,
@@ -227,8 +228,7 @@ function canCleanerHandleApartment(
       allowedApts = apartmentTypes.straordinario_apt || [];
       break;
     case 'formatore_cleaner':
-      allowedApts = apartmentTypes.formatore_apt || [];
-      break;
+      return true;
     case 'ufficio_cleaner':
       allowedApts = apartmentTypes.ufficio_apt || [];
       break;
@@ -259,14 +259,6 @@ function gateMode(
   return { compatible: false, reason, softPenalty: 0 };
 }
 
-function priorityTypeToKey(priorityType: Priority | null | undefined): string | null {
-  if (!priorityType) return null;
-  if (priorityType === 'EO') return 'early_out';
-  if (priorityType === 'HP') return 'high_priority';
-  if (priorityType === 'LP') return 'low_priority';
-  return null;
-}
-
 function checkHardConstraints(
   schedule: CleanerSchedule,
   task: TaskForScheduling,
@@ -288,6 +280,7 @@ function checkHardConstraints(
   const fixedHasLongOT = schedule.fixedHasLongOT === true;
   const softPenalty = { value: 0 };
   const rules = hk;
+  void formatoreRules;
 
   if (officeTask && normalizedRole !== 'ufficio_cleaner') {
     const blocked = gateMode(rules.officeRole, 'OFFICE_TASK_REQUIRES_UFFICIO_CLEANER', HK_SOFT_PENALTY.office, softPenalty);
@@ -299,7 +292,7 @@ function checkHardConstraints(
 
   const cleanerLevel = triadeWeightOrBase(schedule.triadeWeight);
   const taskLevel = triadeWeightOrBase(task.triadeWeight);
-  if (cleanerLevel < taskLevel) {
+  if (normalizedRole !== 'formatore_cleaner' && cleanerLevel < taskLevel) {
     const blocked = gateMode(
       rules.triadeCeiling,
       'TRIADE_LEVEL',
@@ -307,8 +300,13 @@ function checkHardConstraints(
       softPenalty,
     );
     if (blocked) return blocked;
-  } else if (rules.triadeMatch === 'hard' && cleanerLevel !== taskLevel) {
+  } else if (normalizedRole !== 'formatore_cleaner' && rules.triadeMatch === 'hard' && cleanerLevel !== taskLevel) {
     return { compatible: false, reason: 'TRIADE_MATCH', softPenalty: 0 };
+  }
+
+  if (normalizedRole === 'formatore_cleaner' && formatoreTriadeViolated(rules, task.triadeWeight)) {
+    const blocked = gateMode(rules.formatoreTriade, 'FORMATORE_TRIADE_LEVEL', HK_SOFT_PENALTY.formatore, softPenalty);
+    if (blocked) return blocked;
   }
 
   if (!canCleanerHandleApartment(cleanerRole, task.typeApt, apartmentTypes)) {
@@ -321,26 +319,6 @@ function checkHardConstraints(
     if (blocked) return blocked;
   }
 
-  if (normalizedRole === 'formatore_cleaner' && formatoreRules) {
-    const taskPriorityKey = priorityTypeToKey(task.priorityType ?? null);
-    if (formatoreRules.allowedPriorities.length > 0) {
-      if (taskPriorityKey == null) {
-        const blocked = gateMode(rules.formatorePriority, 'FORMATORE_TASK_PRIORITY_MISSING', HK_SOFT_PENALTY.formatore, softPenalty);
-        if (blocked) return blocked;
-      } else {
-        const allowedSet = new Set(formatoreRules.allowedPriorities.map(p => p.toLowerCase().replace(/-/g, '_')));
-        if (!allowedSet.has(taskPriorityKey)) {
-          const blocked = gateMode(rules.formatorePriority, `FORMATORE_PRIORITY_NOT_ALLOWED_${taskPriorityKey}`, HK_SOFT_PENALTY.formatore, softPenalty);
-          if (blocked) return blocked;
-        }
-      }
-    }
-    if (!task.premium && !taskIsStraordinaria && !formatoreRules.standardApt) {
-      const blocked = gateMode(rules.formatoreStandard, 'FORMATORE_TASK_TYPE_STANDARD_NOT_ALLOWED', HK_SOFT_PENALTY.formatore, softPenalty);
-      if (blocked) return blocked;
-    }
-  }
-  
   // 2. Regole OT per il nuovo task da inserire
   if (taskIsStraordinaria) {
     const taskDurationMin = task.cleaningTimeMinutes || 60;

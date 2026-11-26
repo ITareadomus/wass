@@ -562,9 +562,6 @@ async function rehydratePreassignedAssignmentsFromAdam(
   scope: "housekeeping" | "office" | "alg-test",
   options: { cleanerIds?: number[] } = {}
 ): Promise<RehydrateResult> {
-  if (scope === "alg-test") {
-    return { rehydrated: 0, autoConvokedCleaners: 0 };
-  }
   const queueKey = `${scope}:${workDate}`;
   const previous = rehydrateQueues.get(queueKey);
   const current = (previous ? previous.catch(() => undefined) : Promise.resolve()).then(() =>
@@ -584,7 +581,7 @@ async function rehydratePreassignedAssignmentsFromAdam(
 async function runRehydratePreassignedAssignmentsFromAdam(
   workDate: string,
   currentUsername: string,
-  scope: "housekeeping" | "office",
+  scope: "housekeeping" | "office" | "alg-test",
   options: { cleanerIds?: number[] } = {}
 ): Promise<RehydrateResult> {
   const preassignedSeeds = await fetchPreassignedTaskSeedsFromAdam(workDate);
@@ -631,7 +628,7 @@ async function runRehydratePreassignedAssignmentsFromAdam(
   const autoConvokingPreassignedCleanerIds = Array.from(
     new Set(
       effectivePreassignedSeeds
-        .filter((seed: any) => seed?.preAssignedMode !== "readonly")
+        .filter((seed: any) => scope === "alg-test" || seed?.preAssignedMode !== "readonly")
         .map((seed: any) => Number(seed?.assignedCleanerId))
         .filter((id: number) => Number.isFinite(id) && id > 0)
     )
@@ -711,7 +708,7 @@ async function runRehydratePreassignedAssignmentsFromAdam(
     if (!Number.isFinite(cleanerId) || !Number.isFinite(taskId) || cleanerId <= 0) continue;
 
     const preAssignedMode: PreassignedMode = seed.preAssignedMode === "readonly" ? "readonly" : "normal";
-    if (preAssignedMode === "readonly" && !selectedById.has(cleanerId)) {
+    if (preAssignedMode === "readonly" && !selectedById.has(cleanerId) && scope !== "alg-test") {
       continue;
     }
 
@@ -726,11 +723,22 @@ async function runRehydratePreassignedAssignmentsFromAdam(
       null
     );
     if (existingTask) {
-      applyPreassignedModeToTask(
-        existingTask,
-        seed.preAssignedMode === "readonly" ? "readonly" : "normal"
-      );
-      continue;
+      applyPreassignedModeToTask(existingTask, preAssignedMode);
+      let ownerId: number | null = null;
+      for (const entry of timelineData.cleaners_assignments) {
+        if ((entry?.tasks || []).includes(existingTask)) {
+          ownerId = Number(entry?.cleaner?.id);
+          break;
+        }
+      }
+      if (scope !== "alg-test" || ownerId === cleanerId) {
+        continue;
+      }
+      for (const entry of timelineData.cleaners_assignments) {
+        if (Number(entry?.cleaner?.id) !== ownerId) continue;
+        entry.tasks = (entry.tasks || []).filter((task: any) => task !== existingTask);
+      }
+      if (ownerId != null && Number.isFinite(ownerId)) touchedCleanerIds.add(ownerId);
     }
 
     const sourceTask = containerTaskById.get(taskId) || seed;
@@ -1264,6 +1272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { ensureAdamWassRoleTable } = await import("./services/adam-wass-accounts");
     await ensureAdamWassRoleTable();
     await pgDailyAssignmentsService.ensureCleanerAliasesAndRevisionsTables();
+    await pgDailyAssignmentsService.ensureCleanerAnagraficaTable();
     await pgDailyAssignmentsService.ensureLockedColumns();
     await pgDailyAssignmentsService.ensureCustomerNoteColumns();
     await pgDailyAssignmentsService.ensureManualStartTimeColumn();
@@ -1413,17 +1422,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`✅ Eccezioni triade cancellate per ${workDate}`);
       }
 
-      // La prova rilegge i task già nel database, senza cleaner e senza start/end.
+      // La prova rilegge i task già nel database. I pre-assegnati tornano sul cleaner e restano bloccati.
       if (resolvedScope === "alg-test") {
         const { refillAlgTestContainersFromDb } = await import("./services/alg-test-containers");
         const refilled = await refillAlgTestContainersFromDb(workDate);
-        console.log(`✅ Reset prova: ${refilled.taskCount} task rimessi nei contenitori per ${workDate}`);
+        let rehydratedPreassigned = 0;
+        try {
+          const rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
+            workDate,
+            currentUsername,
+            "alg-test"
+          );
+          rehydratedPreassigned = rehydrateResult.rehydrated;
+        } catch (rehydrateError: any) {
+          console.warn(
+            "⚠️ Reidratazione pre-assegnati della prova fallita:",
+            rehydrateError?.message || rehydrateError
+          );
+        }
+        console.log(`✅ Reset prova: ${refilled.taskCount} task nei contenitori, ${rehydratedPreassigned} pre-assegnati in timeline per ${workDate}`);
         return res.json({
           success: true,
-          message: "Timeline di prova svuotata e task rimessi nei contenitori",
+          message: "Timeline di prova svuotata: i pre-assegnati restano sul loro cleaner",
           containersRefreshed: true,
           taskCount: refilled.taskCount,
-          preassignedRehydrated: 0,
+          preassignedRehydrated: rehydratedPreassigned,
         });
       }
 
@@ -2138,6 +2161,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/day-comparison", async (req, res) => {
+    try {
+      const workDate = String(req.query.date || "");
+      if (!isValidWorkDate(workDate)) {
+        return res.status(400).json({ error: "Data non valida" });
+      }
+      const { canReadDayExport } = await import("./services/day-sql-export");
+      const username = String(req.get("x-wass-username") || "");
+      if (!(await canReadDayExport(username))) {
+        return res.status(403).json({ error: "Non autorizzato" });
+      }
+      const scope = req.query.scope === "alg-test" ? "alg-test" : "housekeeping";
+      const { buildWassComparisonSnapshot } = await import("./services/day-comparison-snapshot");
+      const snapshot = await buildWassComparisonSnapshot(workDate, scope);
+      res.json(snapshot);
+    } catch (error: any) {
+      const message = error?.message || "Confronto non riuscito";
+      const missing = /Nessuna (giornata|prova)/.test(message);
+      if (!missing) console.error("GET /api/day-comparison:", error);
+      res.status(missing ? 404 : 500).json({ error: message });
+    }
+  });
+
   // GET /api/timeline/execution-status?date=YYYY-MM-DD
   // Polling UI: solo startwork / cleaned da ADAM, senza ricalcolo timeline.
   app.get("/api/timeline/execution-status", async (req, res) => {
@@ -2287,10 +2333,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (weight != null && !(await isActiveTriadeWeight(weight))) {
         return res.status(400).json({ success: false, error: "Livello non valido" });
       }
-      if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
-      const { saveDayCleanerTriadeOverride } = await import("./services/pg-cleaner-triade-override");
-      await saveDayCleanerTriadeOverride(workDate, cleanerId, weight);
-      res.json({ success: true, cleaner_id: cleanerId, weight });
+      return res.status(403).json({
+        success: false,
+        error: "Il livello del cleaner si imposta solo dall'anagrafica dipendenti",
+      });
     } catch (error: any) {
       console.error("PUT /api/triade/cleaner-day-overrides:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -2657,6 +2703,160 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false,
         error: error.message,
       });
+    }
+  });
+
+  app.get("/api/cleaner-anagrafica", async (_req, res) => {
+    let connection: mysql.Connection | null = null;
+    try {
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      const { withCleanerTriade, loadActiveTriadeLevels } = await import("./services/adam-triade");
+      const roster = await pgDailyAssignmentsService.listCleanerAnagrafica();
+      const [cleaners, triadeLevels] = await Promise.all([
+        withCleanerTriade(roster),
+        loadActiveTriadeLevels(),
+      ]);
+      let customers: Array<{ id: number; name: string }> = [];
+      try {
+        connection = await mysql.createConnection({
+          host: databaseConfig.mysql.host,
+          port: databaseConfig.mysql.port,
+          user: databaseConfig.mysql.user,
+          password: databaseConfig.mysql.password,
+          database: databaseConfig.mysql.database,
+        });
+        const [rows]: any = await connection.execute(
+          `SELECT id, name FROM app_customers WHERE name IS NOT NULL AND TRIM(name) <> '' ORDER BY name`
+        );
+        customers = (Array.isArray(rows) ? rows : [])
+          .map((row: any) => ({ id: Number(row?.id), name: String(row?.name || "").trim() }))
+          .filter((row: { id: number; name: string }) => Number.isInteger(row.id) && row.name);
+      } catch (customerError: any) {
+        console.warn("⚠️ Anagrafica: elenco clienti ADAM non disponibile:", customerError?.message || customerError);
+      }
+      const { listActiveCleanerTriadePromotions } = await import("./services/pg-cleaner-triade-override");
+      const promotions = await listActiveCleanerTriadePromotions();
+      const cleanersWithPromotion = cleaners.map((cleaner) => ({
+        ...cleaner,
+        temporaryTriade: promotions.get(Number(cleaner.id)) ?? null,
+      }));
+      res.json({ cleaners: cleanersWithPromotion, customers, triadeLevels });
+    } catch (error: any) {
+      console.error("Errore GET /api/cleaner-anagrafica:", error);
+      res.status(500).json({ success: false, error: error.message });
+    } finally {
+      if (connection) await connection.end();
+    }
+  });
+
+function parseAnagraficaTime(raw: string): string | null {
+  if (!raw) return null;
+  const match = raw.match(/^(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return raw;
+}
+
+  app.post("/api/cleaner-anagrafica", async (req, res) => {
+    try {
+      const rows = Array.isArray(req.body?.cleaners) ? req.body.cleaners : null;
+      if (!rows) {
+        return res.status(400).json({ success: false, error: "cleaners array required" });
+      }
+      const updates = [];
+      for (const row of rows) {
+        const id = Number(row?.id);
+        if (!Number.isInteger(id)) {
+          return res.status(400).json({ success: false, error: "cleaner id non valido" });
+        }
+        const rawStart = String(row?.defaultStartTime ?? "").trim();
+        const rawEnd = String(row?.defaultEndTime ?? "").trim();
+        const defaultStartTime = parseAnagraficaTime(rawStart);
+        const defaultEndTime = parseAnagraficaTime(rawEnd);
+        if (rawStart && !defaultStartTime) {
+          return res.status(400).json({ success: false, error: `Orario di inizio non valido per il cleaner ${id}` });
+        }
+        if (rawEnd && !defaultEndTime) {
+          return res.status(400).json({ success: false, error: `Orario di fine non valido per il cleaner ${id}` });
+        }
+        const preferredCustomerIds = [...new Set(
+          (Array.isArray(row?.preferredCustomerIds) ? row.preferredCustomerIds : [])
+            .map((value: unknown) => Number(value))
+            .filter((value: number) => Number.isInteger(value))
+        )] as number[];
+        updates.push({
+          id,
+          alias: String(row?.alias ?? ""),
+          name: String(row?.name ?? ""),
+          lastname: String(row?.lastname ?? ""),
+          defaultStartTime,
+          defaultEndTime,
+          preferredCustomerIds,
+          preferredCustomersCustom: row?.preferredCustomersCustom === true,
+        });
+      }
+      const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
+      await pgDailyAssignmentsService.saveCleanerAnagrafica(updates);
+      res.json({ success: true, count: updates.length });
+    } catch (error: any) {
+      console.error("Errore POST /api/cleaner-anagrafica:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/cleaner-triade-promotion", async (req, res) => {
+    try {
+      const cleanerId = Number(req.body?.cleanerId);
+      const days = Number(req.body?.days);
+      if (!Number.isInteger(cleanerId) || cleanerId <= 0) {
+        return res.status(400).json({ success: false, error: "Cleaner non valido" });
+      }
+      if (!Number.isInteger(days) || days < 1 || days > 30) {
+        return res.status(400).json({ success: false, error: "Durata non valida: da 1 a 30 giorni" });
+      }
+      const { loadActiveTriadeLevels, loadCleanerTriadeByIds } = await import("./services/adam-triade");
+      const { romeToday, saveCleanerTriadePromotion, listActiveCleanerTriadePromotions, isTrialEligibleLevel } = await import("./services/pg-cleaner-triade-override");
+      const [levels, current, active] = await Promise.all([
+        loadActiveTriadeLevels(),
+        loadCleanerTriadeByIds([cleanerId]),
+        listActiveCleanerTriadePromotions(),
+      ]);
+      const base = current.get(cleanerId);
+      if (!base) {
+        return res.status(400).json({ success: false, error: "Questo cleaner non ha un livello triade" });
+      }
+      if (active.has(cleanerId)) {
+        return res.status(400).json({ success: false, error: "È già in prova: non si può aggiungere un altro livello" });
+      }
+      if (!isTrialEligibleLevel(base.name)) {
+        return res.status(400).json({ success: false, error: "Il livello di prova è disponibile solo per Essential e Plus" });
+      }
+      const next = [...levels].sort((left, right) => left.weight - right.weight).find((level) => level.weight > base.weight);
+      if (!next) {
+        return res.status(400).json({ success: false, error: "È già al livello più alto" });
+      }
+      const promotion = await saveCleanerTriadePromotion(cleanerId, days, next.weight, romeToday());
+      res.json({ success: true, promotion });
+    } catch (error: any) {
+      console.error("POST /api/cleaner-triade-promotion:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.delete("/api/cleaner-triade-promotion/:cleanerId", async (req, res) => {
+    try {
+      const cleanerId = Number(req.params.cleanerId);
+      if (!Number.isInteger(cleanerId) || cleanerId <= 0) {
+        return res.status(400).json({ success: false, error: "Cleaner non valido" });
+      }
+      const { clearCleanerTriadePromotion } = await import("./services/pg-cleaner-triade-override");
+      await clearCleanerTriadePromotion(cleanerId);
+      res.json({ success: true, cleanerId });
+    } catch (error: any) {
+      console.error("DELETE /api/cleaner-triade-promotion:", error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -5170,32 +5370,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       
-      // CRITICAL: Carica gli orari turno esistenti da PostgreSQL PRIMA di sovrascrivere
+      // Prima di sovrascrivere il roster: tiene l'orario già modificato per il giorno
+      // e applica orario predefinito e clienti preferiti salvati in anagrafica.
       const existingCleaners = await pgDailyAssignmentsService.loadCleanersForDate(workDate, resolvedScope);
-      const existingStartTimes = new Map<number, string>();
-      const existingEndTimes = new Map<number, string>();
-      if (existingCleaners && existingCleaners.length > 0) {
-        for (const c of existingCleaners) {
-          if (c.id && c.start_time) {
-            existingStartTimes.set(c.id, c.start_time);
-          }
-          if (c.id && c.end_time) {
-            existingEndTimes.set(c.id, c.end_time);
-          }
-        }
-        console.log(`✅ Preservati ${existingStartTimes.size} start_time custom da PostgreSQL`);
-      }
-      
-      // Merge: usa gli orari esistenti se presenti, altrimenti fallback default
-      const mergedCleaners = cleaners.map((c: any) => {
-        const existingStartTime = existingStartTimes.get(c.id);
-        const existingEndTime = existingEndTimes.get(c.id);
-        return {
-          ...c,
-          start_time: existingStartTime ?? c.start_time ?? '10:00',
-          end_time: existingEndTime ?? c.end_time ?? '20:00',
-        };
-      });
+      const mergedCleaners = await pgDailyAssignmentsService.mergeCleanersWithAnagrafica(
+        cleaners,
+        existingCleaners
+      );
       
       const success = await pgDailyAssignmentsService.saveCleanersForDate(
         workDate,
@@ -6303,6 +6484,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? { id: c, name: 'Unknown', start_time: '10:00', end_time: '20:00' }
           : { ...c, end_time: c.end_time || "20:00" };
       });
+
+      for (const raw of selectedCleaners) {
+        if (!raw || typeof raw === "number") continue;
+        const cleanerId = Number(raw.id);
+        const stored = cleanersMap.get(cleanerId);
+        const nextStart = String(raw.start_time || "").trim();
+        const currentStart = String(stored?.start_time || "").trim();
+        if (Number.isFinite(cleanerId) && /^\d{2}:\d{2}$/.test(nextStart) && nextStart !== currentStart) {
+          await pgDailyAssignmentsService.updateCleanerField(cleanerId, workDate, "start_time", nextStart);
+        }
+        const nextEnd = String(raw.end_time || "").trim();
+        const currentEnd = String(stored?.end_time || "").trim();
+        if (Number.isFinite(cleanerId) && /^\d{2}:\d{2}$/.test(nextEnd) && nextEnd !== currentEnd) {
+          await pgDailyAssignmentsService.updateCleanerField(cleanerId, workDate, "end_time", nextEnd);
+        }
+      }
 
       const dataToSave = {
         cleaners: enrichedCleaners,
@@ -10903,21 +11100,43 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       if (resolvedScope === "alg-test") {
         const existingTestContainers = await workspaceFiles.loadContainers(date, "alg-test");
         const existingTestCount = Number(existingTestContainers?.summary?.total_tasks ?? 0);
-        if (existingTestCount > 0) {
+        if (existingTestCount === 0) {
+          const { refillAlgTestContainersFromDb } = await import("./services/alg-test-containers");
+          const refilled = await refillAlgTestContainersFromDb(date, { copyCleaners: true });
+          console.log(`✅ Prova algoritmo: ${refilled.taskCount} task dal database per ${date}`);
+        } else {
           console.log(`📦 Prova algoritmo: ${existingTestCount} task già nei contenitori per ${date}`);
-          return res.json({
-            success: true,
-            message: "Contenitori di prova già presenti",
-            skippedAdamRefresh: true,
-          });
         }
-        const { refillAlgTestContainersFromDb } = await import("./services/alg-test-containers");
-        const refilled = await refillAlgTestContainersFromDb(date, { copyCleaners: true });
-        console.log(`✅ Prova algoritmo: ${refilled.taskCount} task dal database, senza assegnazioni, per ${date}`);
+        let rehydratedPreassigned = 0;
+        const testTimeline = existingTestCount > 0
+          ? await workspaceFiles.loadTimeline(date, "alg-test")
+          : null;
+        const alreadyHasPreassigned = (testTimeline?.cleaners_assignments || []).some((entry: any) =>
+          (entry?.tasks || []).some((task: any) => resolvePreassignedModeFromTask(task) != null)
+        );
+        if (!alreadyHasPreassigned) {
+          try {
+            const rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
+              date,
+              createdBy,
+              "alg-test"
+            );
+            rehydratedPreassigned = rehydrateResult.rehydrated;
+          } catch (rehydrateError: any) {
+            console.warn(
+              "⚠️ Reidratazione pre-assegnati della prova fallita:",
+              rehydrateError?.message || rehydrateError
+            );
+          }
+        }
         return res.json({
           success: true,
-          message: "Task caricati dal database senza assegnazioni",
-          taskCount: refilled.taskCount,
+          message: existingTestCount > 0
+            ? "Contenitori di prova già presenti"
+            : "Task caricati dal database",
+          skippedAdamRefresh: existingTestCount > 0,
+          taskCount: existingTestCount,
+          preassignedRehydrated: rehydratedPreassigned,
         });
       }
 
@@ -10957,14 +11176,11 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       // Python ha già salvato containers via API - nessuna azione necessaria
       console.log(`✅ Containers già salvati via API da Python per ${date}`);
 
-      // La prova algoritmo parte senza assegnazioni, anche se ADAM ne ha già.
-      const rehydrateResult = resolvedScope === "alg-test"
-        ? { rehydrated: 0, autoConvokedCleaners: 0 }
-        : await rehydratePreassignedAssignmentsFromAdam(
-            date,
-            createdBy,
-            resolvedScope
-          );
+      const rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
+        date,
+        createdBy,
+        resolvedScope
+      );
       await copyHousekeepingCleanersForAlgTest();
       if (rehydrateResult.rehydrated > 0 || rehydrateResult.autoConvokedCleaners > 0) {
         console.log(
@@ -12811,7 +13027,12 @@ app.post("/api/transfer-to-adam", async (req, res) => {
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
 
       const { runHkAssignmentHypotheses } = await import("./services/optimizer/hk-hypotheses");
-      const hypotheses = await runHkAssignmentHypotheses(workDate, resolveScopeFromReq(req));
+      const { parseWorkloadBalanceChoice } = await import("../shared/workload-balance-choice");
+      const hypotheses = await runHkAssignmentHypotheses(
+        workDate,
+        resolveScopeFromReq(req),
+        req.body?.workload == null ? undefined : parseWorkloadBalanceChoice(req.body.workload),
+      );
       res.json({ success: true, hypotheses });
     } catch (error: any) {
       console.error("❌ Errore optimizer hypotheses:", error);

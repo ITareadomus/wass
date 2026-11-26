@@ -1,12 +1,13 @@
 import { randomUUID } from "crypto";
 import pool from "../../../shared/pg-db";
-import { assignmentScopeSql, containersTableFor, normalizeAssignmentScope, selectedCleanersTableFor, type AssignmentScope } from "../../../shared/assignment-scope";
+import { assignmentScopeSql, assignmentsTableFor, containersTableFor, normalizeAssignmentScope, selectedCleanersTableFor, type AssignmentScope } from "../../../shared/assignment-scope";
 import { assignBalancedDay, type BalancedPriority, type BalancedTask } from "../../../shared/balanced-assignment";
 import type { HkConstraintSettings } from "../../../shared/hk-constraint-settings";
 import { DEFAULT_APARTMENT_TYPES } from "./phase2";
 import { createRun, loadLockedCleanerIds, updateRunStatus } from "./db";
 import { loadPriorityStartWindows, priorityToDbFormat } from "./priorityWindows";
 import { loadTriadeAssignmentWeights, triadeWeightOrBase } from "../triade-assignment";
+import type { WorkloadBalanceChoice } from "../../../shared/workload-balance-choice";
 
 function toMinutes(value: unknown): number | null {
   if (value == null) return null;
@@ -20,6 +21,12 @@ function fromMinutes(workDate: string, value: number): Date {
   const hours = Math.floor(value / 60);
   const minutes = value % 60;
   return new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
+}
+
+function isStickyAssignment(reasons: unknown, taskId: number, lockedTaskIds: Set<number>): boolean {
+  if (lockedTaskIds.has(taskId)) return true;
+  const list = Array.isArray(reasons) ? reasons : [];
+  return list.includes("preassigned_enable_wass_readonly");
 }
 
 function mapPriority(value: unknown): BalancedPriority | null {
@@ -75,6 +82,7 @@ export async function runBalancedDay(
   workDate: string,
   settings: HkConstraintSettings,
   scope: AssignmentScope = "housekeeping",
+  workloadChoice?: WorkloadBalanceChoice,
 ) {
   const resolvedScope = normalizeAssignmentScope(scope);
   const runId = randomUUID();
@@ -88,7 +96,7 @@ export async function runBalancedDay(
   });
 
   try {
-    const [containerRows, selectedRows, apartmentTypes, formatore, lockedCleanerIds] = await Promise.all([
+    const [containerRows, assignedRows, lockedTaskRows, selectedRows, apartmentTypes, formatore, lockedCleanerIds] = await Promise.all([
       pool.query(
         `
           SELECT task_id, logistic_code, client_id, operation_id, lat, lng, cleaning_time,
@@ -99,6 +107,28 @@ export async function runBalancedDay(
             AND lat IS NOT NULL
             AND lng IS NOT NULL
             AND NOT COALESCE(locked, false)
+            AND task_id NOT IN (
+              SELECT task_id FROM daily_task_locks
+              WHERE work_date = $1 AND locked = true
+            )
+        `,
+        [workDate]
+      ),
+      pool.query(
+        `
+          SELECT cleaner_id, task_id, logistic_code, client_id, operation_id,
+                 lat, lng, cleaning_time, checkin_time, checkout_time,
+                 premium, straordinaria, type_apt, priority, reasons
+          FROM ${assignmentsTableFor(resolvedScope)}
+          WHERE work_date = $1 AND ${assignmentScopeSql(resolvedScope)}
+        `,
+        [workDate]
+      ),
+      pool.query(
+        `
+          SELECT task_id
+          FROM daily_task_locks
+          WHERE work_date = $1 AND locked = true
         `,
         [workDate]
       ),
@@ -131,7 +161,44 @@ export async function runBalancedDay(
         )
       : { rows: [] };
 
-    const taskSeeds = containerRows.rows.map((row) => ({
+    const lockedTaskIds = new Set(
+      lockedTaskRows.rows.map((row) => Number(row.task_id)).filter((id: number) => Number.isFinite(id) && id > 0),
+    );
+    const assignmentByTask = new Map<number, (typeof assignedRows.rows)[number]>();
+    for (const row of assignedRows.rows) {
+      const taskId = Number(row.task_id);
+      if (!Number.isFinite(taskId) || taskId <= 0 || assignmentByTask.has(taskId)) continue;
+      assignmentByTask.set(taskId, row);
+    }
+    const selectedSet = new Set(cleanerIds);
+    const containerIds = new Set(containerRows.rows.map((row) => Number(row.task_id)));
+    const fixedByCleaner = new Map<number, { count: number; minutes: number }>();
+    const movableRows: Array<(typeof assignedRows.rows)[number]> = [];
+    for (const [taskId, row] of assignmentByTask) {
+      const cleanerId = Number(row.cleaner_id);
+      const onSelected = selectedSet.has(cleanerId);
+      const sticky = isStickyAssignment(row.reasons, taskId, lockedTaskIds) || !onSelected || row.lat == null || row.lng == null;
+      if (sticky) {
+        if (!onSelected) continue;
+        const bucket = fixedByCleaner.get(cleanerId) ?? { count: 0, minutes: 0 };
+        bucket.count += 1;
+        bucket.minutes += Number(row.cleaning_time) || 0;
+        fixedByCleaner.set(cleanerId, bucket);
+        continue;
+      }
+      if (!containerIds.has(taskId)) movableRows.push(row);
+    }
+
+    const freshRows = [
+      ...containerRows.rows.filter((row) => {
+        const taskId = Number(row.task_id);
+        if (lockedTaskIds.has(taskId)) return false;
+        const existing = assignmentByTask.get(taskId);
+        return !existing || !isStickyAssignment(existing.reasons, taskId, lockedTaskIds);
+      }),
+      ...movableRows,
+    ];
+    const taskSeeds = freshRows.map((row) => ({
       taskId: Number(row.task_id),
       clientId: row.client_id == null ? null : Number(row.client_id),
       operationId: row.operation_id == null ? null : Number(row.operation_id),
@@ -144,7 +211,7 @@ export async function runBalancedDay(
       console.warn("[balanced] Finestre priorità non disponibili:", error);
     }
 
-    const tasks: BalancedTask[] = containerRows.rows.map((row) => ({
+    const tasks: BalancedTask[] = freshRows.map((row) => ({
       taskId: Number(row.task_id),
       logisticCode: Number(row.logistic_code) || 0,
       lat: Number(row.lat),
@@ -159,23 +226,30 @@ export async function runBalancedDay(
       typeApt: String(row.type_apt ?? ""),
       isOffice: false,
     }));
+    const preferredMinutes = new Map(
+      (workloadChoice?.mode === "custom" ? workloadChoice.targets : []).map((row) => [row.cleanerId, row.minutes]),
+    );
     const cleaners = cleanerRows.rows.map((row) => ({
       cleanerId: Number(row.cleaner_id),
       role: String(row.role ?? "Standard"),
       triadeWeight: weights.cleanerWeight.get(Number(row.cleaner_id)) ?? triadeWeightOrBase(null),
       startMin: toMinutes(row.start_time) ?? 10 * 60,
       endMin: toMinutes(row.end_time) ?? 20 * 60,
-      fixedCount: 0,
-      fixedWorkMin: 0,
+      fixedCount: fixedByCleaner.get(Number(row.cleaner_id))?.count ?? 0,
+      fixedWorkMin: fixedByCleaner.get(Number(row.cleaner_id))?.minutes ?? 0,
       fixedHasLongOt: false,
       fixedHasAnyOt: false,
       anchor: null,
+      targetMin: preferredMinutes.get(Number(row.cleaner_id)) ?? null,
     }));
+    const effectiveSettings = workloadChoice
+      ? { ...settings, workloadBalance: "hard" as const }
+      : settings;
 
     const solved = assignBalancedDay({
       tasks,
       cleaners,
-      settings,
+      settings: effectiveSettings,
       apartmentTypes,
       formatore,
       priorityWindows,

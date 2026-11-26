@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
@@ -59,8 +59,6 @@ function DaySlot({
   startMin,
   endMin,
   pxPerMinute,
-  scroll,
-  onFocusMinutes,
   importing,
   onFile,
   onWass,
@@ -72,11 +70,6 @@ function DaySlot({
   startMin: number;
   endMin: number;
   pxPerMinute: number;
-  scroll: Pick<
-    ReturnType<typeof useSyncedTimelineScroll>,
-    "registerScrollRef" | "handleScroll" | "handlePointerDown" | "handlePointerMove" | "stopPan"
-  >;
-  onFocusMinutes: (minutes: number) => void;
   importing: boolean;
   onFile: (file: File) => void;
   onWass: (workDate: string, source: "housekeeping" | "alg-test") => void;
@@ -86,11 +79,12 @@ function DaySlot({
   const [origin, setOrigin] = useState<"wass" | "sql">("wass");
   const [source, setSource] = useState<"housekeeping" | "alg-test">("housekeeping");
   const day = loaded?.snapshot ?? null;
+  const scroll = useSyncedTimelineScroll();
   const selectedDate = workDate
     ? new Date(Number(workDate.slice(0, 4)), Number(workDate.slice(5, 7)) - 1, Number(workDate.slice(8, 10)))
     : undefined;
   return (
-    <section className="flex min-w-0 flex-col gap-3">
+    <section ref={scroll.setScrollRootRef} className="flex min-w-0 flex-col gap-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="text-lg font-semibold">{title}</h2>
@@ -195,7 +189,9 @@ function DaySlot({
         <ComparisonSelectionProvider
           onTaskId={(taskId) => {
             const task = day.tasks.find((item) => item.taskId === taskId || `${item.taskId}:${item.cleanerId}` === taskId);
-            if (task?.startMin != null) onFocusMinutes(task.startMin);
+            if (task?.startMin != null) {
+              scroll.applyScrollLeft((task.startMin - startMin) * pxPerMinute - 60);
+            }
           }}
         >
           <ComparisonTimeline
@@ -249,14 +245,9 @@ export default function DayComparison() {
   const [leftError, setLeftError] = useState<string | null>(null);
   const [rightError, setRightError] = useState<string | null>(null);
   const [importing, setImporting] = useState<"left" | "right" | null>(null);
-  const timelineScroll = useSyncedTimelineScroll();
-
   const loadedDays = [left?.snapshot ?? null, right?.snapshot ?? null];
   const windowRange = useMemo(() => comparisonWindow(loadedDays), [left, right]);
   const pxPerMinute = useMemo(() => comparisonPxPerMinute(loadedDays), [left, right]);
-  const onFocusMinutes = useCallback((minutes: number) => {
-    timelineScroll.applyScrollLeft((minutes - windowRange.startMin) * pxPerMinute - 60);
-  }, [pxPerMinute, timelineScroll.applyScrollLeft, windowRange.startMin]);
 
   const load = async (file: File, side: "left" | "right") => {
     const setLoaded = side === "left" ? setLeft : setRight;
@@ -264,8 +255,7 @@ export default function DayComparison() {
     setError(null);
     try {
       const text = await readFile(file);
-      const snapshot = snapshotFromDaySql(text);
-      setLoaded({ fileName: file.name, snapshot });
+      setLoaded({ fileName: file.name, snapshot: snapshotFromDaySql(text) });
     } catch (error) {
       setLoaded(null);
       setError(error instanceof Error ? error.message : "File non leggibile");
@@ -284,25 +274,14 @@ export default function DayComparison() {
     try {
       const username = getStoredUser()?.username ?? "";
       const scopeQuery = source === "alg-test" ? "&scope=alg-test" : "";
-      const response = await fetch(`/api/day-export.sql?date=${encodeURIComponent(workDate)}${scopeQuery}`, {
+      const response = await fetch(`/api/day-comparison?date=${encodeURIComponent(workDate)}${scopeQuery}`, {
         headers: { "x-wass-username": username },
       });
+      const body = await response.json().catch(() => null);
       if (!response.ok) {
-        const body = await response.json().catch(() => null);
         throw new Error(body?.error || "Import da WASS non riuscito");
       }
-      const text = await response.text();
-      if (!/insert\s+into/i.test(text)) {
-        throw new Error(
-          source === "alg-test"
-            ? "Nessuna prova algoritmo per questa data. Aprila da Prova algoritmo e premi Assegna."
-            : "Nessuna giornata salvata in WASS per questa data",
-        );
-      }
-      const snapshot = snapshotFromDaySql(text, source);
-      if (source === "alg-test" && snapshot.assignedCount === 0 && snapshot.containerCount === 0) {
-        throw new Error("Nessuna prova algoritmo per questa data. Aprila da Prova algoritmo e premi Assegna.");
-      }
+      const snapshot = body as DaySnapshot;
       setLoaded({
         fileName: source === "alg-test" ? `Prova ${workDate}` : `WASS ${workDate}`,
         snapshot,
@@ -320,10 +299,10 @@ export default function DayComparison() {
       <div>
         <h1 className="text-2xl font-semibold">Confronto giornate</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Per ogni lato scegli prima se la giornata arriva da WASS o da un file SQL. Se è WASS, poi scegli giornata vera o giornata di prova. Le due timeline scorrono insieme, trascinando o con la barra in alto. Un doppio clic su un task o su un cleaner lo evidenzia sulla mappa di quel lato.
+          Per ogni lato scegli prima se la giornata arriva da WASS o da un file SQL. Se è WASS, poi scegli giornata vera o giornata di prova. Ogni timeline scorre da sola. Un doppio clic su un task o su un cleaner lo evidenzia sulla mappa di quel lato.
         </p>
       </div>
-      <div ref={timelineScroll.setScrollRootRef} className="grid items-start gap-6 md:grid-cols-2">
+      <div className="grid items-start gap-6 md:grid-cols-2">
         <DaySlot
           title="Giornata A"
           loaded={left}
@@ -331,8 +310,6 @@ export default function DayComparison() {
           startMin={windowRange.startMin}
           endMin={windowRange.endMin}
           pxPerMinute={pxPerMinute}
-          scroll={timelineScroll}
-          onFocusMinutes={onFocusMinutes}
           importing={importing === "left"}
           onFile={(file) => void load(file, "left")}
           onWass={(workDate, source) => void loadFromWass(workDate, "left", source)}
@@ -348,8 +325,6 @@ export default function DayComparison() {
           startMin={windowRange.startMin}
           endMin={windowRange.endMin}
           pxPerMinute={pxPerMinute}
-          scroll={timelineScroll}
-          onFocusMinutes={onFocusMinutes}
           importing={importing === "right"}
           onFile={(file) => void load(file, "right")}
           onWass={(workDate, source) => void loadFromWass(workDate, "right", source)}

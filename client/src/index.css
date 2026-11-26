@@ -148,6 +148,23 @@
   outline-color: rgba(248, 113, 113, 0.6);
 }
 
+.task-triade-mismatch-outline:not(.task-violation-outline) {
+  outline: 1.5px solid rgba(202, 138, 4, 0.9);
+  outline-offset: 1px;
+}
+
+.dark .task-triade-mismatch-outline:not(.task-violation-outline) {
+  outline-color: rgba(250, 204, 21, 0.9);
+}
+
+.task-violation-outline.task-triade-mismatch-outline {
+  box-shadow: 0 0 0 1.5px rgba(202, 138, 4, 0.9);
+}
+
+.dark .task-violation-outline.task-triade-mismatch-outline {
+  box-shadow: 0 0 0 1.5px rgba(250, 204, 21, 0.9);
+}
+
 /* Ruolo viewer: i pulsanti di modifica restano visibili ma non si usano. */
 html[data-viewer="1"] button:not([data-viewer-allow]),
 html[data-viewer="1"] [role="button"]:not([data-viewer-allow]):not(:has([data-dnd-task-card-surface="true"])),

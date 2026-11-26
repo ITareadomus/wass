@@ -1016,20 +1016,73 @@ export async function applyOptimizerToProduction(
     result.insertedCount = insertResult.rowCount || 0;
     console.log(`[applyToProduction] MERGE MODE: Inserted ${result.insertedCount} new assignments (existing preserved)`);
 
+    const movePlan = await client.query(
+      `
+        SELECT a.cleaner_id AS old_cleaner_id, oa.cleaner_id AS new_cleaner_id
+        FROM ${assignmentsTable} AS a
+        JOIN optimizer.optimizer_assignment oa ON oa.task_id = a.task_id AND oa.run_id = $1
+        WHERE a.work_date = $2
+          AND ${assignmentScopeSql(resolvedScope, "a.scope")}
+          AND a.cleaner_id IS DISTINCT FROM oa.cleaner_id
+          AND NOT ('preassigned_enable_wass_readonly' = ANY (COALESCE(a.reasons, ARRAY[]::text[])))
+          AND a.task_id NOT IN (
+            SELECT task_id FROM daily_task_locks
+            WHERE work_date = $2 AND locked = true
+          )
+      `,
+      [runId, workDate]
+    );
+    const movedResult = await client.query(
+      `
+        UPDATE ${assignmentsTable} AS a
+        SET cleaner_id = oa.cleaner_id,
+            sequence = oa.sequence,
+            start_time = oa.start_time::time,
+            end_time = oa.end_time::time,
+            travel_time = COALESCE(oa.travel_minutes_from_prev, 0)
+        FROM optimizer.optimizer_assignment oa
+        WHERE oa.run_id = $1
+          AND a.work_date = $2
+          AND ${assignmentScopeSql(resolvedScope, "a.scope")}
+          AND a.task_id = oa.task_id
+          AND a.cleaner_id IS DISTINCT FROM oa.cleaner_id
+          AND NOT ('preassigned_enable_wass_readonly' = ANY (COALESCE(a.reasons, ARRAY[]::text[])))
+          AND a.task_id NOT IN (
+            SELECT task_id FROM daily_task_locks
+            WHERE work_date = $2 AND locked = true
+          )
+      `,
+      [runId, workDate]
+    );
+    const movedCount = movedResult.rowCount || 0;
+    if (movedCount > 0) {
+      console.log(`[applyToProduction] Spostati ${movedCount} task già in timeline per rispettare le ore`);
+    }
+
     let violations: CheckinViolation[] = [];
-    if (result.insertedCount > 0) {
+    if (result.insertedCount > 0 || movedCount > 0) {
       try {
         const affectedCleanersResult = await client.query(
-          `SELECT DISTINCT oa.cleaner_id
-           FROM optimizer.optimizer_assignment oa
-           JOIN ${assignmentsTable} dac ON dac.task_id = oa.task_id AND dac.work_date = $2
-             AND ${assignmentScopeSql(resolvedScope, "dac.scope")}
-           WHERE oa.run_id = $1`,
+          `SELECT DISTINCT cleaner_id FROM (
+             SELECT oa.cleaner_id
+             FROM optimizer.optimizer_assignment oa
+             JOIN ${assignmentsTable} dac ON dac.task_id = oa.task_id AND dac.work_date = $2
+               AND ${assignmentScopeSql(resolvedScope, "dac.scope")}
+             WHERE oa.run_id = $1
+             UNION
+             SELECT dac.cleaner_id
+             FROM ${assignmentsTable} dac
+             JOIN optimizer.optimizer_assignment oa ON oa.task_id = dac.task_id AND oa.run_id = $1
+             WHERE dac.work_date = $2
+               AND ${assignmentScopeSql(resolvedScope, "dac.scope")}
+           ) affected
+           WHERE cleaner_id IS NOT NULL`,
           [runId, workDate]
         );
-        const cleanerIds: number[] = affectedCleanersResult.rows
-          .map((r: any) => Number(r.cleaner_id))
-          .filter((n: number) => Number.isFinite(n));
+        const cleanerIds: number[] = [
+          ...affectedCleanersResult.rows.map((r: any) => Number(r.cleaner_id)),
+          ...movePlan.rows.flatMap((r: any) => [Number(r.old_cleaner_id), Number(r.new_cleaner_id)]),
+        ].filter((n: number, index, all) => Number.isFinite(n) && n > 0 && all.indexOf(n) === index);
 
         violations = await recalculateAffectedCleaners(client, workDate, runId, cleanerIds, assignmentsTable);
         console.log(`[applyToProduction] Recalculated travel/start/end times for ${cleanerIds.length} cleaners`);

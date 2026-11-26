@@ -114,7 +114,8 @@ export function isLogisticaPathAllowed(pathname: string, search = ""): boolean {
     path.startsWith("/generate-assignments/") ||
     path === "/unconfirmed-tasks" ||
     path.startsWith("/unconfirmed-tasks/") ||
-    path === "/convocazioni"
+    path === "/convocazioni" ||
+    path === "/anagrafica-dipendenti"
   ) {
     return true;
   }

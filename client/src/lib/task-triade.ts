@@ -15,6 +15,8 @@ type TaskTriadeSnapshot = {
 
 const cache = new Map<string, TaskTriadeSnapshot>();
 const listeners = new Map<string, Set<() => void>>();
+let revision = 0;
+const revisionListeners = new Set<() => void>();
 const pending = new Map<string, RequestItem>();
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -22,8 +24,14 @@ function cacheKey(id: number, operationId: number | null) {
   return `${id}:${operationId ?? ""}`;
 }
 
+function bumpRevision() {
+  revision += 1;
+  revisionListeners.forEach((listener) => listener());
+}
+
 function emit(key: string) {
   listeners.get(key)?.forEach((listener) => listener());
+  bumpRevision();
 }
 
 async function flush() {
@@ -88,7 +96,8 @@ export function invalidateTaskTriade() {
     clearTimeout(flushTimer);
     flushTimer = null;
   }
-  for (const key of keys) emit(key);
+  for (const key of keys) listeners.get(key)?.forEach((listener) => listener());
+  bumpRevision();
 }
 
 if (typeof window !== "undefined") {
@@ -108,6 +117,32 @@ function readOperationId(task: any): number | null {
   if (raw == null || raw === "") return null;
   const id = Number(raw);
   return Number.isFinite(id) ? id : null;
+}
+
+export function useTaskTriadeRevision(): number {
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      revisionListeners.add(onStoreChange);
+      return () => revisionListeners.delete(onStoreChange);
+    },
+    () => revision,
+    () => 0,
+  );
+}
+
+export function cachedTaskTriadeWeight(task: any): number | null {
+  const direct = task?.triade?.weight ?? task?.triadeWeight ?? task?.triade_weight;
+  if (direct != null && direct !== "") {
+    const weight = Number(direct);
+    if (Number.isFinite(weight)) return weight;
+  }
+  const id = Number(task?.task_id ?? task?.id);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const snap = cache.get(cacheKey(id, readOperationId(task)));
+  const weight = snap?.triade?.weight;
+  if (weight == null || weight === "") return null;
+  const parsed = Number(weight);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 /** undefined finché ADAM non ha risposto. Con enabled=false non legge e non mostra nulla. */

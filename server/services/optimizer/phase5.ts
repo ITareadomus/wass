@@ -9,7 +9,7 @@ import {
   Phase5CandidateSwap,
   Phase5NeighborhoodCleaner
 } from './phase5OrTools';
-import { HK_CONSTRAINT_PRESETS, type HkConstraintSettings } from '../../../shared/hk-constraint-settings';
+import { formatoreTriadeLevel, formatoreTriadeSelected, HK_CONSTRAINT_PRESETS, type HkConstraintSettings } from '../../../shared/hk-constraint-settings';
 
 export interface Phase5Params {
   maxIterations: number;
@@ -86,8 +86,11 @@ function isTaskMovableToCleaner(
 ): boolean {
   if (task.straordinaria && (rules.longOt !== "off" || rules.shortOt !== "off")) return false;
 
-  if (rules.triadeCeiling === "hard" && !cleanerCanTakeTriadeTask(target.triadeWeight, task.triadeWeight)) return false;
-  if (rules.triadeMatch === "hard") {
+  const role = (target.role || 'Standard').toLowerCase();
+  const formatore = role.includes('formatore');
+  if (formatore && rules.formatoreTriade === "hard" && !formatoreTriadeSelected(rules, formatoreTriadeLevel(task.triadeWeight))) return false;
+  if (!formatore && rules.triadeCeiling === "hard" && !cleanerCanTakeTriadeTask(target.triadeWeight, task.triadeWeight)) return false;
+  if (!formatore && rules.triadeMatch === "hard") {
     const cleanerLevel = Number(target.triadeWeight ?? 1);
     const taskLevel = Number(task.triadeWeight ?? 1);
     if (cleanerLevel !== taskLevel) return false;
@@ -100,12 +103,6 @@ function isTaskMovableToCleaner(
     return t?.straordinaria;
   });
   if (hasExistingOT) return false;
-
-  const role = (target.role || 'Standard').toLowerCase();
-  if (role.includes('formatore') && task.typeApt) {
-    const apt = task.typeApt.toUpperCase();
-    if (!['B', 'C'].includes(apt)) return false;
-  }
 
   return true;
 }

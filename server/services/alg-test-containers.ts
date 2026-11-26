@@ -5,6 +5,7 @@ const ASSIGNMENT_REASONS = ["preassigned_enable_wass", "preassigned_enable_wass_
 /**
  * Contenitori della prova algoritmo: stessi task della giornata housekeeping
  * già salvata nel database, senza cleaner e senza start/end dell'assegnazione.
+ * I pre-assegnati vengono poi messi in timeline dallo stesso percorso della giornata vera.
  */
 export async function refillAlgTestContainersFromDb(
   workDate: string,

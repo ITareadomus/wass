@@ -12,6 +12,7 @@ import {
 import { loadHkProfileLibrary } from "./load-hk-constraints";
 import { runBalancedDay } from "./runBalancedDay";
 import type { AssignmentScope } from "../../../shared/assignment-scope";
+import type { WorkloadBalanceChoice } from "../../../shared/workload-balance-choice";
 
 async function loadHypothesisAssignments(runId: string): Promise<{
   assignments: HkHypothesisAssignment[];
@@ -58,12 +59,13 @@ function descriptionFor(profile: HkNamedProfile): string {
 export async function runHkAssignmentHypotheses(
   workDate: string,
   scope: AssignmentScope = "housekeeping",
+  workloadChoice?: WorkloadBalanceChoice,
 ): Promise<HkHypothesisPickerItem[]> {
   const library = await loadHkProfileLibrary();
   const hypotheses: HkHypothesisPickerItem[] = [];
   for (const profile of library.profiles) {
     console.log(`[hk-hypotheses] Calcolo ipotesi ${profile.name} per ${workDate} (${scope})`);
-    const result = await runBalancedDay(workDate, profile.settings, scope);
+    const result = await runBalancedDay(workDate, profile.settings, scope, workloadChoice);
     if (result.status === "failed") {
       throw new Error(result.error || `Ipotesi ${profile.name} non calcolata`);
     }

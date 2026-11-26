@@ -51,7 +51,7 @@ def can_handle_apt(role_key, type_apt, apartment_types):
     elif role_key == "straordinario_cleaner":
         allowed = apartment_types.get("straordinario_apt") or []
     elif role_key == "formatore_cleaner":
-        allowed = apartment_types.get("formatore_apt") or []
+        return True
     elif role_key == "ufficio_cleaner":
         allowed = apartment_types.get("ufficio_apt") or []
     else:
@@ -85,6 +85,15 @@ def is_continuazione_ps_task(task):
     if op_name is None or str(op_name).strip() == "":
         return True
     return str(op_name).strip().lower() == CONTINUAZIONE_PS_OPERATION_NAME
+
+
+def formatore_triade_blocked(task, constraints):
+    mode = constraint_mode(constraints, "formatoreTriade", "off")
+    if mode == "off":
+        return False
+    weight = task_triade_weight(task.get("triadeWeight"))
+    selected = (constraints or {}).get(f"formatoreLevel{weight}", True)
+    return not bool(selected)
 
 
 def task_triade_weight(value):
@@ -129,16 +138,26 @@ def task_pair_penalty(cleaner, task, apartment_types, office_operation_ids, cons
         return None
     penalty += office_penalty
 
-    cleaner_weight = task_triade_weight(cleaner.get("triadeWeight"))
-    task_weight = task_triade_weight(task.get("triadeWeight"))
-    ceiling = apply_pair(
-        constraint_mode(constraints, "triadeCeiling"),
-        cleaner_weight < task_weight,
-        15000 * max(1, task_weight - cleaner_weight),
-    )
-    if ceiling is None:
-        return None
-    penalty += ceiling
+    if role_key == "formatore_cleaner":
+        preferred = apply_pair(
+            constraint_mode(constraints, "formatoreTriade", "off"),
+            formatore_triade_blocked(task, constraints),
+            12000,
+        )
+        if preferred is None:
+            return None
+        penalty += preferred
+    else:
+        cleaner_weight = task_triade_weight(cleaner.get("triadeWeight"))
+        task_weight = task_triade_weight(task.get("triadeWeight"))
+        ceiling = apply_pair(
+            constraint_mode(constraints, "triadeCeiling"),
+            cleaner_weight < task_weight,
+            15000 * max(1, task_weight - cleaner_weight),
+        )
+        if ceiling is None:
+            return None
+        penalty += ceiling
 
     apt = apply_pair(
         constraint_mode(constraints, "apartmentType"),
@@ -148,28 +167,6 @@ def task_pair_penalty(cleaner, task, apartment_types, office_operation_ids, cons
     if apt is None:
         return None
     penalty += apt
-
-    if role_key == "formatore_cleaner":
-        priority_blocked = not task_formatore_priority_ok(task, formatore_rules)
-        priority = apply_pair(constraint_mode(constraints, "formatorePriority"), priority_blocked, 12000)
-        if priority is None:
-            return None
-        penalty += priority
-        standard_blocked = (
-            not task.get("premium")
-            and not is_real_straordinaria(task, office_operation_ids)
-            and formatore_rules
-            and not formatore_rules.get("standardApt", True)
-        )
-        standard = apply_pair(constraint_mode(constraints, "formatoreStandard"), bool(standard_blocked), 12000)
-        if standard is None:
-            return None
-        penalty += standard
-        if not can_handle_apt("formatore_cleaner", task.get("typeApt"), apartment_types):
-            apt_formatore = apply_pair(constraint_mode(constraints, "apartmentType"), True, 12000)
-            if apt_formatore is None:
-                return None
-            penalty += apt_formatore
 
     return penalty
 
@@ -361,7 +358,6 @@ def main():
     allowed = [[False] * n_c for _ in range(n_g)]
     pair_soft = [[0] * n_c for _ in range(n_g)]
 
-    cleaner_is_formatore = [normalize_role(cleaners[c].get("role")) == "formatore_cleaner" for c in range(n_c)]
     cleaner_triade = [task_triade_weight(cleaners[c].get("triadeWeight")) for c in range(n_c)]
 
     def ot_violation(mode, amount, g_idx, c_idx):
@@ -429,20 +425,6 @@ def main():
                     continue
 
             allowed[g_idx][c_idx] = True
-
-    group_is_formatore_compatible = []
-    for g_idx in range(n_g):
-        group = groups[g_idx]
-        task_ids = group.get("taskIds") or []
-        tasks = [tasks_by_id[tid] for tid in task_ids if tasks_by_id.get(tid)]
-        ok = True
-        for task in tasks:
-            if not task_formatore_compatible(task, formatore_rules, apartment_types, office_operation_ids):
-                ok = False
-                break
-        group_is_formatore_compatible.append(ok)
-
-    FORMATORE_BONUS = 80000
 
     model = cp_model.CpModel()
 
@@ -572,8 +554,6 @@ def main():
             travel_first_min = float(travel_to_first[g][c] if g < len(travel_to_first) and c < len(travel_to_first[g]) else 0) or 0
             travel_min = travel_first_min + (group_travel[g] / SCALE)
             obj_terms.append((-travel_weight * travel_min) * x[g][c])
-            if c < len(cleaner_is_formatore) and cleaner_is_formatore[c] and g < len(group_is_formatore_compatible) and group_is_formatore_compatible[g]:
-                obj_terms.append(FORMATORE_BONUS * x[g][c])
     for c in range(n_c):
         if load_mode != "off":
             obj_terms.append((k_under / SCALE) * under_c[c])

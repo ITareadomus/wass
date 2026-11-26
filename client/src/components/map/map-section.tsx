@@ -10,6 +10,19 @@ import {
   type PersonnelColorScope,
 } from "@/lib/cleaner-colors";
 
+export interface MapFilterControl {
+  taskId: string | null;
+  cleanerId: number | null;
+  setTaskId: (taskId: string | null) => void;
+}
+
+export interface MapRosterCleaner {
+  id: number;
+  name: string;
+  lastname?: string;
+  alias?: string;
+}
+
 interface MapSectionProps {
   tasks: Task[];
   workDate: string;
@@ -20,6 +33,10 @@ interface MapSectionProps {
   compact?: boolean;
   personnelColorScope?: PersonnelColorScope;
   headerExtra?: ReactNode;
+  /** Se presente, il filtro non passa da window: ogni mappa resta indipendente. */
+  mapFilter?: MapFilterControl;
+  /** Se presente, non legge i cleaner della giornata aperta in WASS. */
+  rosterCleaners?: MapRosterCleaner[];
 }
 
 const MILAN_CENTER = { lat: 45.464, lng: 9.19 };
@@ -49,6 +66,27 @@ function fitMapToBoundsOrMilan(map: any, bounds: any) {
   map.fitBounds(bounds);
 }
 
+let googleMapsReady: Promise<void> | null = null;
+
+function loadSharedGoogleMaps(): Promise<void> {
+  if (window.google?.maps) return Promise.resolve();
+  if (googleMapsReady) return googleMapsReady;
+  googleMapsReady = new Promise((resolve) => {
+    const existing = document.querySelector<HTMLScriptElement>('script[src*="maps.googleapis.com/maps/api/js"]');
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyAZ43KN01rau6_DxWZ__fPcWSsLsn9j2bs&v=weekly`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    document.head.appendChild(script);
+  });
+  return googleMapsReady;
+}
+
 declare global {
   interface Window {
     google: any;
@@ -66,6 +104,8 @@ export default function MapSection({
   compact = false,
   personnelColorScope = "housekeeping",
   headerExtra,
+  mapFilter,
+  rosterCleaners,
 }: MapSectionProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const googleMapRef = useRef<any>(null);
@@ -75,8 +115,19 @@ export default function MapSection({
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [cleaners, setCleaners] = useState<any[]>([]);
   const [cleanerAliases, setCleanerAliases] = useState<Record<string, { id: number; name: string; lastname: string; alias: string }>>({});
-  const [filteredCleanerId, setFilteredCleanerId] = useState<number | null>(null);
-  const [filteredTaskId, setFilteredTaskId] = useState<string | null>(null);
+  const [windowCleanerId, setWindowCleanerId] = useState<number | null>(null);
+  const [windowTaskId, setWindowTaskId] = useState<string | null>(null);
+  const filteredCleanerId = mapFilter ? mapFilter.cleanerId : windowCleanerId;
+  const filteredTaskId = mapFilter ? mapFilter.taskId : windowTaskId;
+  const applyTaskFilterRef = useRef<(markerId: string) => void>(() => {});
+  applyTaskFilterRef.current = (markerId: string) => {
+    if (mapFilter) {
+      mapFilter.setTaskId(mapFilter.taskId === markerId ? null : markerId);
+      return;
+    }
+    const currentFilteredTaskId = (window as any).mapFilteredTaskId;
+    (window as any).mapFilteredTaskId = currentFilteredTaskId === markerId ? null : markerId;
+  };
   const scopeValue = assignmentScopeFromWindow();
   const withScope = (url: string) =>
     `${url}${url.includes("?") ? "&" : "?"}scope=${scopeValue}`;
@@ -101,6 +152,10 @@ export default function MapSection({
 
   // Carica i cleaners
   useEffect(() => {
+    if (rosterCleaners) {
+      setCleaners(rosterCleaners);
+      return;
+    }
     const loadCleaners = async () => {
       try {
         const response = await fetch(withScope(`/api/selected-cleaners?date=${workDate}`), {
@@ -130,6 +185,8 @@ export default function MapSection({
     loadCleaners();
     loadCleanerAliases();
 
+    if (mapFilter) return;
+
     // Listener per aggiornamenti del filtro dalla timeline
     // REGOLA: solo uno dei due filtri può essere attivo alla volta
     const checkFilterUpdates = setInterval(() => {
@@ -138,27 +195,28 @@ export default function MapSection({
       
       // Se è stato impostato un nuovo filtro cleaner, cancella il filtro task
       if (newFilterCleanerId !== filteredCleanerId && newFilterCleanerId !== null && newFilterCleanerId !== undefined) {
-        setFilteredCleanerId(newFilterCleanerId);
-        setFilteredTaskId(null);
+        setWindowCleanerId(newFilterCleanerId);
+        setWindowTaskId(null);
         (window as any).mapFilteredTaskId = null;
       }
       // Se è stato impostato un nuovo filtro task, cancella il filtro cleaner
       else if (newFilterTaskId !== filteredTaskId && newFilterTaskId !== null && newFilterTaskId !== undefined) {
-        setFilteredTaskId(newFilterTaskId);
-        setFilteredCleanerId(null);
+        setWindowTaskId(newFilterTaskId);
+        setWindowCleanerId(null);
         (window as any).mapFilteredCleanerId = null;
       }
       // Se entrambi sono stati cancellati, aggiorna
       else if (newFilterCleanerId === null && newFilterTaskId === null) {
-        setFilteredCleanerId(null);
-        setFilteredTaskId(null);
+        setWindowCleanerId(null);
+        setWindowTaskId(null);
       }
     }, 300);
 
     return () => clearInterval(checkFilterUpdates);
-  }, [filteredCleanerId, filteredTaskId, workDate]);
+  }, [filteredCleanerId, filteredTaskId, mapFilter, rosterCleaners, workDate]);
 
   useEffect(() => {
+    if (rosterCleaners) return;
     const reloadMapCleaners = async () => {
       try {
         const [cleanersResponse, aliasesResponse] = await Promise.all([
@@ -192,31 +250,21 @@ export default function MapSection({
       window.removeEventListener("refresh-assignments", onRosterRefresh);
       window.removeEventListener("refresh-selected-cleaners", onRosterRefresh);
     };
-  }, [workDate]);
+  }, [rosterCleaners, workDate]);
 
   // Funzione per ottenere il colore del cleaner (sincronizzato con timeline)
   const getCleanerColor = (cleanerId: number) => {
     return getPersonnelHexColor(cleanerId, personnelColorScope);
   };
 
-  // Carica Google Maps API
+  // Carica Google Maps API. Due mappe sulla stessa pagina condividono lo script.
   useEffect(() => {
-    if (window.google) {
-      setIsMapLoaded(true);
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyAZ43KN01rau6_DxWZ__fPcWSsLsn9j2bs&v=weekly`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => setIsMapLoaded(true);
-    document.head.appendChild(script);
-
+    let cancelled = false;
+    loadSharedGoogleMaps().then(() => {
+      if (!cancelled) setIsMapLoaded(true);
+    });
     return () => {
-      if (script.parentNode) {
-        script.parentNode.removeChild(script);
-      }
+      cancelled = true;
     };
   }, []);
 
@@ -482,16 +530,7 @@ export default function MapSection({
                 // Doppio click rilevato
                 clearTimeout(clickTimer);
                 clickTimer = null;
-                
-                // Toggle filtro (attiva/disattiva animazione) usando ID marker univoco
-                const currentFilteredTaskId = (window as any).mapFilteredTaskId;
-                if (currentFilteredTaskId === markerId) {
-                  // Spegni animazione
-                  (window as any).mapFilteredTaskId = null;
-                } else {
-                  // Accendi animazione
-                  (window as any).mapFilteredTaskId = markerId;
-                }
+                applyTaskFilterRef.current(markerId);
               } else {
                 // Primo click: apri dettagli
                 clickTimer = setTimeout(() => {
@@ -627,8 +666,7 @@ export default function MapSection({
             clearTimeout(clickTimer);
             clickTimer = null;
           }
-          const current = (window as any).mapFilteredTaskId;
-          (window as any).mapFilteredTaskId = current === markerId ? null : markerId;
+          applyTaskFilterRef.current(markerId);
         });
 
         markersRef.current.push(marker);

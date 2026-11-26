@@ -278,6 +278,31 @@ export class PgDailyAssignmentsService {
   }
 
   /**
+   * Anagrafica permanente dei cleaner: orario di inizio predefinito e clienti preferiti
+   * modificati da WASS. Non dipende dalla data di lavoro.
+   */
+  async ensureCleanerAnagraficaTable(): Promise<void> {
+    try {
+      await query(`ALTER TABLE cleaners ADD COLUMN IF NOT EXISTS start_time_manual BOOLEAN NOT NULL DEFAULT FALSE`);
+      await query(`ALTER TABLE cleaners ADD COLUMN IF NOT EXISTS end_time_manual BOOLEAN NOT NULL DEFAULT FALSE`);
+      await query(`
+        CREATE TABLE IF NOT EXISTS cleaner_anagrafica (
+          cleaner_id INTEGER PRIMARY KEY,
+          default_start_time VARCHAR(10),
+          default_end_time VARCHAR(10),
+          preferred_customers INTEGER[] NOT NULL DEFAULT '{}',
+          preferred_customers_custom BOOLEAN NOT NULL DEFAULT FALSE,
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      await query(`ALTER TABLE cleaner_anagrafica ADD COLUMN IF NOT EXISTS default_end_time VARCHAR(10)`);
+      console.log('✅ PG: Tabella cleaner_anagrafica verificata');
+    } catch (error) {
+      console.warn('⚠️ PG: Errore (ignorabile) nella migrazione cleaner_anagrafica:', error);
+    }
+  }
+
+  /**
    * Ensure locked columns exist on daily_containers and daily_containers_history tables
    */
   async ensureLockedColumns(): Promise<void> {
@@ -391,7 +416,7 @@ export class PgDailyAssignmentsService {
       END $$`
     );
     await query(
-      `ALTER TABLE ${table} ADD CONSTRAINT ${table}_weight_check CHECK (weight >= 1)`
+      `ALTER TABLE ${table} ADD CONSTRAINT ${table}_weight_check CHECK (weight >= 0)`
     );
   }
 
@@ -405,7 +430,7 @@ export class PgDailyAssignmentsService {
         CREATE TABLE IF NOT EXISTS daily_task_triade_override (
           work_date DATE NOT NULL,
           task_id INTEGER NOT NULL,
-          weight SMALLINT NOT NULL CHECK (weight >= 1),
+          weight SMALLINT NOT NULL CHECK (weight >= 0),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           PRIMARY KEY (work_date, task_id)
         )
@@ -418,7 +443,7 @@ export class PgDailyAssignmentsService {
         CREATE TABLE IF NOT EXISTS daily_cleaner_triade_override (
           work_date DATE NOT NULL,
           cleaner_id INTEGER NOT NULL,
-          weight SMALLINT NOT NULL CHECK (weight >= 1),
+          weight SMALLINT NOT NULL CHECK (weight >= 0),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           PRIMARY KEY (work_date, cleaner_id)
         )
@@ -426,6 +451,15 @@ export class PgDailyAssignmentsService {
       await query(`
         CREATE INDEX IF NOT EXISTS idx_daily_cleaner_triade_override_date
         ON daily_cleaner_triade_override(work_date)
+      `);
+      await query(`
+        CREATE TABLE IF NOT EXISTS cleaner_triade_promotion (
+          cleaner_id INTEGER PRIMARY KEY,
+          start_date DATE NOT NULL,
+          days INTEGER NOT NULL CHECK (days >= 1 AND days <= 60),
+          weight SMALLINT NOT NULL CHECK (weight >= 1),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
       `);
       await this.relaxTriadeWeightCheck("daily_task_triade_override");
       await this.relaxTriadeWeightCheck("daily_cleaner_triade_override");
@@ -4386,7 +4420,9 @@ export class PgDailyAssignmentsService {
         SELECT 
           c.cleaner_id as id, c.name, c.lastname, c.role, c.active, c.ranking,
           c.counter_hours, c.counter_days, c.available, c.contract_type,
-          c.preferred_customers, c.telegram_id, c.start_time,
+          c.preferred_customers, c.telegram_id, c.start_time, c.end_time,
+          COALESCE(c.start_time_manual, false) AS start_time_manual,
+          COALESCE(c.end_time_manual, false) AS end_time_manual,
           ca.alias
         FROM cleaners c
         LEFT JOIN aliases ca ON ca.cleaner_id = c.cleaner_id
@@ -4419,7 +4455,9 @@ export class PgDailyAssignmentsService {
         SELECT 
           c.cleaner_id as id, c.name, c.lastname, c.role, c.active, c.ranking,
           c.counter_hours, c.counter_days, c.available, c.contract_type,
-          c.preferred_customers, c.telegram_id, c.start_time,
+          c.preferred_customers, c.telegram_id, c.start_time, c.end_time,
+          COALESCE(c.start_time_manual, false) AS start_time_manual,
+          COALESCE(c.end_time_manual, false) AS end_time_manual,
           ca.alias
         FROM cleaners c
         LEFT JOIN aliases ca ON ca.cleaner_id = c.cleaner_id
@@ -4451,7 +4489,9 @@ export class PgDailyAssignmentsService {
         SELECT 
           c.cleaner_id as id, c.name, c.lastname, c.role, c.active, c.ranking,
           c.counter_hours, c.counter_days, c.available, c.contract_type,
-          c.preferred_customers, c.telegram_id, c.start_time,
+          c.preferred_customers, c.telegram_id, c.start_time, c.end_time,
+          COALESCE(c.start_time_manual, false) AS start_time_manual,
+          COALESCE(c.end_time_manual, false) AS end_time_manual,
           ca.alias
         FROM cleaners c
         LEFT JOIN aliases ca ON ca.cleaner_id = c.cleaner_id
@@ -4481,7 +4521,9 @@ export class PgDailyAssignmentsService {
         SELECT
           c.cleaner_id as id, c.name, c.lastname, c.role, c.active, c.ranking,
           c.counter_hours, c.counter_days, c.available, c.contract_type,
-          c.preferred_customers, c.telegram_id, c.start_time,
+          c.preferred_customers, c.telegram_id, c.start_time, c.end_time,
+          COALESCE(c.start_time_manual, false) AS start_time_manual,
+          COALESCE(c.end_time_manual, false) AS end_time_manual,
           ca.alias
         FROM cleaners c
         LEFT JOIN aliases ca ON ca.cleaner_id = c.cleaner_id
@@ -4731,9 +4773,9 @@ export class PgDailyAssignmentsService {
           INSERT INTO cleaners 
           (cleaner_id, work_date, name, lastname, role, active, ranking,
            counter_hours, counter_days, available, contract_type,
-           preferred_customers, telegram_id, start_time, end_time,
+           preferred_customers, telegram_id, start_time, end_time, start_time_manual, end_time_manual,
            created_at, updated_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
         `, [
           cleaner.id,
           workDate,
@@ -4749,7 +4791,9 @@ export class PgDailyAssignmentsService {
           cleaner.preferred_customers || [],
           cleaner.telegram_id || null,
           cleaner.start_time ?? '10:00',
-          cleaner.end_time ?? '20:00'
+          cleaner.end_time ?? '20:00',
+          cleaner.start_time_manual === true,
+          cleaner.end_time_manual === true
         ]);
       }
 
@@ -4810,6 +4854,19 @@ export class PgDailyAssignmentsService {
         return true;
       }
       
+      // L'orario cambiato da timeline o convocazioni resta quello del giorno,
+      // anche se in anagrafica c'è un inizio predefinito diverso.
+      if (field === 'start_time' || field === 'end_time') {
+        const manualColumn = field === 'start_time' ? 'start_time_manual' : 'end_time_manual';
+        await query(`
+          UPDATE cleaners
+          SET ${field} = $1, ${manualColumn} = TRUE, updated_at = NOW()
+          WHERE cleaner_id = $2 AND work_date = $3
+        `, [value, cleanerId, workDate]);
+        console.log(`✅ PG: Cleaner ${cleanerId} aggiornato: ${field} = ${value} (manuale)`);
+        return true;
+      }
+
       // Other fields: update cleaners table
       await query(`
         UPDATE cleaners 
@@ -4967,6 +5024,231 @@ export class PgDailyAssignmentsService {
       client.release();
     }
   }
+
+  async listCleanerAnagrafica(): Promise<any[]> {
+    const result = await query(`
+      SELECT *
+      FROM (
+        SELECT DISTINCT ON (c.cleaner_id)
+          c.cleaner_id AS id,
+          c.name,
+          c.lastname,
+          c.role,
+          c.contract_type,
+          c.active,
+          c.preferred_customers AS roster_preferred,
+          ca.alias,
+          a.default_start_time,
+          a.default_end_time,
+          a.preferred_customers AS saved_preferred,
+          COALESCE(a.preferred_customers_custom, false) AS preferred_customers_custom
+        FROM cleaners c
+        LEFT JOIN aliases ca ON ca.cleaner_id = c.cleaner_id
+        LEFT JOIN cleaner_anagrafica a ON a.cleaner_id = c.cleaner_id
+        WHERE LOWER(TRIM(COALESCE(c.role, ''))) <> 'ufficio'
+        ORDER BY c.cleaner_id, c.work_date DESC
+      ) latest
+      WHERE latest.active IS DISTINCT FROM false
+      ORDER BY latest.lastname, latest.name, latest.id
+    `);
+    return result.rows.map((row: any) => {
+      const custom = row.preferred_customers_custom === true;
+      return {
+        id: Number(row.id),
+        name: row.name || '',
+        lastname: row.lastname || '',
+        role: row.role || '',
+        contractType: row.contract_type || '',
+        alias: row.alias || '',
+        defaultStartTime: asHHmm(row.default_start_time),
+        defaultEndTime: asHHmm(row.default_end_time),
+        preferredCustomerIds: asIdList(custom ? row.saved_preferred : row.roster_preferred),
+        preferredCustomersCustom: custom,
+      };
+    });
+  }
+
+  async loadCleanerAnagraficaMap(): Promise<Map<number, { defaultStartTime: string | null; defaultEndTime: string | null; preferredCustomerIds: number[]; preferredCustomersCustom: boolean }>> {
+    const result = await query(`
+      SELECT cleaner_id, default_start_time, default_end_time, preferred_customers, preferred_customers_custom
+      FROM cleaner_anagrafica
+    `);
+    const map = new Map<number, { defaultStartTime: string | null; defaultEndTime: string | null; preferredCustomerIds: number[]; preferredCustomersCustom: boolean }>();
+    for (const row of result.rows) {
+      const id = Number(row.cleaner_id);
+      if (!Number.isFinite(id)) continue;
+      map.set(id, {
+        defaultStartTime: asHHmm(row.default_start_time),
+        defaultEndTime: asHHmm(row.default_end_time),
+        preferredCustomerIds: asIdList(row.preferred_customers),
+        preferredCustomersCustom: row.preferred_customers_custom === true,
+      });
+    }
+    return map;
+  }
+
+  /**
+   * Allinea il roster del giorno all'anagrafica.
+   * Un orario già modificato per quella data resta com'è.
+   * I clienti preferiti salvati in anagrafica sostituiscono quelli arrivati da ADAM.
+   */
+  async mergeCleanersWithAnagrafica(incoming: any[], existing: any[] | null): Promise<any[]> {
+    const profiles = await this.loadCleanerAnagraficaMap();
+    const existingById = new Map<number, any>();
+    for (const row of existing || []) {
+      const id = Number(row?.id);
+      if (Number.isFinite(id)) existingById.set(id, row);
+    }
+    return incoming.map((cleaner) => {
+      const id = Number(cleaner?.id);
+      const prev = existingById.get(id);
+      const profile = profiles.get(id);
+      const startManual = prev?.start_time_manual === true;
+      const endManual = prev?.end_time_manual === true;
+      const previousStart = asHHmm(prev?.start_time);
+      const previousEnd = asHHmm(prev?.end_time);
+      const defaultStart = profile?.defaultStartTime ?? null;
+      const defaultEnd = profile?.defaultEndTime ?? null;
+      let startTime = asHHmm(cleaner?.start_time) || previousStart || '10:00';
+      let endTime = asHHmm(cleaner?.end_time) || previousEnd || '20:00';
+      let startTimeManual = false;
+      let endTimeManual = false;
+      if (startManual && previousStart) {
+        startTime = previousStart;
+        startTimeManual = true;
+      } else if (defaultStart) {
+        startTime = defaultStart;
+        startTimeManual = false;
+      }
+      if (endManual && previousEnd) {
+        endTime = previousEnd;
+        endTimeManual = true;
+      } else if (defaultEnd) {
+        endTime = defaultEnd;
+        endTimeManual = false;
+      }
+      const preferred = profile?.preferredCustomersCustom
+        ? profile.preferredCustomerIds
+        : asIdList(cleaner?.preferred_customers ?? prev?.preferred_customers);
+      return {
+        ...cleaner,
+        start_time: startTime,
+        end_time: endTime,
+        start_time_manual: startTimeManual,
+        end_time_manual: endTimeManual,
+        preferred_customers: preferred,
+      };
+    });
+  }
+
+  async saveCleanerAnagrafica(
+    updates: Array<{
+      id: number;
+      alias: string;
+      name?: string;
+      lastname?: string;
+      defaultStartTime: string | null;
+      defaultEndTime: string | null;
+      preferredCustomerIds: number[];
+      preferredCustomersCustom: boolean;
+    }>
+  ): Promise<void> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const update of updates) {
+        const alias = String(update.alias || '').trim();
+        if (alias) {
+          await client.query(`
+            INSERT INTO aliases (cleaner_id, alias, name, lastname, updated_at)
+            VALUES ($1, $2, $3, $4, NOW())
+            ON CONFLICT (cleaner_id) DO UPDATE
+              SET alias = EXCLUDED.alias,
+                  name = COALESCE(EXCLUDED.name, aliases.name),
+                  lastname = COALESCE(EXCLUDED.lastname, aliases.lastname),
+                  updated_at = NOW()
+          `, [update.id, alias, update.name || null, update.lastname || null]);
+        } else {
+          await client.query('DELETE FROM aliases WHERE cleaner_id = $1', [update.id]);
+        }
+
+        await client.query(`
+          INSERT INTO cleaner_anagrafica (
+            cleaner_id, default_start_time, default_end_time, preferred_customers, preferred_customers_custom, updated_at
+          )
+          VALUES ($1, $2, $3, $4::integer[], $5, NOW())
+          ON CONFLICT (cleaner_id) DO UPDATE
+            SET default_start_time = EXCLUDED.default_start_time,
+                default_end_time = EXCLUDED.default_end_time,
+                preferred_customers = EXCLUDED.preferred_customers,
+                preferred_customers_custom = EXCLUDED.preferred_customers_custom,
+                updated_at = NOW()
+        `, [
+          update.id,
+          update.defaultStartTime,
+          update.defaultEndTime,
+          update.preferredCustomerIds,
+          update.preferredCustomersCustom,
+        ]);
+
+        if (update.defaultStartTime) {
+          await client.query(`
+            UPDATE cleaners
+            SET start_time = $1, updated_at = NOW()
+            WHERE cleaner_id = $2
+              AND COALESCE(start_time_manual, false) = false
+              AND work_date >= CURRENT_DATE
+          `, [update.defaultStartTime, update.id]);
+        }
+
+        if (update.defaultEndTime) {
+          await client.query(`
+            UPDATE cleaners
+            SET end_time = $1, updated_at = NOW()
+            WHERE cleaner_id = $2
+              AND COALESCE(end_time_manual, false) = false
+              AND work_date >= CURRENT_DATE
+          `, [update.defaultEndTime, update.id]);
+        }
+
+        if (update.preferredCustomersCustom) {
+          await client.query(`
+            UPDATE cleaners
+            SET preferred_customers = $1::integer[], updated_at = NOW()
+            WHERE cleaner_id = $2
+              AND work_date >= CURRENT_DATE
+          `, [update.preferredCustomerIds, update.id]);
+        }
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+}
+
+function asIdList(value: unknown): number[] {
+  if (Array.isArray(value)) {
+    return [...new Set(value.map((item) => Number(item)).filter((id) => Number.isInteger(id)))];
+  }
+  if (typeof value === 'string') {
+    const inner = value.replace(/[{}]/g, '').trim();
+    if (!inner) return [];
+    return [...new Set(inner.split(',').map((item) => Number(item.trim())).filter((id) => Number.isInteger(id)))];
+  }
+  return [];
+}
+
+function asHHmm(value: unknown): string | null {
+  const match = String(value ?? '').trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours > 23 || minutes > 59) return null;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
 const HISTORY_NOISE_WITHOUT_ASSIGNMENT = new Set([

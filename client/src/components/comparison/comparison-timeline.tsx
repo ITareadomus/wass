@@ -26,7 +26,7 @@ function durationLabel(minutes: number): string {
   return `${hours}.${String(mins).padStart(2, "0")}`;
 }
 
-function toCardTask(task: ComparisonTask): TaskType {
+function toCardTask(task: ComparisonTask, collaboratorIds?: number[]): TaskType {
   const start = task.startMin != null ? formatMinutes(task.startMin) : null;
   const end = task.endMin != null ? formatMinutes(task.endMin) : null;
   return {
@@ -35,12 +35,12 @@ function toCardTask(task: ComparisonTask): TaskType {
     alias: task.alias || undefined,
     type: task.customerName || "STANDARD",
     duration: durationLabel(task.cleaningMin),
-    priority: null,
+    priority: task.priority,
     assignedTo: String(task.cleanerId),
     status: "assigned",
     scheduledTime: start,
     address: task.address,
-    apt_code: task.aptCode || task.alias || undefined,
+    apt_code: task.aptCode || undefined,
     lat: task.lat != null ? String(task.lat) : undefined,
     lng: task.lng != null ? String(task.lng) : undefined,
     premium: task.premium,
@@ -49,6 +49,7 @@ function toCardTask(task: ComparisonTask): TaskType {
     checkout_time: task.checkoutTime,
     checkin_time: task.checkinTime,
     customer_reference: task.customerReference || undefined,
+    customer_name: task.customerName || undefined,
     type_apt: task.typeApt || undefined,
     operation_id: task.operationId ?? undefined,
     startTime: start ?? undefined,
@@ -63,11 +64,13 @@ function toCardTask(task: ComparisonTask): TaskType {
     travel_time: task.travelMin,
     assignedCleaner: task.cleanerId,
     collaborator_count: task.collaboratorCount,
+    collaborator_ids: collaboratorIds && collaboratorIds.length > 1 ? collaboratorIds : undefined,
   } as TaskType;
 }
 
 function CleanerTasks({
   tasks,
+  collaboratorIds,
   cleanerStart,
   gridStart,
   pxPerMinute,
@@ -75,13 +78,14 @@ function CleanerTasks({
   workDate,
 }: {
   tasks: ComparisonTask[];
+  collaboratorIds: Map<string, number[]>;
   cleanerStart: number;
   gridStart: number;
   pxPerMinute: number;
   width: number;
   workDate: string | null;
 }) {
-  const cards = tasks.map(toCardTask);
+  const cards = tasks.map((task) => toCardTask(task, collaboratorIds.get(task.taskId)));
   let cursor = gridStart;
   return (
     <div className="relative z-10 flex h-full items-center" style={{ minHeight: 50, width }}>
@@ -155,6 +159,26 @@ function CleanerTasks({
   );
 }
 
+export function comparisonCollaborators(day: DaySnapshot): Map<string, number[]> {
+  const groups = new Map<string, number[]>();
+  for (const task of day.tasks) {
+    if (!task.assigned || task.cleanerId <= 0) continue;
+    const ids = groups.get(task.taskId) ?? [];
+    if (!ids.includes(task.cleanerId)) ids.push(task.cleanerId);
+    groups.set(task.taskId, ids);
+  }
+  return groups;
+}
+
+export function comparisonCardTasks(day: DaySnapshot): TaskType[] {
+  const collaborators = comparisonCollaborators(day);
+  return day.tasks.map((task) => {
+    const card = toCardTask(task, collaborators.get(task.taskId));
+    if (!task.assigned) (card as { sequence?: number | null }).sequence = undefined;
+    return card;
+  });
+}
+
 const NAME_WIDTH = 168;
 
 export function ComparisonTimeline({
@@ -185,6 +209,7 @@ export function ComparisonTimeline({
   const hours: number[] = [];
   for (let minute = startMin; minute <= endMin; minute += 60) hours.push(minute);
   const unassigned = day.tasks.filter((task) => !task.assigned);
+  const collaborators = comparisonCollaborators(day);
   const trackEvents = {
     ref: registerScrollRef,
     onScroll,
@@ -252,6 +277,7 @@ export function ComparisonTimeline({
                   </div>
                   <CleanerTasks
                     tasks={tasks}
+                    collaboratorIds={collaborators}
                     cleanerStart={cleaner.startMin}
                     gridStart={startMin}
                     pxPerMinute={pxPerMinute}

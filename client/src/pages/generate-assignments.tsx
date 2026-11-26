@@ -7,6 +7,8 @@ import {
   isWorkDateInPast,
 } from "@shared/work-date-access";
 import { HkHypothesisSwitcher } from "@/components/dialogs/hk-hypothesis-switcher";
+import { AssignWorkloadDialog } from "@/components/dialogs/assign-workload-dialog";
+import type { WorkloadBalanceChoice } from "@shared/workload-balance-choice";
 import type { HkHypothesisPickerItem } from "@shared/hk-assignment-hypotheses";
 import PriorityColumn from "@/components/drag-drop/priority-column";
 import TimelineView from "@/components/timeline/timeline-view";
@@ -21,7 +23,7 @@ import {
   flushProgramPollTick,
   subscribeProgramPoll,
 } from "@/lib/program-poll-clock";
-import { CalendarIcon, Users, RefreshCw, Settings, Search, Map as MapIcon, BarChart3, ChevronUp, ChevronDown, Pin, PinOff } from "lucide-react";
+import { CalendarIcon, IdCard, Users, RefreshCw, Settings, Search, Map as MapIcon, BarChart3, ChevronUp, ChevronDown, Pin, PinOff } from "lucide-react";
 import TaskCardDragOverlay from "@/components/drag-drop/task-card-drag-overlay";
 import TimelineFloatingPanel from "@/components/timeline/timeline-floating-panel";
 import {
@@ -36,7 +38,7 @@ import {
   useTimelineFloatingPanel,
 } from "@/hooks/use-timeline-floating-panel";
 import { Input } from "@/components/ui/input";
-import { useLocation } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
@@ -739,6 +741,7 @@ export default function GenerateAssignments() {
   
   // Stati per pulsanti Assegna e Refresh Containers
   const [isAssigning, setIsAssigning] = useState(false);
+  const [workloadDialogOpen, setWorkloadDialogOpen] = useState(false);
   const [isRefreshingContainers, setIsRefreshingContainers] = useState(false);
   const isRefreshingContainersRef = useRef(false);
   const tasksLoadSeqRef = useRef(0);
@@ -1264,6 +1267,11 @@ export default function GenerateAssignments() {
             const containersData = await containersResponse.json();
             const totalTasks = Number(containersData?.summary?.total_tasks ?? 0);
             if (totalTasks > 0) {
+              if (scopeValue === "alg-test") {
+                console.log(`📦 ${totalTasks} task già nei contenitori per ${dateStr}, allineo i pre-assegnati`);
+                await extractData(date);
+                return;
+              }
               console.log(`📦 ${totalTasks} task già nei contenitori per ${dateStr}`);
               await loadTasks(true);
               setIsTimelineReadOnly(isWorkDateHistoricallyLocked(date));
@@ -2870,6 +2878,44 @@ export default function GenerateAssignments() {
     }
   };
 
+  const startHousekeepingAssign = async (choice: WorkloadBalanceChoice) => {
+    setWorkloadDialogOpen(false);
+    try {
+      setIsAssigning(true);
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+      const day = String(selectedDate.getDate()).padStart(2, "0");
+      const dateStr = `${year}-${month}-${day}`;
+      const response = await fetch("/api/optimizer/hypotheses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: dateStr, scope: scopeValue, workload: choice }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.message || result?.error || "Errore durante l'assegnazione");
+      }
+      const hypotheses = Array.isArray(result.hypotheses) ? result.hypotheses : [];
+      if (hypotheses.length === 0) {
+        throw new Error("Nessuna ipotesi disponibile");
+      }
+      setHkHypotheses(hypotheses);
+      setPreviewHypothesisId(hypotheses[0]?.summary?.id ?? null);
+      toast({
+        title: "Ipotesi pronte",
+        description: "Confrontale in timeline e applica quella che preferisci.",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Errore",
+        description: error instanceof Error ? error.message : "Errore durante l'assegnazione automatica",
+      });
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-background text-foreground">
       <div className="mx-auto flex w-full min-h-0 max-w-[1920px] flex-1 flex-col overflow-x-hidden px-4 pb-6 pt-14">
@@ -2909,10 +2955,21 @@ export default function GenerateAssignments() {
               </Popover>
             </div>
             {isAlgTest ? null : (
-              <HousekeepingLogisticsSwitch
-                active={isOfficeScope ? "office" : "housekeeping"}
-                workDate={format(selectedDate, "yyyy-MM-dd")}
-              />
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  href="/anagrafica-dipendenti"
+                  data-testid="button-cleaner-anagrafica"
+                  data-viewer-allow=""
+                  className="inline-flex h-9 items-center gap-2 rounded-md border-2 border-custom-blue bg-background px-3 text-sm font-medium text-custom-blue transition-colors hover:bg-custom-blue hover:text-white"
+                >
+                  <IdCard className="h-4 w-4 shrink-0" aria-hidden />
+                  Anagrafica dipendenti
+                </Link>
+                <HousekeepingLogisticsSwitch
+                  active={isOfficeScope ? "office" : "housekeeping"}
+                  workDate={format(selectedDate, "yyyy-MM-dd")}
+                />
+              </div>
             )}
           </div>
         )}
@@ -3021,66 +3078,47 @@ export default function GenerateAssignments() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={async () => {
-                  try {
-                    setIsAssigning(true);
-                    const year = selectedDate.getFullYear();
-                    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-                    const day = String(selectedDate.getDate()).padStart(2, '0');
-                    const dateStr = `${year}-${month}-${day}`;
-                    
-                    if (!isOfficeScope) {
-                      const response = await fetch('/api/optimizer/hypotheses', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ date: dateStr, scope: scopeValue })
-                      });
-                      const result = await response.json().catch(() => ({}));
-                      if (!response.ok || !result?.success) {
-                        throw new Error(result?.message || result?.error || 'Errore durante l\'assegnazione');
-                      }
-                      const hypotheses = Array.isArray(result.hypotheses) ? result.hypotheses : [];
-                      if (hypotheses.length === 0) {
-                        throw new Error('Nessuna ipotesi disponibile');
-                      }
-                      setHkHypotheses(hypotheses);
-                      setPreviewHypothesisId(hypotheses[0]?.summary?.id ?? null);
-                      toast({
-                        title: "Ipotesi pronte",
-                        description: "Confrontale in timeline e applica quella che preferisci.",
-                      });
-                    } else {
-                    const response = await fetch('/api/optimizer/run-all', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ 
-                        date: dateStr, 
-                        scope: scopeValue,
-                        skipPhase4: false, 
-                        applyToProduction: true 
-                      })
-                    });
-                    
-                    if (!response.ok) throw new Error('Errore durante l\'assegnazione');
-                    
-                    const result = await response.json();
-                    const summary = result.summary || {};
-                    toast({
-                      variant: "success",
-                      title: "Assegnazione completata",
-                      description: `${summary.tasksAssigned || 0} task assegnate, ${summary.tasksUnassigned || 0} non assegnate`,
-                    });
-                    await reloadAllTasks();
-                    }
-                  } catch (error) {
-                    toast({
-                      variant: "destructive",
-                      title: "Errore",
-                      description: error instanceof Error ? error.message : "Errore durante l'assegnazione automatica",
-                    });
-                  } finally {
-                    setIsAssigning(false);
+                onClick={() => {
+                  if (!isOfficeScope) {
+                    setWorkloadDialogOpen(true);
+                    return;
                   }
+                  void (async () => {
+                    try {
+                      setIsAssigning(true);
+                      const year = selectedDate.getFullYear();
+                      const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+                      const day = String(selectedDate.getDate()).padStart(2, "0");
+                      const dateStr = `${year}-${month}-${day}`;
+                      const response = await fetch("/api/optimizer/run-all", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          date: dateStr,
+                          scope: scopeValue,
+                          skipPhase4: false,
+                          applyToProduction: true,
+                        }),
+                      });
+                      if (!response.ok) throw new Error("Errore durante l'assegnazione");
+                      const result = await response.json();
+                      const summary = result.summary || {};
+                      toast({
+                        variant: "success",
+                        title: "Assegnazione completata",
+                        description: `${summary.tasksAssigned || 0} task assegnate, ${summary.tasksUnassigned || 0} non assegnate`,
+                      });
+                      await reloadAllTasks();
+                    } catch (error) {
+                      toast({
+                        variant: "destructive",
+                        title: "Errore",
+                        description: error instanceof Error ? error.message : "Errore durante l'assegnazione automatica",
+                      });
+                    } finally {
+                      setIsAssigning(false);
+                    }
+                  })();
                 }}
                 disabled={isAssigning || isWassManualLocked || isRefreshingContainers || isHkHypothesisPreview || !algorithmAssignEnabled}
                 className="flex items-center gap-2 rounded-none text-black dark:text-white hover:bg-custom-blue/80 px-3"
@@ -3441,6 +3479,15 @@ export default function GenerateAssignments() {
         )}
 
       <AssignmentLoadingDialog open={isAssigning} />
+      <AssignWorkloadDialog
+        open={workloadDialogOpen}
+        onOpenChange={setWorkloadDialogOpen}
+        date={format(selectedDate, "yyyy-MM-dd")}
+        scope={scopeValue}
+        onConfirm={(choice) => {
+          void startHousekeepingAssign(choice);
+        }}
+      />
 
       <AlertDialog open={showAdamRefreshDialog} onOpenChange={setShowAdamRefreshDialog}>
         <AlertDialogContent className="sm:max-w-md">

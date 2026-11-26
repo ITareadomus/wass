@@ -78,6 +78,7 @@ import { CleanerTriadMark, parseCleanerTriade, type CleanerTriadeLevel } from "@
 import { DayCleanerTriadLevel } from "@/components/day-cleaner-triad-level";
 import { CleanerRoleBadge, CleanerRoleLetter } from "@/components/cleaner-role-mark";
 import { useTriadeEnabled } from "@/lib/triade-enabled";
+import { useTaskTriadeRevision } from "@/lib/task-triade";
 import { useSyncedTimelineScroll } from "@/hooks/use-synced-timeline-scroll";
 import {
   AlertDialog,
@@ -317,6 +318,7 @@ export default function TimelineView({
   timelineMultiSelect,
 }: TimelineViewProps) {
   const triadeEnabled = useTriadeEnabled();
+  const taskTriadeRevision = useTaskTriadeRevision();
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [selectedCleaner, setSelectedCleaner] = useState<Cleaner | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -2948,7 +2950,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
                 // Verifica se ci sono task incompatibili per questo cleaner
                 // Controlla ogni coppia (task, cleaner) invece del solo cleanerId
-                const hasIncompatibleTasks = validationRules && cleanerRole && !isOfficeCleanerRole(cleanerRole)
+                const hasIncompatibleTasks = taskTriadeRevision >= 0 && validationRules && cleanerRole && !isOfficeCleanerRole(cleanerRole)
                   ? cleanerTasks.some(task => {
                       if (isReadonlyPreassignedTask(task)) return false;
                       if (canCleanerHandleTaskSync(
@@ -3555,6 +3557,7 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                                           }
                                           multiSelectContext={timelineCardMultiSelect}
                                           showExecutionStatusColors={showExecutionStatusColors}
+                                          cleanerTriade={cleanerRole === "Ufficio" ? undefined : cleanerDisplay.triade ?? null}
                                         />
                                         </FirstApartmentTimeShift>
                                       </React.Fragment>
@@ -4598,9 +4601,8 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
 
                 {!isOfficeScope && triadeEnabled && getCleanerDisplayData(selectedCleaner).role !== "Ufficio" && (
                   <div className="col-span-4">
-                    <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1 flex items-center gap-1">
+                    <p className="text-sm font-semibold text-gray-800 dark:text-muted-foreground mb-1">
                       Livello Triade
-                      {!isReadOnly && <Pencil className="w-3 h-3 text-gray-700 dark:text-muted-foreground/60" />}
                     </p>
                     <div className="flex min-h-10 items-center">
                       <DayCleanerTriadLevel
@@ -4608,7 +4610,6 @@ const buildBracePath = (x1: number, x2: number, yTop = 4, yBottom = 20) => {
                         cleanerId={selectedCleaner.id}
                         original={getCleanerDisplayData(selectedCleaner).triade}
                         enabled
-                        editable={!isReadOnly}
                         size="lg"
                         unknown="text"
                         appearance="day"

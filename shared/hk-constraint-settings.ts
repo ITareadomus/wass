@@ -2,6 +2,8 @@ export type ConstraintMode = "off" | "soft" | "hard";
 
 export interface HkConstraintSettings {
   triadeCeiling: ConstraintMode;
+  /** Il giro di assegnazioni parte dagli appartamenti di livello triade più alto. */
+  highLevelFirst: ConstraintMode;
   triadeMatch: ConstraintMode;
   triadeMatchBonus: number;
   triadeOverqualPenalty: number;
@@ -20,6 +22,11 @@ export interface HkConstraintSettings {
   apartmentType: ConstraintMode;
   formatorePriority: ConstraintMode;
   formatoreStandard: ConstraintMode;
+  /** Livelli triade preferiti per il formatore. */
+  formatoreTriade: ConstraintMode;
+  formatoreLevel1: boolean;
+  formatoreLevel2: boolean;
+  formatoreLevel3: boolean;
   priorityWindow: ConstraintMode;
   checkout: ConstraintMode;
   checkin: ConstraintMode;
@@ -51,6 +58,7 @@ const MODES: ConstraintMode[] = ["off", "soft", "hard"];
 export const HK_CONSTRAINT_PRESETS = {
   balanced: {
     triadeCeiling: "hard",
+    highLevelFirst: "off",
     triadeMatch: "soft",
     triadeMatchBonus: 8000,
     triadeOverqualPenalty: 3000,
@@ -68,6 +76,10 @@ export const HK_CONSTRAINT_PRESETS = {
     apartmentType: "hard",
     formatorePriority: "hard",
     formatoreStandard: "hard",
+    formatoreTriade: "off",
+    formatoreLevel1: true,
+    formatoreLevel2: true,
+    formatoreLevel3: true,
     priorityWindow: "soft",
     checkout: "hard",
     checkin: "hard",
@@ -81,6 +93,7 @@ export const HK_CONSTRAINT_PRESETS = {
   },
   triade: {
     triadeCeiling: "hard",
+    highLevelFirst: "off",
     triadeMatch: "soft",
     triadeMatchBonus: 20000,
     triadeOverqualPenalty: 8000,
@@ -98,6 +111,10 @@ export const HK_CONSTRAINT_PRESETS = {
     apartmentType: "hard",
     formatorePriority: "hard",
     formatoreStandard: "hard",
+    formatoreTriade: "off",
+    formatoreLevel1: true,
+    formatoreLevel2: true,
+    formatoreLevel3: true,
     priorityWindow: "soft",
     checkout: "hard",
     checkin: "hard",
@@ -111,6 +128,7 @@ export const HK_CONSTRAINT_PRESETS = {
   },
   distance: {
     triadeCeiling: "off",
+    highLevelFirst: "off",
     triadeMatch: "off",
     triadeMatchBonus: 0,
     triadeOverqualPenalty: 0,
@@ -128,6 +146,10 @@ export const HK_CONSTRAINT_PRESETS = {
     apartmentType: "hard",
     formatorePriority: "hard",
     formatoreStandard: "hard",
+    formatoreTriade: "off",
+    formatoreLevel1: true,
+    formatoreLevel2: true,
+    formatoreLevel3: true,
     priorityWindow: "soft",
     checkout: "hard",
     checkin: "hard",
@@ -168,6 +190,12 @@ export const HK_CONSTRAINT_FIELDS: Array<{
     detail: "Un cleaner prende solo appartamenti del suo livello o più bassi.",
   },
   {
+    id: "highLevelFirst",
+    group: "Vincoli",
+    title: "Partire dal livello più alto",
+    detail: "Il giro di assegnazioni inizia dagli appartamenti di livello triade più alto.",
+  },
+  {
     id: "travel",
     group: "Vincoli",
     title: "Distanza tra appartamenti",
@@ -178,6 +206,12 @@ export const HK_CONSTRAINT_FIELDS: Array<{
     group: "Vincoli",
     title: "Stesso carico di lavoro",
     detail: "I cleaner ricevono più o meno gli stessi minuti di lavoro.",
+  },
+  {
+    id: "formatoreTriade",
+    group: "Vincoli",
+    title: "Task preferiti del formatore",
+    detail: "I livelli triade segnati sono quelli preferiti per il formatore.",
   },
 ];
 
@@ -217,6 +251,7 @@ export function parseHkConstraintSettings(raw: unknown): HkConstraintSettings {
   const source = raw && typeof raw === "object" ? (raw as Partial<HkConstraintSettings>) : {};
   return {
     triadeCeiling: asMode(source.triadeCeiling, base.triadeCeiling),
+    highLevelFirst: asMode(source.highLevelFirst, base.highLevelFirst),
     triadeMatch: asMode(source.triadeMatch, base.triadeMatch),
     triadeMatchBonus: asNumber(source.triadeMatchBonus, base.triadeMatchBonus, 0, 200000),
     triadeOverqualPenalty: asNumber(source.triadeOverqualPenalty, base.triadeOverqualPenalty, 0, 200000),
@@ -244,7 +279,30 @@ export function parseHkConstraintSettings(raw: unknown): HkConstraintSettings {
     apartmentType: asMode(source.apartmentType, base.apartmentType),
     formatorePriority: asMode(source.formatorePriority, base.formatorePriority),
     formatoreStandard: asMode(source.formatoreStandard, base.formatoreStandard),
+    formatoreTriade: asMode(source.formatoreTriade, base.formatoreTriade),
+    formatoreLevel1: asBool(source.formatoreLevel1, base.formatoreLevel1),
+    formatoreLevel2: asBool(source.formatoreLevel2, base.formatoreLevel2),
+    formatoreLevel3: asBool(source.formatoreLevel3, base.formatoreLevel3),
   };
+}
+
+export function formatoreTriadeLevel(value: unknown): 1 | 2 | 3 {
+  const weight = Number(value);
+  if (!Number.isInteger(weight) || weight < 1) return 1;
+  if (weight > 3) return 3;
+  return weight as 1 | 2 | 3;
+}
+
+export function formatoreTriadeSelected(settings: HkConstraintSettings, level: 1 | 2 | 3): boolean {
+  if (level === 1) return settings.formatoreLevel1;
+  if (level === 2) return settings.formatoreLevel2;
+  return settings.formatoreLevel3;
+}
+
+/** Vero quando il livello del task non è tra quelli scelti e il vincolo è acceso. */
+export function formatoreTriadeViolated(settings: HkConstraintSettings, taskWeight: unknown): boolean {
+  if (settings.formatoreTriade === "off" || taskWeight == null || taskWeight === "") return false;
+  return !formatoreTriadeSelected(settings, formatoreTriadeLevel(taskWeight));
 }
 
 export function hkSettingsForHypothesis(id: string | null | undefined): HkConstraintSettings {

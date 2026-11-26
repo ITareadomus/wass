@@ -113,7 +113,9 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { isContinuazioneStraordinariaTask, isTaskLocked } from "@/lib/taskValidation";
 import { useTaskTriade } from "@/lib/task-triade";
-import { parseCleanerTriade, TaskTriadMark } from "@/components/triad-mark";
+import { useDayTriade } from "@/lib/day-triade";
+import { useDayCleanerTriade } from "@/lib/day-cleaner-triade";
+import { parseCleanerTriade, TaskTriadMark, type CleanerTriadeLevel } from "@/components/triad-mark";
 import { DayTriadLevel } from "@/components/day-triad-level";
 import { useTriadeEnabled } from "@/lib/triade-enabled";
 import {
@@ -451,6 +453,8 @@ export interface TaskCardProps {
    * anche se il task è in corso o completato.
    */
   showExecutionStatusColors?: boolean;
+  /** Livello triade del cleaner della riga, già risolto in timeline. */
+  cleanerTriade?: CleanerTriadeLevel | null;
 }
 
 function getTaskMapMarkerId(task: Task): string {
@@ -583,6 +587,28 @@ function LogisticsAdamCodeLabel({
 /** Sopravvive al rimontaggio della card dopo un blocco, così il dialog resta aperto. */
 let openTaskDialogId: string | null = null;
 
+function triadeWeightOf(
+  level: CleanerTriadeLevel | null | undefined,
+  override: number | null | undefined,
+): number | null {
+  if (override != null && Number.isInteger(override) && override >= 0) return Math.min(override, 3);
+  if (level === undefined) return null;
+  return parseCleanerTriade(level)?.weight ?? 1;
+}
+
+function triadeLevelLabel(levels: CleanerTriadeLevel[], weight: number): string {
+  const match = levels.map((level) => parseCleanerTriade(level)).find((level) => level?.weight === weight);
+  return match?.name || `livello ${weight}`;
+}
+
+function triadeMismatchMessage(
+  levels: CleanerTriadeLevel[],
+  taskWeight: number,
+  cleanerWeight: number,
+): string {
+  return `Livello triade non corrispondente: appartamento ${triadeLevelLabel(levels, taskWeight)}, cleaner ${triadeLevelLabel(levels, cleanerWeight)}.`;
+}
+
 export default function TaskCard({
   task,
   index,
@@ -612,10 +638,14 @@ export default function TaskCard({
   timelineRowStaffDisplayLabel = null,
   onLogisticsTimelineMutated,
   showExecutionStatusColors,
+  cleanerTriade,
 }: TaskCardProps) {
   const effectiveWorkDate = workDate || getSelectedWorkDateForScope(operationsScope);
   console.log('🔧 TaskCard render - isReadOnly:', isReadOnly, 'for task:', task.name);
   const triadeEnabled = useTriadeEnabled();
+  const showTriadeWarning = triadeEnabled && isInTimeline && operationsScope !== "logistics";
+  const dayTaskTriade = useDayTriade(effectiveWorkDate, showTriadeWarning);
+  const dayCleanerTriade = useDayCleanerTriade(effectiveWorkDate, showTriadeWarning);
   const taskDialogTaskKey = String((task as any).task_id ?? task.id ?? "");
   const taskDialogId = `${isInTimeline ? "timeline" : "container"}:${currentContainer}:${cleanerId ?? ""}:${taskDialogTaskKey}`;
   const looseTaskDialogId = `task:${taskDialogTaskKey}`;
@@ -1259,6 +1289,27 @@ const valueFieldClass = (editable: boolean, manual: boolean) =>
     };
   }, [navigableTasks, currentTaskId, task, index]);
   const dialogTriade = useTaskTriade(displayTask, showTaskTriade);
+  const taskTriadeId = Number((task as any).task_id ?? (task as any).id);
+  const taskTriadeWeight = triadeWeightOf(
+    cardTriade === undefined ? undefined : cardTriade.triade,
+    Number.isFinite(taskTriadeId) ? dayTaskTriade.overrides[taskTriadeId] ?? null : null,
+  );
+  const cleanerTriadeWeight = cleanerTriade === undefined
+    ? null
+    : triadeWeightOf(
+        cleanerTriade,
+        cleanerId != null ? dayCleanerTriade.overrides[Number(cleanerId)] ?? null : null,
+      );
+  const triadeLevelsReady = cardTriade !== undefined && dayTaskTriade.ready && dayCleanerTriade.ready;
+  const triadeMismatch =
+    showTriadeWarning &&
+    triadeLevelsReady &&
+    taskTriadeWeight != null &&
+    cleanerTriadeWeight != null &&
+    taskTriadeWeight > cleanerTriadeWeight;
+  const triadeMismatchText = triadeMismatch
+    ? triadeMismatchMessage(dayTaskTriade.levels, taskTriadeWeight, cleanerTriadeWeight)
+    : null;
 
   const dialogTaskKey = getTaskKey(displayTask) || getTaskKey(task);
   const dialogTaskIdRaw =
@@ -2947,6 +2998,21 @@ const valueFieldClass = (editable: boolean, manual: boolean) =>
       checkinDate: dialogTaskObj.checkin_date,
     });
   })();
+  const dialogTriadeWeight = triadeWeightOf(
+    dialogTriade === undefined ? undefined : dialogTriade.triade,
+    Number.isFinite(dialogTaskId) ? dayTaskTriade.overrides[dialogTaskId] ?? null : null,
+  );
+  const dialogTriadeMismatchText =
+    showTriadeWarning &&
+    isModalOpen &&
+    dialogTriade !== undefined &&
+    dayTaskTriade.ready &&
+    dayCleanerTriade.ready &&
+    dialogTriadeWeight != null &&
+    cleanerTriadeWeight != null &&
+    dialogTriadeWeight > cleanerTriadeWeight
+      ? triadeMismatchMessage(dayTaskTriade.levels, dialogTriadeWeight, cleanerTriadeWeight)
+      : null;
   const missingLogisticsKindMessage =
     operationsScope === "logistics" &&
     !isInTimeline &&
@@ -3803,6 +3869,7 @@ const valueFieldClass = (editable: boolean, manual: boolean) =>
                       showCompactAdamTimelineUi ? "px-1 py-0" : "flex items-center px-2 py-1",
                       isSelected && isMultiSelectMode && "z-[1] ring-2 ring-sky-500 ring-inset",
                       isOverdue && timelineViolationVisible && "task-violation-outline",
+                      triadeMismatch && "task-triade-mismatch-outline",
                       isInTimeline &&
                         executionColorsEnabled &&
                         housekeepingWorkProgress &&
@@ -3839,6 +3906,7 @@ const valueFieldClass = (editable: boolean, manual: boolean) =>
                     }}
                   >
                     {timelineViolationVisible && <SequenceSummaryViolationIndicator />}
+                    {triadeMismatch && <SequenceSummaryViolationIndicator tone="yellow" />}
                     {isInTimeline &&
                       executionColorsEnabled &&
                       housekeepingWorkProgress &&
@@ -4128,6 +4196,11 @@ const valueFieldClass = (editable: boolean, manual: boolean) =>
                         {timelineViolationShortLabels.join(" · ")}
                       </p>
                     )}
+                    {triadeMismatchText && (
+                      <p className="w-full text-center text-xs font-semibold text-amber-700 dark:text-amber-300">
+                        {triadeMismatchText}
+                      </p>
+                    )}
                     {missingLogisticsKindMessage && effectiveLogisticsTaskKind == null && (
                       <p className="w-full text-center text-xs font-semibold text-amber-700 dark:text-amber-400">
                         Manca tipologia
@@ -4276,6 +4349,12 @@ const valueFieldClass = (editable: boolean, manual: boolean) =>
             </div>
           </DialogHeader>
 
+          {dialogTriadeMismatchText && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+              <p className="font-semibold">Livello triade</p>
+              <p className="mt-1">{dialogTriadeMismatchText}</p>
+            </div>
+          )}
           {dialogTimelineViolationMessages.length > 0 && (
             <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
               <p className="font-semibold">Violazioni:</p>

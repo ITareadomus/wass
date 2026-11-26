@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Check, Pencil, Plus, Trash2 } from "lucide-react";
 import {
@@ -68,6 +69,29 @@ export function HkAlgorithmSettings({
   const stateRef = useRef({ value, profiles });
   stateRef.current = { value, profiles };
   const active = profiles.profiles.find((profile) => profile.id === profiles.activeId) ?? profiles.profiles[0];
+  const [triadeLevels, setTriadeLevels] = useState<Array<{ weight: 1 | 2 | 3; name: string }>>([
+    { weight: 1, name: "Livello 1" },
+    { weight: 2, name: "Livello 2" },
+    { weight: 3, name: "Livello 3" },
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/triade/catalog")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (cancelled || !Array.isArray(data?.levels)) return;
+        setTriadeLevels([1, 2, 3].map((weight) => {
+          const match = data.levels.find((level: { weight?: number }) => Number(level?.weight) === weight);
+          const name = String(match?.name ?? "").trim();
+          return { weight: weight as 1 | 2 | 3, name: name || `Livello ${weight}` };
+        }));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const publish = (constraints: HkConstraintSettings, library: HkProfileLibrary) => {
     stateRef.current = { value: constraints, profiles: library };
@@ -251,6 +275,28 @@ export function HkAlgorithmSettings({
                     <p className="text-sm text-muted-foreground">{field.detail}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
+                    {field.id === "formatoreTriade" && (
+                      <div className="flex flex-wrap items-center gap-3">
+                        {triadeLevels.map((level) => {
+                          const key = `formatoreLevel${level.weight}` as "formatoreLevel1" | "formatoreLevel2" | "formatoreLevel3";
+                          return (
+                            <div key={level.weight} className="flex items-center gap-2">
+                              <Checkbox
+                                id={`formatore-triade-${level.weight}`}
+                                checked={Boolean(value[key])}
+                                onCheckedChange={(checked) => {
+                                  const current = stateRef.current.value;
+                                  writeActive({ ...current, [key]: checked === true });
+                                }}
+                              />
+                              <Label htmlFor={`formatore-triade-${level.weight}`} className="cursor-pointer text-sm">
+                                {level.name}
+                              </Label>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                     {field.id === "travel" && (
                       <div className="flex items-center gap-2">
                         <Label htmlFor="travel-hard-max" className="whitespace-nowrap text-sm">

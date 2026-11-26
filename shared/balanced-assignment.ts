@@ -1,6 +1,7 @@
 import {
   HK_SOFT_PENALTY,
   constraintDecision,
+  formatoreTriadeViolated,
   type ConstraintMode,
   type HkConstraintSettings,
 } from "./hk-constraint-settings";
@@ -56,6 +57,8 @@ export interface BalancedCleaner {
   fixedHasLongOt: boolean;
   fixedHasAnyOt: boolean;
   anchor: { lat: number; lng: number; endMin: number } | null;
+  /** Ore di pulizia a cui avvicinare questo cleaner. Vuoto: usa la media di tutti. */
+  targetMin?: number | null;
 }
 
 export interface BalancedInput {
@@ -91,6 +94,7 @@ export interface BalancedResult {
 }
 
 interface CleanerEval {
+  cleanerId: number;
   hard: number;
   soft: number;
   travel: number;
@@ -204,7 +208,12 @@ function pairViolations(
   const codes: string[] = [];
   const cleanerLevel = cleaner.triadeWeight;
   const taskLevel = task.triadeWeight;
-  const violated = cleanerLevel < taskLevel;
+  const formatore = String(cleaner.role || "").toLowerCase().includes("formatore");
+  if (formatore && formatoreTriadeViolated(settings, taskLevel)) {
+    addCost(cost, settings.formatoreTriade, true, HK_SOFT_PENALTY.formatore);
+    if (cost.hard || cost.soft) codes.push("FORMATORE_TRIADE");
+  }
+  const violated = !formatore && cleanerLevel < taskLevel;
   if (violated && settings.triadeCeiling !== "off") {
     addCost(
       cost,
@@ -215,6 +224,14 @@ function pairViolations(
     if (cost.hard || cost.soft) codes.push("TRIADE_CEILING");
   }
   return { ...cost, codes };
+}
+
+/** Tetto triade obbligatorio: un cleaner di livello più basso non riceve il task. */
+function triadeCeilingBlocks(cleaner: BalancedCleaner, task: BalancedTask, input: BalancedInput): boolean {
+  if (input.settings.triadeCeiling !== "hard") return false;
+  const formatore = String(cleaner.role || "").toLowerCase().includes("formatore");
+  if (formatore) return false;
+  return cleaner.triadeWeight < task.triadeWeight;
 }
 
 function routeShapeViolations(
@@ -297,7 +314,7 @@ function simulateOrder(
   }
 
   const load = cleaner.fixedWorkMin + cleaning;
-  return { hard, soft, travel: travelSum, load, count: order.length, rows };
+  return { cleanerId: cleaner.cleanerId, hard, soft, travel: travelSum, load, count: order.length, rows };
 }
 
 function averageCleaning(input: BalancedInput): number {
@@ -310,6 +327,7 @@ function averageCleaning(input: BalancedInput): number {
 function bestOrder(cleaner: BalancedCleaner, tasks: BalancedTask[], input: BalancedInput): CleanerEval {
   if (tasks.length === 0) {
     return {
+      cleanerId: cleaner.cleanerId,
       hard: 0,
       soft: 0,
       travel: 0,
@@ -345,7 +363,7 @@ function scoreOf(
   evals: CleanerEval[],
   travelMatters: boolean,
   balanceMatters: boolean,
-  target: number,
+  targetOf: (cleanerId: number) => number,
 ): SolutionScore {
   let fifths = 0;
   let hard = 0;
@@ -356,24 +374,51 @@ function scoreOf(
     hard += item.hard;
     soft += item.soft;
     travel += travelMatters ? item.travel : 0;
-    if (balanceMatters) spread += Math.abs(item.load - target);
+    if (balanceMatters) spread += Math.abs(item.load - targetOf(item.cleanerId));
     if (item.count > BALANCED_BASE_TASKS) fifths += 1;
   }
   return { fifths, hard, spread, soft, travel };
+}
+
+function targetMinutes(cleaner: BalancedCleaner, shared: number): number {
+  return cleaner.targetMin != null && cleaner.targetMin > 0 ? cleaner.targetMin : shared;
+}
+
+/** Minuti oltre il target e minuti ancora sotto. Oltre conta prima: 9h su un target di 5h non è “più vicino” di 0h. */
+function hourGap(load: number, target: number): { over: number; under: number } {
+  return {
+    over: Math.max(0, load - target),
+    under: Math.max(0, target - load),
+  };
 }
 
 function taskById(tasks: BalancedTask[]): Map<number, BalancedTask> {
   return new Map(tasks.map((task) => [task.taskId, task]));
 }
 
+function dueMinute(task: BalancedTask): number {
+  return task.checkinMin ?? 24 * 60;
+}
+
+/** Ogni livello triade anticipa il task di un'ora e mezza quando il vincolo è preferibile. */
+const HIGH_LEVEL_SOFT_MINUTES = 90;
+
+function compareAssignmentOrder(a: BalancedTask, b: BalancedTask, mode: ConstraintMode): number {
+  if (mode === "hard" && a.triadeWeight !== b.triadeWeight) return b.triadeWeight - a.triadeWeight;
+  if (mode === "soft") {
+    const aKey = dueMinute(a) - a.triadeWeight * HIGH_LEVEL_SOFT_MINUTES;
+    const bKey = dueMinute(b) - b.triadeWeight * HIGH_LEVEL_SOFT_MINUTES;
+    if (aKey !== bKey) return aKey - bKey;
+  }
+  const aDue = dueMinute(a);
+  const bDue = dueMinute(b);
+  if (aDue !== bDue) return aDue - bDue;
+  if (b.cleaningMin !== a.cleaningMin) return b.cleaningMin - a.cleaningMin;
+  return a.taskId - b.taskId;
+}
+
 export function assignBalancedDay(input: BalancedInput): BalancedResult {
-  const tasks = input.tasks.slice().sort((a, b) => {
-    const aDue = a.checkinMin ?? 24 * 60;
-    const bDue = b.checkinMin ?? 24 * 60;
-    if (aDue !== bDue) return aDue - bDue;
-    if (b.cleaningMin !== a.cleaningMin) return b.cleaningMin - a.cleaningMin;
-    return a.taskId - b.taskId;
-  });
+  const tasks = input.tasks.slice().sort((a, b) => compareAssignmentOrder(a, b, input.settings.highLevelFirst));
   const cleaners = input.cleaners.slice().sort((a, b) => a.cleanerId - b.cleanerId);
   if (cleaners.length === 0) {
     return {
@@ -387,26 +432,38 @@ export function assignBalancedDay(input: BalancedInput): BalancedResult {
   const buckets = new Map<number, number[]>(cleaners.map((cleaner) => [cleaner.cleanerId, []]));
   const lookup = taskById(tasks);
   const unassigned: BalancedUnassigned[] = [];
-  const target = averageCleaning(input);
+  const sharedTarget = averageCleaning(input);
+  const targetOf = (cleanerId: number) => {
+    const cleaner = cleaners.find((item) => item.cleanerId === cleanerId);
+    return cleaner ? targetMinutes(cleaner, sharedTarget) : sharedTarget;
+  };
 
   for (const task of tasks) {
     let bestCleaner: BalancedCleaner | null = null;
     let bestRank: number[] | null = null;
+    let sawRoom = false;
+    let blockedByTriade = false;
     for (const cleaner of cleaners) {
       const current = buckets.get(cleaner.cleanerId)!;
       const cap = caps.get(cleaner.cleanerId) ?? 0;
       if (current.length >= cap) continue;
+      sawRoom = true;
+      if (triadeCeilingBlocks(cleaner, task, input)) {
+        blockedByTriade = true;
+        continue;
+      }
       const trialTasks = current.map((id) => lookup.get(id)!).concat(task);
       const trial = bestOrder(cleaner, trialTasks, input);
       const currentEval = bestOrder(cleaner, current.map((id) => lookup.get(id)!), input);
       const workload = input.settings.workloadBalance;
-      const gap = Math.abs(trial.load - target);
+      const gap = hourGap(trial.load, targetOf(cleaner.cleanerId));
+      const balanceOn = workload !== "off";
       const rank = [
         cleaner.fixedCount + trial.count > BALANCED_BASE_TASKS ? 1 : 0,
         trial.hard - currentEval.hard,
-        workload === "hard" ? gap : 0,
+        balanceOn ? gap.over : 0,
         trial.soft - currentEval.soft,
-        workload === "soft" ? gap : 0,
+        balanceOn ? gap.under : 0,
         input.settings.travel === "off" ? 0 : trial.travel,
         cleaner.cleanerId,
       ];
@@ -416,13 +473,13 @@ export function assignBalancedDay(input: BalancedInput): BalancedResult {
       }
     }
     if (!bestCleaner) {
-      unassigned.push({ taskId: task.taskId, reason: "CAPACITY" });
+      unassigned.push({ taskId: task.taskId, reason: sawRoom && blockedByTriade ? "TRIADE_CEILING" : "CAPACITY" });
       continue;
     }
     buckets.get(bestCleaner.cleanerId)!.push(task.taskId);
   }
 
-  improve(cleaners, buckets, lookup, input, caps, target);
+  improve(cleaners, buckets, lookup, input, caps, targetOf);
 
   const assignments: BalancedAssignmentRow[] = [];
   let fifthTaskCleaners = 0;
@@ -449,7 +506,7 @@ function improve(
   lookup: Map<number, BalancedTask>,
   input: BalancedInput,
   caps: Map<number, number>,
-  target: number,
+  targetOf: (cleanerId: number) => number,
 ) {
   const travelMatters = input.settings.travel !== "off";
   const workload = input.settings.workloadBalance;
@@ -465,7 +522,7 @@ function improve(
       cleaners.map((cleaner) => evals.get(cleaner.cleanerId)!),
       travelMatters,
       workload !== "off",
-      target,
+      targetOf,
     );
 
   let score = currentScore();
@@ -482,6 +539,8 @@ function improve(
           if (dest.cleanerId === source.cleanerId) continue;
           const destIds = buckets.get(dest.cleanerId)!;
           if (destIds.length >= (caps.get(dest.cleanerId) ?? 0)) continue;
+          const moving = lookup.get(taskId);
+          if (moving && triadeCeilingBlocks(dest, moving, input)) continue;
           sourceIds.splice(index, 1);
           destIds.push(taskId);
           const nextSource = bestOrder(source, sourceIds.map((id) => lookup.get(id)!), input);
@@ -504,5 +563,90 @@ function improve(
         }
       }
     }
+    if (!improved && workload !== "off") {
+      const swapped = swapOvertime(cleaners, buckets, lookup, input, evals, targetOf, currentScore);
+      if (swapped) {
+        score = swapped;
+        improved = true;
+      }
+    }
   }
+}
+
+/** Scambia un task lungo di chi è sopra il target con uno più corto di chi è sotto, quando i posti sono già pieni. */
+function swapOvertime(
+  cleaners: BalancedCleaner[],
+  buckets: Map<number, number[]>,
+  lookup: Map<number, BalancedTask>,
+  input: BalancedInput,
+  evals: Map<number, CleanerEval>,
+  targetOf: (cleanerId: number) => number,
+  rescore: () => SolutionScore,
+): SolutionScore | null {
+  const workload = input.settings.workloadBalance;
+  const baseline = rescore();
+  let best: {
+    sourceId: number;
+    destId: number;
+    sourceIndex: number;
+    destIndex: number;
+    sourceEval: CleanerEval;
+    destEval: CleanerEval;
+    score: SolutionScore;
+  } | null = null;
+
+  for (const source of cleaners) {
+    const sourceEval = evals.get(source.cleanerId)!;
+    if (hourGap(sourceEval.load, targetOf(source.cleanerId)).over < 30) continue;
+    const sourceIds = buckets.get(source.cleanerId)!;
+    for (const dest of cleaners) {
+      if (dest.cleanerId === source.cleanerId) continue;
+      const destEval = evals.get(dest.cleanerId)!;
+      if (destEval.load >= sourceEval.load) continue;
+      const destIds = buckets.get(dest.cleanerId)!;
+      for (let i = 0; i < sourceIds.length; i++) {
+        const sourceTask = lookup.get(sourceIds[i]);
+        if (!sourceTask) continue;
+        for (let j = 0; j < destIds.length; j++) {
+          const destTask = lookup.get(destIds[j]);
+          if (!destTask || sourceTask.cleaningMin <= destTask.cleaningMin) continue;
+          if (triadeCeilingBlocks(dest, sourceTask, input) || triadeCeilingBlocks(source, destTask, input)) continue;
+          const outgoing = sourceIds[i];
+          const incoming = destIds[j];
+          sourceIds[i] = incoming;
+          destIds[j] = outgoing;
+          const nextSource = bestOrder(source, sourceIds.map((id) => lookup.get(id)!), input);
+          const nextDest = bestOrder(dest, destIds.map((id) => lookup.get(id)!), input);
+          evals.set(source.cleanerId, nextSource);
+          evals.set(dest.cleanerId, nextDest);
+          const nextScore = rescore();
+          if (betterScore(nextScore, best?.score ?? baseline, workload)) {
+            best = {
+              sourceId: source.cleanerId,
+              destId: dest.cleanerId,
+              sourceIndex: i,
+              destIndex: j,
+              sourceEval: nextSource,
+              destEval: nextDest,
+              score: nextScore,
+            };
+          }
+          sourceIds[i] = outgoing;
+          destIds[j] = incoming;
+          evals.set(source.cleanerId, sourceEval);
+          evals.set(dest.cleanerId, destEval);
+        }
+      }
+    }
+  }
+
+  if (!best) return null;
+  const sourceIds = buckets.get(best.sourceId)!;
+  const destIds = buckets.get(best.destId)!;
+  const outgoing = sourceIds[best.sourceIndex];
+  sourceIds[best.sourceIndex] = destIds[best.destIndex];
+  destIds[best.destIndex] = outgoing;
+  evals.set(best.sourceId, best.sourceEval);
+  evals.set(best.destId, best.destEval);
+  return best.score;
 }

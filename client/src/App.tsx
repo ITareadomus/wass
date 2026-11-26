@@ -14,6 +14,7 @@ import Settings from "@/pages/settings";
 import SystemSettings from "@/pages/system-settings";
 import PreassignedApartments from "@/pages/preassigned-apartments";
 import KeyRegistry from "@/pages/key-registry";
+import CleanerAnagrafica from "@/pages/cleaner-anagrafica";
 import LostKeys, { UnreturnedKeys } from "@/pages/lost-keys";
 import NotFound from "@/pages/not-found";
 import DayComparison from "@/pages/day-comparison";
@@ -289,6 +290,9 @@ function Router() {
       </Route>
       <Route path="/registro-chiavi">
         {() => <Redirect to={`/keys${window.location.search}`} />}
+      </Route>
+      <Route path="/anagrafica-dipendenti">
+        {() => <ProtectedRoute component={CleanerAnagrafica} />}
       </Route>
       <Route path="/chiavi-non-restituite">
         {() => <ProtectedRoute component={UnreturnedKeys} />}
