@@ -208,8 +208,8 @@ function TimeStepper({
 function TrialLevelBody({
   row,
   levels,
-  days,
-  setDays,
+  months,
+  setMonths,
   busy,
   readOnly,
   onApply,
@@ -217,11 +217,11 @@ function TrialLevelBody({
 }: {
   row: CleanerAnagraficaRow;
   levels: CleanerTriadeLevel[];
-  days: number;
-  setDays: (value: number | ((current: number) => number)) => void;
+  months: number;
+  setMonths: (value: number | ((current: number) => number)) => void;
   busy: boolean;
   readOnly: boolean;
-  onApply: (days: number) => void;
+  onApply: (months: number) => void;
   onRevoke: () => void;
 }) {
   const active = row.temporaryTriade;
@@ -260,36 +260,24 @@ function TrialLevelBody({
                 variant="ghost"
                 size="sm"
                 className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900"
-                disabled={readOnly || busy || days <= 1}
-                onClick={() => setDays((current) => Math.max(1, current - 1))}
-                aria-label="Un giorno in meno"
+                disabled={readOnly || busy || months <= 1}
+                onClick={() => setMonths((current) => Math.max(1, current - 1))}
+                aria-label="Un mese in meno"
               >
                 <span className="text-lg font-bold">−</span>
               </Button>
-              <Input
-                type="number"
-                min={1}
-                max={30}
-                inputMode="numeric"
-                disabled={readOnly || busy}
-                value={days}
-                aria-label="Giorni di prova"
-                onChange={(event) => {
-                  const next = Number(event.target.value);
-                  if (!Number.isInteger(next)) return;
-                  setDays(Math.min(30, Math.max(1, next)));
-                }}
-                className="h-8 w-14 border-0 px-0 text-center font-mono text-lg font-bold shadow-none focus-visible:ring-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              />
-              <span className="text-sm text-muted-foreground">gg</span>
+              <span className="min-w-[1.5rem] text-center font-mono text-lg font-bold tabular-nums" aria-label="Mesi di prova">
+                {months}
+              </span>
+              <span className="text-sm text-muted-foreground">{months === 1 ? "mese" : "mesi"}</span>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-900"
-                disabled={readOnly || busy || days >= 30}
-                onClick={() => setDays((current) => Math.min(30, current + 1))}
-                aria-label="Un giorno in più"
+                disabled={readOnly || busy || months >= 3}
+                onClick={() => setMonths((current) => Math.min(3, current + 1))}
+                aria-label="Un mese in più"
               >
                 <span className="text-lg font-bold">+</span>
               </Button>
@@ -298,7 +286,7 @@ function TrialLevelBody({
               type="button"
               disabled={readOnly || busy}
               className="h-11 bg-[hsl(199,89%,48%)] px-4 text-white hover:bg-[hsl(199,89%,42%)]"
-              onClick={() => onApply(days)}
+              onClick={() => onApply(months)}
             >
               Imposta
             </Button>
@@ -356,7 +344,7 @@ export default function CleanerAnagrafica() {
   const [customerCleanerId, setCustomerCleanerId] = useState<number | null>(null);
   const [customerSearch, setCustomerSearch] = useState("");
   const [promoting, setPromoting] = useState(false);
-  const [promotionDays, setPromotionDays] = useState(1);
+  const [promotionMonths, setPromotionMonths] = useState(1);
   const [trialCleanerId, setTrialCleanerId] = useState<number | null>(null);
   const aliasSaveTimer = useRef<number | null>(null);
 
@@ -384,7 +372,7 @@ export default function CleanerAnagrafica() {
   }, [anagraficaQuery.data]);
 
   useEffect(() => {
-    setPromotionDays(1);
+    setPromotionMonths(1);
   }, [selectedId]);
 
   const customerNames = useMemo(() => {
@@ -510,16 +498,16 @@ export default function CleanerAnagrafica() {
     commitDraft(cleanerId, { preferredCustomerIds: [...selected].sort((a, b) => a - b) });
   };
 
-  const raiseLevel = async (cleanerId: number, days: number) => {
+  const raiseLevel = async (cleanerId: number, months: number) => {
     if (readOnly || promoting) return;
     setPromoting(true);
     try {
-      await apiRequest("POST", "/api/cleaner-triade-promotion", { cleanerId, days });
+      await apiRequest("POST", "/api/cleaner-triade-promotion", { cleanerId, months });
       invalidateDayCleanerTriade();
       await queryClient.invalidateQueries({ queryKey: ["/api/cleaner-anagrafica"] });
       toast({
         title: "Livello di prova",
-        description: `Sale di un livello per ${days} giorni, a partire da oggi.`,
+        description: `Sale di un livello per ${months === 1 ? "1 mese" : `${months} mesi`}, a partire da oggi.`,
         variant: "success",
       });
     } catch (error) {
@@ -943,11 +931,11 @@ export default function CleanerAnagrafica() {
             <TrialLevelBody
               row={trialRow}
               levels={triadeLevels}
-              days={promotionDays}
-              setDays={setPromotionDays}
+              months={promotionMonths}
+              setMonths={setPromotionMonths}
               busy={promoting}
               readOnly={readOnly}
-              onApply={(days) => void raiseLevel(trialRow.id, days)}
+              onApply={(months) => void raiseLevel(trialRow.id, months)}
               onRevoke={() => void clearTemporaryLevel(trialRow.id)}
             />
           ) : null}

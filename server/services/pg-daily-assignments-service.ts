@@ -456,13 +456,33 @@ export class PgDailyAssignmentsService {
         CREATE TABLE IF NOT EXISTS cleaner_triade_promotion (
           cleaner_id INTEGER PRIMARY KEY,
           start_date DATE NOT NULL,
-          days INTEGER NOT NULL CHECK (days >= 1 AND days <= 60),
+          days INTEGER NOT NULL CHECK (days >= 1 AND days <= 100),
           weight SMALLINT NOT NULL CHECK (weight >= 1),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
       await this.relaxTriadeWeightCheck("daily_task_triade_override");
       await this.relaxTriadeWeightCheck("daily_cleaner_triade_override");
+      await query(`
+        DO $$
+        DECLARE r record;
+        BEGIN
+          FOR r IN
+            SELECT con.conname
+            FROM pg_constraint con
+            JOIN pg_class rel ON rel.oid = con.conrelid
+            WHERE rel.relname = 'cleaner_triade_promotion'
+              AND con.contype = 'c'
+              AND pg_get_constraintdef(con.oid) ILIKE '%days%'
+          LOOP
+            EXECUTE format('ALTER TABLE cleaner_triade_promotion DROP CONSTRAINT %I', r.conname);
+          END LOOP;
+        END $$
+      `);
+      await query(`
+        ALTER TABLE cleaner_triade_promotion
+        ADD CONSTRAINT cleaner_triade_promotion_days_check CHECK (days >= 1 AND days <= 100)
+      `);
       console.log('✅ PG: Tabelle daily_task_triade_override e daily_cleaner_triade_override verificate');
     } catch (error) {
       console.warn('⚠️ PG: Errore (ignorabile) nella creazione daily_task_triade_override:', error);

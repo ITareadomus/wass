@@ -73,6 +73,24 @@ function asYmd(value: unknown): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
 }
 
+function addCalendarMonths(ymd: string, months: number): string {
+  const [year, month, day] = ymd.split("-").map(Number);
+  const monthIndex = month - 1 + months;
+  const targetYear = year + Math.floor(monthIndex / 12);
+  const targetMonth = ((monthIndex % 12) + 12) % 12;
+  const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  const clampedDay = Math.min(day, lastDay);
+  const nextMonth = String(targetMonth + 1).padStart(2, "0");
+  const nextDay = String(clampedDay).padStart(2, "0");
+  return `${targetYear}-${nextMonth}-${nextDay}`;
+}
+
+/** Durata inclusiva di 1, 2 o 3 mesi di calendario, espressa in giorni. */
+export function trialDaysForMonths(startDate: string, months: number): number {
+  const until = addDays(addCalendarMonths(startDate, months), -1);
+  return daysBetween(startDate, until) + 1;
+}
+
 function addDays(ymd: string, days: number): string {
   const [year, month, day] = ymd.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day + days));

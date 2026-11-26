@@ -578,12 +578,83 @@ async function rehydratePreassignedAssignmentsFromAdam(
   }
 }
 
+async function releaseAlgTestPreassignedTasks(workDate: string, currentUsername: string): Promise<number> {
+  const timeline = await workspaceFiles.loadTimeline(workDate, "alg-test");
+  if (!timeline || !Array.isArray(timeline.cleaners_assignments)) return 0;
+  const released: any[] = [];
+  for (const entry of timeline.cleaners_assignments) {
+    const tasks = Array.isArray(entry?.tasks) ? entry.tasks : [];
+    const kept = [];
+    for (const task of tasks) {
+      if (resolvePreassignedModeFromTask(task)) released.push(task);
+      else kept.push(task);
+    }
+    entry.tasks = kept;
+  }
+  if (released.length === 0) return 0;
+  await workspaceFiles.saveTimeline(
+    workDate,
+    timeline,
+    false,
+    currentUsername,
+    "alg_test_drop_preassigned",
+    undefined,
+    "alg-test"
+  );
+
+  const containers = await workspaceFiles.loadContainers(workDate, "alg-test");
+  if (!containers?.containers) return released.length;
+  const present = new Set<number>();
+  for (const bucketName of ["early_out", "high_priority", "low_priority"] as const) {
+    for (const task of containers.containers?.[bucketName]?.tasks || []) {
+      const taskId = Number(task?.task_id ?? task?.id);
+      if (Number.isFinite(taskId)) present.add(taskId);
+    }
+  }
+  let dirty = false;
+  for (const task of released) {
+    const taskId = Number(task?.task_id ?? task?.id);
+    if (!Number.isFinite(taskId) || present.has(taskId)) continue;
+    const priority = task?.priority === "early_out" || task?.priority === "high_priority"
+      ? task.priority
+      : "low_priority";
+    const bucket = containers.containers[priority] || { tasks: [], count: 0 };
+    containers.containers[priority] = bucket;
+    const copy = { ...task };
+    delete copy.preAssignedMode;
+    copy.reasons = normalizeTaskReasons(copy.reasons).filter(
+      (reason) => reason !== PREASSIGNED_REASON_NORMAL && reason !== PREASSIGNED_REASON_READONLY && reason !== PREASSIGNED_REASON_REHYDRATED
+    );
+    bucket.tasks = Array.isArray(bucket.tasks) ? bucket.tasks : [];
+    bucket.tasks.push(copy);
+    bucket.count = bucket.tasks.length;
+    present.add(taskId);
+    dirty = true;
+  }
+  if (dirty && containers.summary) {
+    const earlyOut = containers.containers?.early_out?.tasks?.length || 0;
+    const highPriority = containers.containers?.high_priority?.tasks?.length || 0;
+    const lowPriority = containers.containers?.low_priority?.tasks?.length || 0;
+    containers.summary.early_out = earlyOut;
+    containers.summary.high_priority = highPriority;
+    containers.summary.low_priority = lowPriority;
+    containers.summary.total_tasks = earlyOut + highPriority + lowPriority;
+  }
+  if (dirty) {
+    await workspaceFiles.saveContainers(workDate, containers, currentUsername, "alg_test_drop_preassigned", "alg-test");
+  }
+  return released.length;
+}
+
 async function runRehydratePreassignedAssignmentsFromAdam(
   workDate: string,
   currentUsername: string,
   scope: "housekeeping" | "office" | "alg-test",
   options: { cleanerIds?: number[] } = {}
 ): Promise<RehydrateResult> {
+  if (scope === "alg-test") {
+    return { rehydrated: 0, autoConvokedCleaners: 0 };
+  }
   const preassignedSeeds = await fetchPreassignedTaskSeedsFromAdam(workDate);
   if (preassignedSeeds.length === 0) {
     return { rehydrated: 0, autoConvokedCleaners: 0 };
@@ -1422,31 +1493,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`✅ Eccezioni triade cancellate per ${workDate}`);
       }
 
-      // La prova rilegge i task già nel database. I pre-assegnati tornano sul cleaner e restano bloccati.
+      // La prova rilegge i task già nel database, senza il cleaner già presente su ADAM.
       if (resolvedScope === "alg-test") {
         const { refillAlgTestContainersFromDb } = await import("./services/alg-test-containers");
         const refilled = await refillAlgTestContainersFromDb(workDate);
-        let rehydratedPreassigned = 0;
-        try {
-          const rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
-            workDate,
-            currentUsername,
-            "alg-test"
-          );
-          rehydratedPreassigned = rehydrateResult.rehydrated;
-        } catch (rehydrateError: any) {
-          console.warn(
-            "⚠️ Reidratazione pre-assegnati della prova fallita:",
-            rehydrateError?.message || rehydrateError
-          );
-        }
-        console.log(`✅ Reset prova: ${refilled.taskCount} task nei contenitori, ${rehydratedPreassigned} pre-assegnati in timeline per ${workDate}`);
+        console.log(`✅ Reset prova: ${refilled.taskCount} task nei contenitori per ${workDate}`);
         return res.json({
           success: true,
-          message: "Timeline di prova svuotata: i pre-assegnati restano sul loro cleaner",
+          message: "Timeline di prova svuotata. I task tornano nei contenitori, senza assegnazione ADAM.",
           containersRefreshed: true,
           taskCount: refilled.taskCount,
-          preassignedRehydrated: rehydratedPreassigned,
+          preassignedRehydrated: 0,
         });
       }
 
@@ -2712,11 +2769,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { pgDailyAssignmentsService } = await import("./services/pg-daily-assignments-service");
       const { withCleanerTriade, loadActiveTriadeLevels } = await import("./services/adam-triade");
       const roster = await pgDailyAssignmentsService.listCleanerAnagrafica();
-      const [cleaners, triadeLevels] = await Promise.all([
-        withCleanerTriade(roster),
-        loadActiveTriadeLevels(),
-      ]);
       let customers: Array<{ id: number; name: string }> = [];
+      let activeCleanerIds: Set<number> | null = null;
       try {
         connection = await mysql.createConnection({
           host: databaseConfig.mysql.host,
@@ -2725,6 +2779,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           password: databaseConfig.mysql.password,
           database: databaseConfig.mysql.database,
         });
+        const [activeRows]: any = await connection.execute(
+          `SELECT id FROM app_users WHERE active = 1 AND user_role_id IN (7, 13, 15, 20)`
+        );
+        activeCleanerIds = new Set(
+          (Array.isArray(activeRows) ? activeRows : [])
+            .map((row: any) => Number(row?.id))
+            .filter((id: number) => Number.isInteger(id) && id > 0)
+        );
         const [rows]: any = await connection.execute(
           `SELECT id, name FROM app_customers WHERE name IS NOT NULL AND TRIM(name) <> '' ORDER BY name`
         );
@@ -2734,6 +2796,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (customerError: any) {
         console.warn("⚠️ Anagrafica: elenco clienti ADAM non disponibile:", customerError?.message || customerError);
       }
+      const activeRoster = activeCleanerIds
+        ? roster.filter((cleaner) => activeCleanerIds.has(Number(cleaner.id)))
+        : roster;
+      const [cleaners, triadeLevels] = await Promise.all([
+        withCleanerTriade(activeRoster),
+        loadActiveTriadeLevels(),
+      ]);
       const { listActiveCleanerTriadePromotions } = await import("./services/pg-cleaner-triade-override");
       const promotions = await listActiveCleanerTriadePromotions();
       const cleanersWithPromotion = cleaners.map((cleaner) => ({
@@ -2809,15 +2878,15 @@ function parseAnagraficaTime(raw: string): string | null {
   app.post("/api/cleaner-triade-promotion", async (req, res) => {
     try {
       const cleanerId = Number(req.body?.cleanerId);
-      const days = Number(req.body?.days);
+      const months = Number(req.body?.months);
       if (!Number.isInteger(cleanerId) || cleanerId <= 0) {
         return res.status(400).json({ success: false, error: "Cleaner non valido" });
       }
-      if (!Number.isInteger(days) || days < 1 || days > 30) {
-        return res.status(400).json({ success: false, error: "Durata non valida: da 1 a 30 giorni" });
+      if (!Number.isInteger(months) || months < 1 || months > 3) {
+        return res.status(400).json({ success: false, error: "Durata non valida: 1, 2 o 3 mesi" });
       }
       const { loadActiveTriadeLevels, loadCleanerTriadeByIds } = await import("./services/adam-triade");
-      const { romeToday, saveCleanerTriadePromotion, listActiveCleanerTriadePromotions, isTrialEligibleLevel } = await import("./services/pg-cleaner-triade-override");
+      const { romeToday, saveCleanerTriadePromotion, listActiveCleanerTriadePromotions, isTrialEligibleLevel, trialDaysForMonths } = await import("./services/pg-cleaner-triade-override");
       const [levels, current, active] = await Promise.all([
         loadActiveTriadeLevels(),
         loadCleanerTriadeByIds([cleanerId]),
@@ -2837,7 +2906,9 @@ function parseAnagraficaTime(raw: string): string | null {
       if (!next) {
         return res.status(400).json({ success: false, error: "È già al livello più alto" });
       }
-      const promotion = await saveCleanerTriadePromotion(cleanerId, days, next.weight, romeToday());
+      const startDate = romeToday();
+      const days = trialDaysForMonths(startDate, months);
+      const promotion = await saveCleanerTriadePromotion(cleanerId, days, next.weight, startDate);
       res.json({ success: true, promotion });
     } catch (error: any) {
       console.error("POST /api/cleaner-triade-promotion:", error);
@@ -8556,7 +8627,7 @@ function parseAnagraficaTime(raw: string): string | null {
       // Supporto per batch updates (array di updates)
       if (req.body.updates && Array.isArray(req.body.updates)) {
         const updates = req.body.updates;
-        const skipAdam = req.body.skipAdam || false;
+        const skipAdam = req.body.skipAdam || resolveScopeFromReq(req) === "alg-test";
         const results: { taskId: string; success: boolean; error?: string }[] = [];
         
         // Raggruppa updates per data per ottimizzare i salvataggi
@@ -9333,7 +9404,7 @@ function parseAnagraficaTime(raw: string): string | null {
         adamValues.push(normalizedCustomerNote);
       }
 
-      if (taskId && adamUpdates.length > 0) {
+      if (resolveScopeFromReq(req) !== "alg-test" && taskId && adamUpdates.length > 0) {
         let connection: any = null;
         try {
           const { resolveAdamUpdatedBy } = await import("./services/adam-wass-accounts");
@@ -10578,6 +10649,12 @@ app.post("/api/transfer-to-adam", async (req, res) => {
   // Endpoint per aggiornare solo l'operation_id di una task su ADAM
   app.patch("/api/adam/task/:taskId/operation", async (req, res) => {
     try {
+      if (resolveScopeFromReq(req) === "alg-test") {
+        return res.status(400).json({
+          success: false,
+          message: "La prova algoritmo non modifica i task su ADAM.",
+        });
+      }
       const { taskId } = req.params;
       const { operation_id } = req.body;
 
@@ -11107,36 +11184,18 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         } else {
           console.log(`📦 Prova algoritmo: ${existingTestCount} task già nei contenitori per ${date}`);
         }
-        let rehydratedPreassigned = 0;
-        const testTimeline = existingTestCount > 0
-          ? await workspaceFiles.loadTimeline(date, "alg-test")
-          : null;
-        const alreadyHasPreassigned = (testTimeline?.cleaners_assignments || []).some((entry: any) =>
-          (entry?.tasks || []).some((task: any) => resolvePreassignedModeFromTask(task) != null)
-        );
-        if (!alreadyHasPreassigned) {
-          try {
-            const rehydrateResult = await rehydratePreassignedAssignmentsFromAdam(
-              date,
-              createdBy,
-              "alg-test"
-            );
-            rehydratedPreassigned = rehydrateResult.rehydrated;
-          } catch (rehydrateError: any) {
-            console.warn(
-              "⚠️ Reidratazione pre-assegnati della prova fallita:",
-              rehydrateError?.message || rehydrateError
-            );
-          }
+        const releasedPreassigned = await releaseAlgTestPreassignedTasks(date, createdBy);
+        if (releasedPreassigned > 0) {
+          console.log(`✅ Prova algoritmo: ${releasedPreassigned} task tolte dall'assegnazione ADAM per ${date}`);
         }
         return res.json({
           success: true,
           message: existingTestCount > 0
             ? "Contenitori di prova già presenti"
             : "Task caricati dal database",
-          skippedAdamRefresh: existingTestCount > 0,
+          skippedAdamRefresh: true,
           taskCount: existingTestCount,
-          preassignedRehydrated: rehydratedPreassigned,
+          preassignedRehydrated: 0,
         });
       }
 

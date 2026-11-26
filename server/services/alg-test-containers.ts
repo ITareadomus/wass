@@ -3,9 +3,8 @@ import { query } from "../../shared/pg-db";
 const ASSIGNMENT_REASONS = ["preassigned_enable_wass", "preassigned_enable_wass_readonly"];
 
 /**
- * Contenitori della prova algoritmo: stessi task della giornata housekeeping
- * già salvata nel database, senza cleaner e senza start/end dell'assegnazione.
- * I pre-assegnati vengono poi messi in timeline dallo stesso percorso della giornata vera.
+ * Contenitori della prova algoritmo: copia su PostgreSQL dei task della giornata
+ * housekeeping, senza cleaner e senza l'assegnazione già presente su ADAM.
  */
 export async function refillAlgTestContainersFromDb(
   workDate: string,

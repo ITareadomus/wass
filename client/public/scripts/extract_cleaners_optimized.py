@@ -331,20 +331,9 @@ for u in cleaners:
     }
     cleaners_data.append(cleaner)
 
-# --- PRESERVA CLEANERS CHE ESISTONO SOLO IN PostgreSQL ---
-# Questi cleaners potrebbero essere stati aggiunti manualmente o non esistere più in ADAM
-# Li preserviamo per non perdere dati (es. start_time custom)
-adam_cleaner_ids = {c["id"] for c in cleaners_data}
-preserved_count = 0
-for pg_cid, pg_cleaner in existing_pg_cleaners.items():
-    if pg_cid not in adam_cleaner_ids:
-        # Questo cleaner esiste solo in PostgreSQL, preservalo
-        cleaners_data.append(pg_cleaner)
-        preserved_count += 1
-        print(f"✅ Preservato cleaner {pg_cid} ({pg_cleaner.get('name', 'Unknown')}) da PostgreSQL (non in ADAM)")
-
-if preserved_count > 0:
-    print(f"✅ Totale cleaners preservati da PostgreSQL: {preserved_count}")
+# Solo gli utenti ADAM con active = 1. Chi non è più attivo non viene riportato
+# dalla copia già presente in PostgreSQL.
+print(f"👥 Cleaners attivi in ADAM: {len(cleaners_data)}")
 
 # SALVATAGGIO SU POSTGRESQL VIA API (UNICA DESTINAZIONE)
 # Il file cleaners.json non viene più utilizzato - PostgreSQL è la fonte unica
