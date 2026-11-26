@@ -787,13 +787,11 @@ export class PgDailyAssignmentsService {
   /**
    * Tabelle fisiche della prova algoritmo.
    * Assegnazioni, contenitori e convocazioni non stanno nelle tabelle della giornata ufficiale.
+   * Si creano all'avvio su qualunque database, come le altre migrazioni.
+   * Dalle tabelle ufficiali si spostano solo le righe già marcate scope = 'alg-test'.
    */
   async ensureAlgTestTables(): Promise<void> {
-    const database = await query(`SELECT current_database() AS name`);
-    if (database.rows[0]?.name !== "defaultdb_dev") {
-      console.warn("⚠️ PG: tabelle prova algoritmo non create: database diverso da defaultdb_dev");
-      return;
-    }
+    try {
     const specs = [
       { name: "alg_test_assignments", source: "daily_assignments_current", unique: "CREATE UNIQUE INDEX IF NOT EXISTS alg_test_assignments_uidx ON alg_test_assignments (work_date, cleaner_id, task_id)" },
       { name: "alg_test_containers", source: "daily_containers", unique: "CREATE UNIQUE INDEX IF NOT EXISTS alg_test_containers_uidx ON alg_test_containers (work_date, task_id)" },
@@ -851,6 +849,9 @@ export class PgDailyAssignmentsService {
       }
     }
     console.log("✅ PG: Tabelle prova algoritmo pronte (assignments, containers, convocazioni)");
+    } catch (error) {
+      console.warn("⚠️ PG: ensureAlgTestTables:", error);
+    }
   }
 
   /**
