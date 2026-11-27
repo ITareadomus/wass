@@ -154,6 +154,46 @@ function sameIdSet(a: number[], b: number[]): boolean {
 const HOUSEKEEPING_CLEANER_ROLE_IDS = [7, 13, 15, 20];
 const OFFICE_CLEANER_ROLE_IDS = [17];
 
+let activeHousekeepingCleanerIdsCache: { at: number; ids: Set<number> } | null = null;
+
+/** Cleaner operativi attivi: Standard, Premium, Straordinario, Formatore. Non ufficio e non altri dipendenti. */
+export async function loadActiveHousekeepingCleanerIds(): Promise<Set<number> | null> {
+  if (activeHousekeepingCleanerIdsCache && Date.now() - activeHousekeepingCleanerIdsCache.at < 60_000) {
+    return activeHousekeepingCleanerIdsCache.ids;
+  }
+  let connection: mysql.Connection | null = null;
+  try {
+    connection = await mysql.createConnection({
+      host: databaseConfig.mysql.host,
+      port: databaseConfig.mysql.port,
+      user: databaseConfig.mysql.user,
+      password: databaseConfig.mysql.password,
+      database: databaseConfig.mysql.database,
+    });
+    const [rows]: any = await connection.execute(
+      `SELECT id FROM app_users WHERE active = 1 AND user_role_id IN (${HOUSEKEEPING_CLEANER_ROLE_IDS.join(",")})`
+    );
+    const ids = new Set<number>(
+      (Array.isArray(rows) ? rows : [])
+        .map((row: any) => Number(row?.id))
+        .filter((id: number) => Number.isInteger(id) && id > 0)
+    );
+    activeHousekeepingCleanerIdsCache = { at: Date.now(), ids };
+    return ids;
+  } catch (error) {
+    console.warn("⚠️ Elenco cleaner operativi ADAM non disponibile:", error);
+    return activeHousekeepingCleanerIdsCache?.ids ?? null;
+  } finally {
+    if (connection) {
+      try {
+        await connection.end();
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+
 /**
  * Ricontrolla su ADAM il ruolo degli utenti indicati sulle task.
  * Restituisce solo gli id con ruolo cleaner dello scope.

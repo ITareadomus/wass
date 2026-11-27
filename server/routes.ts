@@ -578,6 +578,97 @@ async function rehydratePreassignedAssignmentsFromAdam(
   }
 }
 
+async function restrictAlgTestToHousekeepingCleaners(workDate: string, currentUsername: string): Promise<number> {
+  const { loadActiveHousekeepingCleanerIds } = await import("./services/adam-timeline-assignment-sync");
+  const allowed = await loadActiveHousekeepingCleanerIds();
+  if (!allowed) return 0;
+  const isAllowed = (id: unknown) => allowed.has(Number(id));
+
+  let removed = 0;
+  const selected = await workspaceFiles.loadSelectedCleaners(workDate, "alg-test");
+  const selectedCleaners = Array.isArray(selected?.cleaners) ? selected.cleaners : [];
+  const keptCleaners = selectedCleaners.filter((cleaner: any) => isAllowed(cleaner?.id));
+  if (keptCleaners.length !== selectedCleaners.length) {
+    removed += selectedCleaners.length - keptCleaners.length;
+    await workspaceFiles.saveSelectedCleaners(
+      workDate,
+      {
+        cleaners: keptCleaners,
+        total_selected: keptCleaners.length,
+        metadata: { ...(selected?.metadata || {}), date: workDate, scope: "alg-test" },
+      },
+      true,
+      currentUsername,
+      "ALG_TEST_CLEANER_ROLES",
+      "alg-test"
+    );
+  }
+
+  const timeline = await workspaceFiles.loadTimeline(workDate, "alg-test");
+  if (!timeline || !Array.isArray(timeline.cleaners_assignments)) return removed;
+  const releasedTasks: any[] = [];
+  const keptEntries = [];
+  for (const entry of timeline.cleaners_assignments) {
+    if (isAllowed(entry?.cleaner?.id)) {
+      keptEntries.push(entry);
+      continue;
+    }
+    removed += 1;
+    for (const task of Array.isArray(entry?.tasks) ? entry.tasks : []) releasedTasks.push(task);
+  }
+  if (keptEntries.length === timeline.cleaners_assignments.length) return removed;
+  timeline.cleaners_assignments = keptEntries;
+  await workspaceFiles.saveTimeline(
+    workDate,
+    timeline,
+    false,
+    currentUsername,
+    "alg_test_cleaner_roles",
+    undefined,
+    "alg-test"
+  );
+  if (releasedTasks.length === 0) return removed;
+
+  const containers = await workspaceFiles.loadContainers(workDate, "alg-test");
+  if (!containers?.containers) return removed;
+  const present = new Set<number>();
+  for (const bucketName of ["early_out", "high_priority", "low_priority"] as const) {
+    for (const task of containers.containers?.[bucketName]?.tasks || []) {
+      const taskId = Number(task?.task_id ?? task?.id);
+      if (Number.isFinite(taskId)) present.add(taskId);
+    }
+  }
+  let dirty = false;
+  for (const task of releasedTasks) {
+    const taskId = Number(task?.task_id ?? task?.id);
+    if (!Number.isFinite(taskId) || present.has(taskId)) continue;
+    const priority = task?.priority === "early_out" || task?.priority === "high_priority" ? task.priority : "low_priority";
+    const bucket = containers.containers[priority] || { tasks: [], count: 0 };
+    containers.containers[priority] = bucket;
+    const copy = { ...task };
+    delete copy.preAssignedMode;
+    copy.reasons = normalizeTaskReasons(copy.reasons).filter(
+      (reason) => reason !== PREASSIGNED_REASON_NORMAL && reason !== PREASSIGNED_REASON_READONLY && reason !== PREASSIGNED_REASON_REHYDRATED
+    );
+    bucket.tasks = Array.isArray(bucket.tasks) ? bucket.tasks : [];
+    bucket.tasks.push(copy);
+    bucket.count = bucket.tasks.length;
+    present.add(taskId);
+    dirty = true;
+  }
+  if (dirty && containers.summary) {
+    const earlyOut = containers.containers?.early_out?.tasks?.length || 0;
+    const highPriority = containers.containers?.high_priority?.tasks?.length || 0;
+    const lowPriority = containers.containers?.low_priority?.tasks?.length || 0;
+    containers.summary.early_out = earlyOut;
+    containers.summary.high_priority = highPriority;
+    containers.summary.low_priority = lowPriority;
+    containers.summary.total_tasks = earlyOut + highPriority + lowPriority;
+    await workspaceFiles.saveContainers(workDate, containers, currentUsername, "alg_test_cleaner_roles", "alg-test");
+  }
+  return removed;
+}
+
 async function releaseAlgTestPreassignedTasks(workDate: string, currentUsername: string): Promise<number> {
   const timeline = await workspaceFiles.loadTimeline(workDate, "alg-test");
   if (!timeline || !Array.isArray(timeline.cleaners_assignments)) return 0;
@@ -2167,6 +2258,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`📖 GET /api/timeline - Caricamento timeline per ${workDate}`);
 
+      if (resolveScopeFromReq(req) === "alg-test") {
+        await restrictAlgTestToHousekeepingCleaners(workDate, "system");
+      }
+
       // Carica la timeline da PostgreSQL
       const timeline = await workspaceFiles.loadTimeline(workDate, resolveScopeFromReq(req));
 
@@ -2626,6 +2721,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workDate = dateParam;
 
       console.log(`📖 GET /api/selected-cleaners - Caricamento cleaners selezionati per ${workDate}`);
+
+      if (resolveScopeFromReq(req) === "alg-test") {
+        await restrictAlgTestToHousekeepingCleaners(workDate, "system");
+      }
 
       const selectedCleaners = await workspaceFiles.loadSelectedCleaners(workDate, resolveScopeFromReq(req));
 
@@ -11158,11 +11257,20 @@ app.post("/api/transfer-to-adam", async (req, res) => {
         const housekeeping = await workspaceFiles.loadSelectedCleaners(date, "housekeeping");
         const housekeepingCleaners = Array.isArray(housekeeping?.cleaners) ? housekeeping.cleaners : [];
         if (housekeepingCleaners.length === 0) return;
+        const { loadActiveHousekeepingCleanerIds } = await import("./services/adam-timeline-assignment-sync");
+        const allowedCleanerIds = await loadActiveHousekeepingCleanerIds();
+        const operationalCleaners = allowedCleanerIds
+          ? housekeepingCleaners.filter((cleaner: any) => allowedCleanerIds.has(Number(cleaner?.id)))
+          : housekeepingCleaners.filter((cleaner: any) => {
+              const role = String(cleaner?.role || "").trim().toLowerCase();
+              return role === "standard" || role === "premium" || role === "straordinario" || role === "formatore";
+            });
+        if (operationalCleaners.length === 0) return;
         await workspaceFiles.saveSelectedCleaners(
           date,
           {
-            cleaners: housekeepingCleaners,
-            total_selected: housekeepingCleaners.length,
+            cleaners: operationalCleaners,
+            total_selected: operationalCleaners.length,
             metadata: { date, scope: "alg-test" },
           },
           true,
@@ -11170,11 +11278,15 @@ app.post("/api/transfer-to-adam", async (req, res) => {
           "COPY_HOUSEKEEPING",
           "alg-test",
         );
-        console.log(`✅ Prova algoritmo: copiati ${housekeepingCleaners.length} cleaner selezionati da housekeeping per ${date}`);
+        console.log(`✅ Prova algoritmo: copiati ${operationalCleaners.length} cleaner operativi da housekeeping per ${date}`);
       };
       await copyHousekeepingCleanersForAlgTest();
 
       if (resolvedScope === "alg-test") {
+        const removedOtherStaff = await restrictAlgTestToHousekeepingCleaners(date, createdBy);
+        if (removedOtherStaff > 0) {
+          console.log(`✅ Prova algoritmo: esclusi ${removedOtherStaff} dipendenti che non sono cleaner per ${date}`);
+        }
         const existingTestContainers = await workspaceFiles.loadContainers(date, "alg-test");
         const existingTestCount = Number(existingTestContainers?.summary?.total_tasks ?? 0);
         if (existingTestCount === 0) {

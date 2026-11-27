@@ -1138,6 +1138,8 @@ export default function GenerateAssignments() {
       targetDate.setHours(0, 0, 0, 0);
       const isPastDate = isWorkDateInPast(date);
       const isCurrentDate = targetDate.getTime() === today.getTime();
+      // La prova lavora su una copia PostgreSQL: anche un giorno passato si può caricare e usare.
+      const pastLocked = scopeValue !== "alg-test" && isWorkDateHistoricallyLocked(date);
 
       // CRITICAL: Verifica SE esistono assegnazioni salvate per questa data
       const checkResponse = await fetch('/api/check-saved-assignments', {
@@ -1216,8 +1218,8 @@ export default function GenerateAssignments() {
           });
 
           // Imposta timeline in modalità read-only SOLO per date passate
-          setIsTimelineReadOnly(isWorkDateHistoricallyLocked(date));
-          if (isWorkDateHistoricallyLocked(date)) {
+          setIsTimelineReadOnly(pastLocked);
+          if (pastLocked) {
             console.log("🔒 Timeline impostata in modalità READ-ONLY (data passata)");
           } else {
             console.log("✏️ Timeline impostata in modalità EDITABILE (data corrente/futura con salvataggio)");
@@ -1243,7 +1245,7 @@ export default function GenerateAssignments() {
           setIsExtracting(false);
         } else {
           // Caricamento fallito = nessun salvataggio disponibile
-          if (isWorkDateHistoricallyLocked(date)) {
+          if (pastLocked) {
             console.log("📭 Data passata senza salvataggi disponibili - mostro container in sola lettura");
             setIsTimelineReadOnly(true);
           } else {
@@ -1274,7 +1276,7 @@ export default function GenerateAssignments() {
               }
               console.log(`📦 ${totalTasks} task già nei contenitori per ${dateStr}`);
               await loadTasks(true);
-              setIsTimelineReadOnly(isWorkDateHistoricallyLocked(date));
+              setIsTimelineReadOnly(pastLocked);
               setHasUnsavedChanges(false);
               setExtractionStep("Task caricati!");
               setIsExtracting(false);
@@ -1312,7 +1314,7 @@ export default function GenerateAssignments() {
         }
 
         // SOLO date STRETTAMENTE passate sono read-only
-        if (isWorkDateHistoricallyLocked(date)) {
+        if (pastLocked) {
           console.log("🔒 Data passata senza assegnazioni salvate - NESSUNA ESTRAZIONE");
           setIsTimelineReadOnly(true);
 
@@ -1341,7 +1343,7 @@ export default function GenerateAssignments() {
       console.error("Errore nella verifica assegnazioni salvate:", error);
 
       // Fallback SOLO per date NON passate
-      if (!isWorkDateHistoricallyLocked(date)) {
+      if (scopeValue === "alg-test" || !isWorkDateHistoricallyLocked(date)) {
         console.log("Fallback: estrazione per data presente/futura (o passata in development)");
         await extractData(date);
       } else {
@@ -2738,7 +2740,7 @@ export default function GenerateAssignments() {
   // const allTasks = [...timelineTasksWithoutDuplicates, ...containerTasks];
 
   // Determina se la modalità storica è attiva (data passata)
-  const isHistoricalMode = isWorkDateHistoricallyLocked(selectedDate);
+  const isHistoricalMode = !isAlgTest && isWorkDateHistoricallyLocked(selectedDate);
 
   const selectedHkHypothesis = useMemo(
     () =>

@@ -1,4 +1,5 @@
 import { TaskType as Task } from "@shared/schema";
+import { assignmentScopeFromWindow } from "@shared/assignment-scope";
 import { isWorkDateHistoricallyLocked } from "@shared/work-date-access";
 import DraggableTaskCard from "./draggable-task-card";
 import { ContainerTaskClip } from "./container-task-clip";
@@ -87,9 +88,9 @@ export default function PriorityColumn({
     logisticCode: string;
   } | null>(null);
   const [workYear, workMonth, workDay] = workDate.split("-").map(Number);
-  const isHistoricalDateLocked = isWorkDateHistoricallyLocked(
-    new Date(workYear, workMonth - 1, workDay)
-  );
+  const isHistoricalDateLocked =
+    assignmentScopeFromWindow() !== "alg-test" &&
+    isWorkDateHistoricallyLocked(new Date(workYear, workMonth - 1, workDay));
   
   // Usa lo stato passato dal parent
   const isMultiSelectMode = containerMultiSelectState?.isActive ?? false;

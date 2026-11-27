@@ -4,7 +4,7 @@ const ASSIGNMENT_REASONS = ["preassigned_enable_wass", "preassigned_enable_wass_
 
 /**
  * Contenitori della prova algoritmo: copia su PostgreSQL dei task della giornata
- * housekeeping, senza cleaner e senza l'assegnazione già presente su ADAM.
+ * housekeeping, anche di un giorno passato. Il cleaner dell'assegnazione non viene copiato.
  */
 export async function refillAlgTestContainersFromDb(
   workDate: string,
@@ -100,6 +100,22 @@ export async function refillAlgTestContainersFromDb(
           reasons::text[], customer_reference::text, priority::text, 1 AS source_rank
         FROM daily_containers
         WHERE work_date = $1::date AND (scope = 'housekeeping' OR scope IS NULL)
+        UNION ALL
+        SELECT
+          work_date, task_id::bigint, logistic_code::bigint, client_id::bigint, premium::boolean,
+          address::text, lat::numeric, lng::numeric,
+          cleaning_time::integer, checkin_date::date, checkout_date::date, checkin_time::text, checkout_time::text,
+          pax_in::integer, pax_out::integer, small_equipment::boolean, operation_id::integer, confirmed_operation::boolean,
+          straordinaria::boolean, type_apt::text, alias::text, customer_name::text, customer_note::text, customer_note_history::jsonb,
+          reasons::text[], customer_reference::text, priority::text, 2 AS source_rank
+        FROM daily_assignments_history
+        WHERE work_date = $1::date
+          AND (scope = 'housekeeping' OR scope IS NULL)
+          AND revision = (
+            SELECT MAX(revision)
+            FROM daily_assignments_history
+            WHERE work_date = $1::date AND (scope = 'housekeeping' OR scope IS NULL)
+          )
       ) merged
       ORDER BY task_id, source_rank
     ) src
