@@ -13194,7 +13194,7 @@ app.post("/api/transfer-to-adam", async (req, res) => {
     try {
       const { date } = req.body || {};
       const workDate = date || format(new Date(), "yyyy-MM-dd");
-      if (await rejectIfAlgorithmAssignDisabled(res)) return;
+      if (resolveScopeFromReq(req) !== "alg-test" && await rejectIfAlgorithmAssignDisabled(res)) return;
       if (await rejectIfOperationalDayStarted(req, res, workDate)) return;
 
       const { runHkAssignmentHypotheses } = await import("./services/optimizer/hk-hypotheses");

@@ -3122,7 +3122,7 @@ export default function GenerateAssignments() {
                     }
                   })();
                 }}
-                disabled={isAssigning || isWassManualLocked || isRefreshingContainers || isHkHypothesisPreview || !algorithmAssignEnabled}
+                disabled={isAssigning || isWassManualLocked || isRefreshingContainers || isHkHypothesisPreview || (!isAlgTest && !algorithmAssignEnabled)}
                 className="flex items-center gap-2 rounded-none text-black dark:text-white hover:bg-custom-blue/80 px-3"
               >
                 {isAssigning ? (
